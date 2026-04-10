@@ -2,8 +2,12 @@
 1. Abrir VS Code
 2. Abrir terminal de VS Code
 3. Usar el comando "git clone" y pegar el url del repo
+    Algo como "git clone https://github.com/JPonce-23/Software-PA.git"
+4. "cd NOMBRE-DEL-REPO"
+5. git checkout -b dev
+6. git push -u origin dev
 
-## Hacer commit 
-1. git add .                # Agrega los cambios al área de preparación
-2. git commit -m "mensaje"  # Crea un commit con tus cambios
-3. git push origin main     # Sube los cambios a la rama 'main' en GitHub
+## Trabajar en el proyecto (rama dev)
+1. git add .
+2. git commit -m "mensaje"
+3. git push origin dev
