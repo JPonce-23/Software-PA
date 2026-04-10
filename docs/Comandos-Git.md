@@ -2,10 +2,11 @@
 1. Abrir VS Code
 2. Abrir terminal de VS Code
 3. Usar el comando "git clone" y pegar el url del repo
-    Algo como "git clone https://github.com/JPonce-23/Software-PA.git"
+   - Algo como "git clone https://github.com/JPonce-23/Software-PA.git"
 4. "cd NOMBRE-DEL-REPO"
 5. git checkout -b dev
 6. git push -u origin dev
+    - Se usará este comando exclusivo para trabajar en la rama y no en el main
 
 ## Trabajar en el proyecto (rama dev)
 1. git add .
