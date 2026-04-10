@@ -4,9 +4,11 @@
 Repositorio para organizar el desarrollo y pruebas del proyecto 
 
 ## Estructura
-- src: código principal 
-- sandbox: pruebas y experimentos
+- backend: archivos python, API y todo lo relacionado con backend
 - docs: documentación y decisiones 
+- frontend: creación de interfaz para el usuario con HTML, CSS y JS 
+- sandbox: pruebas y experimentos
+
 
 # IMPORTANTE
 - No trabajar directo en main
