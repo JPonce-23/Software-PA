@@ -12,3 +12,7 @@
 1. git add .
 2. git commit -m "mensaje"
 3. git push origin dev
+
+## Prueba de push en dev
+1. Todo ok
+
