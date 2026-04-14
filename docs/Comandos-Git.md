@@ -8,10 +8,14 @@
 6. git push -u origin dev
     - Se usará este comando exclusivo para trabajar en la rama y no en el main
 
-## Trabajar en el proyecto (rama dev)
+## Trabajar y subir cambios en el proyecto (rama dev)
 1. git add .
 2. git commit -m "mensaje"
 3. git push origin dev
+
+## ANTES DE TRABAJAR PON ESTE COMANDO EN TU TERMINAL DE VS CODE
+- git pull origin dev
+## Este comando te ayudará a que se actualice tu repositorio en tu carpeta local 
 
 ## Prueba de push en dev
 1. Todo ok
