@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio de sesión</title>
+    <link rel="stylesheet" href="/sandbox/css/login.css">
+</head>
+<body>
+
+    <main>
+    <div class="container">
+
+        <header class="logo-pa">
+            <img src="/sandbox/assets/images/LOGO PA.png" alt="Logo PA">
+        </header>
+
+        <div class="formulario">
+            <img src="/sandbox/assets/images/LOGO SSALFER.png" alt="Logo SSALFER">
+            <form action="/login" method="POST">
+                <label for="nombre">Correo Institucional</label>
+                <input type="text" id="nombre" placeholder="usuario@pa.gob.mx" required>
+                
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" placeholder="Ingresa la contraseña" required>
+
+                <a href="">¿Olvidaste tu contraseña?</a>
+
+                <button type="submit" value="Iniciar sesión">Iniciar sesión</button>
+            </form>
+        </div>
+
+    </div>
+    </main>
+
+    <footer>
+        <div class="acceso">
+        <p >Acceso exclusivo para personal autorizado</p>
+        </div>
+
+        <div class="autor">
+        <p>&copy; 2026 Procuraduría Agraria. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+</body>
+</html>
