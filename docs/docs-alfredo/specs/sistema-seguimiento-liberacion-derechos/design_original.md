@@ -1,0 +1,2583 @@
+# Documento de Diseño Técnico
+
+## Overview
+
+Este documento presenta el diseño técnico de un sistema web multiusuario para el seguimiento del proceso de liberación de derechos de vía de proyectos ferroviarios que afectan propiedad social (ejidos y comunidades) en México. El sistema reemplaza el actual seguimiento basado en Excel, proporcionando gestión centralizada de datos, control de acceso basado en roles, tableros de control en tiempo real, visualización geográfica interactiva y capacidades completas de reporteo.
+
+**Objetivos Principales:**
+- Centralizar el seguimiento de liberación de derechos de vía en una base de datos relacional con capacidades geoespaciales
+- Proporcionar acceso concurrente a múltiples usuarios con control basado en roles (incluyendo rol de Geógrafo para gestión cartográfica)
+- Generar tableros y visualizaciones de progreso en tiempo real con mapas interactivos
+- Calcular automáticamente superficies afectadas y liberadas mediante análisis geoespacial
+- Visualizar el avance del proyecto en mapas con codificación de colores por estatus
+- Mantener trazabilidad completa mediante auditoría de cambios
+- Facilitar la migración desde hojas de cálculo Excel existentes
+- Soportar importación y gestión de geometrías desde archivos geoespaciales estándar
+- Soportar flujos de trabajo complejos incluyendo asambleas, convenios y procesos registrales
+
+### Resumen Ejecutivo
+
+El sistema gestiona el proceso legal y administrativo de liberación de derechos de vía para proyectos ferroviarios en México. Este proceso involucra:
+
+**Entidades Territoriales:**
+- **Tramos**: Segmentos principales del proyecto ferroviario con representación geométrica (líneas)
+- **Frentes**: Subdivisiones de los tramos con geometrías lineales propias
+- **Núcleos Agrarios**: Ejidos y comunidades (entidades de propiedad social) afectados por el proyecto, representados como polígonos georreferenciados
+
+**Procesos Documentales:**
+- **Sensibilización**: Reuniones de concientización con las comunidades
+- **Caminamientos**: Inspecciones técnicas de campo
+- **Asambleas**: Reuniones formales de ejidatarios/comuneros para aprobar convenios
+- **Convenios**: Acuerdos legales de ocupación de terreno. Los tipos varían según el derecho afectado: para colectivos (COP, Modificatorio, Superficie Adicional, Obras Complementarias) y para individuales (COP, Modificatorio, Ampliación, Ampliación Remanente)
+- **Inscripción RAN**: Proceso de registro en el Registro Agrario Nacional
+- **FIFONAFE**: Proceso de pago de indemnizaciones a través del fideicomiso
+
+**Análisis Geoespacial:**
+- **Intersecciones Geométricas**: Cálculo automático de áreas afectadas mediante intersección de Frentes con Núcleos Agrarios
+- **Transformación de Coordenadas**: Conversión entre WGS84 (visualización web) y UTM (documentos jurídicos)
+- **Cálculo de Superficies**: Determinación automática de hectáreas y metros cuadrados afectados
+- **Validación Topológica**: Verificación de geometrías válidas sin auto-intersecciones
+
+**Actores del Sistema:**
+- **Administradores**: Gestionan usuarios y configuración del sistema
+- **Usuarios de Captura**: Registran y actualizan información del proceso
+- **Geógrafos**: Capturan y editan geometrías de Tramos, Frentes y Núcleos Agrarios
+- **Usuarios Visualizadores**: Consultan reportes, tableros de progreso y mapas interactivos
+
+### Contexto del Dominio
+
+### Arquitectura de Alto Nivel
+
+El sistema sigue una arquitectura de tres capas con extensiones geoespaciales:
+
+```
+┌──────────────────────────────────────────────────────┐
+│            Capa de Presentación                      │
+│   (Aplicación Web Responsiva - React/Vue)            │
+│   - Mapa Interactivo (Leaflet.js)                    │
+│   - Herramientas de Dibujo Geográfico                │
+│   - Paneles de Información Contextual                │
+│   - Tableros de Control                              │
+└──────────────────────────────────────────────────────┘
+                      ↓
+┌──────────────────────────────────────────────────────┐
+│            Capa de Aplicación                        │
+│  (REST API - Node.js/Express o Python/FastAPI)       │
+│  - Servicios de Negocio                              │
+│  - Servicio GIS (Transformación de Coordenadas)      │
+│  - Motor de Cálculos Geoespaciales                   │
+│  - Servicio de Visualización de Mapas                │
+│  - Control de Acceso                                 │
+│  - Validación de Geometrías                          │
+└──────────────────────────────────────────────────────┘
+                      ↓
+┌──────────────────────────────────────────────────────┐
+│             Capa de Datos                            │
+│  (PostgreSQL con extensión PostGIS)                  │
+│  - Modelo Relacional                                 │
+│  - Tipos de Datos Geométricos (GEOMETRY)             │
+│  - Índices Espaciales (GiST)                         │
+│  - Funciones Espaciales (ST_*)                       │
+│  - Auditoría                                         │
+│  - Integridad Referencial                            │
+└──────────────────────────────────────────────────────┘
+```
+
+
+## Arquitectura
+
+### Patrón Arquitectónico
+
+El sistema utiliza una **arquitectura de tres capas con servicios geoespaciales** con separación clara de responsabilidades:
+
+1. **Capa de Presentación**: Interfaz de usuario web responsiva con componentes de mapa interactivo
+2. **Capa de Aplicación**: Lógica de negocio, servicios REST API y motor GIS
+3. **Capa de Datos**: Persistencia en base de datos relacional con extensión PostGIS para datos geoespaciales
+
+### Decisiones Arquitectónicas Clave
+
+**DA-1: Base de Datos Relacional con PostGIS**
+- **Decisión**: Utilizar PostgreSQL con extensión PostGIS como SGBD principal
+- **Justificación**: 
+  - Soporte nativo para integridad referencial compleja
+  - PostGIS proporciona tipos de datos geométricos (GEOMETRY) y funciones espaciales completas (ST_Intersects, ST_Area, ST_Transform, etc.)
+  - Índices espaciales GiST para consultas geométricas eficientes
+  - Soporte para múltiples sistemas de coordenadas (SRID)
+  - Excelente soporte para transacciones ACID
+  - Capacidades de auditoría mediante triggers
+  - Amplia adopción en sistemas GIS empresariales
+- **Alternativas Consideradas**: MySQL con extensión espacial (funcionalidad GIS limitada), MongoDB con índices geoespaciales (no adecuado para relaciones complejas y cálculos geométricos precisos)
+
+**DA-2: API REST con Autenticación JWT**
+- **Decisión**: Implementar API RESTful con tokens JWT para autenticación
+- **Justificación**:
+  - Stateless, escalable para múltiples usuarios concurrentes
+  - JWT permite control de acceso basado en roles incluyendo permisos específicos para Geógrafos
+  - Facilita integración futura con aplicaciones móviles
+- **Alternativas Consideradas**: Sesiones basadas en servidor (menos escalable)
+
+**DA-3: Control de Acceso Basado en Roles (RBAC) con Rol de Geógrafo**
+- **Decisión**: Implementar cuatro roles: Administrador, Usuario_Captura, Usuario_Visualizador y Geógrafo
+- **Justificación**:
+  - Seguridad por principio de mínimo privilegio
+  - Separación clara entre captura administrativa, captura geográfica y visualización
+  - Rol de Geógrafo con permisos específicos para crear/editar geometrías
+  - Auditoría de acciones por rol
+- **Alternativas Consideradas**: Permisos granulares por recurso (demasiado complejo para caso de uso)
+
+**DA-4: Auditoría Automática mediante Triggers de Base de Datos**
+- **Decisión**: Implementar auditoría mediante triggers en PostgreSQL
+- **Justificación**:
+  - Garantiza que ninguna modificación escape de auditoría (incluyendo cambios geométricos)
+  - Rendimiento superior a auditoría en capa de aplicación
+  - Captura incluso cambios directos a BD
+- **Alternativas Consideradas**: Auditoría en capa de aplicación (puede omitirse en accesos directos)
+
+**DA-5: Librería de Mapas Web (Leaflet.js)**
+- **Decisión**: Utilizar Leaflet.js como librería principal para visualización de mapas
+- **Justificación**:
+  - Código abierto y amplia adopción en aplicaciones GIS web
+  - Ligera y eficiente para renderizado de geometrías
+  - Soporte para plugins de dibujo (Leaflet.draw) y edición de geometrías
+  - Compatible con múltiples capas base (OpenStreetMap, imágenes satelitales)
+  - Soporte para GeoJSON como formato de intercambio
+  - Personalizable mediante CSS y JavaScript
+- **Alternativas Consideradas**: OpenLayers (más complejo pero más potente), Google Maps API (licenciamiento y costos), Mapbox GL JS (requiere cuenta y puede tener costos)
+
+**DA-6: Cálculo de Intersecciones en Base de Datos**
+- **Decisión**: Realizar cálculos de intersecciones geométricas mediante funciones PostGIS en la base de datos
+- **Justificación**:
+  - Aprovecha el motor geoespacial optimizado de PostGIS
+  - Minimiza transferencia de datos entre aplicación y BD
+  - Índices espaciales GiST aceleran consultas de intersección
+  - Precisión y consistencia en cálculos geométricos
+  - Menor latencia para cálculos complejos
+- **Alternativas Consideradas**: Cálculos en capa de aplicación con bibliotecas como Turf.js (menos eficiente, mayor transferencia de datos)
+
+**DA-7: Transformación de Coordenadas Dual (WGS84/UTM)**
+- **Decisión**: Almacenar geometrías en WGS84 (EPSG:4326) y transformar a UTM bajo demanda
+- **Justificación**:
+  - WGS84 es estándar para mapas web y Leaflet.js
+  - Transformación a UTM cuando se requiera para documentos jurídicos mediante ST_Transform de PostGIS
+  - Evita duplicación de datos geométricos
+  - Facilita interoperabilidad con servicios de mapas estándar
+- **Alternativas Consideradas**: Almacenar en UTM (complica visualización web), almacenar ambos sistemas (duplicación y riesgo de inconsistencia)
+
+**DA-8: Importación Excel y Archivos Geoespaciales**
+- **Decisión**: Utilizar bibliotecas especializadas para Excel (xlsx, openpyxl) y geoespaciales (GDAL/OGR, fiona, shapely)
+- **Justificación**:
+  - Mantiene compatibilidad con flujo de trabajo actual (Excel)
+  - GDAL/OGR soporta múltiples formatos geoespaciales (Shapefile, KML, GeoJSON)
+  - Validación antes de inserción protege integridad
+  - Generación de reportes de errores facilita corrección
+  - Lectura automática de sistemas de coordenadas desde archivos .prj
+- **Alternativas Consideradas**: Conversión manual (propenso a errores), APIs de servicios en la nube (dependencia externa)
+
+
+## Components and Interfaces
+
+### Módulo de Autenticación y Autorización
+
+```typescript
+interface AuthService {
+  login(correo: string, contrasena: string): Promise<AuthToken>
+  validateToken(token: string): Promise<Usuario>
+  logout(token: string): Promise<void>
+  checkPermission(id_usuario: string, resource: string, operation: 'read' | 'write'): Promise<boolean>
+}
+
+interface AuthToken {
+  token: string
+  expiresAt: Date
+  id_usuario: string
+  rol: 'Administrador' | 'Usuario_Captura' | 'Usuario_Visualizador' | 'Geógrafo'
+}
+
+interface Usuario {
+  id: string
+  username: string
+  email: string
+  rol: 'Administrador' | 'Usuario_Captura' | 'Usuario_Visualizador' | 'Geógrafo'
+  esta_activo: boolean
+  esta_bloqueado: boolean
+  intentos_fallidos_login: number
+  created_at: Date
+  updated_at: Date
+  ultimo_login_at: Date | null
+}
+```
+
+### Módulo de Gestión Territorial (Tramos y Frentes)
+
+```typescript
+interface TerritorialService {
+  getTramoById(id_tramo: string): Promise<Tramo>
+  listTramos(): Promise<Tramo[]>
+  listFrentesByTramo(id_tramo: string): Promise<Frente[]>
+}
+
+interface Tramo {
+  id: string
+  clave: string
+  nombre: string
+  numero: number
+  descripcion: string | null
+  geometria_linea: any
+  longitud_km: number
+  created_at: Date
+  updated_at: Date
+}
+
+interface Frente {
+  id: string
+  tramo_id: string
+  nombre: string
+  descripcion: string | null
+  geometria_linea: any
+  longitud_km: number
+  porcentaje_avance: number
+  created_at: Date
+  updated_at: Date
+}
+```
+
+### Módulo de Núcleos Agrarios
+
+```typescript
+interface NucleoAgrarioService {
+  getNucleoById(id: string): Promise<NucleoAgrario>
+  listNucleos(): Promise<NucleoAgrario[]>
+}
+
+interface NucleoAgrario {
+  id: string
+  nombre: string
+  tipo: 'Ejido' | 'Comunidad'
+  estado: string
+  municipio: string
+  residencia: string | null
+  consecutivo: number
+  geometria_poligono: any
+  superficie_total_ha: number
+  es_expropiacion_directa: boolean
+  motivo_expropiacion: string | null
+  created_at: Date
+  updated_at: Date
+}
+
+interface NucleoTramo {
+  id: string
+  nucleo_agrario_id: string
+  tramo_id: string
+  created_at: Date
+}
+
+interface InterseccionFrenteNucleo {
+  id: string
+  frente_id: string
+  nucleo_agrario_id: string
+  superficie_afectada_ha: number
+  superficie_liberada_ha: number
+  porcentaje_avance: number
+  created_at: Date
+}
+```
+
+### Módulo de Órganos de Representación y Padrón
+
+```typescript
+interface ORV {
+  id: string
+  nucleo_agrario_id: string
+  comisariado_presidente: string
+  comisariado_secretario: string
+  comisariado_tesorero: string
+  consejo_vigilancia_presidente: string
+  consejo_vigilancia_secretario1: string
+  consejo_vigilancia_secretario2: string
+  inicio_vigencia: Date
+  fin_vigencia: Date
+  acta_inscrita_ran: boolean
+  es_vigente: boolean
+  created_at: Date
+  updated_at: Date
+}
+
+interface Padron {
+  id: string
+  nucleo_agrario_id: string
+  fecha_padron: Date
+  numero_ejidatarios: number
+  version: number
+  created_at: Date
+}
+```
+
+### Módulo de Afectaciones
+
+```typescript
+interface Afectacion {
+  id: string
+  nucleo_agrario_id: string
+  frente_id: string | null
+  tipo_derecho: 'Derecho_Colectivo' | 'Derecho_Individual'
+  tipo_tenencia: string
+  subtipo_tenencia: string | null
+  superficie_afectada: number
+  personas_afectadas: number
+  clasificacion: string | null
+  destino_superficie: string | null
+  numero_parcela_solar: string | null
+  created_at: Date
+}
+```
+
+### Módulo de Procesos (Sensibilización, Caminamiento, Asambleas)
+
+```typescript
+interface Sensibilizacion {
+  id: string
+  nucleo_agrario_id: string
+  fecha_programada: Date
+  fecha_realizada: Date | null
+  asistentes: number | null
+  acuerdos: string | null
+  created_at: Date
+}
+
+interface Caminamiento {
+  id: string
+  nucleo_agrario_id: string
+  fecha_programada: Date
+  fecha_realizada: Date | null
+  hallazgos: string | null
+  created_at: Date
+}
+
+interface Asamblea {
+  id: string
+  nucleo_agrario_id: string
+  tipo: string
+  fecha_primera_convocatoria: Date | null
+  fecha_segunda_convocatoria: Date | null
+  fecha_realizacion: Date | null
+  fecha_ingreso_ran: Date | null
+  numero_solicitud_ran: string | null
+  calificacion_registral: string | null
+  fecha_inscripcion: Date | null
+  proposito: string
+  created_at: Date
+}
+```
+
+### Módulo de Convenios e Indemnizaciones
+
+```typescript
+interface Convenio {
+  id: string
+  afectacion_id: string
+  asamblea_id: string | null
+  tipo_convenio: 'COP' | 'Modificatorio' | 'Superficie_Adicional' | 'Obras_Complementarias' | 'Ampliacion' | 'Ampliacion_Remanente'
+  fecha_firma: Date | null
+  monto_90: number
+  monto_100: number
+  monto_bdt: number
+  monto_total: number
+  superficie_adicional_ha: number | null
+  fecha_ingreso_ran: Date | null
+  numero_solicitud_ran: string | null
+  calificacion_registral: string | null
+  fecha_inscripcion: Date | null
+  created_at: Date
+}
+
+interface Indemnizacion {
+  id: string
+  afectacion_id: string
+  convenio_id: string | null
+  estatus: 'Completo' | 'Pendiente' | 'Programado'
+  numero_oficio_fifonafe: string | null
+  fecha_oficio_fifonafe: Date | null
+  informe_no_conflictos_oficio: string | null
+  informe_no_conflictos_fecha: Date | null
+  created_at: Date
+}
+```
+
+### Módulo de Gestión Documental y Alertas
+
+```typescript
+interface DocumentacionSoporte {
+  id: string
+  entidad_tipo: 'NucleoAgrario' | 'Afectacion' | 'Convenio' | 'ORV' | 'Asamblea'
+  entidad_id: string
+  tipo_documento: string
+  estatus: 'Disponible' | 'Faltante'
+  es_critico: boolean
+  url_archivo: string | null
+  created_at: Date
+}
+
+interface Alerta {
+  id: string
+  tipo: 'Vencimiento_ORV' | 'Evento_Proximo' | 'Documento_Faltante'
+  entidad_tipo: string
+  entidad_id: string
+  mensaje: string
+  fecha_evento: Date | null
+  dias_restantes: number | null
+  resuelta: boolean
+  created_at: Date
+}
+
+interface AuditLog {
+  id: string
+  usuario_id: string
+  accion: string
+  entidad_tipo: string
+  entidad_id: string
+  valores_anteriores: any
+  valores_nuevos: any
+  created_at: Date
+}
+```
+
+## Data Models
+
+### Modelo de Dominio
+
+```mermaid
+erDiagram
+    Usuario ||--o{ AuditLog : "realiza"
+    
+    Tramo ||--|{ Frente : "contiene"
+    Tramo ||--o{ NucleoTramo : "tiene"
+    NucleoAgrario ||--o{ NucleoTramo : "tiene"
+    
+    Frente ||--o{ InterseccionFrenteNucleo : "intersecta"
+    NucleoAgrario ||--o{ InterseccionFrenteNucleo : "intersecta"
+    
+    NucleoAgrario ||--o| ORV : "tiene"
+    NucleoAgrario ||--o{ Padron : "tiene"
+    NucleoAgrario ||--o{ Afectacion : "tiene"
+    NucleoAgrario ||--o{ Sensibilizacion : "tiene"
+    NucleoAgrario ||--o{ Caminamiento : "tiene"
+    NucleoAgrario ||--o{ Asamblea : "tiene"
+    NucleoAgrario ||--o{ DocumentacionSoporte : "tiene"
+    
+    Afectacion ||--o{ Convenio : "tiene"
+    Afectacion ||--o| Indemnizacion : "tiene"
+    
+    Convenio }o--o| Asamblea : "aprobado_en"
+    Convenio }o--o| Convenio : "modifica"
+    
+    Alerta }o--|| NucleoAgrario : "relacionada_con"
+```
+
+### Entidades de Base de Datos
+
+**Tabla: usuarios**
+```sql
+CREATE TABLE usuarios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(50) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  rol VARCHAR(30) NOT NULL CHECK (rol IN ('Administrador', 'Usuario_Captura', 'Usuario_Visualizador', 'Geógrafo')),
+  esta_activo BOOLEAN DEFAULT TRUE,
+  esta_bloqueado BOOLEAN DEFAULT FALSE,
+  intentos_fallidos_login INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ultimo_login_at TIMESTAMP
+);
+```
+
+**Tabla: tramos**
+```sql
+CREATE TABLE tramos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clave VARCHAR(50) UNIQUE NOT NULL,
+  nombre VARCHAR(255) NOT NULL,
+  numero INTEGER NOT NULL,
+  descripcion TEXT,
+  geometria_linea GEOMETRY(LINESTRING, 4326),
+  longitud_km DECIMAL(10, 3),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_by UUID REFERENCES usuarios(id),
+  updated_by UUID REFERENCES usuarios(id)
+);
+```
+
+**Tabla: frentes**
+```sql
+CREATE TABLE frentes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tramo_id UUID NOT NULL REFERENCES tramos(id) ON DELETE CASCADE,
+  nombre VARCHAR(255) NOT NULL,
+  descripcion TEXT,
+  geometria_linea GEOMETRY(LINESTRING, 4326),
+  longitud_km DECIMAL(10, 3),
+  porcentaje_avance DECIMAL(5, 2),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: nucleos_agrarios**
+```sql
+CREATE TABLE nucleos_agrarios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre VARCHAR(255) NOT NULL,
+  tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('Ejido', 'Comunidad')),
+  estado VARCHAR(100) NOT NULL,
+  municipio VARCHAR(100) NOT NULL,
+  residencia VARCHAR(255),
+  consecutivo INTEGER NOT NULL,
+  geometria_poligono GEOMETRY(MULTIPOLYGON, 4326),
+  superficie_total_ha DECIMAL(12, 4),
+  es_expropiacion_directa BOOLEAN DEFAULT FALSE,
+  motivo_expropiacion TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: nucleos_tramos**
+```sql
+CREATE TABLE nucleos_tramos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nucleo_agrario_id UUID NOT NULL REFERENCES nucleos_agrarios(id) ON DELETE CASCADE,
+  tramo_id UUID NOT NULL REFERENCES tramos(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(nucleo_agrario_id, tramo_id)
+);
+```
+
+**Tabla: intersecciones_frente_nucleo**
+```sql
+CREATE TABLE intersecciones_frente_nucleo (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  frente_id UUID NOT NULL REFERENCES frentes(id) ON DELETE CASCADE,
+  nucleo_agrario_id UUID NOT NULL REFERENCES nucleos_agrarios(id) ON DELETE CASCADE,
+  superficie_afectada_ha DECIMAL(12, 4) NOT NULL,
+  superficie_liberada_ha DECIMAL(12, 4) DEFAULT 0,
+  porcentaje_avance DECIMAL(5, 2) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(frente_id, nucleo_agrario_id)
+);
+```
+
+**Tabla: orvs**
+```sql
+CREATE TABLE orvs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nucleo_agrario_id UUID NOT NULL REFERENCES nucleos_agrarios(id) ON DELETE CASCADE,
+  comisariado_presidente VARCHAR(255),
+  comisariado_secretario VARCHAR(255),
+  comisariado_tesorero VARCHAR(255),
+  consejo_vigilancia_presidente VARCHAR(255),
+  consejo_vigilancia_secretario1 VARCHAR(255),
+  consejo_vigilancia_secretario2 VARCHAR(255),
+  inicio_vigencia DATE NOT NULL,
+  fin_vigencia DATE NOT NULL,
+  acta_inscrita_ran BOOLEAN DEFAULT FALSE,
+  es_vigente BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: padrones**
+```sql
+CREATE TABLE padrones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nucleo_agrario_id UUID NOT NULL REFERENCES nucleos_agrarios(id) ON DELETE CASCADE,
+  fecha_padron DATE NOT NULL,
+  numero_ejidatarios INTEGER NOT NULL,
+  version INTEGER DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: afectaciones**
+```sql
+CREATE TABLE afectaciones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nucleo_agrario_id UUID NOT NULL REFERENCES nucleos_agrarios(id) ON DELETE CASCADE,
+  frente_id UUID REFERENCES frentes(id),
+  tipo_derecho VARCHAR(50) NOT NULL CHECK (tipo_derecho IN ('Derecho_Colectivo', 'Derecho_Individual')),
+  tipo_tenencia VARCHAR(100) NOT NULL,
+  subtipo_tenencia VARCHAR(100),
+  superficie_afectada DECIMAL(12, 4) NOT NULL,
+  personas_afectadas INTEGER NOT NULL,
+  clasificacion VARCHAR(100),
+  destino_superficie VARCHAR(255),
+  numero_parcela_solar VARCHAR(100),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: sensibilizaciones**
+```sql
+CREATE TABLE sensibilizaciones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nucleo_agrario_id UUID NOT NULL REFERENCES nucleos_agrarios(id) ON DELETE CASCADE,
+  fecha_programada DATE NOT NULL,
+  fecha_realizada DATE,
+  asistentes INTEGER,
+  acuerdos TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: caminamientos**
+```sql
+CREATE TABLE caminamientos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nucleo_agrario_id UUID NOT NULL REFERENCES nucleos_agrarios(id) ON DELETE CASCADE,
+  fecha_programada DATE NOT NULL,
+  fecha_realizada DATE,
+  hallazgos TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: asambleas**
+```sql
+CREATE TABLE asambleas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nucleo_agrario_id UUID NOT NULL REFERENCES nucleos_agrarios(id) ON DELETE CASCADE,
+  tipo VARCHAR(100) NOT NULL,
+  fecha_primera_convocatoria DATE,
+  fecha_segunda_convocatoria DATE,
+  fecha_realizacion DATE,
+  fecha_ingreso_ran DATE,
+  numero_solicitud_ran VARCHAR(100),
+  calificacion_registral VARCHAR(255),
+  fecha_inscripcion DATE,
+  proposito VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: convenios**
+```sql
+CREATE TABLE convenios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  afectacion_id UUID NOT NULL REFERENCES afectaciones(id) ON DELETE CASCADE,
+  asamblea_id UUID REFERENCES asambleas(id),
+  tipo_convenio VARCHAR(50) NOT NULL,
+  fecha_firma DATE,
+  monto_90 DECIMAL(15, 2) DEFAULT 0,
+  monto_100 DECIMAL(15, 2) DEFAULT 0,
+  monto_bdt DECIMAL(15, 2) DEFAULT 0,
+  monto_total DECIMAL(15, 2) DEFAULT 0,
+  superficie_adicional_ha DECIMAL(12, 4),
+  fecha_ingreso_ran DATE,
+  numero_solicitud_ran VARCHAR(100),
+  calificacion_registral VARCHAR(255),
+  fecha_inscripcion DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: indemnizaciones**
+```sql
+CREATE TABLE indemnizaciones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  afectacion_id UUID NOT NULL REFERENCES afectaciones(id) ON DELETE CASCADE,
+  convenio_id UUID REFERENCES convenios(id),
+  estatus VARCHAR(50) NOT NULL CHECK (estatus IN ('Completo', 'Pendiente', 'Programado')),
+  numero_oficio_fifonafe VARCHAR(100),
+  fecha_oficio_fifonafe DATE,
+  informe_no_conflictos_oficio VARCHAR(100),
+  informe_no_conflictos_fecha DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: documentacion_soporte**
+```sql
+CREATE TABLE documentacion_soporte (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  entidad_tipo VARCHAR(50) NOT NULL,
+  entidad_id UUID NOT NULL,
+  tipo_documento VARCHAR(100) NOT NULL,
+  estatus VARCHAR(50) NOT NULL CHECK (estatus IN ('Disponible', 'Faltante')),
+  es_critico BOOLEAN DEFAULT FALSE,
+  url_archivo TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: alertas**
+```sql
+CREATE TABLE alertas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tipo VARCHAR(50) NOT NULL,
+  entidad_tipo VARCHAR(50) NOT NULL,
+  entidad_id UUID NOT NULL,
+  mensaje TEXT NOT NULL,
+  fecha_evento DATE,
+  dias_restantes INTEGER,
+  resuelta BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Tabla: audit_logs**
+```sql
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id UUID NOT NULL REFERENCES usuarios(id),
+  accion VARCHAR(50) NOT NULL,
+  entidad_tipo VARCHAR(50) NOT NULL,
+  entidad_id UUID NOT NULL,
+  valores_anteriores JSONB,
+  valores_nuevos JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Vistas de Base de Datos
+
+**Vista: vw_estado_nucleos**
+```sql
+CREATE VIEW vw_estado_nucleos AS
+SELECT 
+  na.id,
+  na.nombre,
+  na.tipo,
+  na.estado,
+  na.municipio,
+  na.superficie_total_ha,
+  COALESCE(SUM(a.superficie_afectada), 0) AS total_afectado,
+  (SELECT COUNT(*) FROM afectaciones WHERE nucleo_agrario_id = na.id) AS num_afectaciones,
+  (SELECT COUNT(*) FROM convenios c JOIN afectaciones a2 ON c.afectacion_id = a2.id WHERE a2.nucleo_agrario_id = na.id AND c.fecha_inscripcion IS NOT NULL) AS convenios_formalizados
+FROM nucleos_agrarios na
+LEFT JOIN afectaciones a ON na.id = a.nucleo_agrario_id
+GROUP BY na.id;
+```
+
+**Vista: vw_tablero_convenios**
+```sql
+CREATE VIEW vw_tablero_convenios AS
+SELECT 
+  c.tipo_convenio,
+  COUNT(*) as cantidad,
+  SUM(c.monto_total) as suma_montos,
+  a.tipo_derecho
+FROM convenios c
+JOIN afectaciones a ON c.afectacion_id = a.id
+WHERE c.fecha_inscripcion IS NOT NULL
+GROUP BY c.tipo_convenio, a.tipo_derecho;
+```
+
+
+## Correctness Properties
+
+*Una propiedad es una característica o comportamiento que debe ser cierto en todas las ejecuciones válidas de un sistema—esencialmente, una declaración formal sobre lo que el sistema debe hacer. Las propiedades sirven como puente entre las especificaciones legibles por humanos y las garantías de correctness verificables por máquinas.*
+
+Basándose en el análisis de prework de los 25 requerimientos, se han identificado las siguientes propiedades universales que deben cumplirse. Estas propiedades son adecuadas para property-based testing dado que el sistema gestiona lógica de negocio compleja con reglas de validación, cálculos y relaciones que deben mantenerse consistentes a través de todas las entradas válidas.
+
+### Property 1: Integridad Referencial de Autorizaciones
+
+*Para cualquier* usuario autenticado con un rol específico, los permisos otorgados deben corresponder exactamente a las operaciones permitidas para ese rol: Usuario_Captura debe tener permisos de lectura y escritura, Usuario_Visualizador debe tener solo permisos de lectura, y Administrador debe tener todos los permisos.
+
+**Validates: Requirements 1.2, 1.3**
+
+**Estrategia de Implementación:**
+- Generar usuarios aleatorios con roles variados
+- Para cada usuario, verificar que `checkPermission()` retorna los valores correctos según el rol
+- Validar que intentos de escritura por Usuario_Visualizador sean rechazados
+
+### Property 2: Unicidad de Identificadores de Tramos
+
+*Para cualquier* par de Tramos creados en el sistema, sus identificadores (claves) deben ser únicos—no pueden existir dos Tramos con la misma clave simultáneamente.
+
+**Validates: Requirements 2.1, 2.3**
+
+**Estrategia de Implementación:**
+- Generar múltiples Tramos con claves aleatorias
+- Verificar que intentar crear un Tramo con clave existente resulte en error
+- Validar que la consulta de todos los Tramos no contiene duplicados de clave
+
+### Property 3: Cardinalidad de Relación Tramo-Frente
+
+*Para cualquier* Tramo, el sistema debe permitir la asociación de cero o más Frentes, y cada Frente debe estar asociado exactamente a un Tramo válido.
+
+**Validates: Requirements 2.2, 2.4**
+
+**Estrategia de Implementación:**
+- Generar Tramos aleatorios con cantidades variables de Frentes (0 a N)
+- Para cada Frente creado, verificar que `tramoId` referencia un Tramo existente
+- Validar que eliminar un Tramo elimina sus Frentes asociados (cascada)
+
+### Property 4: Validación Condicional de Afectaciones Individuales
+
+*Para cualquier* Afectación clasificada como Derecho_Individual, el sistema debe requerir y almacenar número de parcela e información del titular; para Afectaciones de Derecho_Colectivo, estos campos deben ser opcionales o nulos.
+
+**Validates: Requirements 4.3, 4.4**
+
+**Estrategia de Implementación:**
+- Generar Afectaciones aleatorias de ambos tipos
+- Para Derecho_Individual: validar que `numeroParcela` y `nombreTitular` sean requeridos
+- Para Derecho_Colectivo: validar que estos campos pueden ser nulos
+- Intentar crear Derecho_Individual sin estos campos debe fallar
+
+
+### Property 5: Cálculo Correcto de Superficies desde Geometrías
+
+*Para cualquier* polígono georreferenciado válido almacenado en PostGIS, el cálculo de superficie en hectáreas y metros cuadrados debe ser consistente y reproducible utilizando funciones espaciales estándar (ST_Area).
+
+**Validates: Requirements 3.3, 4.1**
+
+**Estrategia de Implementación:**
+- Generar polígonos aleatorios válidos con diferentes formas y tamaños
+- Calcular superficie mediante `ST_Area()` y funciones del sistema
+- Verificar que hectáreas = metros cuadrados / 10000
+- Validar que recalcular la misma geometría produce el mismo resultado
+
+### Property 6: Conservación de Geometrías en Transformaciones de Coordenadas
+
+*Para cualquier* geometría válida, transformar del sistema de coordenadas A al sistema B y de regreso al sistema A debe producir una geometría equivalente (dentro de un margen de tolerancia por redondeo).
+
+**Validates: Requirements 12.1, 12.2**
+
+**Estrategia de Implementación:**
+- Generar geometrías aleatorias en WGS84 (EPSG:4326)
+- Transformar a UTM (EPSG:32614 o similar) usando `ST_Transform()`
+- Transformar de regreso a WGS84
+- Verificar que las coordenadas resultantes difieren por menos de 0.0001 grados
+
+### Property 7: Consistencia de Intersecciones Geométricas
+
+*Para cualquier* par de geometrías A y B, si A intersecta B, entonces B debe intersectar A (propiedad simétrica de intersección).
+
+**Validates: Requirements 12.3, 12.4**
+
+**Estrategia de Implementación:**
+- Generar pares aleatorios de Frentes y Núcleos Agrarios
+- Si `ST_Intersects(frente, nucleo)` es verdadero, verificar que `ST_Intersects(nucleo, frente)` también es verdadero
+- Validar que el área de intersección es consistente sin importar el orden
+
+### Property 8: Validación de Requisitos de Convenio según Tipo
+
+*Para cualquier* Convenio creado, los campos requeridos deben cumplir con las reglas de validación específicas del tipo: COP requiere fecha de anuencia y minuta de asamblea, Modificatorio requiere referencia a COP previo, Superficie_Adicional requiere nueva superficie afectada.
+
+**Validates: Requirements 5.1, 5.2, 5.3, 5.4**
+
+**Estrategia de Implementación:**
+- Generar Convenios aleatorios de cada tipo
+- Para tipo COP: validar que `fechaAnuencia` y `minutaAsamblea` estén presentes
+- Para tipo Modificatorio: validar que `convenioAnteriorId` referencie un COP existente
+- Intentar crear Convenio sin campos requeridos debe fallar
+
+### Property 9: Progresión de Estados de Convenio
+
+*Para cualquier* Convenio, la transición de estados debe seguir el flujo válido: Borrador → Firmado → Inscrito_RAN. No se permiten transiciones hacia atrás ni saltos de estados.
+
+**Validates: Requirements 5.5, 8.1**
+
+**Estrategia de Implementación:**
+- Generar Convenios en diferentes estados
+- Intentar transicionar de Borrador a Inscrito_RAN directamente debe fallar
+- Intentar transicionar de Inscrito_RAN a Firmado (regresión) debe fallar
+- Validar que solo transiciones válidas (Borrador→Firmado, Firmado→Inscrito_RAN) sean aceptadas
+
+### Property 10: Integridad de Auditoría
+
+*Para cualquier* operación de modificación (INSERT, UPDATE, DELETE) en tablas auditadas, debe existir exactamente un registro correspondiente en la tabla de auditoría con usuario, timestamp y valores anteriores/nuevos correctos.
+
+**Validates: Requirements 11.1, 11.2**
+
+**Estrategia de Implementación:**
+- Ejecutar operaciones aleatorias de creación, actualización y eliminación
+- Para cada operación, verificar que existe un registro en `auditoria`
+- Validar que `usuarioId`, `timestamp`, `operacion` y `valoresAnteriores`/`valoresNuevos` sean correctos
+- Verificar que el conteo de registros de auditoría coincide con el conteo de operaciones
+
+### Property 11: Validación de Vigencia de ORV
+
+*Para cualquier* Núcleo Agrario con ORV registrado, el campo calculado `estaVigente` debe ser verdadero si la fecha actual está entre `fechaInicioVigencia` y `fechaFinVigencia`, y falso en caso contrario.
+
+**Validates: Requirement 3.5**
+
+**Estrategia de Implementación:**
+- Generar ORVs con diferentes rangos de fechas de vigencia (pasadas, actuales, futuras)
+- Para cada ORV, calcular `estaVigente` basado en fecha actual del sistema
+- Verificar que el cálculo coincide con la lógica: `fechaActual BETWEEN fechaInicio AND fechaFin`
+
+### Property 12: Consistencia de Superficies Liberadas
+
+*Para cualquier* Núcleo Agrario, la suma de superficies liberadas de todas sus Afectaciones no debe exceder la superficie total afectada del Núcleo.
+
+**Validates: Requirements 4.2, 12.5**
+
+**Estrategia de Implementación:**
+- Generar Núcleos Agrarios con múltiples Afectaciones
+- Para cada Núcleo, calcular `superficieLiberada = SUM(afectaciones liberadas)`
+- Verificar que `superficieLiberada <= superficieTotalAfectada`
+- Intentar liberar más superficie de la afectada debe generar advertencia o error
+
+
+## Despliegue e Infraestructura
+
+Esta sección detalla la arquitectura de despliegue, configuración de infraestructura, estrategias de alta disponibilidad y respaldos para cumplir con los requerimientos no funcionales RNF-13 (disponibilidad 99%) y RNF-14 (respaldos automáticos diarios).
+
+### Arquitectura de Despliegue
+
+El sistema se despliega en una arquitectura de tres niveles con redundancia y balanceo de carga:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Balanceador de Carga (HAProxy/Nginx)       │
+│              - Health checks automáticos                │
+│              - Distribución round-robin                 │
+│              - Failover automático                      │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+         ┌────────────────┴────────────────┐
+         ↓                                  ↓
+┌─────────────────┐              ┌─────────────────┐
+│ Servidor App 1  │              │ Servidor App 2  │
+│ (Node.js/Python)│              │ (Node.js/Python)│
+│ - API REST      │              │ - API REST      │
+│ - Servicios GIS │              │ - Servicios GIS │
+└─────────────────┘              └─────────────────┘
+         ↓                                  ↓
+         └────────────────┬────────────────┘
+                          ↓
+         ┌────────────────────────────────┐
+         │ PostgreSQL + PostGIS (Primario)│
+         │ - Modo replicación streaming   │
+         └────────────────────────────────┘
+                          ↓
+         ┌────────────────────────────────┐
+         │ PostgreSQL (Réplica - Standby) │
+         │ - Hot standby para lectura     │
+         │ - Failover automático          │
+         └────────────────────────────────┘
+```
+
+### Componentes de Infraestructura
+
+**1. Servidores de Aplicación (Mínimo 2 instancias)**
+- **Especificación**: 4 vCPU, 8 GB RAM, 50 GB SSD
+- **Sistema Operativo**: Linux (Ubuntu Server 22.04 LTS o similar)
+- **Runtime**: Node.js 18+ o Python 3.10+
+- **Configuración**: Modo cluster con gestión de procesos (PM2 para Node.js, Gunicorn/uWSGI para Python)
+- **Redundancia**: Mínimo 2 instancias activas para disponibilidad 99%
+
+**2. Balanceador de Carga**
+- **Tecnología**: HAProxy o Nginx
+- **Funcionalidades**:
+  - Health checks HTTP cada 10 segundos
+  - Timeout de conexión: 5 segundos
+  - Failover automático si servidor no responde
+  - Distribución de carga: Round-robin con sticky sessions (para sesiones JWT)
+- **Alta Disponibilidad**: Configuración activo-pasivo con Keepalived (VIP compartida)
+
+**3. Base de Datos PostgreSQL + PostGIS**
+- **Especificación Primario**: 8 vCPU, 16 GB RAM, 500 GB SSD (con capacidad de expansión)
+- **Especificación Réplica**: Igual que primario
+- **Versión**: PostgreSQL 14+ con PostGIS 3.3+
+- **Configuración de Alta Disponibilidad**:
+  - Replicación streaming síncrona o asíncrona
+  - Hot standby habilitado para réplica de lectura
+  - Failover automático con herramientas como Patroni, repmgr o pgpool-II
+  - WAL archiving para recuperación point-in-time
+
+**4. Almacenamiento de Archivos**
+- **Ubicación**: Almacenamiento compartido (NFS, S3-compatible, o similar)
+- **Propósito**: Documentos escaneados, archivos geoespaciales, reportes generados
+- **Respaldo**: Sincronización con almacenamiento secundario
+
+### Estrategia de Alta Disponibilidad (RNF-13)
+
+**Objetivo**: Disponibilidad del 99% durante horario laboral (8:00 AM - 8:00 PM)
+
+**Cálculo de Tiempo de Inactividad Permitido**:
+- Horario laboral: 12 horas/día
+- 99% disponibilidad = máximo 1% de downtime
+- Downtime permitido: ~7.2 minutos por día laboral
+
+**Mecanismos de Alta Disponibilidad**:
+
+1. **Redundancia de Servidores de Aplicación**
+   - Mínimo 2 instancias activas simultáneamente
+   - Balanceador distribuye carga entre instancias saludables
+   - Si una instancia falla, el balanceador la marca como inactiva y redirige tráfico
+
+2. **Failover Automático de Base de Datos**
+   - PostgreSQL réplica en hot standby
+   - Herramienta de failover automático (Patroni recomendado):
+     - Detecta falla del primario mediante health checks (cada 10 segundos)
+     - Promueve réplica a primario automáticamente
+     - Actualiza endpoint de conexión o DNS
+     - Tiempo de failover objetivo: < 30 segundos
+
+3. **Health Checks y Monitoreo**
+   - Endpoint `/health` en API que verifica:
+     - Conectividad con base de datos
+     - Uso de memoria y CPU dentro de límites
+     - Servicios críticos operativos
+   - Balanceador consulta `/health` cada 10 segundos
+   - Servidor no saludable se remueve de pool automáticamente
+
+4. **Mantenimiento sin Downtime**
+   - Despliegue rolling: actualizar una instancia a la vez
+   - Servidor en mantenimiento se marca como drenando (no acepta nuevas conexiones)
+   - Conexiones existentes se completan antes de apagar servidor
+
+### Estrategia de Respaldos (RNF-14)
+
+**Objetivo**: Respaldos automáticos diarios con capacidad de recuperación
+
+**Tipo de Respaldos**:
+
+1. **Respaldo Completo Diario (Full Backup)**
+   - **Frecuencia**: Diario a las 2:00 AM (fuera de horario laboral)
+   - **Método**: `pg_dump` o `pg_basebackup` de PostgreSQL
+   - **Contenido**: 
+     - Base de datos completa incluyendo esquemas, datos, geometrías
+     - Archivos de configuración del sistema
+     - Documentos y archivos asociados
+   - **Ubicación**: Servidor de respaldos dedicado o almacenamiento en la nube
+   - **Retención**: 
+     - Respaldos diarios: 7 días
+     - Respaldos semanales: 4 semanas
+     - Respaldos mensuales: 12 meses
+
+2. **Respaldo Incremental Continuo (WAL Archiving)**
+   - **Frecuencia**: Continuo (cada vez que se completa un segmento WAL)
+   - **Método**: PostgreSQL WAL archiving con `archive_command`
+   - **Propósito**: Permite recuperación point-in-time (PITR)
+   - **Ubicación**: Almacenamiento separado del servidor principal
+   - **Retención**: 30 días de archivos WAL
+
+**Procedimiento de Respaldo Automatizado**:
+
+```bash
+#!/bin/bash
+# Script de respaldo diario (cron: 0 2 * * *)
+
+BACKUP_DIR="/backups/postgresql"
+DATE=$(date +%Y%m%d_%H%M%S)
+DB_NAME="sistema_liberacion_derechos"
+RETENTION_DAYS=7
+
+# Crear respaldo con pg_dump
+pg_dump -U postgres -Fc $DB_NAME > $BACKUP_DIR/backup_$DATE.dump
+
+# Comprimir archivos de documentos
+tar -czf $BACKUP_DIR/documentos_$DATE.tar.gz /var/app/documentos
+
+# Eliminar respaldos antiguos
+find $BACKUP_DIR -name "backup_*.dump" -mtime +$RETENTION_DAYS -delete
+find $BACKUP_DIR -name "documentos_*.tar.gz" -mtime +$RETENTION_DAYS -delete
+
+# Verificar integridad del respaldo
+pg_restore --list $BACKUP_DIR/backup_$DATE.dump > /dev/null
+if [ $? -eq 0 ]; then
+  echo "Respaldo exitoso: backup_$DATE.dump"
+  # Opcional: copiar a almacenamiento remoto (S3, rsync, etc.)
+  # aws s3 cp $BACKUP_DIR/backup_$DATE.dump s3://bucket-respaldos/
+else
+  echo "ERROR: Respaldo falló validación"
+  # Enviar alerta a administradores
+fi
+```
+
+**Procedimiento de Recuperación**:
+
+1. **Recuperación desde Respaldo Completo**:
+   ```bash
+   # Restaurar base de datos
+   pg_restore -U postgres -d $DB_NAME -c $BACKUP_DIR/backup_YYYYMMDD.dump
+   
+   # Restaurar archivos de documentos
+   tar -xzf $BACKUP_DIR/documentos_YYYYMMDD.tar.gz -C /var/app/
+   ```
+
+2. **Recuperación Point-in-Time (PITR)**:
+   - Restaurar respaldo base más reciente
+   - Aplicar archivos WAL hasta el punto de tiempo deseado
+   - PostgreSQL replay automático de transacciones
+
+**Verificación de Respaldos**:
+- Prueba mensual de restauración en ambiente de prueba
+- Validación de integridad mediante `pg_restore --list`
+- Monitoreo de tamaño de respaldos (alerta si crece inusualmente o no crece)
+
+### Monitoreo y Alertas
+
+**Herramientas de Monitoreo**:
+- **Prometheus + Grafana**: Métricas de sistema, aplicación y base de datos
+- **PostgreSQL Exporter**: Métricas específicas de PostgreSQL
+- **Node Exporter / Python metrics**: Métricas de servidores de aplicación
+
+**Métricas Clave a Monitorear**:
+
+1. **Disponibilidad**:
+   - Uptime de servidores de aplicación
+   - Uptime de base de datos primaria
+   - Tasa de éxito de health checks
+   - Latencia de respuesta de API
+
+2. **Rendimiento**:
+   - Tiempo de respuesta de endpoints (p50, p95, p99)
+   - Throughput de requests por segundo
+   - Duración de consultas SQL
+   - Uso de conexiones de base de datos
+
+3. **Recursos**:
+   - Uso de CPU, memoria, disco de cada servidor
+   - Espacio disponible en base de datos
+   - Tamaño de archivos WAL no archivados
+   - Lag de replicación (réplica vs primario)
+
+4. **Respaldos**:
+   - Éxito/fallo de respaldos diarios
+   - Tamaño de respaldos generados
+   - Tiempo de ejecución de respaldos
+   - Espacio disponible en almacenamiento de respaldos
+
+**Alertas Configuradas**:
+
+| Condición | Severidad | Acción |
+|-----------|-----------|--------|
+| Servidor de aplicación no responde por > 1 minuto | Crítica | Email + SMS a administradores |
+| Base de datos primaria no responde | Crítica | Failover automático + notificación |
+| Uso de disco > 85% | Alta | Email a administradores |
+| Respaldo diario falló | Alta | Email a administradores |
+| Lag de replicación > 5 minutos | Media | Email a administradores |
+| Tiempo de respuesta p95 > 3 segundos | Media | Email a desarrolladores |
+| Uso de CPU > 80% por > 10 minutos | Media | Email a administradores |
+
+### Consideraciones de Seguridad en Infraestructura
+
+1. **Red y Firewall**:
+   - Base de datos no expuesta a internet público
+   - Acceso a BD solo desde servidores de aplicación
+   - Reglas de firewall restrictivas (whitelist)
+   - Conexiones cifradas con TLS/SSL
+
+2. **Acceso y Autenticación**:
+   - Acceso SSH mediante claves, sin contraseñas
+   - Usuarios con privilegios mínimos necesarios
+   - Rotación periódica de credenciales de base de datos
+
+3. **Cifrado**:
+   - Conexiones HTTPS para tráfico web (certificado TLS)
+   - Cifrado en tránsito para replicación de BD
+   - Cifrado en reposo para respaldos (opcional pero recomendado)
+
+### Escalabilidad Futura
+
+El diseño permite escalar horizontalmente según crezca la demanda:
+
+1. **Escalar Capa de Aplicación**:
+   - Agregar más instancias de servidores de aplicación
+   - Actualizar configuración del balanceador
+
+2. **Escalar Base de Datos**:
+   - Agregar réplicas de lectura adicionales
+   - Distribuir consultas de solo lectura a réplicas
+   - Particionar tablas grandes por fecha o región (si es necesario)
+
+3. **Optimización de Rendimiento**:
+   - Caché de consultas frecuentes (Redis/Memcached)
+   - CDN para assets estáticos del frontend
+   - Índices adicionales basados en patrones de uso real
+
+
+## Gestión de Sesiones y Autenticación (RNF-9)
+
+Esta sección detalla la implementación del cierre automático de sesión por inactividad, complementando el Módulo de Autenticación y Autorización descrito anteriormente.
+
+### Estrategia de Tokens JWT con Expiración
+
+**Configuración de Tokens**:
+- **Access Token**: Token JWT de corta duración para autenticación de requests
+  - Tiempo de vida: 30 minutos
+  - Contiene: `userId`, `role`, `username`, `iat` (issued at), `exp` (expiration)
+  - Almacenado en: memoria del cliente (variable JavaScript), NO en localStorage
+  
+- **Refresh Token**: Token de larga duración para renovar access tokens
+  - Tiempo de vida: 7 días
+  - Almacenado en: Cookie HTTPOnly, Secure, SameSite
+  - Permite renovar access token sin reautenticación
+
+### Implementación de Inactividad (30 minutos - RNF-9)
+
+**Mecanismo de Detección de Actividad**:
+
+El sistema considera "actividad" cualquiera de las siguientes acciones del usuario:
+- Interacción con la interfaz (clicks, tipeo, scroll)
+- Peticiones HTTP a la API
+- Movimiento del mouse (registrado con throttling para evitar sobrecarga)
+
+**Implementación en Frontend**:
+
+```typescript
+class SessionManager {
+  private lastActivityTimestamp: number
+  private inactivityTimeout: number = 30 * 60 * 1000  // 30 minutos en milisegundos
+  private checkInterval: number = 60 * 1000  // Verificar cada minuto
+  private intervalId: number | null = null
+  
+  constructor() {
+    this.lastActivityTimestamp = Date.now()
+    this.setupActivityListeners()
+    this.startInactivityCheck()
+  }
+  
+  // Registrar actividad del usuario
+  private setupActivityListeners(): void {
+    const events = ['mousedown', 'keypress', 'scroll', 'touchstart']
+    events.forEach(event => {
+      window.addEventListener(event, () => this.updateActivity(), { passive: true })
+    })
+  }
+  
+  private updateActivity(): void {
+    this.lastActivityTimestamp = Date.now()
+  }
+  
+  // Verificar periódicamente si hay inactividad
+  private startInactivityCheck(): void {
+    this.intervalId = window.setInterval(() => {
+      const inactiveTime = Date.now() - this.lastActivityTimestamp
+      
+      if (inactiveTime >= this.inactivityTimeout) {
+        this.handleInactivityTimeout()
+      } else if (inactiveTime >= this.inactivityTimeout - 5 * 60 * 1000) {
+        // Advertencia 5 minutos antes del cierre
+        this.showInactivityWarning(this.inactivityTimeout - inactiveTime)
+      }
+    }, this.checkInterval)
+  }
+  
+  private handleInactivityTimeout(): void {
+    // Limpiar intervalo
+    if (this.intervalId) clearInterval(this.intervalId)
+    
+    // Invalidar token en servidor
+    this.logout()
+    
+    // Redirigir a login con mensaje
+    window.location.href = '/login?reason=inactivity'
+  }
+  
+  private showInactivityWarning(timeRemaining: number): void {
+    // Mostrar notificación al usuario
+    const minutes = Math.floor(timeRemaining / 60000)
+    alert(`Tu sesión expirará en ${minutes} minuto(s) por inactividad. ¿Deseas continuar?`)
+    // Si usuario hace click en "Continuar", updateActivity() se llama automáticamente
+  }
+  
+  private async logout(): Promise<void> {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${this.getAccessToken()}` }
+    })
+    // Limpiar tokens locales
+    this.clearTokens()
+  }
+}
+```
+
+**Implementación en Backend**:
+
+```typescript
+// Middleware para actualizar timestamp de última actividad
+function trackActivity(req: Request, res: Response, next: NextFunction) {
+  if (req.user) {
+    // Actualizar timestamp en sesión o base de datos
+    sessionStore.updateLastActivity(req.user.userId, new Date())
+  }
+  next()
+}
+
+// Aplicar middleware a todas las rutas protegidas
+app.use('/api/*', authenticateJWT, trackActivity)
+```
+
+### Renovación Automática de Tokens
+
+Para evitar interrupciones durante sesiones activas, el sistema implementa renovación automática de access tokens:
+
+**Flujo de Renovación**:
+
+1. **Detección de Expiración Próxima**:
+   - Cliente verifica tiempo de expiración del access token antes de cada request
+   - Si el token expira en menos de 5 minutos, solicita renovación
+
+2. **Endpoint de Renovación**:
+   ```typescript
+   // POST /api/auth/refresh
+   async function refreshToken(req: Request, res: Response) {
+     const refreshToken = req.cookies.refreshToken
+     
+     if (!refreshToken) {
+       return res.status(401).json({ error: 'No refresh token provided' })
+     }
+     
+     try {
+       // Validar refresh token
+       const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET)
+       
+       // Verificar que no esté en lista negra (opcional)
+       const isBlacklisted = await checkTokenBlacklist(refreshToken)
+       if (isBlacklisted) {
+         return res.status(401).json({ error: 'Token revoked' })
+       }
+       
+       // Generar nuevo access token
+       const newAccessToken = jwt.sign(
+         { userId: decoded.userId, role: decoded.role, username: decoded.username },
+         ACCESS_TOKEN_SECRET,
+         { expiresIn: '30m' }
+       )
+       
+       // Actualizar timestamp de actividad
+       await sessionStore.updateLastActivity(decoded.userId, new Date())
+       
+       return res.json({ accessToken: newAccessToken })
+     } catch (error) {
+       return res.status(401).json({ error: 'Invalid refresh token' })
+     }
+   }
+   ```
+
+3. **Cliente Solicita Renovación Automáticamente**:
+   ```typescript
+   async function apiRequest(endpoint: string, options: RequestInit) {
+     const token = getAccessToken()
+     
+     // Verificar si token está por expirar
+     if (isTokenExpiringSoon(token)) {
+       await renewAccessToken()
+     }
+     
+     // Realizar request con token actualizado
+     return fetch(endpoint, {
+       ...options,
+       headers: {
+         ...options.headers,
+         'Authorization': `Bearer ${getAccessToken()}`
+       }
+     })
+   }
+   ```
+
+### Cierre de Sesión Manual
+
+El usuario puede cerrar sesión manualmente en cualquier momento:
+
+**Endpoint de Logout**:
+```typescript
+// POST /api/auth/logout
+async function logout(req: Request, res: Response) {
+  const userId = req.user.userId
+  const token = req.headers.authorization?.split(' ')[1]
+  
+  // Agregar token a lista negra (opcional, para invalidación inmediata)
+  await addTokenToBlacklist(token, 30 * 60)  // Expira en 30 minutos
+  
+  // Eliminar refresh token de base de datos
+  await sessionStore.deleteRefreshToken(userId)
+  
+  // Limpiar cookie de refresh token
+  res.clearCookie('refreshToken')
+  
+  return res.status(200).json({ message: 'Logout successful' })
+}
+```
+
+### Almacenamiento de Sesiones
+
+**Opción 1: Stateless (solo JWT, sin almacenamiento de sesión)**
+- Ventaja: Escalable, sin dependencia de almacenamiento compartido
+- Desventaja: No se puede invalidar token hasta que expire naturalmente
+
+**Opción 2: Almacenamiento de Refresh Tokens en Base de Datos (Recomendado)**
+- Tabla `sesiones_activas`:
+  ```sql
+  CREATE TABLE sesiones_activas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id UUID REFERENCES usuarios(id) ON DELETE CASCADE,
+    refresh_token_hash VARCHAR(255) NOT NULL,
+    ultima_actividad TIMESTAMP NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    direccion_ip VARCHAR(45),
+    user_agent TEXT,
+    UNIQUE(refresh_token_hash)
+  );
+  
+  CREATE INDEX idx_sesiones_usuario ON sesiones_activas(usuario_id);
+  CREATE INDEX idx_sesiones_actividad ON sesiones_activas(ultima_actividad);
+  ```
+
+- Ventajas:
+  - Permite invalidar sesiones inmediatamente
+  - Auditoría de sesiones activas
+  - Permite listar y cerrar sesiones remotamente
+  - Limpieza automática de sesiones expiradas:
+    ```sql
+    -- Job diario para eliminar sesiones inactivas
+    DELETE FROM sesiones_activas 
+    WHERE ultima_actividad < NOW() - INTERVAL '30 minutes';
+    ```
+
+### Casos Especiales de Gestión de Sesiones
+
+**1. Múltiples Sesiones del Mismo Usuario**:
+- El sistema permite múltiples sesiones concurrentes (mismo usuario en diferentes dispositivos/navegadores)
+- Cada sesión tiene su propio refresh token
+- Cerrar sesión en un dispositivo no afecta otras sesiones
+
+**2. Cierre de Sesión Remoto**:
+- Administradores pueden cerrar sesiones de otros usuarios desde panel de administración
+- Implementación:
+  ```typescript
+  async function revokeUserSessions(adminUserId: string, targetUserId: string) {
+    // Verificar que adminUserId tiene rol Administrador
+    // Eliminar todos los refresh tokens del usuario objetivo
+    await sessionStore.deleteAllUserSessions(targetUserId)
+    // Los access tokens actuales seguirán funcionando hasta expirar (máximo 30 minutos)
+  }
+  ```
+
+**3. Cambio de Rol o Permisos**:
+- Si se modifica el rol de un usuario, las sesiones activas mantienen el rol anterior hasta que el access token expire
+- Para aplicar cambios inmediatamente, se puede forzar cierre de sesiones del usuario
+
+**4. Cambio de Contraseña**:
+- Al cambiar contraseña, se invalidan todas las sesiones existentes
+- Usuario debe autenticarse nuevamente con la nueva contraseña
+
+
+## Consideraciones Técnicas Adicionales
+
+### Clarificación sobre Geometrías de Tramos (Req 2.6)
+
+**Inconsistencia Aparente**:
+- El requerimiento Req 2.6 menciona "información del polígono del tramo"
+- El diseño implementa geometrías lineales (LINESTRING) para Tramos
+
+**Justificación de la Decisión de Diseño**:
+
+Los Tramos representan trazos ferroviarios, que son inherentemente entidades lineales (vías de tren). La implementación con geometría lineal (LINESTRING) es correcta por las siguientes razones:
+
+1. **Naturaleza del Dominio**: Un trazo ferroviario es una línea, no un área
+2. **Cálculo de Derecho de Vía**: El área afectada se calcula aplicando un buffer a la línea central (por ejemplo, 50 metros a cada lado)
+3. **Representación Cartográfica**: Los trazos ferroviarios se representan como líneas en mapas
+4. **Precisión Topológica**: LINESTRING permite representar exactamente la ruta del trazo
+
+**Interpretación del Requerimiento**:
+- "Polígono del tramo" se refiere al área de derecho de vía (calculada dinámicamente mediante buffer)
+- La geometría base almacenada es lineal
+- El "polígono" se genera cuando se necesita calcular intersecciones con núcleos agrarios:
+  ```sql
+  -- Generar polígono de derecho de vía a partir de línea
+  SELECT ST_Buffer(
+    ST_Transform(geometria_linea, 32614),  -- Transformar a UTM para buffer en metros
+    50  -- Radio del buffer en metros (ancho de derecho de vía)
+  ) AS poligono_derecho_via
+  FROM tramos
+  WHERE id = 'tramo_id';
+  ```
+
+**Recomendación**:
+- Mantener geometría lineal (LINESTRING) como representación base
+- Calcular polígono de derecho de vía dinámicamente cuando se requiera
+- Documentar el ancho de derecho de vía como parámetro configurable del sistema
+
+### Optimización de Consultas Geoespaciales
+
+**Índices Espaciales**:
+Todos los campos de geometría deben tener índices GiST para acelerar consultas espaciales:
+
+```sql
+CREATE INDEX idx_tramos_geometria ON tramos USING GIST(geometria_linea);
+CREATE INDEX idx_frentes_geometria ON frentes USING GIST(geometria_linea);
+CREATE INDEX idx_nucleos_geometria ON nucleos_agrarios USING GIST(geometria_poligono);
+```
+
+**Simplificación de Geometrías para Visualización**:
+Para mejorar rendimiento en mapas con zoom alejado, se puede usar simplificación de Douglas-Peucker:
+
+```sql
+-- Simplificar geometría según nivel de zoom
+SELECT 
+  id, 
+  nombre,
+  CASE 
+    WHEN :zoom_level < 10 THEN ST_Simplify(geometria_poligono, 0.01)
+    WHEN :zoom_level < 13 THEN ST_Simplify(geometria_poligono, 0.001)
+    ELSE geometria_poligono
+  END AS geometria
+FROM nucleos_agrarios;
+```
+
+### Manejo de Sistemas de Coordenadas
+
+**SRIDs Soportados**:
+- **EPSG:4326 (WGS84)**: Sistema de coordenadas geográficas estándar para almacenamiento y visualización web
+- **EPSG:32614 (UTM Zona 14N)**: Para México central, usado en documentos jurídicos
+- **EPSG:32615 (UTM Zona 15N)**: Para México oriental
+- **EPSG:32613 (UTM Zona 13N)**: Para México occidental
+
+**Detección Automática de Zona UTM**:
+```sql
+-- Función para determinar zona UTM basada en longitud
+CREATE OR REPLACE FUNCTION detectar_zona_utm(longitud DECIMAL)
+RETURNS INTEGER AS $$
+BEGIN
+  -- Fórmula: zona = floor((longitud + 180) / 6) + 1
+  RETURN FLOOR((longitud + 180) / 6) + 1;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+```
+
+
+## Error Handling
+
+El sistema implementa una estrategia integral de manejo de errores en todas las capas de la arquitectura.
+
+### Clasificación de Errores
+
+**1. Errores de Validación (4xx)**:
+- **400 Bad Request**: Datos de entrada inválidos o incompletos
+- **401 Unauthorized**: Autenticación fallida o token inválido
+- **403 Forbidden**: Usuario autenticado pero sin permisos para la operación
+- **404 Not Found**: Recurso solicitado no existe
+- **409 Conflict**: Violación de restricciones de unicidad o integridad
+
+**2. Errores de Servidor (5xx)**:
+- **500 Internal Server Error**: Error inesperado en lógica de aplicación
+- **502 Bad Gateway**: Error de conectividad con base de datos o servicios externos
+- **503 Service Unavailable**: Sistema en mantenimiento o sobrecargado
+
+### Estructura de Respuestas de Error
+
+Todas las respuestas de error siguen un formato JSON consistente:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Los datos proporcionados son inválidos",
+    "details": [
+      {
+        "field": "numeroEjidatarios",
+        "message": "Debe ser un número positivo",
+        "value": -5
+      }
+    ],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "requestId": "req_abc123"
+  }
+}
+```
+
+### Códigos de Error del Dominio
+
+| Código | Descripción | HTTP Status |
+|--------|-------------|-------------|
+| `AUTH_FAILED` | Credenciales inválidas | 401 |
+| `TOKEN_EXPIRED` | Token JWT expirado | 401 |
+| `INSUFFICIENT_PERMISSIONS` | Usuario sin permisos | 403 |
+| `RESOURCE_NOT_FOUND` | Entidad no encontrada | 404 |
+| `DUPLICATE_KEY` | Identificador duplicado | 409 |
+| `VALIDATION_ERROR` | Datos inválidos | 400 |
+| `GEOMETRY_INVALID` | Geometría topológicamente inválida | 400 |
+| `SRID_MISMATCH` | Sistema de coordenadas incompatible | 400 |
+| `WORKFLOW_VIOLATION` | Transición de estado inválida | 409 |
+| `REFERENTIAL_INTEGRITY` | Violación de integridad referencial | 409 |
+| `DATABASE_ERROR` | Error de base de datos | 500 |
+| `GIS_CALCULATION_ERROR` | Error en cálculo geoespacial | 500 |
+
+### Manejo de Errores por Capa
+
+**Capa de Presentación (Frontend)**:
+```typescript
+class ErrorHandler {
+  static handleApiError(error: ApiError): void {
+    switch (error.code) {
+      case 'TOKEN_EXPIRED':
+        // Intentar renovar token automáticamente
+        this.refreshToken().catch(() => {
+          // Si falla renovación, redirigir a login
+          window.location.href = '/login?reason=session_expired'
+        })
+        break
+      
+      case 'INSUFFICIENT_PERMISSIONS':
+        // Mostrar mensaje de permisos insuficientes
+        this.showNotification('No tienes permisos para realizar esta operación', 'error')
+        break
+      
+      case 'VALIDATION_ERROR':
+        // Resaltar campos con errores en formulario
+        this.highlightFieldErrors(error.details)
+        break
+      
+      case 'GEOMETRY_INVALID':
+        // Mostrar errores de geometría en mapa
+        this.showGeometryErrors(error.details)
+        break
+      
+      default:
+        // Error genérico
+        this.showNotification('Ocurrió un error inesperado', 'error')
+        this.logError(error)
+    }
+  }
+}
+```
+
+**Capa de Aplicación (Backend)**:
+```typescript
+// Middleware global de manejo de errores
+function errorHandlerMiddleware(
+  error: Error, 
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): void {
+  // Log del error para debugging
+  logger.error({
+    message: error.message,
+    stack: error.stack,
+    requestId: req.id,
+    userId: req.user?.userId,
+    path: req.path,
+    method: req.method
+  })
+  
+  // Determinar respuesta según tipo de error
+  if (error instanceof ValidationError) {
+    return res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: error.message,
+        details: error.validationDetails,
+        timestamp: new Date().toISOString(),
+        requestId: req.id
+      }
+    })
+  }
+  
+  if (error instanceof GeometryError) {
+    return res.status(400).json({
+      error: {
+        code: 'GEOMETRY_INVALID',
+        message: error.message,
+        details: error.geometryErrors,
+        timestamp: new Date().toISOString(),
+        requestId: req.id
+      }
+    })
+  }
+  
+  if (error instanceof DatabaseError) {
+    // No exponer detalles internos de BD al cliente
+    return res.status(500).json({
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Error interno del servidor',
+        timestamp: new Date().toISOString(),
+        requestId: req.id
+      }
+    })
+  }
+  
+  // Error genérico no manejado
+  return res.status(500).json({
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: 'Error interno del servidor',
+      timestamp: new Date().toISOString(),
+      requestId: req.id
+    }
+  })
+}
+```
+
+**Capa de Datos (Base de Datos)**:
+```sql
+-- Manejo de errores en funciones PL/pgSQL
+CREATE OR REPLACE FUNCTION calcular_superficie_liberada(frente_id UUID)
+RETURNS DECIMAL AS $$
+DECLARE
+  superficie DECIMAL;
+BEGIN
+  -- Intentar cálculo
+  SELECT COALESCE(SUM(superficie_hectareas), 0)
+  INTO superficie
+  FROM afectaciones a
+  JOIN convenios c ON a.id = c.afectacion_id
+  WHERE c.frente_id = frente_id
+    AND c.estatus_inscripcion = 'Inscrito_RAN';
+  
+  RETURN superficie;
+  
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Log del error
+    INSERT INTO error_log (funcion, mensaje, sqlstate, timestamp)
+    VALUES ('calcular_superficie_liberada', SQLERRM, SQLSTATE, NOW());
+    
+    -- Re-lanzar error para que aplicación lo maneje
+    RAISE;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Estrategias Específicas de Recuperación
+
+**1. Errores de Conectividad de Base de Datos**:
+- **Estrategia**: Reintentos con backoff exponencial
+- **Implementación**:
+  ```typescript
+  async function executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<T> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await operation()
+      } catch (error) {
+        if (attempt === maxRetries - 1) throw error
+        
+        // Verificar si es error recuperable
+        if (!isRecoverableError(error)) throw error
+        
+        // Esperar antes de reintentar (backoff exponencial)
+        const delay = baseDelay * Math.pow(2, attempt)
+        await sleep(delay)
+      }
+    }
+  }
+  ```
+
+**2. Errores de Validación de Geometrías**:
+- **Estrategia**: Intentar reparación automática con ST_MakeValid
+- **Implementación**:
+  ```sql
+  -- Intentar corregir geometría inválida
+  CREATE OR REPLACE FUNCTION guardar_geometria_segura(
+    entidad_id UUID,
+    geometria GEOMETRY
+  ) RETURNS GEOMETRY AS $$
+  DECLARE
+    geometria_valida GEOMETRY;
+  BEGIN
+    -- Verificar validez
+    IF ST_IsValid(geometria) THEN
+      RETURN geometria;
+    ELSE
+      -- Intentar reparación
+      geometria_valida := ST_MakeValid(geometria);
+      
+      IF ST_IsValid(geometria_valida) THEN
+        -- Log de advertencia
+        INSERT INTO advertencias_geometria (entidad_id, mensaje, timestamp)
+        VALUES (entidad_id, 'Geometría corregida automáticamente', NOW());
+        
+        RETURN geometria_valida;
+      ELSE
+        -- Si no se puede reparar, rechazar
+        RAISE EXCEPTION 'Geometría inválida y no reparable';
+      END IF;
+    END IF;
+  END;
+  $$ LANGUAGE plpgsql;
+  ```
+
+**3. Timeouts de Consultas Largas**:
+- **Configuración**: Timeout de consulta a nivel de base de datos
+  ```sql
+  -- Configurar timeout global
+  ALTER DATABASE sistema_liberacion_derechos SET statement_timeout = '30s';
+  
+  -- Timeout específico para consultas geoespaciales complejas
+  SET statement_timeout = '60s';
+  ```
+- **Manejo en aplicación**: Detectar timeout y ofrecer opciones al usuario (simplificar consulta, exportar en background)
+
+**4. Violaciones de Integridad Referencial**:
+- **Estrategia**: Transacciones con verificación previa
+- **Implementación**:
+  ```typescript
+  async function eliminarTramo(tramoId: string): Promise<void> {
+    const transaction = await db.transaction()
+    
+    try {
+      // Verificar dependencias antes de eliminar
+      const frentes = await transaction.query(
+        'SELECT COUNT(*) FROM frentes WHERE tramo_id = $1',
+        [tramoId]
+      )
+      
+      if (frentes.rows[0].count > 0) {
+        throw new Error('No se puede eliminar tramo con frentes asociados')
+      }
+      
+      // Proceder con eliminación
+      await transaction.query('DELETE FROM tramos WHERE id = $1', [tramoId])
+      await transaction.commit()
+    } catch (error) {
+      await transaction.rollback()
+      throw error
+    }
+  }
+  ```
+
+### Logging y Monitoreo de Errores
+
+**Niveles de Log**:
+- **ERROR**: Errores que impiden completar operaciones
+- **WARN**: Situaciones anómalas pero recuperables
+- **INFO**: Operaciones exitosas importantes
+- **DEBUG**: Información detallada para debugging
+
+**Campos de Log Estándar**:
+```typescript
+interface LogEntry {
+  level: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG'
+  timestamp: string
+  requestId: string
+  userId?: string
+  message: string
+  context: {
+    service: string
+    operation: string
+    [key: string]: any
+  }
+  error?: {
+    message: string
+    stack: string
+    code?: string
+  }
+}
+```
+
+**Integración con Sistema de Monitoreo**:
+- Errores 5xx activan alertas automáticas
+- Tasa de errores 4xx monitoreada para detectar problemas de usabilidad
+- Dashboard de errores con tendencias y análisis
+
+
+## Testing Strategy
+
+El sistema implementa una estrategia de testing integral en múltiples niveles para garantizar correctness, confiabilidad y mantenibilidad.
+
+### Pirámide de Testing
+
+```
+                    ┌─────────────┐
+                    │   E2E Tests │  (10%)
+                    │  Manuales   │
+                    └─────────────┘
+                  ┌─────────────────┐
+                  │ Integration Tests│  (20%)
+                  │   Automatizados  │
+                  └─────────────────┘
+              ┌─────────────────────────┐
+              │    Unit Tests            │  (40%)
+              │    Automatizados         │
+              └─────────────────────────┘
+          ┌───────────────────────────────────┐
+          │   Property-Based Tests            │  (30%)
+          │   (Verificación de Propiedades)   │
+          └───────────────────────────────────┘
+```
+
+### 1. Property-Based Testing (PBT)
+
+**Objetivo**: Verificar que las propiedades de correctness definidas se cumplen para todas las entradas válidas posibles.
+
+**Framework**: Utilizar bibliotecas especializadas:
+- **JavaScript/TypeScript**: fast-check
+- **Python**: Hypothesis
+
+**Ejemplo de Test de Propiedad**:
+
+```typescript
+import fc from 'fast-check'
+
+describe('Property 1: Integridad Referencial de Autorizaciones', () => {
+  it('Usuario_Captura debe tener permisos de lectura y escritura', () => {
+    fc.assert(
+      fc.property(
+        // Generador de usuarios con rol Usuario_Captura
+        fc.record({
+          userId: fc.uuid(),
+          username: fc.string(),
+          role: fc.constant('Usuario_Captura')
+        }),
+        // Generador de recursos
+        fc.oneof(
+          fc.constant('Tramo'),
+          fc.constant('Frente'),
+          fc.constant('NucleoAgrario'),
+          fc.constant('Afectacion')
+        ),
+        async (user, resource) => {
+          // Verificar permisos de lectura
+          const canRead = await authService.checkPermission(
+            user.userId,
+            resource,
+            'read'
+          )
+          expect(canRead).toBe(true)
+          
+          // Verificar permisos de escritura
+          const canWrite = await authService.checkPermission(
+            user.userId,
+            resource,
+            'write'
+          )
+          expect(canWrite).toBe(true)
+        }
+      ),
+      { numRuns: 100 }  // Ejecutar 100 casos aleatorios
+    )
+  })
+  
+  it('Usuario_Visualizador debe tener solo permisos de lectura', () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          userId: fc.uuid(),
+          username: fc.string(),
+          role: fc.constant('Usuario_Visualizador')
+        }),
+        fc.oneof(
+          fc.constant('Tramo'),
+          fc.constant('Frente'),
+          fc.constant('NucleoAgrario')
+        ),
+        async (user, resource) => {
+          const canRead = await authService.checkPermission(
+            user.userId,
+            resource,
+            'read'
+          )
+          expect(canRead).toBe(true)
+          
+          const canWrite = await authService.checkPermission(
+            user.userId,
+            resource,
+            'write'
+          )
+          expect(canWrite).toBe(false)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+```
+
+**Generadores Personalizados para el Dominio**:
+
+```typescript
+// Generador de geometrías lineales válidas
+const lineStringGenerator = fc.array(
+  fc.tuple(
+    fc.double({ min: -180, max: 180 }),  // longitud
+    fc.double({ min: -90, max: 90 })      // latitud
+  ),
+  { minLength: 2, maxLength: 100 }
+).map(coords => ({
+  type: 'LineString',
+  coordinates: coords
+}))
+
+// Generador de polígonos válidos (cerrados)
+const polygonGenerator = fc.array(
+  fc.tuple(
+    fc.double({ min: -180, max: 180 }),
+    fc.double({ min: -90, max: 90 })
+  ),
+  { minLength: 3, maxLength: 50 }
+).map(coords => {
+  // Cerrar el polígono (primer punto = último punto)
+  const closedCoords = [...coords, coords[0]]
+  return {
+    type: 'Polygon',
+    coordinates: [closedCoords]
+  }
+})
+
+// Generador de Convenios
+const convenioGenerator = fc.record({
+  tipo: fc.oneof(
+    fc.constant('COP'),
+    fc.constant('Modificatorio'),
+    fc.constant('Superficie_Adicional'),
+    fc.constant('Obras_Complementarias'),
+    fc.constant('Ampliacion'),
+    fc.constant('Ampliacion_Remanente')
+  ),
+  fechaFirma: fc.date({ min: new Date('2020-01-01'), max: new Date() }),
+  monto90: fc.option(fc.double({ min: 0, max: 10000000 })),
+  monto100: fc.option(fc.double({ min: 0, max: 10000000 })),
+  montoBDT: fc.option(fc.double({ min: 0, max: 5000000 }))
+})
+```
+
+### 2. Unit Testing
+
+**Objetivo**: Verificar que componentes individuales funcionan correctamente de forma aislada.
+
+**Cobertura Objetivo**: Mínimo 80% de cobertura de código
+
+**Áreas de Enfoque**:
+- Validaciones de datos
+- Funciones de transformación y cálculo
+- Lógica de negocio pura (sin dependencias externas)
+
+**Ejemplo de Unit Test**:
+
+```typescript
+describe('GISService.calcularSuperficie', () => {
+  it('debe calcular superficie correctamente para polígono cuadrado', async () => {
+    // Polígono cuadrado de 100m x 100m en UTM
+    const poligono = {
+      type: 'Polygon',
+      coordinates: [[
+        [500000, 2000000],
+        [500100, 2000000],
+        [500100, 2000100],
+        [500000, 2000100],
+        [500000, 2000000]
+      ]]
+    }
+    
+    const resultado = await gisService.calcularSuperficie(poligono)
+    
+    expect(resultado.metrosCuadrados).toBeCloseTo(10000, 1)
+    expect(resultado.hectareas).toBeCloseTo(1, 4)
+  })
+  
+  it('debe manejar geometrías nulas correctamente', async () => {
+    await expect(
+      gisService.calcularSuperficie(null)
+    ).rejects.toThrow('Geometría no puede ser nula')
+  })
+})
+
+describe('MotorCalculosGeoService.calcularPorcentajeAvanceFrente', () => {
+  let mockDb: jest.Mocked<Database>
+  let service: MotorCalculosGeoService
+  
+  beforeEach(() => {
+    mockDb = createMockDatabase()
+    service = new MotorCalculosGeoService(mockDb)
+  })
+  
+  it('debe calcular 100% cuando toda superficie está liberada', async () => {
+    // Mock de datos
+    mockDb.query.mockResolvedValueOnce({
+      rows: [{ superficie_total: 100, superficie_liberada: 100 }]
+    })
+    
+    const resultado = await service.calcularPorcentajeAvanceFrente('frente-1')
+    
+    expect(resultado.porcentajeTotal).toBe(100)
+    expect(resultado.colorIndicador).toBe('verde')
+  })
+  
+  it('debe calcular 0% cuando no hay superficie liberada', async () => {
+    mockDb.query.mockResolvedValueOnce({
+      rows: [{ superficie_total: 100, superficie_liberada: 0 }]
+    })
+    
+    const resultado = await service.calcularPorcentajeAvanceFrente('frente-1')
+    
+    expect(resultado.porcentajeTotal).toBe(0)
+    expect(resultado.colorIndicador).toBe('rojo')
+  })
+})
+```
+
+### 3. Integration Testing
+
+**Objetivo**: Verificar que componentes funcionan correctamente cuando se integran entre sí.
+
+**Áreas de Enfoque**:
+- Interacción entre capa de aplicación y base de datos
+- Flujos completos de API endpoints
+- Cálculos geoespaciales con PostGIS real
+- Transformaciones de coordenadas
+
+**Configuración de Ambiente de Prueba**:
+- Base de datos PostgreSQL + PostGIS dedicada para tests
+- Datos de prueba predefinidos (fixtures)
+- Limpieza automática entre tests
+
+**Ejemplo de Integration Test**:
+
+```typescript
+describe('API Integration: Gestión de Núcleos Agrarios', () => {
+  let testDb: Database
+  let apiClient: TestApiClient
+  let authToken: string
+  
+  beforeAll(async () => {
+    // Inicializar BD de prueba
+    testDb = await setupTestDatabase()
+    await testDb.runMigrations()
+    
+    // Autenticar usuario de prueba
+    authToken = await apiClient.login('test_usuario', 'password')
+  })
+  
+  afterAll(async () => {
+    await testDb.cleanup()
+  })
+  
+  it('debe crear núcleo agrario con geometría y calcular superficie', async () => {
+    const nucleoData = {
+      nombre: 'Ejido Prueba',
+      tipo: 'Ejido',
+      estado: 'Jalisco',
+      municipio: 'Guadalajara',
+      geometriaPoligono: {
+        type: 'Polygon',
+        coordinates: [[
+          [-103.35, 20.67],
+          [-103.34, 20.67],
+          [-103.34, 20.68],
+          [-103.35, 20.68],
+          [-103.35, 20.67]
+        ]]
+      }
+    }
+    
+    const response = await apiClient.post(
+      '/api/nucleos-agrarios',
+      nucleoData,
+      { headers: { Authorization: `Bearer ${authToken}` } }
+    )
+    
+    expect(response.status).toBe(201)
+    expect(response.data.id).toBeDefined()
+    expect(response.data.superficieHectareas).toBeGreaterThan(0)
+    
+    // Verificar que se guardó en BD
+    const nucleoEnBD = await testDb.query(
+      'SELECT * FROM nucleos_agrarios WHERE id = $1',
+      [response.data.id]
+    )
+    expect(nucleoEnBD.rows).toHaveLength(1)
+    expect(ST_IsValid(nucleoEnBD.rows[0].geometria_poligono)).toBe(true)
+  })
+  
+  it('debe calcular intersecciones correctamente con frentes', async () => {
+    // Crear frente que intersecta núcleo
+    const frenteId = await createTestFrente(testDb, {
+      geometriaLinea: {
+        type: 'LineString',
+        coordinates: [
+          [-103.355, 20.675],
+          [-103.345, 20.675]
+        ]
+      }
+    })
+    
+    // Solicitar intersecciones
+    const response = await apiClient.get(
+      `/api/motor-calculos/intersecciones/frente/${frenteId}`,
+      { headers: { Authorization: `Bearer ${authToken}` } }
+    )
+    
+    expect(response.status).toBe(200)
+    expect(response.data).toHaveLength(1)
+    expect(response.data[0].nucleoAgrarioNombre).toBe('Ejido Prueba')
+    expect(response.data[0].superficieInterseccionHa).toBeGreaterThan(0)
+  })
+})
+```
+
+### 4. End-to-End (E2E) Testing
+
+**Objetivo**: Verificar flujos completos del usuario desde interfaz hasta base de datos.
+
+**Framework**: Playwright o Cypress
+
+**Áreas de Enfoque**:
+- Flujos críticos de usuario
+- Interacción con mapas interactivos
+- Formularios complejos
+- Navegación entre vistas
+
+**Ejemplo de E2E Test**:
+
+```typescript
+describe('E2E: Creación de Convenio COP', () => {
+  let page: Page
+  
+  beforeEach(async () => {
+    page = await browser.newPage()
+    await page.goto('http://localhost:3000/login')
+    
+    // Login
+    await page.fill('[name="username"]', 'usuario_captura')
+    await page.fill('[name="password"]', 'password')
+    await page.click('button[type="submit"]')
+    await page.waitForURL('**/dashboard')
+  })
+  
+  it('debe permitir crear convenio COP con todos los campos requeridos', async () => {
+    // Navegar a formulario de convenio
+    await page.click('text=Convenios')
+    await page.click('text=Nuevo Convenio')
+    
+    // Seleccionar tipo
+    await page.selectOption('[name="tipo"]', 'COP')
+    
+    // Llenar campos requeridos para COP
+    await page.fill('[name="fechaAnuencia"]', '2024-01-15')
+    await page.fill('[name="minutaAsamblea"]', 'Acta 001/2024')
+    await page.fill('[name="fechaFirma"]', '2024-02-01')
+    await page.fill('[name="monto90"]', '500000')
+    
+    // Seleccionar núcleo agrario de dropdown
+    await page.click('[name="nucleoAgrarioId"]')
+    await page.click('text=Ejido San José')
+    
+    // Guardar
+    await page.click('button:has-text("Guardar")')
+    
+    // Verificar éxito
+    await expect(page.locator('.notification-success')).toBeVisible()
+    await expect(page.locator('.notification-success')).toContainText(
+      'Convenio creado exitosamente'
+    )
+    
+    // Verificar que aparece en lista
+    await page.click('text=Lista de Convenios')
+    await expect(page.locator('td:has-text("Acta 001/2024")')).toBeVisible()
+  })
+  
+  it('debe validar campos requeridos antes de guardar', async () => {
+    await page.click('text=Convenios')
+    await page.click('text=Nuevo Convenio')
+    await page.selectOption('[name="tipo"]', 'COP')
+    
+    // Intentar guardar sin llenar campos requeridos
+    await page.click('button:has-text("Guardar")')
+    
+    // Verificar mensajes de error
+    await expect(page.locator('.error-fechaAnuencia')).toContainText(
+      'Fecha de anuencia es requerida'
+    )
+    await expect(page.locator('.error-minutaAsamblea')).toContainText(
+      'Minuta de asamblea es requerida'
+    )
+  })
+})
+
+describe('E2E: Interacción con Mapa', () => {
+  it('debe permitir dibujar polígono de núcleo agrario en mapa', async () => {
+    const page = await browser.newPage()
+    await loginAsGeografo(page)
+    
+    // Navegar a crear núcleo agrario
+    await page.click('text=Núcleos Agrarios')
+    await page.click('text=Nuevo Núcleo')
+    
+    // Activar herramienta de dibujo
+    await page.click('[data-testid="draw-polygon-tool"]')
+    
+    // Simular clicks en el mapa para dibujar polígono
+    const map = await page.locator('#map-container')
+    await map.click({ position: { x: 200, y: 200 } })
+    await map.click({ position: { x: 300, y: 200 } })
+    await map.click({ position: { x: 300, y: 300 } })
+    await map.click({ position: { x: 200, y: 300 } })
+    await map.click({ position: { x: 200, y: 200 } })  // Cerrar polígono
+    
+    // Confirmar geometría
+    await page.click('button:has-text("Confirmar Geometría")')
+    
+    // Verificar que se calculó superficie automáticamente
+    const superficieInput = page.locator('[name="superficieHectareas"]')
+    await expect(superficieInput).toHaveValue(/^\d+\.\d+$/)
+    
+    // Completar formulario y guardar
+    await page.fill('[name="nombre"]', 'Ejido Prueba Dibujado')
+    await page.selectOption('[name="tipo"]', 'Ejido')
+    await page.click('button:has-text("Guardar")')
+    
+    // Verificar que aparece en mapa
+    await expect(map.locator('[data-nucleo-id]')).toBeVisible()
+  })
+})
+```
+
+### 5. Performance Testing
+
+**Objetivo**: Verificar que el sistema cumple con requerimientos de rendimiento (RNF-1, RNF-2, RNF-3).
+
+**Herramientas**: Apache JMeter, k6, Artillery
+
+**Escenarios de Prueba**:
+
+1. **Carga de Usuario Concurrente** (RNF-1: 50 usuarios simultáneos):
+   ```javascript
+   // k6 load test
+   import http from 'k6/http'
+   import { check, sleep } from 'k6'
+   
+   export const options = {
+     stages: [
+       { duration: '2m', target: 50 },  // Ramp up a 50 usuarios
+       { duration: '5m', target: 50 },  // Mantener 50 usuarios
+       { duration: '2m', target: 0 }    // Ramp down
+     ],
+     thresholds: {
+       http_req_duration: ['p(95)<3000'],  // 95% requests < 3s
+       http_req_failed: ['rate<0.01']      // < 1% de errores
+     }
+   }
+   
+   export default function() {
+     const token = login()
+     
+     // Simular navegación típica
+     http.get('https://api.example.com/nucleos-agrarios', {
+       headers: { Authorization: `Bearer ${token}` }
+     })
+     
+     sleep(2)
+     
+     http.get('https://api.example.com/tramos', {
+       headers: { Authorization: `Bearer ${token}` }
+     })
+     
+     sleep(3)
+   }
+   ```
+
+2. **Consultas Geoespaciales Complejas** (RNF-2: < 5 segundos):
+   - Intersección de frente con múltiples núcleos agrarios
+   - Cálculo de superficies liberadas para tramo completo
+   - Generación de reportes con datos geográficos
+
+3. **Carga de Mapas con Muchas Geometrías** (RNF-3: < 2 segundos):
+   - Cargar 500+ polígonos de núcleos agrarios
+   - Verificar tiempo de renderizado en frontend
+   - Medir impacto de simplificación de geometrías
+
+**Criterios de Aceptación**:
+- 95% de requests < 3 segundos
+- 99% de requests < 5 segundos
+- 0% de errores bajo carga normal
+- < 1% de errores bajo carga máxima
+
+### 6. Security Testing
+
+**Objetivo**: Verificar que el sistema es seguro contra vulnerabilidades comunes.
+
+**Áreas de Prueba**:
+
+1. **Autenticación y Autorización**:
+   - Intentar acceder a recursos sin autenticación
+   - Intentar realizar operaciones sin permisos suficientes
+   - Verificar expiración de tokens
+   - Verificar cierre de sesión por inactividad
+
+2. **Inyección SQL**:
+   - Intentar inyecciones en todos los campos de entrada
+   - Verificar uso de consultas parametrizadas
+   - Ejemplo de test:
+     ```typescript
+     it('debe prevenir inyección SQL en búsqueda de núcleos', async () => {
+       const maliciousInput = "'; DROP TABLE nucleos_agrarios; --"
+       
+       const response = await apiClient.get(
+         `/api/nucleos-agrarios/buscar?nombre=${maliciousInput}`
+       )
+       
+       // No debe generar error de SQL
+       expect(response.status).not.toBe(500)
+       
+       // Verificar que tabla sigue existiendo
+       const count = await testDb.query(
+         'SELECT COUNT(*) FROM nucleos_agrarios'
+       )
+       expect(count.rows[0].count).toBeGreaterThan(0)
+     })
+     ```
+
+3. **Cross-Site Scripting (XSS)**:
+   - Intentar inyectar scripts en campos de texto
+   - Verificar sanitización de inputs
+   - Verificar escape de outputs
+
+4. **Cross-Site Request Forgery (CSRF)**:
+   - Verificar tokens CSRF en formularios
+   - Verificar validación de origen de requests
+
+**Herramientas**:
+- OWASP ZAP para escaneo automático de vulnerabilidades
+- Burp Suite para pruebas manuales
+- npm audit / pip-audit para dependencias vulnerables
+
+### 7. Accessibility Testing
+
+**Objetivo**: Verificar que la interfaz es accesible para usuarios con discapacidades.
+
+**Estándares**: WCAG 2.1 Level AA
+
+**Herramientas**:
+- axe DevTools
+- Lighthouse (Chrome DevTools)
+- NVDA/JAWS screen readers
+
+**Áreas de Verificación**:
+- Contraste de colores (mínimo 4.5:1)
+- Navegación por teclado
+- Atributos ARIA correctos
+- Etiquetas de formulario
+- Texto alternativo para imágenes
+
+### Test Data Management
+
+**Fixtures de Datos de Prueba**:
+
+```typescript
+// fixtures/nucleos-agrarios.ts
+export const nucleosAgrariosFixtures = [
+  {
+    id: 'nucleo-1',
+    nombre: 'Ejido San José',
+    tipo: 'Ejido',
+    estado: 'Jalisco',
+    municipio: 'Guadalajara',
+    geometriaPoligono: {
+      type: 'Polygon',
+      coordinates: [[
+        [-103.35, 20.67],
+        [-103.34, 20.67],
+        [-103.34, 20.68],
+        [-103.35, 20.68],
+        [-103.35, 20.67]
+      ]]
+    },
+    superficieHectareas: 123.45
+  },
+  // ... más fixtures
+]
+
+// Helper para cargar fixtures en BD de prueba
+export async function loadFixtures(db: Database) {
+  await db.query('TRUNCATE TABLE nucleos_agrarios CASCADE')
+  
+  for (const nucleo of nucleosAgrariosFixtures) {
+    await db.query(
+      `INSERT INTO nucleos_agrarios (id, nombre, tipo, estado, municipio, geometria_poligono, superficie_hectareas)
+       VALUES ($1, $2, $3, $4, $5, ST_GeomFromGeoJSON($6), $7)`,
+      [nucleo.id, nucleo.nombre, nucleo.tipo, nucleo.estado, nucleo.municipio,
+       JSON.stringify(nucleo.geometriaPoligono), nucleo.superficieHectareas]
+    )
+  }
+}
+```
+
+### Continuous Integration (CI)
+
+**Pipeline de CI**:
+
+```yaml
+# .github/workflows/ci.yml
+name: CI Pipeline
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgis/postgis:14-3.3
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run unit tests
+        run: npm run test:unit
+      
+      - name: Run property-based tests
+        run: npm run test:property
+      
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+      
+      - name: Check code coverage
+        run: npm run test:coverage
+        
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+      
+      - name: Run linter
+        run: npm run lint
+      
+      - name: Run security audit
+        run: npm audit --audit-level=moderate
+```
+
+### Test Execution Schedule
+
+| Tipo de Test | Frecuencia | Duración Estimada | Trigger |
+|--------------|-----------|-------------------|---------|
+| Unit Tests | Cada commit | 2-5 minutos | CI automático |
+| Property-Based Tests | Cada commit | 5-10 minutos | CI automático |
+| Integration Tests | Cada commit | 10-15 minutos | CI automático |
+| E2E Tests | Cada PR | 20-30 minutos | CI automático |
+| Performance Tests | Semanal | 30-60 minutos | Programado |
+| Security Tests | Semanal | 15-30 minutos | Programado |
+| Accessibility Tests | Cada release | 15-30 minutos | Manual |
+
+### Test Metrics y Reporting
+
+**Métricas Clave**:
+- **Code Coverage**: Objetivo > 80%
+- **Test Pass Rate**: Objetivo > 99%
+- **Test Execution Time**: Monitorear tendencias
+- **Flaky Tests**: Identificar y corregir tests intermitentes
+
+**Reporting**:
+- Dashboard de cobertura (Codecov, Coveralls)
+- Reportes de tests en PRs
+- Tendencias históricas de métricas
+- Alertas automáticas si métricas caen por debajo de umbrales
