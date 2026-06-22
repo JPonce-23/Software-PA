@@ -1223,32 +1223,7 @@ CONSTRAINT chk_modificatorio_individual_sin_superficie CHECK (
 
 ---
 
-### RN-4: Campos RAN "2" Exclusivos para Obras Complementarias
 
-**Ubicación**: Tabla `convenio`, campos `ingreso_ran_fecha_2`, `numero_solicitud_ingreso_2`, `calificacion_registral_2`, `acta_inscrita_fecha_ran_2`
-
-**Regla**: Los campos RAN con sufijo "_2" SOLO deben poblarse cuando `tipo_convenio = 'obras_complementarias'`. Para todos los demás tipos de convenio, estos campos deben ser NULL.
-
-**Fuente**: Confirmación del stakeholder (Procuraduría Agraria):
-> "Al ser una nueva ocupación en tierras de uso común, la ley exige detonar de nuevo todo el ciclo [...] el sistema utiliza los campos Ingresado al RAN (Fecha) 2 y Número de Solicitud de Ingreso 2 como una nomenclatura diferenciada para evitar duplicidades en el sistema."
-
-**Implementación**:
-```sql
-CONSTRAINT chk_campos_ran_2_solo_obras_complementarias CHECK (
-    (tipo_convenio = 'obras_complementarias')
-    OR
-    (tipo_convenio != 'obras_complementarias' 
-     AND ingreso_ran_fecha_2 IS NULL 
-     AND numero_solicitud_ingreso_2 IS NULL 
-     AND calificacion_registral_2 IS NULL 
-     AND acta_inscrita_fecha_ran_2 IS NULL)
-)
-```
-
-**Justificación**: Obras Complementarias requiere un nuevo ciclo completo de asamblea y trámite RAN por ser una nueva ocupación de tierras colectivas. Los campos "_2" son nomenclatura técnica para evitar colisiones con los campos del COP original, manteniendo ambos ciclos documentados en la misma fila del expediente. Esto refleja la práctica operativa donde un solo expediente contiene múltiples ciclos de autorización.
-
-**Contexto Operativo Detallado**:
-Las Obras Complementarias representan **una nueva ocupación de tierras de uso común** descubierta durante la ejecución del proyecto. Por ley, esto requiere detonar un **ciclo completamente nuevo** que incluye:
 ### RN-4: Normalización del Ciclo de Obras Complementarias
 
 **Ubicación**: Tabla `asamblea` y tabla `convenio`
@@ -1690,6 +1665,7 @@ Dado el hardware disponible, el sistema se despliega en una arquitectura de serv
 **3. Servidor de Aplicación**
 - **Runtime**: Node.js 18+ o Python 3.10+
 - **Configuración**: Un único proceso o cluster limitado a 2-3 workers para no saturar los 4 vCPU del servidor, balanceando los requerimientos de la BD.
+- **Validación RNF-1**: Obligatorio realizar pruebas de carga empíricas (ej. k6) para confirmar que esta arquitectura mononodo soporta 50 usuarios concurrentes sin degradación.
 
 **4. Base de Datos**
 - **Versión**: PostgreSQL 14+ con PostGIS 3.3+
@@ -1757,7 +1733,8 @@ find $BACKUP_DIR -name "documentos_*.tar.gz" -mtime +$RETENTION_DAYS -delete
 pg_restore --list $BACKUP_DIR/backup_$DATE.dump > /dev/null
 if [ $? -eq 0 ]; then
   echo "Respaldo exitoso: backup_$DATE.dump"
-  # Opcional: copiar a almacenamiento remoto (S3, rsync, etc.)
+  # Copia obligatoria a almacenamiento offsite (S3) para prevenir pérdida por falla de disco
+  aws s3 sync $BACKUP_DIR s3://backups-liberacion-derechos/postgresql/
   # aws s3 cp $BACKUP_DIR/backup_$DATE.dump s3://bucket-respaldos/
 else
   echo "ERROR: Respaldo falló validación"
