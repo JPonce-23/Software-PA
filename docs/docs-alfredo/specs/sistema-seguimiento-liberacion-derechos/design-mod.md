@@ -645,6 +645,12 @@ CREATE TABLE tramo (
     geometria_linea GEOMETRY(MULTILINESTRING, 4326),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_registro DATE NOT NULL DEFAULT CURRENT_DATE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT
 );
 
@@ -657,6 +663,12 @@ CREATE TABLE frente (
     geometria_linea GEOMETRY(MULTILINESTRING, 4326),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_registro DATE NOT NULL DEFAULT CURRENT_DATE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT,
     CONSTRAINT uq_frente_tramo_clave UNIQUE (id_tramo, clave_frente),
     CONSTRAINT uq_frente_tramo_id UNIQUE (id_tramo, id_frente)
@@ -671,6 +683,12 @@ CREATE TABLE nucleo_agrario (
     residencia VARCHAR(300),
     geometria_poligono GEOMETRY(MULTIPOLYGON, 4326),
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT
 );
 
@@ -686,6 +704,12 @@ CREATE TABLE tramo_nucleo (
     es_expropiacion BOOLEAN NOT NULL DEFAULT FALSE,
     causa_problema TEXT,
     proyecto_no_afecta_uso_comun BOOLEAN,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT,
     CONSTRAINT uq_tramo_nucleo_consecutivo UNIQUE (id_tramo, consecutivo),
     CONSTRAINT fk_tramo_nucleo_frente_mismo_tramo
@@ -707,6 +731,11 @@ CREATE TABLE usuario (
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_alta TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT
 );
 
@@ -754,6 +783,12 @@ CREATE TABLE orv (
     consejo_vigilancia_secretario1 VARCHAR(300),
     consejo_vigilancia_secretario2 VARCHAR(300),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT
 );
 
@@ -765,6 +800,12 @@ CREATE TABLE padron_historial (
     id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
     fecha_registro TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT,
     CONSTRAINT uq_padron_nucleo UNIQUE (id_nucleo, id_padron)
 );
@@ -781,6 +822,12 @@ CREATE TABLE parcela (
     documentacion_disponible BOOLEAN NOT NULL DEFAULT FALSE,
     documentacion_faltante TEXT,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT,
     CONSTRAINT uq_parcela_nucleo_id UNIQUE (id_nucleo, id_parcela)
 );
@@ -803,6 +850,12 @@ CREATE TABLE afectacion (
     documentacion_faltante TEXT,
     origen_registro VARCHAR(50) NOT NULL DEFAULT 'captura_sistema' CHECK (origen_registro IN ('migracion_excel', 'captura_sistema')),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT,
     CONSTRAINT chk_afectacion_tipo_geometria CHECK (geometria_afectacion IS NULL OR ST_GeometryType(geometria_afectacion) IN ('ST_Polygon', 'ST_MultiPolygon')),
     CONSTRAINT chk_afectacion_geometria_valida CHECK (geometria_afectacion IS NULL OR ST_IsValid(geometria_afectacion)),
@@ -832,6 +885,12 @@ CREATE TABLE actividad_campo (
     id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
     fecha_registro TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT
 );
 
@@ -857,6 +916,12 @@ CREATE TABLE asamblea (
     id_padron INTEGER,
     id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT,
     CONSTRAINT fk_asamblea_tramo_nucleo FOREIGN KEY (id_nucleo, id_tramo_nucleo) REFERENCES tramo_nucleo(id_nucleo, id_tramo_nucleo),
     CONSTRAINT fk_asamblea_padron FOREIGN KEY (id_nucleo, id_padron) REFERENCES padron_historial(id_nucleo, id_padron),
@@ -890,6 +955,12 @@ CREATE TABLE convenio (
     documentacion_faltante TEXT,
     id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT,
     CONSTRAINT uq_convenio_linaje UNIQUE (id_tramo_nucleo, id_convenio, id_afectacion),
     CONSTRAINT fk_convenio_afectacion_compuesta
@@ -958,10 +1029,16 @@ CREATE TABLE tramite_fifonafe (
     fecha_oficio_rpta_repr_a_dgaopr DATE,
     fecha_oficio_rpta_dgaopr_a_fifonafe DATE,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT,
     CONSTRAINT fk_tramite_convenio_compuesta
-        FOREIGN KEY (id_tramo_nucleo, id_convenio, tipo_afectacion)
-        REFERENCES convenio(id_tramo_nucleo, id_convenio, tipo_afectacion),
+        FOREIGN KEY (id_tramo_nucleo, id_convenio, id_afectacion)
+        REFERENCES convenio(id_tramo_nucleo, id_convenio, id_afectacion),
     CONSTRAINT fk_tramite_afectacion_compuesta
         FOREIGN KEY (id_tramo_nucleo, id_afectacion, tipo_afectacion)
         REFERENCES afectacion(id_tramo_nucleo, id_afectacion, tipo_afectacion)
@@ -979,6 +1056,12 @@ CREATE TABLE documentacion_soporte (
     es_critico BOOLEAN NOT NULL DEFAULT FALSE,
     url_archivo TEXT,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
     observaciones TEXT,
     fecha_carga TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -994,7 +1077,13 @@ CREATE TABLE alertas (
     fecha_evento DATE,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     esta_activa BOOLEAN NOT NULL DEFAULT TRUE,
-    activo BOOLEAN NOT NULL DEFAULT TRUE
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT
 );
 
 CREATE TABLE alertas_vistas (
@@ -1097,6 +1186,22 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_validar_superficie_liberada_convenio
 AFTER INSERT OR UPDATE OF convenio_inscrito_fecha_ran, activo, tipo_convenio, id_convenio_padre, superficie_total_ha, superficie_real_afectada_ha, superficie_adicional_ha, superficie_ampliacion_ha, id_afectacion ON convenio
 FOR EACH ROW EXECUTE FUNCTION fn_validar_superficie_liberada_convenio();
+
+-- Trigger para auto-incrementar la Afectación base al registrar expansiones
+CREATE OR REPLACE FUNCTION fn_sincronizar_superficie_adicional() RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') AND NEW.activo = TRUE THEN
+        UPDATE afectacion 
+        SET superficie_afectada_ha = superficie_afectada_ha + COALESCE(NEW.superficie_adicional_ha, NEW.superficie_ampliacion_ha, 0)
+        WHERE id_afectacion = NEW.id_afectacion;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sincronizar_superficie_adicional
+AFTER INSERT OR UPDATE OF activo, superficie_adicional_ha, superficie_ampliacion_ha ON convenio
+FOR EACH ROW EXECUTE FUNCTION fn_sincronizar_superficie_adicional();
 
 -- Trigger sobre Afectación (Protección contra reducción)
 CREATE OR REPLACE FUNCTION fn_validar_superficie_afectada_reducida() RETURNS TRIGGER AS $$
@@ -1589,8 +1694,8 @@ CONSTRAINT chk_superficie_exclusiva_estricta CHECK (
 |-----------------|---------------|--------------|
 | Individual | COP Original | `superficie_total_ha` |
 | Individual | Modificatorio | Ninguno (solo montos) |
-| Individual | Ampliación | `superficie_total_ha` (nueva superficie) |
-| Individual | Ampliación Remanente | `superficie_total_ha` |
+| Individual | Ampliación | `superficie_ampliacion_ha` |
+| Individual | Ampliación Remanente | `superficie_ampliacion_ha` |
 | Colectivo | COP Original | `superficie_real_afectada_ha` |
 | Colectivo | Modificatorio | `superficie_real_afectada_ha` |
 | Colectivo | Superficie Adicional | `superficie_adicional_ha` |

@@ -48,7 +48,7 @@ Como las tierras de uso común son de todos, la PA debe recabar información té
 
 * Convenio Modificatorio: Solo se capturan los ajustes al acuerdo inicial: Convenio Modificatorio Firmado (Fecha), los montos (90%, 100%, Monto BDT) y la Superficie Total Real Afectada (Ha), junto con sus respectivos campos de ingreso e inscripción al RAN.  
 * Convenio Superficie Adicional: Se reinicia el ciclo de asamblea y RAN. Se captura el Convenio Sup. Adicional Firmado (Fecha), los montos (90%, 100%, BDT) y la Superficie Adicional (Ha).  
-* Convenio Obras Complementarias: Repite el ciclo pero usando campos con nomenclatura diferenciada para evitar duplicidades en el sistema: Asamblea 1ra Convocatoria (Fecha), Asamblea 2da Convocatoria (Fecha), Ingresado al RAN (Fecha) 2, Número de Solicitud de Ingreso 2\. Se captura el Convenio Firmado (Fecha), montos (90%, 100%) y la Superficie Total Real Afectada (Ha). (Nota: En esta variante no se captura Monto BDT).
+* Convenio Obras Complementarias: Al representar una nueva ocupación en tierras de uso común, se abandona la captura en columnas paralelas. Se debe detonar un **nuevo ciclo relacional independiente**, registrando una nueva Asamblea de Anuencia y un nuevo Convenio vinculados al núcleo agrario, preservando intacto el COP original. Se captura el Convenio Firmado (Fecha), montos (90%, 100%) y la Superficie Total Real Afectada (Ha). (Nota: En esta variante no se captura Monto BDT).
 
 Fase 3B: Matriz de Seguimiento a Derechos Individuales (Parcelas)  
 Como las parcelas tienen un dueño asignado, no interviene la asamblea. Tras el caminamiento, la PA crea un expediente privado.
