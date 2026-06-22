@@ -315,12 +315,8 @@ interface TramoNucleo {
   numero_tramo: string | null
   geometria_segmento: GeoJSON | null
   longitud_m: number | null
-  no_parcela_solar: string | null
   es_expropiacion: boolean
   causa_problema: string | null
-  validado_liberado: boolean
-  fecha_validacion_liberado: Date | null
-  id_usuario_validacion: number | null // FK a Usuario
   proyecto_no_afecta_uso_comun: boolean | null
   observaciones: string | null
 }
@@ -348,12 +344,20 @@ interface NucleoAgrario {
   observaciones: string | null
 }
 
+interface PadronHistorial {
+  id_padron: number // PK SERIAL
+  id_nucleo: number // FK a NucleoAgrario
+  fecha_padron: Date
+  numero_ejidatarios_comuneros: number
+  id_usuario_registro: number | null // FK a Usuario
+  fecha_registro: Date
+  observaciones: string | null
+}
+
 interface ORV {
   id_orv: number // PK SERIAL
   id_nucleo: number // FK a NucleoAgrario
   numero_orv: string | null
-  fecha_padron: Date | null
-  numero_ejidatarios_comuneros: number | null
   inicio_vigencia: Date
   fin_vigencia: Date
   orv_vigente: boolean
@@ -404,6 +408,7 @@ interface Afectacion {
   tipo_tenencia: string
   subtipo_tenencia: string | null
   destino_superficie: string | null
+  no_parcela_solar: string | null
   superficie_afectada_ha: number | null
   num_personas_afectadas: number | null
   situacion_juridica: string | null
@@ -429,6 +434,7 @@ interface Asamblea {
   id_asamblea: number // PK SERIAL
   id_tramo_nucleo: number // FK a TramoNucleo
   tipo_asamblea: 'informacion' | 'anuencia' | 'retiro_fondos' | 'conciliacion' | 'no_verificativo'
+  estatus_asamblea: 'programado' | 'pendiente' | 'completo' | null
   contexto_proceso: string | null
   fecha_exp_1a: Date | null
   fecha_prog_1a: Date | null
@@ -442,6 +448,7 @@ interface Asamblea {
   acta_inscripcion_fecha_ran: Date | null
   documentacion_disponible: boolean
   documentacion_faltante: string | null
+  id_padron: number | null // FK a PadronHistorial (Quórum legal)
   id_usuario_registro: number | null // FK a Usuario
   observaciones: string | null
 }
@@ -480,32 +487,13 @@ interface Convenio {
   superficie_real_afectada_ha: number | null
   
   superficie_adicional_ha: number | null
+  superficie_ampliacion_ha: number | null
   
-  // Campos RAN estándar (para COP Original, Modificatorio, Superficie Adicional, Ampliación)
+  // Campos RAN estándar
   ingreso_ran_fecha: Date | null
   numero_solicitud_ingreso: string | null
   calificacion_registral: string | null
   convenio_inscrito_fecha_ran: Date | null
-  
-  /**
-   * Campos RAN "2": EXCLUSIVOS para convenios de tipo 'obras_complementarias'
-   * 
-   * El sufijo "_2" es nomenclatura técnica del sistema para evitar duplicidades en la misma fila.
-   * Estos campos NO representan una segunda inscripción del mismo convenio, sino un NUEVO CICLO
-   * COMPLETO de asamblea + inscripción RAN que coexiste en el MISMO REGISTRO.
-   * 
-   * Proceso de Obras Complementarias:
-   * 1. Nueva asamblea de anuencia (requerida por ley para nueva ocupación de uso común)
-   * 2. Nueva inscripción de acta → ingreso_ran_fecha_2, numero_solicitud_ingreso_2
-   * 3. Nueva calificación registral → calificacion_registral_2
-   * 4. Nueva inscripción definitiva → acta_inscrita_fecha_ran_2
-   * 
-   * RESTRICCIÓN: Estos campos deben ser NULL para todos los tipos de convenio excepto 'obras_complementarias'
-   */
-  ingreso_ran_fecha_2: Date | null
-  numero_solicitud_ingreso_2: string | null
-  calificacion_registral_2: string | null
-  acta_inscrita_fecha_ran_2: Date | null
   
   documentacion_disponible: boolean
   documentacion_faltante: string | null
@@ -519,7 +507,7 @@ interface TramiteFifonafe {
   id_convenio: number | null // FK a Convenio
   id_afectacion: number | null // FK a Afectacion
   tipo_afectacion: 'colectivo' | 'individual'
-  tipo_tramite: 'retiro_fondos' | 'indemnizacion' | 'informe_no_conflictos'
+  tipo_tramite: 'indemnizacion' | 'informe_no_conflictos'
   estatus: 'programado' | 'pendiente' | 'completo' | 'cancelado'
   hay_conflictos: boolean | null
   no_oficio_fifonafe_a_dgaopr: string | null
@@ -683,12 +671,8 @@ CREATE TABLE tramo_nucleo (
     numero_tramo VARCHAR(50),
     geometria_segmento GEOMETRY(MULTILINESTRING, 4326),
     longitud_m NUMERIC(14,2) CHECK (longitud_m >= 0),
-    no_parcela_solar VARCHAR(100),
     es_expropiacion BOOLEAN NOT NULL DEFAULT FALSE,
     causa_problema TEXT,
-    validado_liberado BOOLEAN NOT NULL DEFAULT FALSE,
-    fecha_validacion_liberado TIMESTAMPTZ,
-    id_usuario_validacion INTEGER REFERENCES usuario(id_usuario),
     proyecto_no_afecta_uso_comun BOOLEAN,
     observaciones TEXT,
     CONSTRAINT uq_tramo_nucleo_consecutivo UNIQUE (id_tramo, consecutivo),
@@ -745,8 +729,6 @@ CREATE TABLE orv (
     id_orv SERIAL PRIMARY KEY,
     id_nucleo INTEGER NOT NULL REFERENCES nucleo_agrario(id_nucleo),
     numero_orv VARCHAR(50),
-    fecha_padron DATE,
-    numero_ejidatarios_comuneros INTEGER CHECK (numero_ejidatarios_comuneros >= 0),
     inicio_vigencia DATE NOT NULL,
     fin_vigencia DATE NOT NULL,
     orv_vigente BOOLEAN NOT NULL DEFAULT FALSE,
@@ -759,6 +741,16 @@ CREATE TABLE orv (
     consejo_vigilancia_presidente VARCHAR(300),
     consejo_vigilancia_secretario1 VARCHAR(300),
     consejo_vigilancia_secretario2 VARCHAR(300),
+    observaciones TEXT
+);
+
+CREATE TABLE padron_historial (
+    id_padron SERIAL PRIMARY KEY,
+    id_nucleo INTEGER NOT NULL REFERENCES nucleo_agrario(id_nucleo),
+    fecha_padron DATE NOT NULL,
+    numero_ejidatarios_comuneros INTEGER NOT NULL CHECK (numero_ejidatarios_comuneros >= 0),
+    id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
+    fecha_registro TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     observaciones TEXT
 );
 
@@ -786,6 +778,7 @@ CREATE TABLE afectacion (
     tipo_tenencia VARCHAR(80) NOT NULL,
     subtipo_tenencia VARCHAR(80),
     destino_superficie VARCHAR(80),
+    no_parcela_solar VARCHAR(100),
     superficie_afectada_ha NUMERIC(12,4) CHECK (superficie_afectada_ha >= 0),
     num_personas_afectadas INTEGER CHECK (num_personas_afectadas >= 0),
     situacion_juridica TEXT,
@@ -826,12 +819,14 @@ CREATE TABLE asamblea (
     fecha_prog_2a DATE,
     fecha_realizada DATE,
     resultado_anuencia VARCHAR(30) NOT NULL DEFAULT 'pendiente' CHECK (resultado_anuencia IN ('otorgada', 'negada', 'pendiente', 'no_aplica')),
+    estatus_asamblea VARCHAR(30) CHECK (estatus_asamblea IN ('programado', 'pendiente', 'completo')),
     ingreso_ran_fecha DATE,
     numero_solicitud_ran VARCHAR(100),
     calificacion_registral_ran TEXT,
     acta_inscripcion_fecha_ran DATE,
     documentacion_disponible BOOLEAN NOT NULL DEFAULT FALSE,
     documentacion_faltante TEXT,
+    id_padron INTEGER REFERENCES padron_historial(id_padron),
     id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
     observaciones TEXT,
     CONSTRAINT uq_asamblea_tramo_id UNIQUE (id_tramo_nucleo, id_asamblea)
@@ -869,30 +864,13 @@ CREATE TABLE convenio (
     superficie_real_afectada_ha NUMERIC(12,4) CHECK (superficie_real_afectada_ha >= 0),
     
     superficie_adicional_ha NUMERIC(12,4) CHECK (superficie_adicional_ha >= 0),
+    superficie_ampliacion_ha NUMERIC(12,4) CHECK (superficie_ampliacion_ha >= 0),
     
-    -- Campos RAN estándar (para COP Original, Modificatorio, Superficie Adicional, Ampliación)
+    -- Campos RAN estándar
     ingreso_ran_fecha DATE,
     numero_solicitud_ingreso VARCHAR(100),
     calificacion_registral TEXT,
     convenio_inscrito_fecha_ran DATE,
-    
-    -- CAMPOS RAN "2": EXCLUSIVOS para convenios de tipo 'obras_complementarias'
-    -- El sufijo "_2" es nomenclatura técnica del sistema para evitar duplicidades en la misma fila.
-    -- Estos campos NO representan una segunda inscripción del mismo convenio, sino un NUEVO CICLO
-    -- COMPLETO de asamblea + inscripción RAN que coexiste en el MISMO REGISTRO de base de datos.
-    --
-    -- Proceso de Obras Complementarias:
-    -- 1. Nueva asamblea de anuencia (requerida por ley para nueva ocupación de uso común)
-    -- 2. Nueva inscripción de acta → ingreso_ran_fecha_2, numero_solicitud_ingreso_2
-    -- 3. Nueva calificación registral → calificacion_registral_2
-    -- 4. Nueva inscripción definitiva → acta_inscrita_fecha_ran_2
-    --
-    -- RESTRICCIÓN: Estos campos deben ser NULL para todos los tipos de convenio excepto 'obras_complementarias'
-    -- Validado por: chk_campos_ran_2_solo_obras_complementarias
-    ingreso_ran_fecha_2 DATE,
-    numero_solicitud_ingreso_2 VARCHAR(100),
-    calificacion_registral_2 TEXT,
-    acta_inscrita_fecha_ran_2 DATE,
     
     documentacion_disponible BOOLEAN NOT NULL DEFAULT FALSE,
     documentacion_faltante TEXT,
@@ -919,32 +897,33 @@ CREATE TABLE convenio (
         OR
         (tipo_convenio != 'obras_complementarias')
     ),
-    -- Regla: Modificatorio Individual solo requiere fecha, monto_90, monto_100 (sin superficie ni BDT)
-    CONSTRAINT chk_modificatorio_individual_sin_superficie CHECK (
-        NOT (tipo_convenio = 'modificatorio' 
-             AND tipo_afectacion = 'individual' 
-             AND (superficie_total_ha IS NOT NULL 
-                  OR superficie_real_afectada_ha IS NOT NULL 
-                  OR superficie_adicional_ha IS NOT NULL
-                  OR monto_bdt IS NOT NULL))
+    -- Regla: Modificatorio Individual solo requiere fecha, monto_90, monto_100 (sin superficie, sin BDT, sin RAN)
+    CONSTRAINT chk_modificatorio_individual_restricciones CHECK (
+        NOT (tipo_convenio = 'modificatorio' AND tipo_afectacion = 'individual')
+        OR
+        (superficie_total_ha IS NULL 
+         AND superficie_real_afectada_ha IS NULL 
+         AND superficie_adicional_ha IS NULL
+         AND superficie_ampliacion_ha IS NULL
+         AND monto_bdt IS NULL
+         AND ingreso_ran_fecha IS NULL
+         AND numero_solicitud_ingreso IS NULL
+         AND calificacion_registral IS NULL
+         AND convenio_inscrito_fecha_ran IS NULL)
     ),
-    -- Regla: Campos RAN "2" solo para Obras Complementarias (nuevo ciclo en misma fila)
-    CONSTRAINT chk_campos_ran_2_solo_obras_complementarias CHECK (
-        (tipo_convenio = 'obras_complementarias')
-        OR
-        (tipo_convenio != 'obras_complementarias' 
-         AND ingreso_ran_fecha_2 IS NULL 
-         AND numero_solicitud_ingreso_2 IS NULL 
-         AND calificacion_registral_2 IS NULL 
-         AND acta_inscrita_fecha_ran_2 IS NULL)
-    ),
-    -- Regla: superficie_total_ha es para individuales, superficie_real_afectada_ha es para colectivos
-    CONSTRAINT chk_superficie_segun_tipo_afectacion CHECK (
-        (tipo_afectacion = 'individual' AND superficie_real_afectada_ha IS NULL)
-        OR
-        (tipo_afectacion = 'colectivo' AND superficie_total_ha IS NULL)
-        OR
-        (tipo_afectacion = 'individual' AND tipo_convenio = 'modificatorio')  -- Excepción: modificatorio individual no usa ninguna
+    -- Regla: Exclusividad estricta de campos de superficie según el tipo de convenio y afectación
+    CONSTRAINT chk_superficie_exclusiva_estricta CHECK (
+        (tipo_afectacion != 'individual' OR (superficie_real_afectada_ha IS NULL AND superficie_adicional_ha IS NULL))
+        AND
+        (tipo_afectacion != 'colectivo' OR (superficie_total_ha IS NULL AND superficie_ampliacion_ha IS NULL))
+        AND
+        (tipo_convenio != 'cop_original' OR tipo_afectacion != 'individual' OR superficie_ampliacion_ha IS NULL)
+        AND
+        (tipo_convenio NOT IN ('ampliacion', 'ampliacion_remanente') OR superficie_total_ha IS NULL)
+        AND
+        (tipo_convenio != 'superficie_adicional' OR superficie_real_afectada_ha IS NULL)
+        AND
+        (tipo_convenio NOT IN ('cop_original', 'obras_complementarias') OR tipo_afectacion != 'colectivo' OR superficie_adicional_ha IS NULL)
     )
 );
 
@@ -954,8 +933,8 @@ CREATE TABLE tramite_fifonafe (
     id_convenio INTEGER,
     id_afectacion INTEGER,
     tipo_afectacion VARCHAR(20) NOT NULL CHECK (tipo_afectacion IN ('colectivo', 'individual')),
-    tipo_tramite VARCHAR(50) NOT NULL CHECK (tipo_tramite IN ('retiro_fondos', 'indemnizacion', 'informe_no_conflictos')),
-    estatus VARCHAR(30) NOT NULL DEFAULT 'pendiente',
+    tipo_tramite VARCHAR(50) NOT NULL CHECK (tipo_tramite IN ('indemnizacion', 'informe_no_conflictos')),
+    estatus VARCHAR(30) NOT NULL DEFAULT 'pendiente' CHECK (estatus IN ('programado', 'pendiente', 'completo', 'cancelado')),
     hay_conflictos BOOLEAN,
     no_oficio_fifonafe_a_dgaopr VARCHAR(50),
     no_oficio_dgaopr_a_repr VARCHAR(50),
@@ -1008,6 +987,41 @@ CREATE TABLE alertas_vistas (
     fecha_vista TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (id_alerta, id_usuario)
 );
+
+-- Índices Espaciales y de Rendimiento
+CREATE INDEX idx_tramo_geometria ON tramo USING GIST (geometria_linea);
+CREATE INDEX idx_frente_geometria ON frente USING GIST (geometria_linea);
+CREATE INDEX idx_nucleo_geometria ON nucleo_agrario USING GIST (geometria_poligono);
+CREATE INDEX idx_tramo_nucleo_geometria ON tramo_nucleo USING GIST (geometria_segmento);
+
+-- Triggers de Reglas de Negocio (Excepciones de Dominio)
+CREATE OR REPLACE FUNCTION fn_validar_afectacion_uso_comun() RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.tipo_afectacion = 'colectivo' THEN
+        IF EXISTS (SELECT 1 FROM tramo_nucleo WHERE id_tramo_nucleo = NEW.id_tramo_nucleo AND proyecto_no_afecta_uso_comun = TRUE) THEN
+            RAISE EXCEPTION 'No se pueden crear afectaciones colectivas si el proyecto no afecta uso común';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_afectacion_uso_comun
+BEFORE INSERT OR UPDATE ON afectacion
+FOR EACH ROW EXECUTE FUNCTION fn_validar_afectacion_uso_comun();
+
+CREATE OR REPLACE FUNCTION fn_validar_convenio_expropiacion() RETURNS TRIGGER AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM tramo_nucleo WHERE id_tramo_nucleo = NEW.id_tramo_nucleo AND es_expropiacion = TRUE) THEN
+        RAISE EXCEPTION 'No se pueden registrar convenios en un tramo-núcleo marcado como Expropiación Directa';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_convenio_expropiacion
+BEFORE INSERT OR UPDATE ON convenio
+FOR EACH ROW EXECUTE FUNCTION fn_validar_convenio_expropiacion();
 ```
 
 ### Vistas de Base de Datos
@@ -1044,12 +1058,20 @@ SELECT
     tn.id_nucleo,
     tn.consecutivo,
     tn.longitud_m,
-    tn.validado_liberado,
     tn.causa_problema,
     EXISTS (SELECT 1 FROM asamblea a WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo AND a.resultado_anuencia = 'otorgada') AS tiene_anuencia,
     EXISTS (SELECT 1 FROM convenio c WHERE c.id_tramo_nucleo = tn.id_tramo_nucleo AND c.convenio_inscrito_fecha_ran IS NOT NULL) AS tiene_convenio_inscrito_ran,
     CASE
-        WHEN tn.validado_liberado = TRUE THEN 'liberado'
+        WHEN (SELECT COUNT(*) FROM afectacion a WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo) > 0 
+             AND NOT EXISTS (
+                 SELECT 1 FROM afectacion a 
+                 WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo 
+                 AND NOT EXISTS (
+                     SELECT 1 FROM convenio c 
+                     WHERE c.id_afectacion = a.id_afectacion 
+                     AND c.convenio_inscrito_fecha_ran IS NOT NULL
+                 )
+             ) THEN 'liberado'
         WHEN tn.es_expropiacion = TRUE THEN 'problema'
         WHEN NULLIF(BTRIM(tn.causa_problema), '') IS NOT NULL THEN 'problema'
         WHEN EXISTS (SELECT 1 FROM convenio c WHERE c.id_tramo_nucleo = tn.id_tramo_nucleo) THEN 'en_proceso'
@@ -1201,17 +1223,26 @@ CONSTRAINT chk_campos_ran_2_solo_obras_complementarias CHECK (
 
 **Contexto Operativo Detallado**:
 Las Obras Complementarias representan **una nueva ocupación de tierras de uso común** descubierta durante la ejecución del proyecto. Por ley, esto requiere detonar un **ciclo completamente nuevo** que incluye:
+### RN-4: Normalización del Ciclo de Obras Complementarias
+
+**Ubicación**: Tabla `asamblea` y tabla `convenio`
+
+**Regla**: Los convenios de tipo 'obras_complementarias' requieren un nuevo ciclo completo de asamblea e inscripción RAN. Para preservar la normalización del modelo relacional, esto se implementa creando un nuevo registro en la tabla `asamblea` (con `contexto_proceso = 'obras_complementarias'`) y vinculándolo al nuevo convenio mediante la llave foránea `id_asamblea_autorizacion`. NO se deben duplicar campos registrales dentro de la tabla `convenio`.
+
+**Fuente**: Confirmación del stakeholder (Procuraduría Agraria) e identificaciones de auditoría:
+> "Al ser una nueva ocupación en tierras de uso común, la ley exige detonar de nuevo todo el ciclo [...]"
+
+**Implementación**:
+La tabla `asamblea` maneja su propio flujo registral RAN de manera independiente para cada evento comunitario, lo que permite asociar asambleas subsecuentes a convenios de obras complementarias sin corromper la integridad del expediente original.
+
+**Justificación**: Obras Complementarias requiere un nuevo ciclo completo de asamblea y trámite RAN por ser una nueva ocupación de tierras colectivas. Evitar la des-normalización heredada del formato plano en Excel asegura una trazabilidad correcta del acta de asamblea independiente de los montos económicos del convenio.
+
+**Contexto Operativo Detallado**:
+Las Obras Complementarias representan **una nueva ocupación de tierras de uso común** descubierta durante la ejecución del proyecto. Por ley, esto requiere detonar un **ciclo completamente nuevo** que incluye:
 1. Nueva asamblea de anuencia (porque es una nueva afectación al uso común)
 2. Nueva inscripción de acta al RAN
 3. Nuevo convenio con sus propios montos
 4. Nueva inscripción del convenio al RAN
-
-**Naturaleza del Sufijo "_2"**:
-- El sufijo "_2" es **nomenclatura técnica del sistema** para evitar colisiones de columnas en la misma fila
-- **NO** significa "segunda versión" o "segunda inscripción" del mismo convenio
-- Representa un **nuevo sub-proceso completo** (nueva variante de convenio) que coexiste con el COP original
-- Ambos ciclos (COP original y Obras Complementarias) se documentan en **la misma fila** de la base de datos
-- Facilita la migración desde el sistema Excel donde ambos procesos se capturan en la misma hoja
 
 **Flujo de Obras Complementarias**:
 1. **COP Original** (campos estándar):
@@ -1221,11 +1252,11 @@ Las Obras Complementarias representan **una nueva ocupación de tierras de uso c
    - Calificación → `calificacion_registral`
    - Inscripción → `convenio_inscrito_fecha_ran`
 
-2. **Obras Complementarias** (campos "_2" en el MISMO registro):
+2. **Obras Complementarias** (nuevo ciclo relacional):
    - Nueva asamblea → nuevo registro en tabla `asamblea` con `contexto_proceso = 'obras_complementarias'`
-   - Ingreso de nueva acta al RAN → `ingreso_ran_fecha_2`, `numero_solicitud_ingreso_2`
-   - Nueva calificación registral → `calificacion_registral_2`
-   - Inscripción de nueva acta → `acta_inscrita_fecha_ran_2`
+   - Ingreso de nueva acta al RAN → administrado por la tabla `asamblea` (`ingreso_ran_fecha`, etc.)
+   - Nuevo convenio firmado → nuevo registro en `convenio` vinculado a la nueva asamblea
+   - Inscripción de nuevo convenio → campos RAN estándar del nuevo registro de `convenio`
 
 ---
 
@@ -1269,20 +1300,23 @@ Los dos campos de superficie reflejan una diferencia fundamental en el derecho a
 
 **Implementación**:
 ```sql
-CONSTRAINT chk_superficie_segun_tipo_afectacion CHECK (
-    (tipo_afectacion = 'individual' AND superficie_real_afectada_ha IS NULL)
-    OR
-    (tipo_afectacion = 'colectivo' AND superficie_total_ha IS NULL)
-    OR
-    (tipo_afectacion = 'individual' AND tipo_convenio = 'modificatorio')
+CONSTRAINT chk_superficie_exclusiva_estricta CHECK (
+    (tipo_afectacion != 'individual' OR (superficie_real_afectada_ha IS NULL AND superficie_adicional_ha IS NULL))
+    AND
+    (tipo_afectacion != 'colectivo' OR (superficie_total_ha IS NULL AND superficie_ampliacion_ha IS NULL))
+    AND
+    (tipo_convenio != 'cop_original' OR tipo_afectacion != 'individual' OR superficie_ampliacion_ha IS NULL)
+    AND
+    (tipo_convenio NOT IN ('ampliacion', 'ampliacion_remanente') OR superficie_total_ha IS NULL)
+    AND
+    (tipo_convenio != 'superficie_adicional' OR superficie_real_afectada_ha IS NULL)
+    AND
+    (tipo_convenio NOT IN ('cop_original', 'obras_complementarias') OR tipo_afectacion != 'colectivo' OR superficie_adicional_ha IS NULL)
 )
 ```
 
 **Justificación**: 
-- Refleja la diferencia legal entre propiedad individual (parcelas) y colectiva (uso común)
-- Previene confusión sobre qué campo usar
-- Las tierras de uso común son inalienables y requieren proceso de asamblea
-- Las parcelas individuales tienen un titular específico y proceso directo
+- Garantiza lógicamente que una fila cumpla los requisitos de exclusión sin provocar errores de contradicción matemática (utilizando implicaciones `NOT A OR B`).
 
 **Tabla de Uso**:
 
@@ -1310,11 +1344,21 @@ Esta sección documenta decisiones arquitectónicas clave relacionadas con las r
 - `superficie_real_afectada_ha`: EXCLUSIVO para afectaciones COLECTIVAS (tierras de uso común inalienables)
 - Esta distinción no es técnica sino **jurídica**: refleja diferencias legales fundamentales en el derecho agrario mexicano
 
-**2. Campos RAN "2" - Ciclo de Obras Complementarias**:
-- Los campos con sufijo "_2" (`ingreso_ran_fecha_2`, `numero_solicitud_ingreso_2`, etc.) son EXCLUSIVOS para `tipo_convenio = 'obras_complementarias'`
-- El sufijo "_2" es **nomenclatura técnica** para evitar colisiones en la misma fila
-- NO representa una "segunda inscripción" sino un **nuevo ciclo completo** de asamblea + RAN que coexiste en el mismo registro
-- Refleja la práctica operativa donde ambos ciclos se documentan en la misma fila del sistema Excel
+**2. Ciclo Normalizado de Obras Complementarias**:
+- Las Obras Complementarias detonan un nuevo ciclo de asamblea y RAN. En lugar de utilizar campos duplicados con sufijos "_2", el diseño relacional emplea la inserción de nuevos registros en la tabla `asamblea` que se relacionan con los nuevos convenios a través de `id_asamblea_autorizacion`.
+- Esto subsana los problemas de normalización inherentes al antiguo sistema en Excel.
+
+**3. Restricciones RAN en Modificatorios Individuales**:
+- El Modificatorio Individual (al ser un mero ajuste económico privado sin afectación adicional de superficie) NO requiere inscripción en el RAN, según lo define el proceso (Fase 3B). El diseño exige estrictamente que sus campos registrales queden nulos a través del constraint `chk_modificatorio_individual_restricciones`.
+
+**4. Ubicación Normalizada de "No. de Parcela / Solar"**:
+- El número de parcela/solar (cuando aplica a tierras colectivas) describe funcionalmente el "Destino de la Superficie" en la asamblea de Derechos Colectivos (Fase 3A). Se movió lógicamente hacia la tabla `afectacion` junto al campo `destino_superficie`, ya que pertenece puramente a los datos formales de la afectación y no al registro genérico del cruce `tramo_nucleo`.
+
+**5. Trazabilidad Determinista del Quórum (id_padron)**:
+- Se añadió explícitamente una llave foránea `id_padron` en la tabla `asamblea`. Aunque el sistema podría derivar el padrón cruzando la fecha de la asamblea con la fecha del padrón, esta llave foránea asegura inmutabilidad jurídica. Hace que cada acta de asamblea esté unida irrefutablemente a una versión histórica del censo de población para probar la legalidad del quórum.
+
+**6. Excepciones Operativas Reforzadas mediante Triggers**:
+- Las banderas booleanas para excepciones como `es_expropiacion` y `proyecto_no_afecta_uso_comun` ahora actúan como validadores absolutos en el motor de base de datos a través de *Triggers* automáticos (`fn_validar_convenio_expropiacion`, `fn_validar_afectacion_uso_comun`). Si un tramo-núcleo es forzado a juicio expropiatorio (fracasa el acuerdo), se bloqueará inmediatamente cualquier intento de crear convenios conciliatorios, previniendo estados inconsistentes.
 
 ---
 
@@ -1340,26 +1384,24 @@ En lugar de agregar un campo explícito `estatus` a la tabla `convenio`, se cre�
 
 **Justificación**: Las fechas son la fuente de verdad del estado del convenio. Mantener un campo separado requeriría sincronización mediante triggers y aumentaría el riesgo de inconsistencias. La vista calculada garantiza que el estado siempre refleje las fechas reales.
 
-#### Campos RAN Duplicados para Obras Complementarias
+#### Normalización del Ciclo de Obras Complementarias
 
 El proceso requiere que Obras Complementarias detone un **nuevo ciclo completo** de asamblea, firmas e inscripción RAN. Según el stakeholder:
 
-> "Al ser una nueva ocupación en tierras de uso común, la ley exige detonar de nuevo todo el ciclo: se requiere una nueva asamblea de anuencia, nuevas firmas y su propia inscripción al Registro Agrario Nacional (RAN). Como todos estos datos conviven dentro de la misma gran pestaña de 'Derechos Colectivos', el sistema utiliza los campos Ingresado al RAN (Fecha) 2 y Número de Solicitud de Ingreso 2 como una nomenclatura diferenciada para evitar duplicidades en el sistema."
+> "Al ser una nueva ocupación en tierras de uso común, la ley exige detonar de nuevo todo el ciclo: se requiere una nueva asamblea de anuencia, nuevas firmas y su propia inscripción al Registro Agrario Nacional (RAN)."
 
-**Estrategia Adoptada**: Campos duplicados con sufijo "_2" en la MISMA fila
-- `ingreso_ran_fecha_2`, `numero_solicitud_ingreso_2`, `calificacion_registral_2`, `acta_inscrita_fecha_ran_2`
-- Solo se populan cuando `tipo_convenio = 'obras_complementarias'`
-- Validado mediante constraint `chk_campos_ran_2_solo_obras_complementarias`
+**Estrategia Adoptada**: Creación de nuevos registros relacionales
+- Se inserta un nuevo registro en la tabla `asamblea` con `contexto_proceso = 'obras_complementarias'`.
+- Se inserta un nuevo registro en la tabla `convenio` (tipo_convenio = 'obras_complementarias') vinculado a la nueva asamblea.
 
 **Justificación**: 
-- Mantiene la lógica del sistema Excel original (misma fila)
-- El "2" es un sufijo técnico para evitar colisiones de columnas
-- Refleja que es un nuevo sub-proceso dentro del mismo expediente de Obras Complementarias
-- Facilita queries que necesitan ver el ciclo completo en una sola fila
+- Cumple estrictamente con las reglas de normalización de base de datos.
+- Previene la mezcla conceptual entre campos de registro de asamblea y registro de convenio.
+- Facilita el mantenimiento y trazabilidad escalable del histórico de afectaciones en un mismo expediente.
 
-**Alternativa Rechazada**: Crear un nuevo registro de convenio hijo
-- Desventaja: No refleja la práctica operativa actual donde ambos ciclos se documentan juntos
-- Desventaja: Complicaría la migración desde Excel existente
+**Alternativa Rechazada**: Campos duplicados con sufijo "_2" (e.g. `ingreso_ran_fecha_2`)
+- Desventaja: Rompe la Primera Forma Normal.
+- Desventaja: Traslada artificialmente las limitaciones bidimensionales de una hoja de cálculo al motor de base de datos.
 
 ---
 

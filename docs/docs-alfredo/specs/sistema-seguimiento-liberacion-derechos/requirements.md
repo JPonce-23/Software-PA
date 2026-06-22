@@ -29,8 +29,8 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 - **Indemnización**: pago o compensación económica que el Estado otorga a los sujetos o núcleos agrarios a cambio de adquirir sus bienes o tierras por causas de utilidad pública, concretamente a través del proceso legal de expropiación
 - **Monto BDT**: corresponde a la indemnización de Bienes Distintos a la Tierra
 - **superficie_total_ha**: Campo usado en convenios de afectación INDIVIDUAL. Mide la superficie de la parcela particular afectada con un dueño específico. Se captura en expedientes privados.
+- **superficie_ampliacion_ha**: Campo usado en convenios de afectación INDIVIDUAL (Ampliación o Ampliación Remanente). Mide la nueva superficie afectada que se adiciona a la original.
 - **superficie_real_afectada_ha**: Campo usado en convenios de afectación COLECTIVA. Mide el impacto sobre las tierras inalienables de uso común que requieren asambleas. La distinción es jurídica: estas tierras pertenecen al núcleo agrario completo, no a individuos.
-- **Campos RAN "2"** (ingreso_ran_fecha_2, numero_solicitud_ingreso_2, etc.): Campos exclusivos para Obras Complementarias. El sufijo "2" es nomenclatura técnica para evitar duplicidades en el sistema. Representan un nuevo ciclo completo de asamblea e inscripción RAN que convive en la misma fila del expediente.
 - **Expropiación**: Es la forma legal en la que el Estado adquiere bienes por causas de utilidad pública a cambio de una indemnización
 - **Comisariado Ejidal / de Bienes Comunales**: Órgano encargado de ejecutar los acuerdos de la asamblea y representar legalmente al núcleo agrario. Está conformado por un Presidente, Secretario y Tesorero.
 - **Consejo de Vigilancia**: Órgano cuya función principal es supervisar las acciones del Comisariado.
@@ -94,7 +94,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 2. CUANDO se crea una Afectación, EL Sistema DEBERÁ capturar superficie afectada en hectáreas o metros cuadrados, tipo de tenencia, subtipo de tenencia y personas considerando si la afectación es sobre derechos colectivos, derechos individuales o tierras de uso común o parcelas afectadas
 3. EL Sistema DEBERÁ clasificar la Afectación como Derecho_Colectivo o Derecho_Individual
 4. DONDE una Afectación se clasifica como Derecho_Individual, EL Sistema DEBERÁ capturar número de parcela, información del titular y documentación de la propiedad
-5. DONDE una Afectación se clasifica como Derecho_Colectivo, El sistema DEBERÁ capturar destino de la superficie, Número de parcela/solar, padrón de ejidatarios/comuneros y estatus de los orv
+5. DONDE una Afectación se clasifica como Derecho_Colectivo, EL Sistema DEBERÁ capturar destino de la superficie, número de parcela/solar (si aplica a un área comunal específica), y relacionar el padrón y estatus de ORV vigentes en asambleas.
 6. EL Sistema DEBERÁ permitir múltiples Afectaciones por Núcleo_Agrario
 
 ### Requirement 5: Seguimiento de Proceso de Sensibilización
@@ -273,8 +273,8 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 1. EL Sistema DEBERÁ capturar fecha del padrón
 2. EL Sistema DEBERÁ registrar número total de ejidatarios o comuneros en el padrón
-3. EL Sistema DEBERÁ permitir actualización del padrón cuando se generen nuevas versiones
-4. EL Sistema DEBERÁ mantener historial de cambios en el padrón
+3. EL Sistema DEBERÁ mantener historial de cambios en el padrón
+4. EL Sistema DEBERÁ vincular obligatoriamente cada acta de asamblea registrada con la versión histórica del padrón vigente en su momento, garantizando la inmutabilidad de la auditoría de quórum legal.
 5. EL Sistema DEBERÁ asociar el padrón con el Núcleo_Agrario correspondiente
 
 ### Requirement 19: Indicadores de Expropiación Directa
