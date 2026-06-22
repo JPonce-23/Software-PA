@@ -1,0 +1,93 @@
+Role: Senior Fullstack Developer & Systems Architect.
+
+Context: Project development and validation based on @[Description.md], @[Estructura Datos.md], @[requirements.md], and @[design-mod.md]. The system must strictly align with @[Descripción proceso.md] as the primary source of truth.
+
+Exact Task: Perform a comprehensive cross-audit between @[requirements.md] and @[design-mod.md] to verify that:
+
+1. Requirements accurately describe the system behavior and logic.
+2. The design correctly implements those requirements.
+3. Both are fully aligned with @[Descripción proceso.md], @[Estructura Datos.md], and @[Description.md].
+
+Objectives:
+
+* Validate bidirectional traceability (requirements ↔ design).
+* Detect mismatches, omissions, or inconsistencies.
+* Ensure data structures align with @[Estructura Datos.md] and @[Descripción proceso.md].
+* Confirm that no logic is implemented in design without being defined in requirements.
+* Confirm that no requirement lacks representation in design.
+
+Constraints:
+
+* Do not write code or implement changes.
+* Do not assume undefined behavior; explicitly flag gaps.
+* @[Descripción proceso.md] is the ultimate source of truth and overrides all other documents.
+* Focus on correctness, completeness, and implementation readiness.
+
+Output Format:
+
+* Section 1: Requirements → Design Traceability
+
+  * For each requirement:
+
+    * Is it implemented in @[design-mod.md]? (Yes/No/Partial)
+    * Reference to design section
+    * Observations
+
+* Section 2: Design → Requirements Validation
+
+  * For each major design component:
+
+    * Is it backed by a requirement? (Yes/No)
+    * If not, flag as overdesign or undocumented logic
+
+* Section 3: Alignment with Sources of Truth
+
+  * Deviations from @[Descripción proceso.md]
+  * Inconsistencies with @[Estructura Datos.md]
+  * Misalignment with @[Description.md]
+
+* Section 4: Data Model Consistency
+
+  * Validation of entities, relationships, and constraints
+  * Conflicts between design and data structure definition
+
+* Section 5: Gaps and Issues
+
+  * Missing requirements
+  * Missing design elements
+  * Ambiguities or conflicting definitions
+
+* Section 6: Implementation Readiness Assessment
+
+  * Ready / Not Ready
+  * Clear justification based on findings
+
+* Section 7: Required Actions
+
+  * Minimal set of changes needed to reach implementation readiness
+  * Clearly categorized as:
+
+    * Critical (blocking)
+    * Non-critical (recommended)
+
+
+
+
+Role: Senior Fullstack Developer & Systems Architect.
+
+Context: Project development and prior audit results based on the inconsistencies and required improvements have already been identified.
+
+Exact Task: Apply the approved improvements to @[requirements.md] and @[design-mod.md], ensuring full alignment with @[Descripción proceso.md] as the single source of truth.
+
+Constraints:
+- Do not introduce new logic beyond the previously identified improvements.
+- Preserve existing structure and naming conventions unless a change was explicitly required.
+- Maintain consistency across all related sections and documents.
+- Do not modify @[Descripción proceso.md].
+- Ensure all changes are traceable to a previously identified inconsistency or improvement.
+
+Output Format:
+- Section 1: Summary of applied changes (grouped by document).
+- Section 2: Detailed modifications (before vs after for each change).
+- Section 3: Traceability mapping (each change linked to its original inconsistency or improvement).
+- Section 4: Validation checklist confirming alignment with @[Descripción proceso.md].
