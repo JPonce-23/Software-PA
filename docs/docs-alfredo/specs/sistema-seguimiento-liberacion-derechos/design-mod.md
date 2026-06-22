@@ -232,7 +232,7 @@ interface AuthToken {
   token: string
   expiresAt: Date
   id_usuario: number // FK a Usuario
-  rol: 'admin' | 'operador' | 'analista' | 'geografo'
+  rol: 'admin' | 'operador' | 'visualizador' | 'geografo'
 }
 
 interface Usuario {
@@ -241,7 +241,7 @@ interface Usuario {
   apellido_paterno: string
   apellido_materno: string | null
   correo: string
-  rol: 'admin' | 'operador' | 'analista' | 'geografo'
+  rol: 'admin' | 'operador' | 'visualizador' | 'geografo'
   activo: boolean
   fecha_alta: Date
   fecha_baja: Date | null
@@ -691,7 +691,7 @@ CREATE TABLE usuario (
     apellido_materno VARCHAR(250),
     correo VARCHAR(320) UNIQUE NOT NULL,
     contrasena_hash VARCHAR(255) NOT NULL,
-    rol VARCHAR(30) NOT NULL CHECK (rol IN ('admin', 'operador', 'analista', 'geografo')),
+    rol VARCHAR(30) NOT NULL CHECK (rol IN ('admin', 'operador', 'visualizador', 'geografo')),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_alta TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     fecha_baja TIMESTAMPTZ,
@@ -721,6 +721,7 @@ CREATE TABLE usuario_frente (
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     PRIMARY KEY (id_usuario, id_frente)
 );
+
 ```
 
 **4. Parcelas, ORV y Afectaciones**
@@ -1022,6 +1023,31 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_validar_convenio_expropiacion
 BEFORE INSERT OR UPDATE ON convenio
 FOR EACH ROW EXECUTE FUNCTION fn_validar_convenio_expropiacion();
+
+CREATE OR REPLACE FUNCTION fn_validar_superficie_liberada() RETURNS TRIGGER AS $$
+DECLARE
+    sup_afectada NUMERIC;
+    sup_liberada_actual NUMERIC;
+    nueva_sup NUMERIC;
+BEGIN
+    SELECT superficie_afectada_ha INTO sup_afectada
+    FROM afectacion WHERE id_afectacion = NEW.id_afectacion;
+    
+    SELECT COALESCE(SUM(COALESCE(superficie_real_afectada_ha, 0) + COALESCE(superficie_total_ha, 0) + COALESCE(superficie_adicional_ha, 0) + COALESCE(superficie_ampliacion_ha, 0)), 0) INTO sup_liberada_actual
+    FROM convenio WHERE id_afectacion = NEW.id_afectacion AND id_convenio != NEW.id_convenio;
+    
+    nueva_sup := COALESCE(NEW.superficie_real_afectada_ha, 0) + COALESCE(NEW.superficie_total_ha, 0) + COALESCE(NEW.superficie_adicional_ha, 0) + COALESCE(NEW.superficie_ampliacion_ha, 0);
+    
+    IF (sup_liberada_actual + nueva_sup) > sup_afectada THEN
+        RAISE EXCEPTION 'La suma de superficies liberadas no puede exceder la superficie afectada total';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_superficie_liberada
+BEFORE INSERT OR UPDATE ON convenio
+FOR EACH ROW EXECUTE FUNCTION fn_validar_superficie_liberada();
 ```
 
 ### Vistas de Base de Datos
@@ -1398,6 +1424,7 @@ El proceso requiere que Obras Complementarias detone un **nuevo ciclo completo**
 - Cumple estrictamente con las reglas de normalización de base de datos.
 - Previene la mezcla conceptual entre campos de registro de asamblea y registro de convenio.
 - Facilita el mantenimiento y trazabilidad escalable del histórico de afectaciones en un mismo expediente.
+- **Estatus:** Esta desviación arquitectónica hacia la normalización (abandonar columnas `_2` del Excel original) ha sido formalmente **avalada y aprobada por los stakeholders**, convirtiéndose en la estrategia oficial del sistema.
 
 **Alternativa Rechazada**: Campos duplicados con sufijo "_2" (e.g. `ingreso_ran_fecha_2`)
 - Desventaja: Rompe la Primera Forma Normal.
@@ -1616,110 +1643,68 @@ Basándose en el análisis de prework de los 25 requerimientos, se han identific
 
 Esta sección detalla la arquitectura de despliegue, configuración de infraestructura, estrategias de alta disponibilidad y respaldos para cumplir con los requerimientos no funcionales RNF-13 (disponibilidad 99%) y RNF-14 (respaldos automáticos diarios).
 
-### Arquitectura de Despliegue
+### Arquitectura de Despliegue (Servidor Único)
 
-El sistema se despliega en una arquitectura de tres niveles con redundancia y balanceo de carga:
+Dado el hardware disponible, el sistema se despliega en una arquitectura de servidor único (Monolítica) optimizada para aprovechar los recursos locales. Se recomienda el uso de contenedores (ej. Docker Compose) para facilitar el encapsulamiento y orquestación de los servicios dentro del mismo nodo.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              Balanceador de Carga (HAProxy/Nginx)       │
-│              - Health checks automáticos                │
-│              - Distribución round-robin                 │
-│              - Failover automático                      │
+│               Servidor Único (Ubuntu 24.04)             │
+│   (4 vCPU, 8 GB RAM, 100 GB SSD)                        │
+│                                                         │
+│   ┌─────────────────────────────────────────────────┐   │
+│   │ Reverse Proxy (Nginx)                           │   │
+│   │ - Terminación SSL/TLS                           │   │
+│   │ - Enrutamiento a frontend y API                 │   │
+│   └────────────────────────┬────────────────────────┘   │
+│                            ↓                            │
+│   ┌────────────────────────┴────────────────────────┐   │
+│   │ Contenedor App (Node.js/Python)                 │   │
+│   │ - API REST                                      │   │
+│   │ - Servicios GIS                                 │   │
+│   └────────────────────────┬────────────────────────┘   │
+│                            ↓                            │
+│   ┌────────────────────────┴────────────────────────┐   │
+│   │ Contenedor Base de Datos                        │   │
+│   │ - PostgreSQL + PostGIS                          │   │
+│   └─────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
-                          ↓
-         ┌────────────────┴────────────────┐
-         ↓                                  ↓
-┌─────────────────┐              ┌─────────────────┐
-│ Servidor App 1  │              │ Servidor App 2  │
-│ (Node.js/Python)│              │ (Node.js/Python)│
-│ - API REST      │              │ - API REST      │
-│ - Servicios GIS │              │ - Servicios GIS │
-└─────────────────┘              └─────────────────┘
-         ↓                                  ↓
-         └────────────────┬────────────────┘
-                          ↓
-         ┌────────────────────────────────┐
-         │ PostgreSQL + PostGIS (Primario)│
-         │ - Modo replicación streaming   │
-         └────────────────────────────────┘
-                          ↓
-         ┌────────────────────────────────┐
-         │ PostgreSQL (Réplica - Standby) │
-         │ - Hot standby para lectura     │
-         │ - Failover automático          │
-         └────────────────────────────────┘
 ```
 
 ### Componentes de Infraestructura
 
-**1. Servidores de Aplicación (Mínimo 2 instancias)**
-- **Especificación**: 4 vCPU, 8 GB RAM, 50 GB SSD
-- **Sistema Operativo**: Linux (Ubuntu Server 22.04 LTS o similar)
+**1. Servidor Físico / Virtual**
+- **Sistema Operativo**: Ubuntu 24.04.3 LTS (Kernel Linux 6.8)
+- **Arquitectura**: x86_64
+- **CPU**: 4 vCPU
+- **Memoria RAM**: 8 GB (7.6 GiB efectivos)
+- **Almacenamiento**: 100 GB SSD (aprox. 86 GB disponibles)
+
+**2. Proxy Inverso y Servidor Web**
+- **Tecnología**: Nginx
+- **Funcionalidades**: 
+  - Gestión de certificados SSL (Let's Encrypt)
+  - Servir archivos estáticos del frontend
+  - Redirección de tráfico `/api` al backend
+
+**3. Servidor de Aplicación**
 - **Runtime**: Node.js 18+ o Python 3.10+
-- **Configuración**: Modo cluster con gestión de procesos (PM2 para Node.js, Gunicorn/uWSGI para Python)
-- **Redundancia**: Mínimo 2 instancias activas para disponibilidad 99%
+- **Configuración**: Un único proceso o cluster limitado a 2-3 workers para no saturar los 4 vCPU del servidor, balanceando los requerimientos de la BD.
 
-**2. Balanceador de Carga**
-- **Tecnología**: HAProxy o Nginx
-- **Funcionalidades**:
-  - Health checks HTTP cada 10 segundos
-  - Timeout de conexión: 5 segundos
-  - Failover automático si servidor no responde
-  - Distribución de carga: Round-robin con sticky sessions (para sesiones JWT)
-- **Alta Disponibilidad**: Configuración activo-pasivo con Keepalived (VIP compartida)
-
-**3. Base de Datos PostgreSQL + PostGIS**
-- **Especificación Primario**: 8 vCPU, 16 GB RAM, 500 GB SSD (con capacidad de expansión)
-- **Especificación Réplica**: Igual que primario
+**4. Base de Datos**
 - **Versión**: PostgreSQL 14+ con PostGIS 3.3+
-- **Configuración de Alta Disponibilidad**:
-  - Replicación streaming síncrona o asíncrona
-  - Hot standby habilitado para réplica de lectura
-  - Failover automático con herramientas como Patroni, repmgr o pgpool-II
-  - WAL archiving para recuperación point-in-time
+- **Configuración Optimizada para 8GB RAM**:
+  - `shared_buffers` = 2GB (25% de RAM)
+  - `work_mem` = 16MB
+  - `maintenance_work_mem` = 512MB
+  - `effective_cache_size` = 4GB
 
-**4. Almacenamiento de Archivos**
-- **Ubicación**: Almacenamiento compartido (NFS, S3-compatible, o similar)
-- **Propósito**: Documentos escaneados, archivos geoespaciales, reportes generados
-- **Respaldo**: Sincronización con almacenamiento secundario
+### Estrategia de Disponibilidad y Recuperación (RNF-13)
 
-### Estrategia de Alta Disponibilidad (RNF-13)
-
-**Objetivo**: Disponibilidad del 99% durante horario laboral (8:00 AM - 8:00 PM)
-
-**Cálculo de Tiempo de Inactividad Permitido**:
-- Horario laboral: 12 horas/día
-- 99% disponibilidad = máximo 1% de downtime
-- Downtime permitido: ~7.2 minutos por día laboral
-
-**Mecanismos de Alta Disponibilidad**:
-
-1. **Redundancia de Servidores de Aplicación**
-   - Mínimo 2 instancias activas simultáneamente
-   - Balanceador distribuye carga entre instancias saludables
-   - Si una instancia falla, el balanceador la marca como inactiva y redirige tráfico
-
-2. **Failover Automático de Base de Datos**
-   - PostgreSQL réplica en hot standby
-   - Herramienta de failover automático (Patroni recomendado):
-     - Detecta falla del primario mediante health checks (cada 10 segundos)
-     - Promueve réplica a primario automáticamente
-     - Actualiza endpoint de conexión o DNS
-     - Tiempo de failover objetivo: < 30 segundos
-
-3. **Health Checks y Monitoreo**
-   - Endpoint `/health` en API que verifica:
-     - Conectividad con base de datos
-     - Uso de memoria y CPU dentro de límites
-     - Servicios críticos operativos
-   - Balanceador consulta `/health` cada 10 segundos
-   - Servidor no saludable se remueve de pool automáticamente
-
-4. **Mantenimiento sin Downtime**
-   - Despliegue rolling: actualizar una instancia a la vez
-   - Servidor en mantenimiento se marca como drenando (no acepta nuevas conexiones)
-   - Conexiones existentes se completan antes de apagar servidor
+Al contar con un servidor único, la disponibilidad del 99% se enfoca en resiliencia del software más que en redundancia de hardware.
+- **Auto-recuperación**: Uso de Docker (restart policies) o Systemd para reiniciar automáticamente los servicios si fallan.
+- **Monitoreo Local**: Scripts ligeros o herramientas como `htop` y `pm2/docker stats` para vigilar el consumo de CPU y disco (evitando saturar los 86 GB disponibles).
+- **Mantenimiento**: Implicará ventanas de downtime planificadas para actualizaciones (despliegue blue/green no es factible por limitaciones de RAM).
 
 ### Estrategia de Respaldos (RNF-14)
 
@@ -2648,7 +2633,7 @@ describe('Property 1: Integridad Referencial de Autorizaciones', () => {
         fc.record({
           userId: fc.nat(),
           username: fc.string(),
-          role: fc.constant('analista')
+          role: fc.constant('visualizador')
         }),
         fc.oneof(
           fc.constant('Tramo'),

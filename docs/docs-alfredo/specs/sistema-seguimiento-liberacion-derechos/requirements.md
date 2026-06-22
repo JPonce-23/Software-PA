@@ -7,8 +7,8 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 ## Glossary
 
 - **Sistema**: La aplicación web de seguimiento que se está desarrollando
-- **Usuario_Captura**: Usuario de captura de datos que registra información en el sistema
-- **Usuario_Visualizador**: Usuario final/stakeholder que visualiza reportes de progreso y tableros
+- **operador**: Usuario de captura de datos que registra información en el sistema
+- **visualizador**: Usuario final/stakeholder que visualiza reportes de progreso y tableros
 - **Geógrafo**: Usuario especializado con permisos para capturar y editar información geográfica/técnica de geometrías de Tramos, Frentes, Núcleos Agrarios y coordenadas geoespaciales
 - **Núcleo_Agrario**: Es la entidad central del sistema que representa a cada ejido o comunidad agraria. Cuentan con personalidad jurídica y patrimonio propio.
 - **Tramo**: cada una de las secciones principales que integran el proyecto ferroviario. Constituye la unidad geográfica y operativa de mayor nivel dentro del sistema, y su función principal es facilitar el seguimiento del derecho de vía.
@@ -49,35 +49,36 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 #### Acceptance Criteria
 
-1. EL Sistema DEBERÁ soportar la creación de cuentas de usuario con roles asignados: Administrador, Usuario_Captura, Usuario_Visualizador y Geógrafo
-2. CUANDO un Usuario_Captura inicie sesión, EL Sistema DEBERÁ otorgar permisos de lectura y escritura sobre datos administrativos y de seguimiento
-3. CUANDO un Usuario_Visualizador inicie sesión, EL Sistema DEBERÁ otorgar permisos de solo lectura
+1. EL Sistema DEBERÁ soportar la creación de cuentas de usuario con roles asignados: Administrador, operador, visualizador y Geógrafo
+2. CUANDO un operador inicie sesión, EL Sistema DEBERÁ otorgar permisos de lectura y escritura sobre datos administrativos y de seguimiento
+3. CUANDO un visualizador inicie sesión, EL Sistema DEBERÁ otorgar permisos de solo lectura
 4. CUANDO un Geógrafo inicie sesión, EL Sistema DEBERÁ otorgar permisos de lectura y escritura sobre geometrías y datos geoespaciales
 5. EL Sistema DEBERÁ autenticar usuarios antes de otorgar acceso
 6. EL Sistema DEBERÁ mantener un registro de auditoría de acciones de usuario
+7. EL Sistema DEBERÁ permitir la asignación de uno o varios Frentes a cada usuario para organizar y delimitar su responsabilidad territorial
 
 
 ### Requirement 2: Gestión de Estructura del Proyecto Ferroviario
 
-**User Story:** Como Usuario_Captura, quiero definir y organizar segmentos ferroviarios (Tramos) y sus subdivisiones (Frentes), para poder estructurar el proyecto geográficamente, el proyecto puede tener más de un tramo.
+**User Story:** Como operador, quiero definir y organizar segmentos ferroviarios (Tramos) y sus subdivisiones (Frentes), para poder estructurar el proyecto geográficamente, el proyecto puede tener más de un tramo.
 
 #### Acceptance Criteria
 
 1. EL Sistema DEBERÁ permitir la creación de registros de Tramo con identificadores únicos
 2. EL Sistema DEBERÁ permitir la creación de registros de Frente asociados a un Tramo
-3. CUANDO se crea un Tramo, EL Sistema DEBERÁ requerir un nombre único, clave y número del tramo
+3. CUANDO se crea un Tramo, EL Sistema DEBERÁ requerir un nombre único y clave. El número de tramo se captura en el registro de la intersección con el Núcleo Agrario.
 4. EL Sistema DEBERÁ soportar múltiples Frentes por Tramo
 5. EL Sistema DEBERÁ mostrar la relación jerárquica entre Tramos y Frentes
 6. El sistema DEBERÁ representar el tramo espacialmente, es de suma importancia registrar el polígono definiendo el sistema de coordenadas de entrada. Se debe vigilar la correcta zonificación y el Sistema de Referencia de Coordenadas (SRC), considerando que los mapas base suelen usar coordenadas geográficas WGS84, mientras que los documentos jurídicos de liberación utilizan coordenadas UTM.
 
 ### Requirement 3: Registro de Núcleos Agrarios
 
-**User Story:** Como Usuario_Captura, quiero registrar Núcleos Agrarios (ejidos y comunidades) afectados por el proyecto ferroviario, para poder dar seguimiento a todas las entidades de propiedad social afectadas.
+**User Story:** Como operador, quiero registrar Núcleos Agrarios (ejidos y comunidades) afectados por el proyecto ferroviario, para poder dar seguimiento a todas las entidades de propiedad social afectadas.
 
 #### Acceptance Criteria
 
 1. EL Sistema DEBERÁ permitir la creación de registros de Núcleo_Agrario
-2. CUANDO se crea un Núcleo_Agrario, EL Sistema DEBERÁ capturar: nombre, tipo (Ejido/Comunidad), estado, municipio, residencia y consecutivo
+2. CUANDO se crea un Núcleo_Agrario, EL Sistema DEBERÁ capturar: nombre, tipo (Ejido/Comunidad), estado, municipio y residencia. El consecutivo se captura en el registro de la intersección con el Tramo.
 3. EL Sistema DEBERÁ almacenar información de datos generales específicos para Derechos Colectivos o individuales acorde al tipo de afectación
 4. EL Sistema DEBERÁ almacenar información de ORV incluyendo integrantes y fechas de vigencia
 5. EL Sistema DEBERÁ dar seguimiento a información del Padrón incluyendo fecha y número de integrantes
@@ -86,7 +87,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 4: Registro de Afectaciones
 
-**Historia de Usuario:** Como Usuario_Captura, quiero registrar superficies afectadas por el proyecto ferroviario, para poder dar seguimiento tanto a impactos de derechos colectivos como individuales.
+**Historia de Usuario:** Como operador, quiero registrar superficies afectadas por el proyecto ferroviario, para poder dar seguimiento tanto a impactos de derechos colectivos como individuales.
 
 #### Criterios de Aceptación
 
@@ -99,7 +100,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 5: Seguimiento de Proceso de Sensibilización
 
-**Historia de Usuario:** Como Usuario_Captura, quiero dar seguimiento a reuniones de sensibilización con comunidades afectadas, para poder documentar esfuerzos de acercamiento.
+**Historia de Usuario:** Como operador, quiero dar seguimiento a reuniones de sensibilización con comunidades afectadas, para poder documentar esfuerzos de acercamiento.
 
 #### Criterios de Aceptación
 
@@ -111,7 +112,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 6: Seguimiento de Caminamientos
 
-**Historia de Usuario:** Como Usuario_Captura, quiero dar seguimiento a inspecciones de campo (Caminamientos), para poder documentar actividades de verificación técnica.
+**Historia de Usuario:** Como operador, quiero dar seguimiento a inspecciones de campo (Caminamientos), para poder documentar actividades de verificación técnica.
 
 #### Criterios de Aceptación
 
@@ -122,7 +123,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 7: Registro de Asambleas
 
-**Historia de Usuario:** Como Usuario_Captura, quiero dar seguimiento a asambleas incluyendo convocatorias y realizaciones, para poder monitorear el proceso formal de aprobación.
+**Historia de Usuario:** Como operador, quiero dar seguimiento a asambleas incluyendo convocatorias y realizaciones, para poder monitorear el proceso formal de aprobación.
 
 #### Criterios de Aceptación
 
@@ -134,7 +135,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 8: Gestión de Convenios
 
-**Historia de Usuario:** Como Usuario_Captura, quiero registrar y dar seguimiento a convenios de diferentes tipos, para poder monitorear el proceso completo de contratación.
+**Historia de Usuario:** Como operador, quiero registrar y dar seguimiento a convenios de diferentes tipos, para poder monitorear el proceso completo de contratación.
 
 #### Criterios de Aceptación
 
@@ -156,7 +157,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 9: Seguimiento de Indemnizaciones y FIFONAFE
 
-**Historia de Usuario:** Como Usuario_Captura, quiero dar seguimiento a pagos de indemnización y procesamiento de FIFONAFE, para poder monitorear estatus de pagos.
+**Historia de Usuario:** Como operador, quiero dar seguimiento a pagos de indemnización y procesamiento de FIFONAFE, para poder monitorear estatus de pagos.
 
 #### Criterios de Aceptación
 
@@ -173,7 +174,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 10: Tablero de Convenios Formalizados
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero visualizar un tablero mostrando conteos de convenios formalizados, para poder entender el progreso general.
+**Historia de Usuario:** Como visualizador, quiero visualizar un tablero mostrando conteos de convenios formalizados, para poder entender el progreso general.
 
 #### Criterios de Aceptación
 
@@ -185,7 +186,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 11: Tablero de Superficies Liberadas
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero visualizar superficies liberadas con ubicaciones y mediciones, para poder dar seguimiento al progreso espacial.
+**Historia de Usuario:** Como visualizador, quiero visualizar superficies liberadas con ubicaciones y mediciones, para poder dar seguimiento al progreso espacial.
 
 #### Criterios de Aceptación
 
@@ -197,7 +198,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 12: Visualización de Progreso por Tramo
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero visualizar gráficas tipo dona mostrando porcentaje liberado por segmento ferroviario, para poder evaluar completitud a nivel de segmento.
+**Historia de Usuario:** Como visualizador, quiero visualizar gráficas tipo dona mostrando porcentaje liberado por segmento ferroviario, para poder evaluar completitud a nivel de segmento.
 
 #### Criterios de Aceptación
 
@@ -209,7 +210,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 13: Generación de Reportes
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero generar y exportar reportes, para poder compartir información de progreso con actores interesados.
+**Historia de Usuario:** Como visualizador, quiero generar y exportar reportes, para poder compartir información de progreso con actores interesados.
 
 #### Criterios de Aceptación
 
@@ -234,7 +235,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 15: Gestión de Documentación Soporte
 
-**Historia de Usuario:** Como Usuario_Captura, quiero dar seguimiento al estatus de documentación soporte, para poder identificar documentos faltantes.
+**Historia de Usuario:** Como operador, quiero dar seguimiento al estatus de documentación soporte, para poder identificar documentos faltantes.
 
 #### Criterios de Aceptación
 
@@ -246,7 +247,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 16: Seguimiento de Inscripciones en RAN
 
-**Historia de Usuario:** Como Usuario_Captura, quiero dar seguimiento al proceso de inscripción de documentos en el RAN, para poder monitorear la formalización registral.
+**Historia de Usuario:** Como operador, quiero dar seguimiento al proceso de inscripción de documentos en el RAN, para poder monitorear la formalización registral.
 
 #### Criterios de Aceptación
 
@@ -258,7 +259,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 17: Gestión de ORV (Órganos de Representación y Vigilancia)
 
-**Historia de Usuario:** Como Usuario_Captura, quiero registrar integrantes de los órganos de representación de núcleos agrarios, para poder mantener información actualizada de representantes legales.
+**Historia de Usuario:** Como operador, quiero registrar integrantes de los órganos de representación de núcleos agrarios, para poder mantener información actualizada de representantes legales.
 
 #### Criterios de Aceptación
 
@@ -271,7 +272,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 18: Registro de Padrón de Ejidatarios/Comuneros
 
-**Historia de Usuario:** Como Usuario_Captura, quiero registrar información del padrón de ejidatarios o comuneros, para poder documentar la composición del núcleo agrario.
+**Historia de Usuario:** Como operador, quiero registrar información del padrón de ejidatarios o comuneros, para poder documentar la composición del núcleo agrario.
 
 #### Criterios de Aceptación
 
@@ -283,7 +284,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 19: Indicadores de Excepciones Operativas
 
-**Historia de Usuario:** Como Usuario_Captura, quiero marcar núcleos agrarios y tramos sujetos a excepciones operativas (expropiación directa, comunidad indígena, no afecta tierras de uso común), para poder distinguir estos procedimientos especiales.
+**Historia de Usuario:** Como operador, quiero marcar núcleos agrarios y tramos sujetos a excepciones operativas (expropiación directa, comunidad indígena, no afecta tierras de uso común), para poder distinguir estos procedimientos especiales.
 
 #### Criterios de Aceptación
 
@@ -297,7 +298,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 20: Seguimiento de Obras Complementarias
 
-**Historia de Usuario:** Como Usuario_Captura, quiero dar seguimiento específico a convenios de obras complementarias, para poder monitorear este tipo especial de afectación.
+**Historia de Usuario:** Como operador, quiero dar seguimiento específico a convenios de obras complementarias, para poder monitorear este tipo especial de afectación.
 
 #### Criterios de Aceptación
 
@@ -309,7 +310,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 21: Gestión de Superficies Adicionales
 
-**Historia de Usuario:** Como Usuario_Captura, quiero registrar superficies adicionales descubiertas durante la ejecución del proyecto, para poder documentar expansiones de afectación.
+**Historia de Usuario:** Como operador, quiero registrar superficies adicionales descubiertas durante la ejecución del proyecto, para poder documentar expansiones de afectación.
 
 #### Criterios de Aceptación
 
@@ -322,7 +323,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 22: Alertas y Notificaciones de Vencimientos
 
-**Historia de Usuario:** Como Usuario_Captura, quiero recibir alertas sobre vencimientos próximos de ORV y eventos programados, para poder actuar oportunamente.
+**Historia de Usuario:** Como operador, quiero recibir alertas sobre vencimientos próximos de ORV y eventos programados, para poder actuar oportunamente.
 
 #### Criterios de Aceptación
 
@@ -334,7 +335,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 23: Cálculo de Montos de Indemnización
 
-**Historia de Usuario:** Como Usuario_Captura, quiero registrar diferentes montos asociados a convenios (90%, 100%, BDT), para poder dar seguimiento completo a obligaciones económicas.
+**Historia de Usuario:** Como operador, quiero registrar diferentes montos asociados a convenios (90%, 100%, BDT), para poder dar seguimiento completo a obligaciones económicas.
 
 #### Criterios de Aceptación
 
@@ -346,7 +347,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 24: Búsqueda y Filtrado Avanzado
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero buscar y filtrar información por múltiples criterios, para poder localizar rápidamente datos específicos.
+**Historia de Usuario:** Como visualizador, quiero buscar y filtrar información por múltiples criterios, para poder localizar rápidamente datos específicos.
 
 #### Criterios de Aceptación
 
@@ -420,7 +421,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 30: Mapa Interactivo Principal
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero visualizar un mapa interactivo del proyecto ferroviario, para poder explorar espacialmente el trazo, frentes y núcleos agrarios.
+**Historia de Usuario:** Como visualizador, quiero visualizar un mapa interactivo del proyecto ferroviario, para poder explorar espacialmente el trazo, frentes y núcleos agrarios.
 
 #### Criterios de Aceptación
 
@@ -433,7 +434,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 31: Visualización de Núcleos Agrarios en Mapa
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero ver Núcleos Agrarios representados en el mapa con información al interactuar, para poder identificar rápidamente su estatus.
+**Historia de Usuario:** Como visualizador, quiero ver Núcleos Agrarios representados en el mapa con información al interactuar, para poder identificar rápidamente su estatus.
 
 #### Criterios de Aceptación
 
@@ -445,7 +446,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 32: Navegación Jerárquica desde Proyecto hasta Núcleos Agrarios
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero navegar jerárquicamente desde el Proyecto hasta los Núcleos Agrarios en el mapa, para poder explorar el progreso en diferentes niveles de detalle.
+**Historia de Usuario:** Como visualizador, quiero navegar jerárquicamente desde el Proyecto hasta los Núcleos Agrarios en el mapa, para poder explorar el progreso en diferentes niveles de detalle.
 
 #### Criterios de Aceptación
 
@@ -458,7 +459,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 33: Panel de Información Detallada de Frente
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero ver información detallada de un Frente al seleccionarlo, para poder entender su progreso de liberación.
+**Historia de Usuario:** Como visualizador, quiero ver información detallada de un Frente al seleccionarlo, para poder entender su progreso de liberación.
 
 #### Criterios de Aceptación
 
@@ -470,7 +471,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 34: Cálculo Automático de Superficies por Frente
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero que el sistema calcule automáticamente las superficies afectadas y liberadas por Frente, para obtener métricas de avance precisas.
+**Historia de Usuario:** Como visualizador, quiero que el sistema calcule automáticamente las superficies afectadas y liberadas por Frente, para obtener métricas de avance precisas.
 
 #### Criterios de Aceptación
 
@@ -483,7 +484,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 35: Codificación de Colores por Avance de Frente
 
-**Historia de Usuario:** Como Usuario_Visualizador, quiero ver los Frentes codificados con colores según su porcentaje de avance, para identificar rápidamente el progreso en el mapa.
+**Historia de Usuario:** Como visualizador, quiero ver los Frentes codificados con colores según su porcentaje de avance, para identificar rápidamente el progreso en el mapa.
 
 #### Criterios de Aceptación
 
