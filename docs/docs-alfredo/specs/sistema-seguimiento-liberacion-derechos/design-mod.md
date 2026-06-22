@@ -212,6 +212,17 @@ El sistema utiliza una **arquitectura de tres capas con servicios geoespaciales*
   - Lectura automática de sistemas de coordenadas desde archivos .prj
 - **Alternativas Consideradas**: Conversión manual (propenso a errores), APIs de servicios en la nube (dependencia externa)
 
+**DA-9: Rastreabilidad Total del Borrado Lógico (Soft Deletes)**
+- **Decisión**: Queda prohibida la eliminación física de registros. Además del campo `activo BOOLEAN`, todas las tablas operativas asumen tener la traza de baja (`fecha_baja`, `id_usuario_baja`, `motivo_baja`) y la de reactivación (`fecha_reactivacion`, `id_usuario_reactivacion`, `motivo_reactivacion`).
+- **Justificación**: El trigger `fn_validar_baja_logica()` bloquea bajas anónimas y conserva el historial al reactivarse. Además rige la regla "Soft-Restrict" impidiendo baja de padres con hijos activos.
+
+**DA-10: Auditoría Transaccional y Usuario de Migración**
+- **Decisión**: El trigger `fn_audit_log` rechaza cualquier cambio si el contexto `app.current_user_id` es nulo.
+- **Justificación**: Para scripts de base de datos directos, se define el usuario `id_usuario = 1` (SYSTEM_MIGRATION). Se debe invocar estrictamente de forma transaccional: `BEGIN; SET LOCAL "app.current_user_id" = '1'; [DML]; COMMIT;`.
+
+**DA-11: Cálculo Geoespacial Oficial vs Visualización (Buffers)**
+- **Decisión**: La columna `ancho_total_derecho_via_m` se define en metros. La base de datos usa `ST_Buffer(geom::geography)` para validación topológica `ST_Intersects` al vuelo. Sin embargo, para cálculos de superficie oficial (`ST_Area`), se requiere forzar transformación a UTM (`ST_Transform`).
+
 
 ## Components and Interfaces
 
@@ -630,6 +641,7 @@ CREATE TABLE tramo (
     clave_tramo VARCHAR(20) UNIQUE NOT NULL,
     nombre_tramo VARCHAR(200) NOT NULL,
     descripcion TEXT,
+    ancho_total_derecho_via_m NUMERIC(6,2) DEFAULT 40.00 CHECK (ancho_total_derecho_via_m > 0),
     geometria_linea GEOMETRY(MULTILINESTRING, 4326),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_registro DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -732,7 +744,6 @@ CREATE TABLE orv (
     numero_orv VARCHAR(50),
     inicio_vigencia DATE NOT NULL,
     fin_vigencia DATE NOT NULL,
-    orv_vigente BOOLEAN NOT NULL DEFAULT FALSE,
     acta_eleccion_inscrita_ran BOOLEAN NOT NULL DEFAULT FALSE,
     documentacion_disponible BOOLEAN NOT NULL DEFAULT FALSE,
     documentacion_faltante TEXT,
@@ -742,6 +753,7 @@ CREATE TABLE orv (
     consejo_vigilancia_presidente VARCHAR(300),
     consejo_vigilancia_secretario1 VARCHAR(300),
     consejo_vigilancia_secretario2 VARCHAR(300),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     observaciones TEXT
 );
 
@@ -752,7 +764,9 @@ CREATE TABLE padron_historial (
     numero_ejidatarios_comuneros INTEGER NOT NULL CHECK (numero_ejidatarios_comuneros >= 0),
     id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
     fecha_registro TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    observaciones TEXT
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    observaciones TEXT,
+    CONSTRAINT uq_padron_nucleo UNIQUE (id_nucleo, id_padron)
 );
 
 CREATE TABLE parcela (
@@ -766,6 +780,7 @@ CREATE TABLE parcela (
     nombre_titular VARCHAR(300),
     documentacion_disponible BOOLEAN NOT NULL DEFAULT FALSE,
     documentacion_faltante TEXT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     observaciones TEXT,
     CONSTRAINT uq_parcela_nucleo_id UNIQUE (id_nucleo, id_parcela)
 );
@@ -781,17 +796,27 @@ CREATE TABLE afectacion (
     destino_superficie VARCHAR(80),
     no_parcela_solar VARCHAR(100),
     superficie_afectada_ha NUMERIC(12,4) CHECK (superficie_afectada_ha >= 0),
+    geometria_afectacion GEOMETRY(Geometry, 4326),
     num_personas_afectadas INTEGER CHECK (num_personas_afectadas >= 0),
     situacion_juridica TEXT,
     documentacion_disponible BOOLEAN NOT NULL DEFAULT FALSE,
     documentacion_faltante TEXT,
+    origen_registro VARCHAR(50) NOT NULL DEFAULT 'captura_sistema' CHECK (origen_registro IN ('migracion_excel', 'captura_sistema')),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     observaciones TEXT,
+    CONSTRAINT chk_afectacion_tipo_geometria CHECK (geometria_afectacion IS NULL OR ST_GeometryType(geometria_afectacion) IN ('ST_Polygon', 'ST_MultiPolygon')),
+    CONSTRAINT chk_afectacion_geometria_valida CHECK (geometria_afectacion IS NULL OR ST_IsValid(geometria_afectacion)),
+    CONSTRAINT chk_afectacion_srid CHECK (geometria_afectacion IS NULL OR ST_SRID(geometria_afectacion) = 4326),
+    CONSTRAINT chk_geometria_requerida_nativos CHECK (origen_registro = 'migracion_excel' OR geometria_afectacion IS NOT NULL),
+    CONSTRAINT chk_individual_requiere_parcela CHECK (tipo_afectacion = 'colectivo' OR id_parcela IS NOT NULL),
     CONSTRAINT fk_afectacion_tramo_nucleo_mismo_nucleo
         FOREIGN KEY (id_nucleo, id_tramo_nucleo) REFERENCES tramo_nucleo(id_nucleo, id_tramo_nucleo),
     CONSTRAINT fk_afectacion_parcela_mismo_nucleo
         FOREIGN KEY (id_nucleo, id_parcela) REFERENCES parcela(id_nucleo, id_parcela),
     CONSTRAINT uq_afectacion_tramo_id_tipo UNIQUE (id_tramo_nucleo, id_afectacion, tipo_afectacion)
 );
+
+CREATE INDEX idx_afectacion_geom ON afectacion USING GIST (geometria_afectacion);
 ```
 
 **5. Proceso Operativo y Documentos**
@@ -806,12 +831,14 @@ CREATE TABLE actividad_campo (
     resultado TEXT,
     id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
     fecha_registro TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     observaciones TEXT
 );
 
 CREATE TABLE asamblea (
     id_asamblea SERIAL PRIMARY KEY,
-    id_tramo_nucleo INTEGER NOT NULL REFERENCES tramo_nucleo(id_tramo_nucleo),
+    id_nucleo INTEGER NOT NULL,
+    id_tramo_nucleo INTEGER NOT NULL,
     tipo_asamblea VARCHAR(50) NOT NULL CHECK (tipo_asamblea IN ('informacion', 'anuencia', 'retiro_fondos', 'conciliacion', 'no_verificativo')),
     contexto_proceso VARCHAR(50),
     fecha_exp_1a DATE,
@@ -827,9 +854,12 @@ CREATE TABLE asamblea (
     acta_inscripcion_fecha_ran DATE,
     documentacion_disponible BOOLEAN NOT NULL DEFAULT FALSE,
     documentacion_faltante TEXT,
-    id_padron INTEGER REFERENCES padron_historial(id_padron),
+    id_padron INTEGER,
     id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     observaciones TEXT,
+    CONSTRAINT fk_asamblea_tramo_nucleo FOREIGN KEY (id_nucleo, id_tramo_nucleo) REFERENCES tramo_nucleo(id_nucleo, id_tramo_nucleo),
+    CONSTRAINT fk_asamblea_padron FOREIGN KEY (id_nucleo, id_padron) REFERENCES padron_historial(id_nucleo, id_padron),
     CONSTRAINT uq_asamblea_tramo_id UNIQUE (id_tramo_nucleo, id_asamblea)
 );
 
@@ -848,71 +878,53 @@ CREATE TABLE convenio (
     monto_100 NUMERIC(18,2) CHECK (monto_100 >= 0),
     monto_90 NUMERIC(18,2) CHECK (monto_90 >= 0),
     monto_bdt NUMERIC(18,2) CHECK (monto_bdt >= 0),
-    
-    -- CAMPOS DE SUPERFICIE: Distinción jurídica por tipo de derecho afectado
-    -- superficie_total_ha: Usado EXCLUSIVAMENTE para afectaciones INDIVIDUALES (derechos individuales)
-    --   Representa la superficie específica de la PARCELA afectada que tiene un dueño particular.
-    --   Se captura en expedientes privados mediante negociación directa con el titular.
-    --   La distinción es jurídica: estas parcelas tienen titular específico y no requieren asamblea.
-    --   IMPORTANTE: No usar para afectaciones colectivas. Ver superficie_real_afectada_ha.
     superficie_total_ha NUMERIC(12,4) CHECK (superficie_total_ha >= 0),
-    
-    -- superficie_real_afectada_ha: Usado EXCLUSIVAMENTE para afectaciones COLECTIVAS (derechos colectivos)
-    --   Representa la superficie de TIERRAS DE USO COMÚN que pertenecen al núcleo agrario completo.
-    --   Estas tierras son INALIENABLES y su afectación requiere proceso de asamblea.
-    --   La distinción es jurídica: no son propiedad de individuos sino del núcleo agrario.
-    --   IMPORTANTE: No usar para afectaciones individuales. Ver superficie_total_ha.
     superficie_real_afectada_ha NUMERIC(12,4) CHECK (superficie_real_afectada_ha >= 0),
-    
     superficie_adicional_ha NUMERIC(12,4) CHECK (superficie_adicional_ha >= 0),
     superficie_ampliacion_ha NUMERIC(12,4) CHECK (superficie_ampliacion_ha >= 0),
-    
-    -- Campos RAN estándar
     ingreso_ran_fecha DATE,
     numero_solicitud_ingreso VARCHAR(100),
     calificacion_registral TEXT,
     convenio_inscrito_fecha_ran DATE,
-    
     documentacion_disponible BOOLEAN NOT NULL DEFAULT FALSE,
     documentacion_faltante TEXT,
     id_usuario_registro INTEGER REFERENCES usuario(id_usuario),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     observaciones TEXT,
+    CONSTRAINT uq_convenio_linaje UNIQUE (id_tramo_nucleo, id_convenio, id_afectacion),
     CONSTRAINT fk_convenio_afectacion_compuesta
         FOREIGN KEY (id_tramo_nucleo, id_afectacion, tipo_afectacion)
         REFERENCES afectacion(id_tramo_nucleo, id_afectacion, tipo_afectacion),
     CONSTRAINT fk_convenio_padre_recursiva
-        FOREIGN KEY (id_tramo_nucleo, id_convenio_padre, tipo_afectacion)
-        REFERENCES convenio(id_tramo_nucleo, id_convenio, tipo_afectacion),
+        FOREIGN KEY (id_tramo_nucleo, id_convenio_padre, id_afectacion)
+        REFERENCES convenio(id_tramo_nucleo, id_convenio, id_afectacion),
     CONSTRAINT fk_convenio_asamblea_compuesta
         FOREIGN KEY (id_tramo_nucleo, id_asamblea_autorizacion)
         REFERENCES asamblea(id_tramo_nucleo, id_asamblea),
-    -- Validar que tipo_convenio sea coherente con tipo_afectacion
     CONSTRAINT chk_tipo_convenio_por_afectacion CHECK (
         (tipo_afectacion = 'colectivo' AND tipo_convenio IN ('cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias'))
         OR
         (tipo_afectacion = 'individual' AND tipo_convenio IN ('cop_original', 'modificatorio', 'ampliacion', 'ampliacion_remanente'))
     ),
-    -- Regla: Obras Complementarias NO captura monto BDT (según proceso)
+    CONSTRAINT chk_colectivo_requiere_asamblea CHECK (
+        tipo_afectacion = 'individual' OR tipo_convenio IN ('modificatorio') OR id_asamblea_autorizacion IS NOT NULL
+    ),
+    CONSTRAINT chk_individual_sin_asamblea CHECK (
+        tipo_afectacion = 'colectivo' OR id_asamblea_autorizacion IS NULL
+    ),
+    CONSTRAINT chk_modificatorio_requiere_padre CHECK (
+        tipo_convenio != 'modificatorio' OR id_convenio_padre IS NOT NULL
+    ),
     CONSTRAINT chk_bdt_no_obras_complementarias CHECK (
         (tipo_convenio = 'obras_complementarias' AND monto_bdt IS NULL)
         OR
         (tipo_convenio != 'obras_complementarias')
     ),
-    -- Regla: Modificatorio Individual solo requiere fecha, monto_90, monto_100 (sin superficie, sin BDT, sin RAN)
     CONSTRAINT chk_modificatorio_individual_restricciones CHECK (
         NOT (tipo_convenio = 'modificatorio' AND tipo_afectacion = 'individual')
         OR
-        (superficie_total_ha IS NULL 
-         AND superficie_real_afectada_ha IS NULL 
-         AND superficie_adicional_ha IS NULL
-         AND superficie_ampliacion_ha IS NULL
-         AND monto_bdt IS NULL
-         AND ingreso_ran_fecha IS NULL
-         AND numero_solicitud_ingreso IS NULL
-         AND calificacion_registral IS NULL
-         AND convenio_inscrito_fecha_ran IS NULL)
+        (superficie_total_ha IS NULL AND superficie_real_afectada_ha IS NULL AND superficie_adicional_ha IS NULL AND superficie_ampliacion_ha IS NULL AND monto_bdt IS NULL AND ingreso_ran_fecha IS NULL AND numero_solicitud_ingreso IS NULL AND calificacion_registral IS NULL AND convenio_inscrito_fecha_ran IS NULL)
     ),
-    -- Regla: Exclusividad estricta de campos de superficie según el tipo de convenio y afectación
     CONSTRAINT chk_superficie_exclusiva_estricta CHECK (
         (tipo_afectacion != 'individual' OR (superficie_real_afectada_ha IS NULL AND superficie_adicional_ha IS NULL))
         AND
@@ -945,6 +957,7 @@ CREATE TABLE tramite_fifonafe (
     fecha_oficio_dgaopr_a_repr DATE,
     fecha_oficio_rpta_repr_a_dgaopr DATE,
     fecha_oficio_rpta_dgaopr_a_fifonafe DATE,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     observaciones TEXT,
     CONSTRAINT fk_tramite_convenio_compuesta
         FOREIGN KEY (id_tramo_nucleo, id_convenio, tipo_afectacion)
@@ -965,6 +978,7 @@ CREATE TABLE documentacion_soporte (
     categoria VARCHAR(20) NOT NULL CHECK (categoria IN ('disponible', 'faltante')),
     es_critico BOOLEAN NOT NULL DEFAULT FALSE,
     url_archivo TEXT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     observaciones TEXT,
     fecha_carga TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -979,7 +993,8 @@ CREATE TABLE alertas (
     entidad_relacionada_tipo VARCHAR(50) NOT NULL,
     fecha_evento DATE,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    esta_activa BOOLEAN NOT NULL DEFAULT TRUE
+    esta_activa BOOLEAN NOT NULL DEFAULT TRUE,
+    activo BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE alertas_vistas (
@@ -1024,38 +1039,233 @@ CREATE TRIGGER trg_validar_convenio_expropiacion
 BEFORE INSERT OR UPDATE ON convenio
 FOR EACH ROW EXECUTE FUNCTION fn_validar_convenio_expropiacion();
 
-CREATE OR REPLACE FUNCTION fn_validar_superficie_liberada() RETURNS TRIGGER AS $$
+-- Función centralizada de cálculo de superficie liberada
+CREATE OR REPLACE FUNCTION fn_calcular_superficie_liberada_afectacion(p_id_afectacion INTEGER) RETURNS NUMERIC AS $$
+DECLARE
+    v_total_liberado NUMERIC := 0;
+BEGIN
+    SELECT COALESCE(SUM(sup_liberada_base) + SUM(sup_liberada_adicional), 0) INTO v_total_liberado
+    FROM (
+        WITH ModificatoriosVigentes AS (
+            SELECT id_convenio_padre, id_convenio, superficie_real_afectada_ha, superficie_total_ha
+            FROM (
+                SELECT id_convenio_padre, id_convenio, superficie_real_afectada_ha, superficie_total_ha,
+                       ROW_NUMBER() OVER (PARTITION BY id_convenio_padre ORDER BY fecha_firma DESC, id_convenio DESC) as rn
+                FROM convenio
+                WHERE tipo_convenio = 'modificatorio' AND convenio_inscrito_fecha_ran IS NOT NULL AND activo = TRUE
+            ) t WHERE rn = 1
+        ),
+        ConveniosBase AS (
+            SELECT c.id_tramo_nucleo,
+                   COALESCE(m.superficie_real_afectada_ha, m.superficie_total_ha, c.superficie_real_afectada_ha, c.superficie_total_ha, 0) AS sup_liberada_base,
+                   0 AS sup_liberada_adicional
+            FROM convenio c
+            LEFT JOIN ModificatoriosVigentes m ON m.id_convenio_padre = c.id_convenio
+            WHERE c.tipo_convenio IN ('cop_original', 'obras_complementarias') AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE AND c.id_afectacion = p_id_afectacion
+        ),
+        SuperficiesAdicionales AS (
+            SELECT c.id_tramo_nucleo,
+                   0 AS sup_liberada_base,
+                   COALESCE(c.superficie_adicional_ha, c.superficie_ampliacion_ha, 0) AS sup_liberada_adicional
+            FROM convenio c
+            WHERE c.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE AND c.id_afectacion = p_id_afectacion
+        )
+        SELECT sup_liberada_base, sup_liberada_adicional FROM ConveniosBase
+        UNION ALL
+        SELECT sup_liberada_base, sup_liberada_adicional FROM SuperficiesAdicionales
+    ) calculo;
+    RETURN v_total_liberado;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger sobre Convenio (Cálculo exacto)
+CREATE OR REPLACE FUNCTION fn_validar_superficie_liberada_convenio() RETURNS TRIGGER AS $$
 DECLARE
     sup_afectada NUMERIC;
-    sup_liberada_actual NUMERIC;
-    nueva_sup NUMERIC;
+    sup_liberada_calculada NUMERIC;
 BEGIN
-    SELECT superficie_afectada_ha INTO sup_afectada
-    FROM afectacion WHERE id_afectacion = NEW.id_afectacion;
+    SELECT superficie_afectada_ha INTO sup_afectada FROM afectacion WHERE id_afectacion = NEW.id_afectacion AND activo = TRUE;
+    sup_liberada_calculada := fn_calcular_superficie_liberada_afectacion(NEW.id_afectacion);
     
-    SELECT COALESCE(SUM(COALESCE(superficie_real_afectada_ha, 0) + COALESCE(superficie_total_ha, 0) + COALESCE(superficie_adicional_ha, 0) + COALESCE(superficie_ampliacion_ha, 0)), 0) INTO sup_liberada_actual
-    FROM convenio WHERE id_afectacion = NEW.id_afectacion AND id_convenio != NEW.id_convenio;
-    
-    nueva_sup := COALESCE(NEW.superficie_real_afectada_ha, 0) + COALESCE(NEW.superficie_total_ha, 0) + COALESCE(NEW.superficie_adicional_ha, 0) + COALESCE(NEW.superficie_ampliacion_ha, 0);
-    
-    IF (sup_liberada_actual + nueva_sup) > sup_afectada THEN
-        RAISE EXCEPTION 'La suma de superficies liberadas no puede exceder la superficie afectada total';
+    IF sup_liberada_calculada > sup_afectada THEN
+        RAISE EXCEPTION 'La suma de superficies liberadas calculada (%) excede la superficie afectada total (%)', sup_liberada_calculada, sup_afectada;
     END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_validar_superficie_liberada
+CREATE TRIGGER trg_validar_superficie_liberada_convenio
+AFTER INSERT OR UPDATE OF convenio_inscrito_fecha_ran, activo, tipo_convenio, id_convenio_padre, superficie_total_ha, superficie_real_afectada_ha, superficie_adicional_ha, superficie_ampliacion_ha, id_afectacion ON convenio
+FOR EACH ROW EXECUTE FUNCTION fn_validar_superficie_liberada_convenio();
+
+-- Trigger sobre Afectación (Protección contra reducción)
+CREATE OR REPLACE FUNCTION fn_validar_superficie_afectada_reducida() RETURNS TRIGGER AS $$
+DECLARE
+    sup_liberada_calculada NUMERIC;
+BEGIN
+    IF NEW.superficie_afectada_ha < OLD.superficie_afectada_ha THEN
+        sup_liberada_calculada := fn_calcular_superficie_liberada_afectacion(NEW.id_afectacion);
+        IF NEW.superficie_afectada_ha < sup_liberada_calculada THEN
+            RAISE EXCEPTION 'La nueva superficie afectada (%) no puede ser menor a la superficie ya liberada en convenios activos (%)', NEW.superficie_afectada_ha, sup_liberada_calculada;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_superficie_afectada_reducida
+BEFORE UPDATE OF superficie_afectada_ha ON afectacion
+FOR EACH ROW EXECUTE FUNCTION fn_validar_superficie_afectada_reducida();
+
+-- Validación estricta de Parcela Individual
+CREATE OR REPLACE FUNCTION fn_validar_parcela_individual() RETURNS TRIGGER AS $$
+DECLARE
+    p_no_ppt VARCHAR;
+    p_titular VARCHAR;
+    p_cert VARCHAR;
+    p_folio VARCHAR;
+    p_doc_faltante TEXT;
+BEGIN
+    IF NEW.tipo_afectacion = 'individual' AND NEW.id_parcela IS NOT NULL THEN
+        SELECT no_parcela_ppt, nombre_titular, certificado_parcelario, folio_derechos, documentacion_faltante
+        INTO p_no_ppt, p_titular, p_cert, p_folio, p_doc_faltante
+        FROM parcela WHERE id_parcela = NEW.id_parcela;
+        
+        IF p_no_ppt IS NULL OR p_titular IS NULL THEN
+            RAISE EXCEPTION 'La parcela vinculada a una afectación individual debe tener no_parcela_ppt y nombre_titular';
+        END IF;
+        
+        IF (p_cert IS NULL OR p_folio IS NULL) AND p_doc_faltante IS NULL THEN
+            RAISE EXCEPTION 'Si la parcela carece de certificado, el campo documentacion_faltante debe estar poblado indicando la justificación.';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_parcela_individual
+BEFORE INSERT OR UPDATE ON afectacion
+FOR EACH ROW EXECUTE FUNCTION fn_validar_parcela_individual();
+
+-- Validación de Modificatorio Colectivo
+CREATE OR REPLACE FUNCTION fn_validar_modificatorio_colectivo() RETURNS TRIGGER AS $$
+DECLARE
+    padre_tipo VARCHAR;
+    padre_afectacion VARCHAR;
+    padre_asamblea INTEGER;
+    padre_anuencia VARCHAR;
+BEGIN
+    IF NEW.tipo_convenio = 'modificatorio' AND NEW.tipo_afectacion = 'colectivo' THEN
+        IF NEW.id_convenio_padre IS NULL THEN
+            RAISE EXCEPTION 'Un modificatorio colectivo debe tener un id_convenio_padre';
+        END IF;
+        
+        SELECT c.tipo_convenio, c.tipo_afectacion, c.id_asamblea_autorizacion, a.resultado_anuencia
+        INTO padre_tipo, padre_afectacion, padre_asamblea, padre_anuencia
+        FROM convenio c
+        LEFT JOIN asamblea a ON a.id_asamblea = c.id_asamblea_autorizacion
+        WHERE c.id_convenio = NEW.id_convenio_padre;
+        
+        IF padre_tipo NOT IN ('cop_original', 'obras_complementarias', 'superficie_adicional') THEN
+            RAISE EXCEPTION 'El padre de un modificatorio colectivo debe ser cop_original, obras_complementarias o superficie_adicional';
+        END IF;
+        
+        IF padre_afectacion != 'colectivo' THEN
+            RAISE EXCEPTION 'El convenio padre debe ser de afectación colectiva';
+        END IF;
+        
+        IF padre_asamblea IS NULL OR padre_anuencia != 'otorgada' THEN
+            RAISE EXCEPTION 'El convenio padre debe contar con una asamblea vinculada cuya anuencia haya sido otorgada';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_modificatorio_colectivo
 BEFORE INSERT OR UPDATE ON convenio
-FOR EACH ROW EXECUTE FUNCTION fn_validar_superficie_liberada();
-```
+FOR EACH ROW EXECUTE FUNCTION fn_validar_modificatorio_colectivo();
+
+-- Soft-Restrict (Inactivos) y Trazabilidad Forense
+CREATE OR REPLACE FUNCTION fn_validar_baja_logica() RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.activo = TRUE AND NEW.activo = FALSE THEN
+        IF NEW.fecha_baja IS NULL OR NEW.id_usuario_baja IS NULL OR NEW.motivo_baja IS NULL THEN
+            RAISE EXCEPTION 'Toda baja lógica requiere fecha_baja, id_usuario_baja y motivo_baja';
+        END IF;
+    ELSIF OLD.activo = FALSE AND NEW.activo = TRUE THEN
+        IF NEW.fecha_reactivacion IS NULL OR NEW.id_usuario_reactivacion IS NULL OR NEW.motivo_reactivacion IS NULL THEN
+            RAISE EXCEPTION 'Toda reactivación requiere fecha_reactivacion, id_usuario_reactivacion y motivo_reactivacion, manteniendo intactos los datos de la baja original';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger Espacial para Afectación
+CREATE OR REPLACE FUNCTION fn_validar_coherencia_espacial() RETURNS TRIGGER AS $$
+DECLARE
+    v_nucleo_geom GEOMETRY;
+    v_tramo_geom GEOMETRY;
+    v_ancho NUMERIC;
+BEGIN
+    IF NEW.origen_registro = 'captura_sistema' AND NEW.geometria_afectacion IS NOT NULL THEN
+        SELECT geometria_poligono INTO v_nucleo_geom FROM nucleo_agrario WHERE id_nucleo = NEW.id_nucleo;
+        IF NOT ST_Intersects(NEW.geometria_afectacion, v_nucleo_geom) THEN
+            RAISE EXCEPTION 'La afectación no intersecta con su núcleo agrario';
+        END IF;
+
+        SELECT t.geometria_linea, t.ancho_total_derecho_via_m INTO v_tramo_geom, v_ancho 
+        FROM tramo_nucleo tn JOIN tramo t ON tn.id_tramo = t.id_tramo WHERE tn.id_tramo_nucleo = NEW.id_tramo_nucleo;
+        
+        IF NOT ST_Intersects(NEW.geometria_afectacion, ST_Buffer(v_tramo_geom::geography, v_ancho / 2)::geometry) THEN
+            RAISE EXCEPTION 'La afectación no intersecta con el derecho de vía del tramo';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_coherencia_espacial
+BEFORE INSERT OR UPDATE ON afectacion
+FOR EACH ROW EXECUTE FUNCTION fn_validar_coherencia_espacial();
+
+-- Prohibición estricta de DELETE Físico
+CREATE OR REPLACE FUNCTION fn_prevent_physical_delete() RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'Borrado físico prohibido por auditoría. Use UPDATE activo = FALSE';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Función Genérica de Auditoría Universal
+CREATE OR REPLACE FUNCTION fn_audit_log() RETURNS TRIGGER AS $$
+DECLARE
+    current_user_id TEXT;
+BEGIN
+    current_user_id := current_setting('app.current_user_id', true);
+    IF current_user_id IS NULL OR current_user_id = '' THEN
+        RAISE EXCEPTION 'Auditoría fallida: Falta el contexto de usuario (app.current_user_id). Use BEGIN; SET LOCAL "app.current_user_id" = 1; COMMIT;';
+    END IF;
+    
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO bitacora (id_usuario, entidad_tipo, entidad_id, accion, valor_nuevo)
+        VALUES (current_user_id::INTEGER, TG_TABLE_NAME, NEW.id, 'insert', row_to_json(NEW));
+        RETURN NEW;
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO bitacora (id_usuario, entidad_tipo, entidad_id, accion, valor_anterior, valor_nuevo)
+        VALUES (current_user_id::INTEGER, TG_TABLE_NAME, NEW.id, 'update', row_to_json(OLD), row_to_json(NEW));
+        RETURN NEW;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
 
 ### Vistas de Base de Datos
 
 Las vistas integran el cálculo espacial y las relaciones del esquema final (usando `vw_dashboard_liberacion` y dependencias) para proveer datos a los tableros de control.
 
 **Vista: vw_convenio_estado**
-Calcula el estado del flujo de trabajo de cada convenio basado en fechas clave. Esta vista evita la necesidad de un campo explícito de estado manteniendo las fechas como fuente de verdad.
+Calcula el estado del flujo de trabajo de cada convenio basado en fechas clave.
 
 ```sql
 CREATE OR REPLACE VIEW vw_convenio_estado AS
@@ -1067,14 +1277,22 @@ SELECT
         WHEN c.fecha_firma IS NOT NULL THEN 'firmado'
         ELSE 'borrador'
     END AS estado_calculado,
-    -- Indicadores de validación
     (c.convenio_inscrito_fecha_ran IS NOT NULL) AS esta_inscrito_ran,
     (c.fecha_firma IS NOT NULL) AS esta_firmado
-FROM convenio c;
+FROM convenio c WHERE c.activo = TRUE;
+```
+
+**Vista: vw_orv_estado**
+```sql
+CREATE OR REPLACE VIEW vw_orv_estado AS
+SELECT 
+    *,
+    (CURRENT_DATE BETWEEN inicio_vigencia AND fin_vigencia) AS orv_vigente 
+FROM orv WHERE activo = TRUE;
 ```
 
 **Vista: vw_tramo_nucleo_estado**
-Evalúa en tiempo real si un cruce geográfico ya tiene convenios, trámites, o problemas documentados.
+Evalúa en tiempo real si un cruce geográfico ya tiene convenios, trámites, o problemas documentados. Separa el estado legal del geoespacial.
 ```sql
 CREATE OR REPLACE VIEW vw_tramo_nucleo_estado AS
 SELECT
@@ -1085,31 +1303,64 @@ SELECT
     tn.consecutivo,
     tn.longitud_m,
     tn.causa_problema,
-    EXISTS (SELECT 1 FROM asamblea a WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo AND a.resultado_anuencia = 'otorgada') AS tiene_anuencia,
-    EXISTS (SELECT 1 FROM convenio c WHERE c.id_tramo_nucleo = tn.id_tramo_nucleo AND c.convenio_inscrito_fecha_ran IS NOT NULL) AS tiene_convenio_inscrito_ran,
+    EXISTS (SELECT 1 FROM asamblea a WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo AND a.resultado_anuencia = 'otorgada' AND a.activo = TRUE) AS tiene_anuencia,
+    EXISTS (SELECT 1 FROM convenio c WHERE c.id_tramo_nucleo = tn.id_tramo_nucleo AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE) AS tiene_convenio_inscrito_ran,
+    -- ESTADO LEGAL
     CASE
-        WHEN (SELECT COUNT(*) FROM afectacion a WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo) > 0 
-             AND NOT EXISTS (
-                 SELECT 1 FROM afectacion a 
-                 WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo 
-                 AND NOT EXISTS (
-                     SELECT 1 FROM convenio c 
-                     WHERE c.id_afectacion = a.id_afectacion 
-                     AND c.convenio_inscrito_fecha_ran IS NOT NULL
-                 )
-             ) THEN 'liberado'
         WHEN tn.es_expropiacion = TRUE THEN 'problema'
         WHEN NULLIF(BTRIM(tn.causa_problema), '') IS NOT NULL THEN 'problema'
-        WHEN EXISTS (SELECT 1 FROM convenio c WHERE c.id_tramo_nucleo = tn.id_tramo_nucleo) THEN 'en_proceso'
+        WHEN (SELECT COUNT(*) FROM afectacion a WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo AND a.activo = TRUE) > 0 
+             AND NOT EXISTS (
+                 SELECT 1 FROM afectacion a WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo AND a.activo = TRUE
+                 AND NOT EXISTS (SELECT 1 FROM convenio c WHERE c.id_afectacion = a.id_afectacion AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE)
+             ) THEN 'liberado'
+        WHEN EXISTS (SELECT 1 FROM convenio c WHERE c.id_tramo_nucleo = tn.id_tramo_nucleo AND c.activo = TRUE) THEN 'en_proceso'
         ELSE 'pendiente'
-    END AS estado_operativo_calculado
-FROM tramo_nucleo tn;
+    END AS estado_legal,
+    -- ESTADO GEOESPACIAL
+    CASE
+        WHEN (SELECT COUNT(*) FROM afectacion a WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo AND a.activo = TRUE) = 0 THEN 'pendiente_digitalizacion'
+        WHEN EXISTS (SELECT 1 FROM afectacion a WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo AND a.geometria_afectacion IS NULL AND a.activo = TRUE) THEN 'pendiente_digitalizacion'
+        ELSE 'completo'
+    END AS estado_geoespacial
+FROM tramo_nucleo tn WHERE tn.activo = TRUE;
 ```
 
 **Vista: vw_dashboard_liberacion**
-Agrupa las afectaciones, convenios y estatus para análisis global.
+Agrupa las afectaciones, convenios y estatus para análisis global. Resuelve la precedencia de los modificatorios y restringe la liberación a convenios inscritos.
 ```sql
 CREATE OR REPLACE VIEW vw_dashboard_liberacion AS
+WITH ModificatoriosVigentes AS (
+    SELECT id_convenio_padre, id_convenio, superficie_real_afectada_ha, superficie_total_ha
+    FROM (
+        SELECT id_convenio_padre, id_convenio, superficie_real_afectada_ha, superficie_total_ha,
+               ROW_NUMBER() OVER (PARTITION BY id_convenio_padre ORDER BY fecha_firma DESC, id_convenio DESC) as rn
+        FROM convenio
+        WHERE tipo_convenio = 'modificatorio' AND convenio_inscrito_fecha_ran IS NOT NULL AND activo = TRUE
+    ) t WHERE rn = 1
+),
+ConveniosBase AS (
+    SELECT c.*,
+           COALESCE(m.superficie_real_afectada_ha, m.superficie_total_ha, c.superficie_real_afectada_ha, c.superficie_total_ha, 0) AS sup_liberada_base
+    FROM convenio c
+    LEFT JOIN ModificatoriosVigentes m ON m.id_convenio_padre = c.id_convenio
+    WHERE c.tipo_convenio IN ('cop_original', 'obras_complementarias') AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE
+),
+SuperficiesAdicionales AS (
+    SELECT c.*,
+           COALESCE(c.superficie_adicional_ha, c.superficie_ampliacion_ha, 0) AS sup_liberada_adicional
+    FROM convenio c
+    WHERE c.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE
+),
+AgrupacionLiberada AS (
+    SELECT id_tramo_nucleo,
+           SUM(sup_liberada_base) + COALESCE((SELECT SUM(sup_liberada_adicional) FROM SuperficiesAdicionales sa WHERE sa.id_tramo_nucleo = cb.id_tramo_nucleo), 0) AS superficie_liberada_ha,
+           COUNT(*) AS total_convenios_formalizados_ran,
+           SUM(CASE WHEN tipo_afectacion = 'colectivo' THEN sup_liberada_base ELSE 0 END) AS total_colectivo_ha,
+           SUM(CASE WHEN tipo_afectacion = 'individual' THEN sup_liberada_base ELSE 0 END) AS total_individual_ha
+    FROM ConveniosBase cb
+    GROUP BY id_tramo_nucleo
+)
 SELECT
     v.id_tramo_nucleo,
     t.id_tramo,
@@ -1118,24 +1369,37 @@ SELECT
     n.id_nucleo,
     n.nombre_nucleo,
     ef.nombre AS entidad_federativa,
-    v.estado_operativo_calculado,
+    v.estado_legal,
+    v.estado_geoespacial,
     COALESCE(af.total_superficie_afectada_ha, 0) AS total_superficie_afectada_ha,
-    COALESCE(cv.total_convenios, 0) AS total_convenios,
-    COALESCE(cv.total_monto_100, 0) AS total_monto_100
+    COALESCE(al.superficie_liberada_ha, 0) AS superficie_liberada_ha,
+    COALESCE(af.total_superficie_afectada_ha, 0) - COALESCE(al.superficie_liberada_ha, 0) AS superficie_pendiente_ha,
+    CASE 
+        WHEN COALESCE(af.total_superficie_afectada_ha, 0) = 0 THEN 0
+        ELSE ROUND((COALESCE(al.superficie_liberada_ha, 0) / af.total_superficie_afectada_ha) * 100, 2)
+    END AS porcentaje_avance_legal,
+    CASE 
+        WHEN COALESCE(af.total_superficie_afectada_ha, 0) = 0 THEN 0
+        ELSE ROUND((COALESCE(af_geo.superficie_con_geometria, 0) / af.total_superficie_afectada_ha) * 100, 2)
+    END AS porcentaje_avance_geoespacial,
+    COALESCE(al.total_convenios_formalizados_ran, 0) AS total_convenios_formalizados_ran,
+    COALESCE(al.total_colectivo_ha, 0) AS total_colectivo_ha,
+    COALESCE(al.total_individual_ha, 0) AS total_individual_ha
 FROM vw_tramo_nucleo_estado v
-JOIN tramo t ON t.id_tramo = v.id_tramo
-JOIN frente f ON f.id_frente = v.id_frente
-JOIN nucleo_agrario n ON n.id_nucleo = v.id_nucleo
-JOIN municipio m ON m.id_municipio = n.id_municipio
-JOIN entidad_federativa ef ON ef.id_entidad = m.id_entidad
+JOIN tramo t ON t.id_tramo = v.id_tramo AND t.activo = TRUE
+JOIN frente f ON f.id_frente = v.id_frente AND f.activo = TRUE
+JOIN nucleo_agrario n ON n.id_nucleo = v.id_nucleo AND n.activo = TRUE
+JOIN municipio m ON m.id_municipio = n.id_municipio AND m.activo = TRUE
+JOIN entidad_federativa ef ON ef.id_entidad = m.id_entidad AND ef.activo = TRUE
 LEFT JOIN (
     SELECT id_tramo_nucleo, SUM(COALESCE(superficie_afectada_ha, 0)) AS total_superficie_afectada_ha
-    FROM afectacion GROUP BY id_tramo_nucleo
+    FROM afectacion WHERE activo = TRUE GROUP BY id_tramo_nucleo
 ) af ON af.id_tramo_nucleo = v.id_tramo_nucleo
 LEFT JOIN (
-    SELECT id_tramo_nucleo, COUNT(*) AS total_convenios, SUM(COALESCE(monto_100, 0)) AS total_monto_100
-    FROM convenio GROUP BY id_tramo_nucleo
-) cv ON cv.id_tramo_nucleo = v.id_tramo_nucleo;
+    SELECT id_tramo_nucleo, SUM(COALESCE(superficie_afectada_ha, 0)) AS superficie_con_geometria
+    FROM afectacion WHERE activo = TRUE AND geometria_afectacion IS NOT NULL GROUP BY id_tramo_nucleo
+) af_geo ON af_geo.id_tramo_nucleo = v.id_tramo_nucleo
+LEFT JOIN AgrupacionLiberada al ON al.id_tramo_nucleo = v.id_tramo_nucleo;
 ```
 
 ## Reglas de Negocio Implementadas en Base de Datos

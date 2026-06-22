@@ -69,7 +69,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 3. CUANDO se crea un Tramo, EL Sistema DEBERÁ requerir un nombre único y clave. El número de tramo se captura en el registro de la intersección con el Núcleo Agrario.
 4. EL Sistema DEBERÁ soportar múltiples Frentes por Tramo
 5. EL Sistema DEBERÁ mostrar la relación jerárquica entre Tramos y Frentes
-6. El sistema DEBERÁ representar el tramo espacialmente, es de suma importancia registrar el polígono definiendo el sistema de coordenadas de entrada. Se debe vigilar la correcta zonificación y el Sistema de Referencia de Coordenadas (SRC), considerando que los mapas base suelen usar coordenadas geográficas WGS84, mientras que los documentos jurídicos de liberación utilizan coordenadas UTM.
+6. EL Sistema DEBERÁ almacenar la geometría del tramo estrictamente como un trazo lineal (MultiLineString). Los polígonos de derecho de vía se calcularán de manera dinámica (on-the-fly) mediante un buffer perimetral (parametrizado en metros por el `ancho_total_derecho_via_m` de cada tramo) sobre el trazo central, usando un casting a "geography" para validaciones exactas sin depender de proyecciones planas.
 
 ### Requirement 3: Registro de Núcleos Agrarios
 
@@ -97,6 +97,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 4. DONDE una Afectación se clasifica como Derecho_Individual, EL Sistema DEBERÁ capturar número de parcela, información del titular y documentación de la propiedad
 5. DONDE una Afectación se clasifica como Derecho_Colectivo, EL Sistema DEBERÁ capturar destino de la superficie, número de parcela/solar (si aplica a un área comunal específica), y relacionar el padrón y estatus de ORV vigentes en asambleas.
 6. EL Sistema DEBERÁ permitir múltiples Afectaciones por Núcleo_Agrario
+7. EL Sistema DEBERÁ hacer obligatoria la captura del polígono de afectación para altas desde interfaz, garantizando intersección espacial con su Núcleo y su Tramo asociado (`origen_registro IN ('migracion_excel', 'captura_sistema')`). Para importación masiva desde Excel, se permitirá geometrías nulas marcando el expediente como "Pendiente de Digitalización Espacial".
 
 ### Requirement 5: Seguimiento de Proceso de Sensibilización
 
@@ -153,7 +154,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 10. EL Sistema DEBERÁ validar que el tipo de convenio sea consistente con el tipo de afectación:
     - Superficie Adicional y Obras Complementarias SOLO aplican a Derechos Colectivos
     - Ampliación y Ampliación Remanente SOLO aplican a Derechos Individuales
-11. CUANDO se crea un Convenio variante (Modificatorio, Superficie Adicional, Obras Complementarias, Ampliación), EL Sistema DEBERÁ permitir vincularlo con su Convenio COP padre mediante referencia
+11. CUANDO se crea un Convenio variante (Modificatorio, Superficie Adicional, Obras Complementarias, Ampliación), EL Sistema DEBERÁ permitir vincularlo con su Convenio COP padre mediante referencia. En el caso del Modificatorio Colectivo, este puede apuntar y modificar a un `cop_original`, una `superficie_adicional` o unas `obras_complementarias`, siempre que dicho padre cuente con una Asamblea autorizadora válida.
 
 ### Requirement 9: Seguimiento de Indemnizaciones y FIFONAFE
 
@@ -304,7 +305,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 1. EL Sistema DEBERÁ soportar creación de Convenios tipo Obras Complementarias
 2. CUANDO se crea un Convenio de Obras Complementarias, EL Sistema DEBERÁ capturar superficie total real afectada
-3. EL Sistema DEBERÁ vincular asambleas de aprobación con Convenios de Obras Complementarias
+3. EL Sistema DEBERÁ detonar un nuevo ciclo relacional completo creando registros independientes de Asamblea y Convenio para las Obras Complementarias, preservando intacto el COP original y abandonando la captura en campos paralelos duplicados.
 4. EL Sistema DEBERÁ calcular montos específicos (90%, 100%) para Obras Complementarias
 5. EL Sistema DEBERÁ mostrar en reportes separación entre convenios COP estándar y Obras Complementarias
 
@@ -368,6 +369,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 3. EL Sistema DEBERÁ permitir consultar historial de cambios por registro
 4. EL Sistema DEBERÁ generar reportes de auditoría por usuario y rango de fechas
 5. EL Sistema DEBERÁ preservar historial de auditoría de forma permanente
+6. EL Sistema DEBERÁ aplicar el registro de auditoría estricto (vía base de datos) a absolutamente todas las tablas operativas, incluyendo accesos de usuario, alertas y documentación soporte.
 
 ### Requirement 26: Captura y Edición de Geometrías de Tramos
 
@@ -463,11 +465,11 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 #### Criterios de Aceptación
 
-1. CUANDO se selecciona un Frente, EL Sistema DEBERÁ mostrar porcentaje de avance total calculado como: (superficie liberada / superficie total afectada) × 100
-2. EL Sistema DEBERÁ mostrar desglose de porcentaje de superficie de uso común liberada
-3. EL Sistema DEBERÁ mostrar desglose de porcentaje de superficie de uso individual liberada
-4. EL Sistema DEBERÁ listar todos los Núcleos Agrarios que intersectan el Frente con: nombre, superficie afectada y estatus
-5. EL Sistema DEBERÁ mostrar superficie total afectada por el Frente en hectáreas y metros cuadrados
+1. CUANDO se selecciona un Frente, EL Sistema DEBERÁ mostrar de forma segregada y no excluyente: el Avance Legal y el Avance Geoespacial.
+2. EL Sistema DEBERÁ calcular el porcentaje de Avance Legal como: (superficie liberada inscrita formalmente / superficie total afectada) × 100
+3. EL Sistema DEBERÁ calcular el porcentaje de Avance Geoespacial como: (superficie afectada con geometría validada / superficie total afectada) × 100
+4. EL Sistema DEBERÁ mostrar desglose de superficie de uso común liberada y superficie de uso individual liberada
+5. EL Sistema DEBERÁ listar todos los Núcleos Agrarios que intersectan el Frente con: nombre, superficie afectada y estatus legal/espacial actual.
 
 ### Requirement 34: Cálculo Automático de Superficies por Frente
 
