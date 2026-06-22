@@ -162,8 +162,12 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 1. EL Sistema DEBERÁ permitir el registro de estatus de Indemnización para cada Afectación (individual o colectiva)
 2. EL Sistema DEBERÁ soportar valores de estatus: Completo, Pendiente, Programado
-3. EL Sistema DEBERÁ dar seguimiento a correspondencia de oficios de FIFONAFE incluyendo números de oficio y fechas
-4. EL Sistema DEBERÁ dar seguimiento a informes de no conflictos con números de oficio y fechas
+3. EL Sistema DEBERÁ dar seguimiento a correspondencia de oficios de FIFONAFE, rastreando obligatoriamente los siguientes cuatro oficios con sus respectivos números y fechas:
+    a. Oficio de FIFONAFE a DGAOPR/Representación
+    b. Oficio de DGAOPR a Representación
+    c. Respuesta de Representación a DGAOPR
+    d. Respuesta de DGAOPR/Representación a FIFONAFE
+4. EL Sistema DEBERÁ dar seguimiento a informes de no conflictos a través de la cadena de oficios antes mencionada
 5. EL Sistema DEBERÁ mostrar estatus de completitud de pago por Afectación
 
 
@@ -277,17 +281,19 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 4. EL Sistema DEBERÁ vincular obligatoriamente cada acta de asamblea registrada con la versión histórica del padrón vigente en su momento, garantizando la inmutabilidad de la auditoría de quórum legal.
 5. EL Sistema DEBERÁ asociar el padrón con el Núcleo_Agrario correspondiente
 
-### Requirement 19: Indicadores de Expropiación Directa
+### Requirement 19: Indicadores de Excepciones Operativas
 
-**Historia de Usuario:** Como Usuario_Captura, quiero marcar núcleos agrarios sujetos a expropiación directa, para poder distinguir este procedimiento especial.
+**Historia de Usuario:** Como Usuario_Captura, quiero marcar núcleos agrarios y tramos sujetos a excepciones operativas (expropiación directa, comunidad indígena, no afecta tierras de uso común), para poder distinguir estos procedimientos especiales.
 
 #### Criterios de Aceptación
 
 1. EL Sistema DEBERÁ permitir marcar un Núcleo_Agrario como sujeto a expropiación directa
-2. CUANDO un Núcleo_Agrario se marca como expropiación directa, EL Sistema DEBERÁ mostrar indicador visual distintivo
-3. EL Sistema DEBERÁ filtrar reportes y tableros por tipo de procedimiento (convenio vs expropiación)
-4. EL Sistema DEBERÁ registrar razón o motivo de la expropiación directa
-5. EL Sistema DEBERÁ generar estadísticas separadas para núcleos bajo expropiación directa
+2. EL Sistema DEBERÁ permitir marcar un Núcleo_Agrario como Comunidad Indígena
+3. EL Sistema DEBERÁ permitir indicar si El Proyecto Ferroviario No Afecta Tierras de Uso Común para un tramo-núcleo específico
+4. CUANDO se active alguna de estas excepciones, EL Sistema DEBERÁ mostrar un indicador visual distintivo
+5. EL Sistema DEBERÁ filtrar reportes y tableros por tipo de procedimiento (convenio vs expropiación)
+6. EL Sistema DEBERÁ registrar razón o motivo de la expropiación directa
+7. EL Sistema DEBERÁ generar estadísticas separadas para núcleos bajo expropiación directa
 
 ### Requirement 20: Seguimiento de Obras Complementarias
 

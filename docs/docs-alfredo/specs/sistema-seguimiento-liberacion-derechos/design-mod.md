@@ -1591,6 +1591,26 @@ Basándose en el análisis de prework de los 25 requerimientos, se han identific
 - Verificar que `superficieLiberada <= superficieTotalAfectada`
 - Intentar liberar más superficie de la afectada debe generar advertencia o error
 
+### Property 13: Validación de Excepciones Operativas
+
+*Para cualquier* Núcleo Agrario o Tramo-Núcleo, el sistema debe registrar y hacer cumplir correctamente las banderas de excepciones operativas, tales como Expropiación Directa, Comunidad Indígena y No Afecta Tierras de Uso Común, activando bloqueos de convenios según aplique.
+
+**Validates: Requirements 19.1, 19.2, 19.3, 19.4**
+
+**Estrategia de Implementación:**
+- Crear Tramo-Núcleo marcado con `es_expropiacion = true`
+- Verificar que los triggers bloquean la creación de convenios conciliatorios
+- Verificar que los reportes discriminan correctamente las banderas `comunidad_indigena` y `proyecto_no_afecta_uso_comun`
+
+### Property 14: Trazabilidad de Oficios FIFONAFE
+
+*Para cualquier* proceso de indemnización, el sistema debe garantizar la captura exacta de la cadena interinstitucional de oficios de FIFONAFE con sus fechas y números respectivos.
+
+**Validates: Requirements 9.3, 9.4**
+
+**Estrategia de Implementación:**
+- Generar un flujo de indemnización registrando los 4 oficios obligatorios (FIFONAFE, DGAOPR, Representación)
+- Verificar que la vista de seguimiento muestre el estado de completitud basado en la integridad de la cadena documental
 
 ## Despliegue e Infraestructura
 
