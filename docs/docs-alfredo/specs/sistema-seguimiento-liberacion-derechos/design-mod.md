@@ -1041,7 +1041,19 @@ CREATE TABLE tramite_fifonafe (
         REFERENCES convenio(id_tramo_nucleo, id_convenio, id_afectacion),
     CONSTRAINT fk_tramite_afectacion_compuesta
         FOREIGN KEY (id_tramo_nucleo, id_afectacion, tipo_afectacion)
-        REFERENCES afectacion(id_tramo_nucleo, id_afectacion, tipo_afectacion)
+        REFERENCES afectacion(id_tramo_nucleo, id_afectacion, tipo_afectacion),
+    CONSTRAINT chk_estatus_completo_requiere_oficios CHECK (
+        estatus != 'completo' OR (
+            no_oficio_fifonafe_a_dgaopr IS NOT NULL AND
+            no_oficio_dgaopr_a_repr IS NOT NULL AND
+            no_oficio_rpta_repr_a_dgaopr IS NOT NULL AND
+            no_oficio_rpta_dgaopr_a_fifonafe IS NOT NULL AND
+            fecha_oficio_fifonafe_a_dgaopr IS NOT NULL AND
+            fecha_oficio_dgaopr_a_repr IS NOT NULL AND
+            fecha_oficio_rpta_repr_a_dgaopr IS NOT NULL AND
+            fecha_oficio_rpta_dgaopr_a_fifonafe IS NOT NULL
+        )
+    )
 );
 ```
 
@@ -1905,14 +1917,14 @@ Basándose en el análisis de prework de los 25 requerimientos, se han identific
 
 ### Property 8: Validación de Requisitos de Convenio según Tipo
 
-*Para cualquier* Convenio creado, los campos requeridos deben cumplir con las reglas de validación específicas del tipo: COP requiere fecha de anuencia y minuta de asamblea, Modificatorio requiere referencia a COP previo, Superficie_Adicional requiere nueva superficie afectada.
+*Para cualquier* Convenio creado, los campos requeridos deben cumplir con las reglas de validación específicas del tipo: cop_original requiere fecha de anuencia y minuta de asamblea, modificatorio requiere referencia a cop_original previo, superficie_adicional requiere nueva superficie afectada.
 
 **Validates: Requirements 5.1, 5.2, 5.3, 5.4**
 
 **Estrategia de Implementación:**
 - Generar Convenios aleatorios de cada tipo
-- Para tipo COP: validar que `fechaAnuencia` y `minutaAsamblea` estén presentes
-- Para tipo Modificatorio: validar que `convenioAnteriorId` referencie un COP existente
+- Para tipo cop_original: validar que `fechaAnuencia` y `minutaAsamblea` estén presentes
+- Para tipo modificatorio: validar que `convenioAnteriorId` referencie un cop_original existente
 - Intentar crear Convenio sin campos requeridos debe fallar
 
 ### Property 9: Progresión de Estados de Convenio
@@ -3042,12 +3054,12 @@ const polygonGenerator = fc.array(
 // Generador de Convenios
 const convenioGenerator = fc.record({
   tipo: fc.oneof(
-    fc.constant('COP'),
-    fc.constant('Modificatorio'),
-    fc.constant('Superficie_Adicional'),
-    fc.constant('Obras_Complementarias'),
-    fc.constant('Ampliacion'),
-    fc.constant('Ampliacion_Remanente')
+    fc.constant('cop_original'),
+    fc.constant('modificatorio'),
+    fc.constant('superficie_adicional'),
+    fc.constant('obras_complementarias'),
+    fc.constant('ampliacion'),
+    fc.constant('ampliacion_remanente')
   ),
   fechaFirma: fc.date({ min: new Date('2020-01-01'), max: new Date() }),
   monto90: fc.option(fc.double({ min: 0, max: 10000000 })),
@@ -3245,7 +3257,7 @@ describe('API Integration: Gestión de Núcleos Agrarios', () => {
 **Ejemplo de E2E Test**:
 
 ```typescript
-describe('E2E: Creación de Convenio COP', () => {
+describe('E2E: Creación de Convenio cop_original', () => {
   let page: Page
   
   beforeEach(async () => {
@@ -3259,15 +3271,15 @@ describe('E2E: Creación de Convenio COP', () => {
     await page.waitForURL('**/dashboard')
   })
   
-  it('debe permitir crear convenio COP con todos los campos requeridos', async () => {
+  it('debe permitir crear convenio cop_original con todos los campos requeridos', async () => {
     // Navegar a formulario de convenio
     await page.click('text=Convenios')
     await page.click('text=Nuevo Convenio')
     
     // Seleccionar tipo
-    await page.selectOption('[name="tipo"]', 'COP')
+    await page.selectOption('[name="tipo"]', 'cop_original')
     
-    // Llenar campos requeridos para COP
+    // Llenar campos requeridos para cop_original
     await page.fill('[name="fechaAnuencia"]', '2024-01-15')
     await page.fill('[name="minutaAsamblea"]', 'Acta 001/2024')
     await page.fill('[name="fechaFirma"]', '2024-02-01')
@@ -3294,7 +3306,7 @@ describe('E2E: Creación de Convenio COP', () => {
   it('debe validar campos requeridos antes de guardar', async () => {
     await page.click('text=Convenios')
     await page.click('text=Nuevo Convenio')
-    await page.selectOption('[name="tipo"]', 'COP')
+    await page.selectOption('[name="tipo"]', 'cop_original')
     
     // Intentar guardar sin llenar campos requeridos
     await page.click('button:has-text("Guardar")')

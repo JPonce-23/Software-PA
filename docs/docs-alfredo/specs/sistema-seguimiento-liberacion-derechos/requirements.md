@@ -171,6 +171,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
     d. Respuesta de DGAOPR/Representación a FIFONAFE
 4. EL Sistema DEBERÁ dar seguimiento a informes de no conflictos a través de la cadena de oficios antes mencionada
 5. EL Sistema DEBERÁ mostrar estatus de completitud de pago por Afectación
+6. EL Sistema DEBERÁ rechazar (mediante restricción estricta en Base de Datos) cualquier intento de marcar el estatus de Indemnización como 'Completo' si no se han capturado los cuatro números de oficio de la cadena de FIFONAFE y sus respectivas fechas.
 
 
 ### Requirement 10: Tablero de Convenios Formalizados
@@ -583,20 +584,34 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Migración de Datos
 
-La migración desde Excel requiere mapeo cuidadoso de:
+La migración desde Excel está **estrictamente acotada a los campos descritos en el formato original operativo** (documentados en `Estructura Datos.md`). Estos campos son puramente administrativos, jurídicos y numéricos. 
+El alcance incluye exclusivamente:
 - Datos Generales de Núcleos Agrarios
-- Seguimiento de Afectación a Derechos Colectivos
-- Seguimiento de Afectación a Derechos Individuales
-- Datos de FIFONAFE
-- Información de ORV
+- Seguimiento de Afectación a Derechos Colectivos e Individuales
+- Datos de FIFONAFE e Información de ORV
 - Documentación soporte
+
+**Restricción Crítica:** No se realizará ninguna migración de datos geográficos o espaciales (polígonos, coordenadas) desde los archivos de Excel. Todo registro histórico importado desde Excel deberá nacer en el sistema con el estatus de carencia espacial (por ejemplo, "Pendiente de Digitalización Espacial") hasta que un Geógrafo genere y vincule la geometría real en el nuevo sistema.
 
 ### Estructura Geográfica
 
 El sistema debe reflejar la jerarquía:
 **Proyecto → Tramos → Frentes → Núcleos Agrarios → Afectaciones**
 
+La entidad central que articula esta jerarquía es el **TramoNucleo** (la intersección geográfica y administrativa entre un Frente/Tramo y un Núcleo Agrario). El TramoNucleo genera todo el seguimiento posterior (Caminamiento, Asambleas, Convenios), funcionando como el "eje central" que agrupa las afectaciones y vincula las métricas de avance.
+
 Cada nivel debe permitir agregación de métricas hacia niveles superiores.
+
+### Flujo de Workflow Detallado
+
+El sistema debe documentar y rastrear el estado esperado en cada fase del proceso:
+1. **Identificación**: Identificación inicial del Núcleo Agrario afectado y su registro.
+2. **Sensibilización**: Reuniones informativas y acercamiento social inicial.
+3. **Caminamiento**: Recorrido técnico en campo para determinar la afectación real.
+4. **Asamblea**: Obtención de anuencias y aprobaciones formales.
+5. **Convenio**: Firma del acuerdo (COP, modificatorio, etc.) con sus respectivos montos.
+6. **RAN**: Ingreso e inscripción de las actas de asamblea y convenios.
+7. **FIFONAFE**: (Para colectivos) Trámite de retiro de fondos y pago de indemnización a través de la cadena de oficios.
 
 ### Consideraciones Geoespaciales
 
