@@ -65,7 +65,7 @@ El sistema sigue el proceso operativo descrito en `Descripción proceso.md`, el 
 - **COP Original**: Asamblea anuencia → Firma → Inscripción RAN (acta y convenio)
 - **Modificatorio**: Ajustes al COP original (montos, superficie)
 - **Superficie Adicional**: Nueva asamblea + nuevo ciclo RAN para superficie descubierta posteriormente
-- **Obras Complementarias**: **Nuevo ciclo completo** (asamblea + RAN) documentado con campos "_2"
+- **Obras Complementarias**: **Nuevo ciclo completo** (asamblea + RAN) modelado como registros independientes de Asamblea y Convenio vinculados al mismo Tramo_Núcleo, preservando intacto el COP original
 
 **Fase 3B: Matriz de Derechos Individuales (Parcelas)**
 - **COP Original**: Negociación privada → Firma → Inscripción RAN
@@ -83,7 +83,7 @@ El sistema sigue el proceso operativo descrito en `Descripción proceso.md`, el 
 1. Las tierras de uso común (colectivas) son **inalienables** - requieren asamblea obligatoriamente
 2. Las parcelas individuales tienen titular específico - negociación directa sin asamblea
 3. Obras Complementarias es un convenio variante que requiere **nuevo ciclo completo** (no es modificación)
-4. Los campos RAN "_2" capturan este segundo ciclo en la **misma fila** del expediente
+4. Los campos RAN "_2" del Excel original representan un segundo ciclo operativo y se normalizan como registros independientes de Asamblea y Convenio, evitando conservar columnas paralelas en una misma fila del expediente
 
 ### Arquitectura de Alto Nivel
 
@@ -329,6 +329,7 @@ interface TramoNucleo {
   es_expropiacion: boolean
   causa_problema: string | null
   proyecto_no_afecta_uso_comun: boolean | null
+  activo: boolean
   observaciones: string | null
 }
 ```
@@ -352,6 +353,7 @@ interface NucleoAgrario {
   residencia: string | null
   geometria_poligono: GeoJSON | null
   fecha_creacion: Date
+  activo: boolean
   observaciones: string | null
 }
 
@@ -683,6 +685,7 @@ CREATE TABLE nucleo_agrario (
     residencia VARCHAR(300),
     geometria_poligono GEOMETRY(MULTIPOLYGON, 4326),
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_baja TIMESTAMPTZ,
     id_usuario_baja INTEGER,
     motivo_baja TEXT,
@@ -704,6 +707,7 @@ CREATE TABLE tramo_nucleo (
     es_expropiacion BOOLEAN NOT NULL DEFAULT FALSE,
     causa_problema TEXT,
     proyecto_no_afecta_uso_comun BOOLEAN,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_baja TIMESTAMPTZ,
     id_usuario_baja INTEGER,
     motivo_baja TEXT,
@@ -1105,6 +1109,26 @@ CREATE TABLE alertas_vistas (
     PRIMARY KEY (id_alerta, id_usuario)
 );
 
+-- Validación de referencias dinámicas de documentación soporte
+CREATE OR REPLACE FUNCTION fn_validar_documentacion_soporte_referencia() RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.entidad_relacionada_tipo = 'nucleo_agrario' AND NOT EXISTS (SELECT 1 FROM nucleo_agrario WHERE id_nucleo = NEW.entidad_relacionada_id AND activo = TRUE) THEN
+        RAISE EXCEPTION 'La documentación soporte referencia un núcleo agrario inexistente o inactivo';
+    ELSIF NEW.entidad_relacionada_tipo = 'afectacion' AND NOT EXISTS (SELECT 1 FROM afectacion WHERE id_afectacion = NEW.entidad_relacionada_id AND activo = TRUE) THEN
+        RAISE EXCEPTION 'La documentación soporte referencia una afectación inexistente o inactiva';
+    ELSIF NEW.entidad_relacionada_tipo = 'convenio' AND NOT EXISTS (SELECT 1 FROM convenio WHERE id_convenio = NEW.entidad_relacionada_id AND activo = TRUE) THEN
+        RAISE EXCEPTION 'La documentación soporte referencia un convenio inexistente o inactivo';
+    ELSIF NEW.entidad_relacionada_tipo = 'orv' AND NOT EXISTS (SELECT 1 FROM orv WHERE id_orv = NEW.entidad_relacionada_id AND activo = TRUE) THEN
+        RAISE EXCEPTION 'La documentación soporte referencia un ORV inexistente o inactivo';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_documentacion_soporte_referencia
+BEFORE INSERT OR UPDATE ON documentacion_soporte
+FOR EACH ROW EXECUTE FUNCTION fn_validar_documentacion_soporte_referencia();
+
 -- Índices Espaciales y de Rendimiento
 CREATE INDEX idx_tramo_geometria ON tramo USING GIST (geometria_linea);
 CREATE INDEX idx_frente_geometria ON frente USING GIST (geometria_linea);
@@ -1199,13 +1223,39 @@ CREATE TRIGGER trg_validar_superficie_liberada_convenio
 AFTER INSERT OR UPDATE OF convenio_inscrito_fecha_ran, activo, tipo_convenio, id_convenio_padre, superficie_total_ha, superficie_real_afectada_ha, superficie_adicional_ha, superficie_ampliacion_ha, id_afectacion ON convenio
 FOR EACH ROW EXECUTE FUNCTION fn_validar_superficie_liberada_convenio();
 
--- Trigger para auto-incrementar la Afectación base al registrar expansiones
+-- Trigger para sincronizar la superficie afectada base al registrar expansiones
 CREATE OR REPLACE FUNCTION fn_sincronizar_superficie_adicional() RETURNS TRIGGER AS $$
+DECLARE
+    delta_superficie NUMERIC := 0;
+    old_superficie NUMERIC := 0;
+    new_superficie NUMERIC := 0;
 BEGIN
-    IF NEW.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') AND NEW.activo = TRUE THEN
-        UPDATE afectacion 
-        SET superficie_afectada_ha = superficie_afectada_ha + COALESCE(NEW.superficie_adicional_ha, NEW.superficie_ampliacion_ha, 0)
-        WHERE id_afectacion = NEW.id_afectacion;
+    IF NEW.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') THEN
+        new_superficie := COALESCE(NEW.superficie_adicional_ha, NEW.superficie_ampliacion_ha, 0);
+
+        IF TG_OP = 'INSERT' THEN
+            IF NEW.activo = TRUE THEN
+                delta_superficie := new_superficie;
+            END IF;
+        ELSIF TG_OP = 'UPDATE' THEN
+            IF OLD.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') THEN
+                old_superficie := COALESCE(OLD.superficie_adicional_ha, OLD.superficie_ampliacion_ha, 0);
+            END IF;
+
+            IF OLD.activo = TRUE AND NEW.activo = TRUE THEN
+                delta_superficie := new_superficie - old_superficie;
+            ELSIF OLD.activo = FALSE AND NEW.activo = TRUE THEN
+                delta_superficie := new_superficie;
+            ELSIF OLD.activo = TRUE AND NEW.activo = FALSE THEN
+                delta_superficie := -old_superficie;
+            END IF;
+        END IF;
+
+        IF delta_superficie <> 0 THEN
+            UPDATE afectacion 
+            SET superficie_afectada_ha = COALESCE(superficie_afectada_ha, 0) + delta_superficie
+            WHERE id_afectacion = NEW.id_afectacion;
+        END IF;
     END IF;
     RETURN NEW;
 END;
@@ -1358,24 +1408,42 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION fn_audit_log() RETURNS TRIGGER AS $$
 DECLARE
     current_user_id TEXT;
+    pk_column TEXT;
+    entidad_pk BIGINT;
 BEGIN
     current_user_id := current_setting('app.current_user_id', true);
     IF current_user_id IS NULL OR current_user_id = '' THEN
         RAISE EXCEPTION 'Auditoría fallida: Falta el contexto de usuario (app.current_user_id). Use BEGIN; SET LOCAL "app.current_user_id" = 1; COMMIT;';
     END IF;
-    
+
+    pk_column := TG_ARGV[0];
+    IF pk_column IS NULL OR pk_column = '' THEN
+        RAISE EXCEPTION 'Auditoría fallida: el trigger debe indicar la columna PK en TG_ARGV[0]';
+    END IF;
+
     IF TG_OP = 'INSERT' THEN
+        entidad_pk := (to_jsonb(NEW) ->> pk_column)::BIGINT;
         INSERT INTO bitacora (id_usuario, entidad_tipo, entidad_id, accion, valor_nuevo)
-        VALUES (current_user_id::INTEGER, TG_TABLE_NAME, NEW.id, 'insert', row_to_json(NEW));
+        VALUES (current_user_id::INTEGER, TG_TABLE_NAME, entidad_pk, 'insert', row_to_json(NEW));
         RETURN NEW;
     ELSIF TG_OP = 'UPDATE' THEN
+        entidad_pk := (to_jsonb(NEW) ->> pk_column)::BIGINT;
         INSERT INTO bitacora (id_usuario, entidad_tipo, entidad_id, accion, valor_anterior, valor_nuevo)
-        VALUES (current_user_id::INTEGER, TG_TABLE_NAME, NEW.id, 'update', row_to_json(OLD), row_to_json(NEW));
+        VALUES (current_user_id::INTEGER, TG_TABLE_NAME, entidad_pk, 'update', row_to_json(OLD), row_to_json(NEW));
         RETURN NEW;
     END IF;
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Instanciación obligatoria de auditoría y protección de borrado físico
+-- Cada tabla operativa debe crear su trigger de auditoría pasando explícitamente su PK real, por ejemplo:
+-- CREATE TRIGGER trg_audit_<tabla> AFTER INSERT OR UPDATE ON <tabla>
+-- FOR EACH ROW EXECUTE FUNCTION fn_audit_log('<columna_pk>');
+-- CREATE TRIGGER trg_prevent_delete_<tabla> BEFORE DELETE ON <tabla>
+-- FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+-- CREATE TRIGGER trg_baja_logica_<tabla> BEFORE UPDATE OF activo ON <tabla>
+-- FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
 
 ### Vistas de Base de Datos
 
@@ -1457,25 +1525,40 @@ WITH ModificatoriosVigentes AS (
     ) t WHERE rn = 1
 ),
 ConveniosBase AS (
-    SELECT c.*,
-           COALESCE(m.superficie_real_afectada_ha, m.superficie_total_ha, c.superficie_real_afectada_ha, c.superficie_total_ha, 0) AS sup_liberada_base
+    SELECT c.id_tramo_nucleo,
+           c.id_convenio,
+           c.tipo_afectacion,
+           COALESCE(m.superficie_real_afectada_ha, m.superficie_total_ha, c.superficie_real_afectada_ha, c.superficie_total_ha, 0) AS superficie_liberada_ha
     FROM convenio c
     LEFT JOIN ModificatoriosVigentes m ON m.id_convenio_padre = c.id_convenio
-    WHERE c.tipo_convenio IN ('cop_original', 'obras_complementarias') AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE
+    WHERE c.tipo_convenio IN ('cop_original', 'obras_complementarias')
+      AND c.convenio_inscrito_fecha_ran IS NOT NULL
+      AND c.activo = TRUE
 ),
 SuperficiesAdicionales AS (
-    SELECT c.*,
-           COALESCE(c.superficie_adicional_ha, c.superficie_ampliacion_ha, 0) AS sup_liberada_adicional
+    SELECT c.id_tramo_nucleo,
+           c.id_convenio,
+           c.tipo_afectacion,
+           COALESCE(c.superficie_adicional_ha, c.superficie_ampliacion_ha, 0) AS superficie_liberada_ha
     FROM convenio c
-    WHERE c.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE
+    WHERE c.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente')
+      AND c.convenio_inscrito_fecha_ran IS NOT NULL
+      AND c.activo = TRUE
+),
+LiberacionUnificada AS (
+    SELECT * FROM ConveniosBase
+    UNION ALL
+    SELECT * FROM SuperficiesAdicionales
 ),
 AgrupacionLiberada AS (
     SELECT id_tramo_nucleo,
-           SUM(sup_liberada_base) + COALESCE((SELECT SUM(sup_liberada_adicional) FROM SuperficiesAdicionales sa WHERE sa.id_tramo_nucleo = cb.id_tramo_nucleo), 0) AS superficie_liberada_ha,
-           COUNT(*) AS total_convenios_formalizados_ran,
-           SUM(CASE WHEN tipo_afectacion = 'colectivo' THEN sup_liberada_base ELSE 0 END) AS total_colectivo_ha,
-           SUM(CASE WHEN tipo_afectacion = 'individual' THEN sup_liberada_base ELSE 0 END) AS total_individual_ha
-    FROM ConveniosBase cb
+           SUM(superficie_liberada_ha) AS superficie_liberada_ha,
+           COUNT(DISTINCT id_convenio) AS total_convenios_formalizados_ran,
+           COUNT(DISTINCT CASE WHEN tipo_afectacion = 'colectivo' THEN id_convenio END) AS total_convenios_colectivos_formalizados_ran,
+           COUNT(DISTINCT CASE WHEN tipo_afectacion = 'individual' THEN id_convenio END) AS total_convenios_individuales_formalizados_ran,
+           SUM(CASE WHEN tipo_afectacion = 'colectivo' THEN superficie_liberada_ha ELSE 0 END) AS total_colectivo_ha,
+           SUM(CASE WHEN tipo_afectacion = 'individual' THEN superficie_liberada_ha ELSE 0 END) AS total_individual_ha
+    FROM LiberacionUnificada
     GROUP BY id_tramo_nucleo
 )
 SELECT
@@ -1500,6 +1583,8 @@ SELECT
         ELSE ROUND((COALESCE(af_geo.superficie_con_geometria, 0) / af.total_superficie_afectada_ha) * 100, 2)
     END AS porcentaje_avance_geoespacial,
     COALESCE(al.total_convenios_formalizados_ran, 0) AS total_convenios_formalizados_ran,
+    COALESCE(al.total_convenios_colectivos_formalizados_ran, 0) AS total_convenios_colectivos_formalizados_ran,
+    COALESCE(al.total_convenios_individuales_formalizados_ran, 0) AS total_convenios_individuales_formalizados_ran,
     COALESCE(al.total_colectivo_ha, 0) AS total_colectivo_ha,
     COALESCE(al.total_individual_ha, 0) AS total_individual_ha
 FROM vw_tramo_nucleo_estado v

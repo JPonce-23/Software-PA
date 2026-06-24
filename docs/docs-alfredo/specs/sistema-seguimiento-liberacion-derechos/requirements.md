@@ -13,6 +13,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 - **Núcleo_Agrario**: Es la entidad central del sistema que representa a cada ejido o comunidad agraria. Cuentan con personalidad jurídica y patrimonio propio.
 - **Tramo**: cada una de las secciones principales que integran el proyecto ferroviario. Constituye la unidad geográfica y operativa de mayor nivel dentro del sistema, y su función principal es facilitar el seguimiento del derecho de vía.
 - **Frente**: porción o subdivisión en la que se divide un tramo.
+- **Tramo_Núcleo**: Representa la intersección entre un Tramo del proyecto ferroviario y un Núcleo Agrario afectado. Mientras que el Tramo es la unidad geográfica/operativa del proyecto y el Núcleo Agrario (ejido o comunidad) es la entidad central atravesada, el Tramo_Núcleo es el nivel relacional donde se abre el expediente administrativo y se capturan el consecutivo, número de tramo, excepciones operativas del cruce y seguimiento territorial.
 - **Afectación**: Superficie afectada - Registro que documenta la superficie, tipo de tenencia y las personas o parcelas afectadas por el paso del proyecto.
 - **Convenio**: Acuerdo que facilita la ocupación de terreno para el inicio de los trabajos operativos, ya que sin él, las obras no pueden comenzar sino hasta el final de todo el proceso legal de expropiación. Los tipos de convenio varían según el tipo de derecho afectado: para derechos colectivos incluye COP, Modificatorio, Superficie Adicional y Obras Complementarias; para derechos individuales incluye COP, Modificatorio, Ampliación y Ampliación Remanente.
 - **COP**: Convenio de Ocupación Previa - Es un acuerdo formal donde un núcleo agrario o titular parcelario da permiso para ocupar temporalmente sus tierras mientras se tramita el proceso de expropiación.
@@ -286,17 +287,17 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 19: Indicadores de Excepciones Operativas
 
-**Historia de Usuario:** Como operador, quiero marcar núcleos agrarios y tramos sujetos a excepciones operativas (expropiación directa, comunidad indígena, no afecta tierras de uso común), para poder distinguir estos procedimientos especiales.
+**Historia de Usuario:** Como operador, quiero marcar excepciones operativas en el nivel jurídico correcto: Comunidad Indígena a nivel Núcleo_Agrario, y Expropiación Directa o No Afecta Tierras de Uso Común a nivel Tramo_Núcleo, para distinguir procedimientos especiales sin reclasificar indebidamente todo el núcleo agrario.
 
 #### Criterios de Aceptación
 
-1. EL Sistema DEBERÁ permitir marcar un Núcleo_Agrario como sujeto a expropiación directa
+1. EL Sistema DEBERÁ permitir marcar un Tramo_Núcleo como sujeto a expropiación directa
 2. EL Sistema DEBERÁ permitir marcar un Núcleo_Agrario como Comunidad Indígena
-3. EL Sistema DEBERÁ permitir indicar si El Proyecto Ferroviario No Afecta Tierras de Uso Común para un tramo-núcleo específico
+3. EL Sistema DEBERÁ permitir indicar si El Proyecto Ferroviario No Afecta Tierras de Uso Común para un Tramo_Núcleo específico
 4. CUANDO se active alguna de estas excepciones, EL Sistema DEBERÁ mostrar un indicador visual distintivo
 5. EL Sistema DEBERÁ filtrar reportes y tableros por tipo de procedimiento (convenio vs expropiación)
-6. EL Sistema DEBERÁ registrar razón o motivo de la expropiación directa
-7. EL Sistema DEBERÁ generar estadísticas separadas para núcleos bajo expropiación directa
+6. EL Sistema DEBERÁ registrar razón o motivo de la expropiación directa en el Tramo_Núcleo correspondiente
+7. EL Sistema DEBERÁ generar estadísticas separadas para cruces Tramo_Núcleo bajo expropiación directa, sin reclasificar automáticamente todo el Núcleo_Agrario
 
 ### Requirement 20: Seguimiento de Obras Complementarias
 
