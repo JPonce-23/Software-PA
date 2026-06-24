@@ -170,7 +170,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
     b. Oficio de DGAOPR a Representación
     c. Respuesta de Representación a DGAOPR
     d. Respuesta de DGAOPR/Representación a FIFONAFE
-4. EL Sistema DEBERÁ dar seguimiento a informes de no conflictos a través de la cadena de oficios antes mencionada
+4. EL Sistema DEBERÁ dar seguimiento a informes de no conflictos a través de la cadena de oficios antes mencionada, manejando estos flujos de oficios de forma paralela y completamente independiente para afectaciones individuales y colectivas.
 5. EL Sistema DEBERÁ mostrar estatus de completitud de pago por Afectación
 6. EL Sistema DEBERÁ rechazar (mediante restricción estricta en Base de Datos) cualquier intento de marcar el estatus de Indemnización como 'Completo' si no se han capturado los cuatro números de oficio de la cadena de FIFONAFE y sus respectivas fechas.
 
@@ -282,7 +282,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 1. EL Sistema DEBERÁ capturar fecha del padrón
 2. EL Sistema DEBERÁ registrar número total de ejidatarios o comuneros en el padrón
 3. EL Sistema DEBERÁ mantener historial de cambios en el padrón
-4. EL Sistema DEBERÁ vincular obligatoriamente cada acta de asamblea registrada con la versión histórica del padrón vigente en su momento, garantizando la inmutabilidad de la auditoría de quórum legal.
+4. EL Sistema DEBERÁ vincular obligatoriamente cada acta de asamblea registrada con la versión histórica del padrón vigente en su momento. El sistema confía en el acta física y solo registra que se realizó, sin automatizar el cálculo o validación matemática del quórum legal.
 5. EL Sistema DEBERÁ asociar el padrón con el Núcleo_Agrario correspondiente
 
 ### Requirement 19: Indicadores de Excepciones Operativas
@@ -291,7 +291,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 #### Criterios de Aceptación
 
-1. EL Sistema DEBERÁ permitir marcar un Tramo_Núcleo como sujeto a expropiación directa
+1. EL Sistema DEBERÁ permitir marcar un Tramo_Núcleo como sujeto a expropiación directa (esta bandera funciona únicamente como marcador de excepción; el sistema no rastrea el paso a paso del juicio expropiatorio).
 2. EL Sistema DEBERÁ permitir marcar un Núcleo_Agrario como Comunidad Indígena
 3. EL Sistema DEBERÁ permitir indicar si El Proyecto Ferroviario No Afecta Tierras de Uso Común para un Tramo_Núcleo específico
 4. CUANDO se active alguna de estas excepciones, EL Sistema DEBERÁ mostrar un indicador visual distintivo

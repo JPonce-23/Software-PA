@@ -1191,8 +1191,9 @@ BEGIN
         SuperficiesAdicionales AS (
             SELECT c.id_tramo_nucleo,
                    0 AS sup_liberada_base,
-                   COALESCE(c.superficie_adicional_ha, c.superficie_ampliacion_ha, 0) AS sup_liberada_adicional
+                   COALESCE(m.superficie_real_afectada_ha, m.superficie_total_ha, c.superficie_adicional_ha, c.superficie_ampliacion_ha, 0) AS sup_liberada_adicional
             FROM convenio c
+            LEFT JOIN ModificatoriosVigentes m ON m.id_convenio_padre = c.id_convenio
             WHERE c.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE AND c.id_afectacion = p_id_afectacion
         )
         SELECT sup_liberada_base, sup_liberada_adicional FROM ConveniosBase
@@ -1229,25 +1230,41 @@ DECLARE
     delta_superficie NUMERIC := 0;
     old_superficie NUMERIC := 0;
     new_superficie NUMERIC := 0;
+    padre_superficie NUMERIC := 0;
+    es_modificatorio_de_adicional BOOLEAN := FALSE;
 BEGIN
     IF NEW.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') THEN
         new_superficie := COALESCE(NEW.superficie_adicional_ha, NEW.superficie_ampliacion_ha, 0);
+        IF TG_OP = 'UPDATE' THEN
+            old_superficie := COALESCE(OLD.superficie_adicional_ha, OLD.superficie_ampliacion_ha, 0);
+        END IF;
+    ELSIF NEW.tipo_convenio = 'modificatorio' AND NEW.id_convenio_padre IS NOT NULL THEN
+        SELECT COALESCE(superficie_adicional_ha, superficie_ampliacion_ha, 0) 
+        INTO padre_superficie 
+        FROM convenio WHERE id_convenio = NEW.id_convenio_padre AND tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente');
 
-        IF TG_OP = 'INSERT' THEN
-            IF NEW.activo = TRUE THEN
-                delta_superficie := new_superficie;
+        IF FOUND THEN
+            es_modificatorio_de_adicional := TRUE;
+            new_superficie := COALESCE(NEW.superficie_real_afectada_ha, NEW.superficie_total_ha, 0);
+            
+            IF TG_OP = 'INSERT' THEN
+                old_superficie := padre_superficie;
+            ELSIF TG_OP = 'UPDATE' THEN
+                old_superficie := COALESCE(OLD.superficie_real_afectada_ha, OLD.superficie_total_ha, 0);
             END IF;
+        END IF;
+    END IF;
+
+    IF NEW.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') OR es_modificatorio_de_adicional THEN
+        IF TG_OP = 'INSERT' AND NEW.activo = TRUE THEN
+            delta_superficie := new_superficie - old_superficie;
         ELSIF TG_OP = 'UPDATE' THEN
-            IF OLD.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente') THEN
-                old_superficie := COALESCE(OLD.superficie_adicional_ha, OLD.superficie_ampliacion_ha, 0);
-            END IF;
-
             IF OLD.activo = TRUE AND NEW.activo = TRUE THEN
                 delta_superficie := new_superficie - old_superficie;
             ELSIF OLD.activo = FALSE AND NEW.activo = TRUE THEN
-                delta_superficie := new_superficie;
+                delta_superficie := new_superficie - padre_superficie;
             ELSIF OLD.activo = TRUE AND NEW.activo = FALSE THEN
-                delta_superficie := -old_superficie;
+                delta_superficie := padre_superficie - old_superficie;
             END IF;
         END IF;
 
@@ -1262,7 +1279,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_sincronizar_superficie_adicional
-AFTER INSERT OR UPDATE OF activo, superficie_adicional_ha, superficie_ampliacion_ha ON convenio
+AFTER INSERT OR UPDATE OF activo, superficie_adicional_ha, superficie_ampliacion_ha, superficie_real_afectada_ha, superficie_total_ha ON convenio
 FOR EACH ROW EXECUTE FUNCTION fn_sincronizar_superficie_adicional();
 
 -- Trigger sobre Afectación (Protección contra reducción)
@@ -1436,14 +1453,238 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Instanciación obligatoria de auditoría y protección de borrado físico
--- Cada tabla operativa debe crear su trigger de auditoría pasando explícitamente su PK real, por ejemplo:
--- CREATE TRIGGER trg_audit_<tabla> AFTER INSERT OR UPDATE ON <tabla>
--- FOR EACH ROW EXECUTE FUNCTION fn_audit_log('<columna_pk>');
--- CREATE TRIGGER trg_prevent_delete_<tabla> BEFORE DELETE ON <tabla>
--- FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
--- CREATE TRIGGER trg_baja_logica_<tabla> BEFORE UPDATE OF activo ON <tabla>
--- FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+-- =============================================================
+-- C-01: INSTANCIACIÓN EXPLÍCITA DE TRIGGERS DE AUDITORÍA,
+--       PROTECCIÓN DE BORRADO FÍSICO Y BAJA LÓGICA
+-- Corrección post-auditoría: se reemplazan los comentarios
+-- plantilla por sentencias SQL ejecutables para cada tabla
+-- operativa. Omitir cualquiera de estos triggers invalidaría
+-- el Req. 25 (auditoría universal) en producción.
+-- =============================================================
+
+-- entidad_federativa
+CREATE TRIGGER trg_audit_entidad_federativa
+    AFTER INSERT OR UPDATE ON entidad_federativa
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_entidad');
+CREATE TRIGGER trg_prevent_delete_entidad_federativa
+    BEFORE DELETE ON entidad_federativa
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+
+-- municipio
+CREATE TRIGGER trg_audit_municipio
+    AFTER INSERT OR UPDATE ON municipio
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_municipio');
+CREATE TRIGGER trg_prevent_delete_municipio
+    BEFORE DELETE ON municipio
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+
+-- tramo
+CREATE TRIGGER trg_audit_tramo
+    AFTER INSERT OR UPDATE ON tramo
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_tramo');
+CREATE TRIGGER trg_prevent_delete_tramo
+    BEFORE DELETE ON tramo
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_tramo
+    BEFORE UPDATE OF activo ON tramo
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- frente
+CREATE TRIGGER trg_audit_frente
+    AFTER INSERT OR UPDATE ON frente
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_frente');
+CREATE TRIGGER trg_prevent_delete_frente
+    BEFORE DELETE ON frente
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_frente
+    BEFORE UPDATE OF activo ON frente
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- nucleo_agrario
+CREATE TRIGGER trg_audit_nucleo_agrario
+    AFTER INSERT OR UPDATE ON nucleo_agrario
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_nucleo');
+CREATE TRIGGER trg_prevent_delete_nucleo_agrario
+    BEFORE DELETE ON nucleo_agrario
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_nucleo_agrario
+    BEFORE UPDATE OF activo ON nucleo_agrario
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- tramo_nucleo
+CREATE TRIGGER trg_audit_tramo_nucleo
+    AFTER INSERT OR UPDATE ON tramo_nucleo
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_tramo_nucleo');
+CREATE TRIGGER trg_prevent_delete_tramo_nucleo
+    BEFORE DELETE ON tramo_nucleo
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_tramo_nucleo
+    BEFORE UPDATE OF activo ON tramo_nucleo
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- usuario
+CREATE TRIGGER trg_audit_usuario
+    AFTER INSERT OR UPDATE ON usuario
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_usuario');
+CREATE TRIGGER trg_prevent_delete_usuario
+    BEFORE DELETE ON usuario
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_usuario
+    BEFORE UPDATE OF activo ON usuario
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- orv
+CREATE TRIGGER trg_audit_orv
+    AFTER INSERT OR UPDATE ON orv
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_orv');
+CREATE TRIGGER trg_prevent_delete_orv
+    BEFORE DELETE ON orv
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_orv
+    BEFORE UPDATE OF activo ON orv
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- padron_historial
+CREATE TRIGGER trg_audit_padron_historial
+    AFTER INSERT OR UPDATE ON padron_historial
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_padron');
+CREATE TRIGGER trg_prevent_delete_padron_historial
+    BEFORE DELETE ON padron_historial
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_padron_historial
+    BEFORE UPDATE OF activo ON padron_historial
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- parcela
+CREATE TRIGGER trg_audit_parcela
+    AFTER INSERT OR UPDATE ON parcela
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_parcela');
+CREATE TRIGGER trg_prevent_delete_parcela
+    BEFORE DELETE ON parcela
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_parcela
+    BEFORE UPDATE OF activo ON parcela
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- afectacion
+CREATE TRIGGER trg_audit_afectacion
+    AFTER INSERT OR UPDATE ON afectacion
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_afectacion');
+CREATE TRIGGER trg_prevent_delete_afectacion
+    BEFORE DELETE ON afectacion
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_afectacion
+    BEFORE UPDATE OF activo ON afectacion
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- actividad_campo
+CREATE TRIGGER trg_audit_actividad_campo
+    AFTER INSERT OR UPDATE ON actividad_campo
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_actividad');
+CREATE TRIGGER trg_prevent_delete_actividad_campo
+    BEFORE DELETE ON actividad_campo
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_actividad_campo
+    BEFORE UPDATE OF activo ON actividad_campo
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- asamblea
+CREATE TRIGGER trg_audit_asamblea
+    AFTER INSERT OR UPDATE ON asamblea
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_asamblea');
+CREATE TRIGGER trg_prevent_delete_asamblea
+    BEFORE DELETE ON asamblea
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_asamblea
+    BEFORE UPDATE OF activo ON asamblea
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- convenio
+CREATE TRIGGER trg_audit_convenio
+    AFTER INSERT OR UPDATE ON convenio
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_convenio');
+CREATE TRIGGER trg_prevent_delete_convenio
+    BEFORE DELETE ON convenio
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_convenio
+    BEFORE UPDATE OF activo ON convenio
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- tramite_fifonafe
+CREATE TRIGGER trg_audit_tramite_fifonafe
+    AFTER INSERT OR UPDATE ON tramite_fifonafe
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_tramite_fifonafe');
+CREATE TRIGGER trg_prevent_delete_tramite_fifonafe
+    BEFORE DELETE ON tramite_fifonafe
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_tramite_fifonafe
+    BEFORE UPDATE OF activo ON tramite_fifonafe
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- documentacion_soporte
+CREATE TRIGGER trg_audit_documentacion_soporte
+    AFTER INSERT OR UPDATE ON documentacion_soporte
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_documento');
+CREATE TRIGGER trg_prevent_delete_documentacion_soporte
+    BEFORE DELETE ON documentacion_soporte
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_documentacion_soporte
+    BEFORE UPDATE OF activo ON documentacion_soporte
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- alertas
+CREATE TRIGGER trg_audit_alertas
+    AFTER INSERT OR UPDATE ON alertas
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_alerta');
+CREATE TRIGGER trg_prevent_delete_alertas
+    BEFORE DELETE ON alertas
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_alertas
+    BEFORE UPDATE OF activo ON alertas
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- =============================================================
+-- C-02: PROTECCIÓN CONTRA REGRESIÓN DE ESTADO DE CONVENIO
+-- Corrección post-auditoría: el estado borrador→firmado→inscrito
+-- es unidireccional. Sin este trigger, un UPDATE podría poner
+-- fecha_firma o convenio_inscrito_fecha_ran a NULL, provocando
+-- una regresión silenciosa de estado que violaría la Property 9.
+-- =============================================================
+
+CREATE OR REPLACE FUNCTION fn_validar_regresion_estado_convenio() RETURNS TRIGGER AS $$
+BEGIN
+    -- Bloquear regresión: fecha_firma no puede pasar de valor a NULL
+    IF OLD.fecha_firma IS NOT NULL AND NEW.fecha_firma IS NULL THEN
+        RAISE EXCEPTION
+            'Regresión de estado prohibida: convenio % ya fue firmado (fecha_firma = %). '
+            'No se puede eliminar la fecha de firma.',
+            OLD.id_convenio, OLD.fecha_firma;
+    END IF;
+
+    -- Bloquear regresión: convenio_inscrito_fecha_ran no puede pasar de valor a NULL
+    IF OLD.convenio_inscrito_fecha_ran IS NOT NULL AND NEW.convenio_inscrito_fecha_ran IS NULL THEN
+        RAISE EXCEPTION
+            'Regresión de estado prohibida: convenio % ya fue inscrito en RAN (fecha = %). '
+            'No se puede eliminar la fecha de inscripción.',
+            OLD.id_convenio, OLD.convenio_inscrito_fecha_ran;
+    END IF;
+
+    -- Bloquear adelanto de pasos: no se puede inscribir sin haber ingresado
+    IF NEW.convenio_inscrito_fecha_ran IS NOT NULL AND NEW.ingreso_ran_fecha IS NULL THEN
+        RAISE EXCEPTION
+            'Secuencia inválida en convenio %: no se puede registrar inscripción en RAN '
+            'sin antes registrar la fecha de ingreso (ingreso_ran_fecha).',
+            NEW.id_convenio;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_regresion_estado_convenio
+    BEFORE UPDATE OF fecha_firma, ingreso_ran_fecha, convenio_inscrito_fecha_ran
+    ON convenio
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_regresion_estado_convenio();
 
 ### Vistas de Base de Datos
 
@@ -1539,8 +1780,9 @@ SuperficiesAdicionales AS (
     SELECT c.id_tramo_nucleo,
            c.id_convenio,
            c.tipo_afectacion,
-           COALESCE(c.superficie_adicional_ha, c.superficie_ampliacion_ha, 0) AS superficie_liberada_ha
+           COALESCE(m.superficie_real_afectada_ha, m.superficie_total_ha, c.superficie_adicional_ha, c.superficie_ampliacion_ha, 0) AS superficie_liberada_ha
     FROM convenio c
+    LEFT JOIN ModificatoriosVigentes m ON m.id_convenio_padre = c.id_convenio
     WHERE c.tipo_convenio IN ('superficie_adicional', 'ampliacion', 'ampliacion_remanente')
       AND c.convenio_inscrito_fecha_ran IS NOT NULL
       AND c.activo = TRUE
@@ -2828,31 +3070,32 @@ function errorHandlerMiddleware(
 
 **Capa de Datos (Base de Datos)**:
 ```sql
--- Manejo de errores en funciones PL/pgSQL
+-- C-03: Función corregida para cálculo de superficie liberada por tramo_nucleo.
+-- La versión anterior usaba una suma directa de superficie_afectada_ha que
+-- ignoraba la lógica de modificatorios vigentes (ROW_NUMBER por convenio padre).
+-- Esta versión delega a fn_calcular_superficie_liberada_afectacion(), garantizando
+-- que ambas rutas de cálculo usen exactamente la misma lógica de negocio.
 CREATE OR REPLACE FUNCTION calcular_superficie_liberada(p_id_tramo_nucleo INTEGER)
-RETURNS DECIMAL AS $$
+RETURNS NUMERIC AS $$
 DECLARE
-  superficie DECIMAL;
+    v_total NUMERIC := 0;
 BEGIN
-  -- Intentar cálculo
-  SELECT COALESCE(SUM(a.superficie_afectada_ha), 0)
-  INTO superficie
-  FROM afectacion a
-  JOIN convenio c ON a.id_afectacion = c.id_afectacion
-    AND a.id_tramo_nucleo = c.id_tramo_nucleo
-  WHERE c.id_tramo_nucleo = p_id_tramo_nucleo
-    AND c.convenio_inscrito_fecha_ran IS NOT NULL;
-  
-  RETURN superficie;
-  
+    SELECT COALESCE(
+        SUM(fn_calcular_superficie_liberada_afectacion(a.id_afectacion)),
+        0
+    )
+    INTO v_total
+    FROM afectacion a
+    WHERE a.id_tramo_nucleo = p_id_tramo_nucleo
+      AND a.activo = TRUE;
+
+    RETURN v_total;
+
 EXCEPTION
-  WHEN OTHERS THEN
-    -- Log del error
-    INSERT INTO error_log (funcion, mensaje, sqlstate, timestamp)
-    VALUES ('calcular_superficie_liberada', SQLERRM, SQLSTATE, NOW());
-    
-    -- Re-lanzar error para que aplicación lo maneje
-    RAISE;
+    WHEN OTHERS THEN
+        RAISE EXCEPTION
+            'Error en calcular_superficie_liberada(tramo_nucleo=%): % (SQLSTATE: %)',
+            p_id_tramo_nucleo, SQLERRM, SQLSTATE;
 END;
 $$ LANGUAGE plpgsql;
 ```
