@@ -1,4 +1,5 @@
 -- Migración Inicial: Esquema Base y Lógica Geoespacial
+CREATE EXTENSION IF NOT EXISTS postgis;
 
 CREATE TABLE entidad_federativa (
     id_entidad SERIAL PRIMARY KEY,
@@ -1052,12 +1053,6 @@ CREATE TRIGGER trg_validar_regresion_estado_convenio
     ON convenio
     FOR EACH ROW EXECUTE FUNCTION fn_validar_regresion_estado_convenio();
 
-### Vistas de Base de Datos
-
-Las vistas integran el cálculo espacial y las relaciones del esquema final (usando `vw_dashboard_liberacion` y dependencias) para proveer datos a los tableros de control.
-
-**Vista: vw_convenio_estado**
-Calcula el estado del flujo de trabajo de cada convenio basado en fechas clave.
 
 
 CREATE OR REPLACE VIEW vw_orv_estado AS
