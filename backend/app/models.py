@@ -59,3 +59,215 @@ class NucleoAgrario(Base):
     activo = Column(Boolean, default=True, nullable=False)
 
     municipio = relationship("Municipio", back_populates="nucleos")
+
+from sqlalchemy.dialects.postgresql import JSONB, INET
+
+class TramoNucleo(Base):
+    __tablename__ = "tramo_nucleo"
+    id_tramo_nucleo = Column(Integer, primary_key=True, index=True)
+    id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
+    id_frente = Column(Integer, ForeignKey("frente.id_frente"), nullable=False)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    consecutivo = Column(Integer, nullable=False)
+    numero_tramo = Column(String(50))
+    geometria_segmento = Column(Geometry(geometry_type='MULTILINESTRING', srid=4326))
+    longitud_m = Column(Numeric(14,2))
+    es_expropiacion = Column(Boolean, default=False, nullable=False)
+    causa_problema = Column(String)
+    proyecto_no_afecta_uso_comun = Column(Boolean)
+    activo = Column(Boolean, default=True, nullable=False)
+    
+class Usuario(Base):
+    __tablename__ = "usuario"
+    id_usuario = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(250), nullable=False)
+    apellido_paterno = Column(String(250), nullable=False)
+    apellido_materno = Column(String(250))
+    correo = Column(String(320), unique=True, nullable=False)
+    contrasena_hash = Column(String(255), nullable=False)
+    rol = Column(String(30), nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class Orv(Base):
+    __tablename__ = "orv"
+    id_orv = Column(Integer, primary_key=True, index=True)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    numero_orv = Column(String(50))
+    inicio_vigencia = Column(Date, nullable=False)
+    fin_vigencia = Column(Date, nullable=False)
+    acta_eleccion_inscrita_ran = Column(Boolean, default=False, nullable=False)
+    documentacion_disponible = Column(Boolean, default=False, nullable=False)
+    documentacion_faltante = Column(String)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class PadronHistorial(Base):
+    __tablename__ = "padron_historial"
+    id_padron = Column(Integer, primary_key=True, index=True)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    fecha_padron = Column(Date, nullable=False)
+    numero_ejidatarios_comuneros = Column(Integer, nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class Parcela(Base):
+    __tablename__ = "parcela"
+    id_parcela = Column(Integer, primary_key=True, index=True)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    tipo_parcela = Column(String(30))
+    no_parcela_ppt = Column(String(50))
+    certificado_parcelario = Column(String(100))
+    folio_derechos = Column(String(100))
+    constancia_vigencia_fecha = Column(Date)
+    nombre_titular = Column(String(300))
+    activo = Column(Boolean, default=True, nullable=False)
+
+class Afectacion(Base):
+    __tablename__ = "afectacion"
+    id_afectacion = Column(Integer, primary_key=True, index=True)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    id_parcela = Column(Integer, ForeignKey("parcela.id_parcela"))
+    tipo_afectacion = Column(String(20), nullable=False)
+    tipo_tenencia = Column(String(80), nullable=False)
+    subtipo_tenencia = Column(String(80))
+    destino_superficie = Column(String(80))
+    no_parcela_solar = Column(String(100))
+    superficie_afectada_ha = Column(Numeric(12,4))
+    geometria_afectacion = Column(Geometry(geometry_type='GEOMETRY', srid=4326))
+    num_personas_afectadas = Column(Integer)
+    situacion_juridica = Column(String)
+    documentacion_disponible = Column(Boolean, default=False, nullable=False)
+    documentacion_faltante = Column(String)
+    origen_registro = Column(String(50), default='captura_sistema', nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class Asamblea(Base):
+    __tablename__ = "asamblea"
+    id_asamblea = Column(Integer, primary_key=True, index=True)
+    id_nucleo = Column(Integer, nullable=False)
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    tipo_asamblea = Column(String(50), nullable=False)
+    contexto_proceso = Column(String(50))
+    fecha_exp_1a = Column(Date)
+    fecha_prog_1a = Column(Date)
+    fecha_exp_2a = Column(Date)
+    fecha_prog_2a = Column(Date)
+    fecha_realizada = Column(Date)
+    resultado_anuencia = Column(String(30), default='pendiente', nullable=False)
+    estatus_asamblea = Column(String(30))
+    ingreso_ran_fecha = Column(Date)
+    numero_solicitud_ran = Column(String(100))
+    calificacion_registral_ran = Column(String)
+    acta_inscripcion_fecha_ran = Column(Date)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class Convenio(Base):
+    __tablename__ = "convenio"
+    id_convenio = Column(Integer, primary_key=True, index=True)
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"), nullable=False)
+    id_convenio_padre = Column(Integer, ForeignKey("convenio.id_convenio"))
+    id_asamblea_autorizacion = Column(Integer, ForeignKey("asamblea.id_asamblea"))
+    tipo_afectacion = Column(String(20), nullable=False)
+    tipo_convenio = Column(String(50), nullable=False)
+    fecha_firma = Column(Date)
+    monto_100 = Column(Numeric(18,2))
+    monto_90 = Column(Numeric(18,2))
+    monto_bdt = Column(Numeric(18,2))
+    superficie_total_ha = Column(Numeric(12,4))
+    superficie_real_afectada_ha = Column(Numeric(12,4))
+    superficie_adicional_ha = Column(Numeric(12,4))
+    superficie_ampliacion_ha = Column(Numeric(12,4))
+    ingreso_ran_fecha = Column(Date)
+    numero_solicitud_ingreso = Column(String(100))
+    calificacion_registral = Column(String)
+    convenio_inscrito_fecha_ran = Column(Date)
+    activo = Column(Boolean, default=True, nullable=False)
+
+
+class Bitacora(Base):
+    __tablename__ = "bitacora"
+    id_bitacora = Column(Integer, primary_key=True, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"))
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"))
+    entidad_tipo = Column(String(100), nullable=False)
+    entidad_id = Column(Integer)
+    accion = Column(String(30), nullable=False)
+    detalle_cambio = Column(String)
+    valor_anterior = Column(JSONB)
+    valor_nuevo = Column(JSONB)
+    fecha_hora = Column(DateTime, nullable=False)
+    ip_origen = Column(INET)
+    user_agent = Column(String)
+
+class UsuarioFrente(Base):
+    __tablename__ = "usuario_frente"
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    id_frente = Column(Integer, ForeignKey("frente.id_frente"), primary_key=True)
+    fecha_asignacion = Column(DateTime, nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class ActividadCampo(Base):
+    __tablename__ = "actividad_campo"
+    id_actividad = Column(Integer, primary_key=True, index=True)
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    tipo_actividad = Column(String(50), nullable=False)
+    contexto_proceso = Column(String(50), nullable=False, default='cop_original')
+    fecha_programada = Column(Date)
+    fecha_realizada = Column(Date)
+    resultado = Column(String)
+    id_usuario_registro = Column(Integer, ForeignKey("usuario.id_usuario"))
+    fecha_registro = Column(DateTime, nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class TramiteFifonafe(Base):
+    __tablename__ = "tramite_fifonafe"
+    id_tramite_fifonafe = Column(Integer, primary_key=True, index=True)
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    id_convenio = Column(Integer, ForeignKey("convenio.id_convenio"))
+    id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"))
+    tipo_afectacion = Column(String(20), nullable=False)
+    tipo_tramite = Column(String(50), nullable=False)
+    estatus = Column(String(30), nullable=False, default='pendiente')
+    hay_conflictos = Column(Boolean)
+    no_oficio_fifonafe_a_dgaopr = Column(String(50))
+    no_oficio_dgaopr_a_repr = Column(String(50))
+    no_oficio_rpta_repr_a_dgaopr = Column(String(50))
+    no_oficio_rpta_dgaopr_a_fifonafe = Column(String(50))
+    fecha_oficio_fifonafe_a_dgaopr = Column(Date)
+    fecha_oficio_dgaopr_a_repr = Column(Date)
+    fecha_oficio_rpta_repr_a_dgaopr = Column(Date)
+    fecha_oficio_rpta_dgaopr_a_fifonafe = Column(Date)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class DocumentacionSoporte(Base):
+    __tablename__ = "documentacion_soporte"
+    id_documento = Column(Integer, primary_key=True, index=True)
+    entidad_relacionada_id = Column(Integer, nullable=False)
+    entidad_relacionada_tipo = Column(String(50), nullable=False)
+    tipo_documento = Column(String(100), nullable=False)
+    categoria = Column(String(20), nullable=False)
+    es_critico = Column(Boolean, nullable=False, default=False)
+    url_archivo = Column(String)
+    activo = Column(Boolean, default=True, nullable=False)
+    fecha_carga = Column(DateTime, nullable=False)
+
+class Alerta(Base):
+    __tablename__ = "alertas"
+    id_alerta = Column(Integer, primary_key=True, index=True)
+    tipo = Column(String(50), nullable=False)
+    prioridad = Column(String(10), nullable=False)
+    titulo = Column(String(255), nullable=False)
+    descripcion = Column(String)
+    entidad_relacionada_id = Column(Integer, nullable=False)
+    entidad_relacionada_tipo = Column(String(50), nullable=False)
+    fecha_evento = Column(Date)
+    fecha_creacion = Column(DateTime, nullable=False)
+    esta_activa = Column(Boolean, default=True, nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class AlertasVistas(Base):
+    __tablename__ = "alertas_vistas"
+    id_alerta = Column(Integer, ForeignKey("alertas.id_alerta", ondelete="CASCADE"), primary_key=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario", ondelete="CASCADE"), primary_key=True)
+    fecha_vista = Column(DateTime, nullable=False)
