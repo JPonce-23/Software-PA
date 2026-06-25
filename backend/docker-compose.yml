@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  db:
+    # Usamos la imagen oficial que ya incluye PostgreSQL + PostGIS preconfigurado
+    image: postgis/postgis:15-3.3
+    container_name: trenes_db_container
+    restart: always
+    environment:
+      POSTGRES_USER: alfredo
+      POSTGRES_PASSWORD: L3cl3rc1614+
+      POSTGRES_DB: db_trenes
+    ports:
+      # Exponemos en el puerto 5433 de tu PC para no chocar con tu Postgres local
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: trenes_pgadmin_container
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: fredy0505.sanchez@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: L3cl3rc1614sf90
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
