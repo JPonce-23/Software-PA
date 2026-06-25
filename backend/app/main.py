@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List
@@ -10,6 +11,14 @@ app = FastAPI(
     title="API - Sistema de Seguimiento de Liberación de Derechos",
     description="Backend geoespacial completo con FastAPI y PostGIS",
     version="1.2.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Permitir a React comunicarse con Python
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/")
