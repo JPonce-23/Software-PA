@@ -1,7 +1,18 @@
-from sqlalchemy import Column, Integer, String, Boolean, Numeric, Date, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Numeric, Date, ForeignKey, DateTime, BigInteger
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
+from sqlalchemy.dialects.postgresql import JSONB, INET
 from .database import Base
+
+# Mixin for Soft Delete and Auditing fields present in all operational tables
+class AuditableMixin:
+    fecha_baja = Column(DateTime(timezone=True))
+    id_usuario_baja = Column(Integer)
+    motivo_baja = Column(String)
+    fecha_reactivacion = Column(DateTime(timezone=True))
+    id_usuario_reactivacion = Column(Integer)
+    motivo_reactivacion = Column(String)
+    observaciones = Column(String)
 
 class EntidadFederativa(Base):
     __tablename__ = "entidad_federativa"
@@ -9,7 +20,6 @@ class EntidadFederativa(Base):
     clave_inegi = Column(String(2), unique=True, nullable=False)
     nombre = Column(String(100), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
-
     municipios = relationship("Municipio", back_populates="entidad")
 
 class Municipio(Base):
@@ -19,50 +29,47 @@ class Municipio(Base):
     clave_inegi = Column(String(5), unique=True, nullable=False)
     nombre = Column(String(150), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
-
     entidad = relationship("EntidadFederativa", back_populates="municipios")
     nucleos = relationship("NucleoAgrario", back_populates="municipio")
 
-class Tramo(Base):
+class Tramo(Base, AuditableMixin):
     __tablename__ = "tramo"
     id_tramo = Column(Integer, primary_key=True, index=True)
     clave_tramo = Column(String(20), unique=True, nullable=False)
     nombre_tramo = Column(String(200), nullable=False)
     descripcion = Column(String)
     ancho_total_derecho_via_m = Column(Numeric(6, 2), default=40.00)
-    # Columna Espacial usando GeoAlchemy2
     geometria_linea = Column(Geometry(geometry_type='MULTILINESTRING', srid=4326))
     activo = Column(Boolean, default=True, nullable=False)
-
+    fecha_registro = Column(Date, nullable=False)
     frentes = relationship("Frente", back_populates="tramo")
 
-class Frente(Base):
+class Frente(Base, AuditableMixin):
     __tablename__ = "frente"
     id_frente = Column(Integer, primary_key=True, index=True)
     id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
     clave_frente = Column(String(30), nullable=False)
     nombre_frente = Column(String(200), nullable=False)
+    descripcion = Column(String)
     geometria_linea = Column(Geometry(geometry_type='MULTILINESTRING', srid=4326))
     activo = Column(Boolean, default=True, nullable=False)
-
+    fecha_registro = Column(Date, nullable=False)
     tramo = relationship("Tramo", back_populates="frentes")
 
-class NucleoAgrario(Base):
+class NucleoAgrario(Base, AuditableMixin):
     __tablename__ = "nucleo_agrario"
     id_nucleo = Column(Integer, primary_key=True, index=True)
     id_municipio = Column(Integer, ForeignKey("municipio.id_municipio"), nullable=False)
     nombre_nucleo = Column(String(300), nullable=False)
     tipo_nucleo = Column(String(20), nullable=False)
     comunidad_indigena = Column(Boolean, default=False, nullable=False)
-    # Columna Espacial usando GeoAlchemy2
+    residencia = Column(String(300))
     geometria_poligono = Column(Geometry(geometry_type='MULTIPOLYGON', srid=4326))
+    fecha_creacion = Column(DateTime(timezone=True), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
-
     municipio = relationship("Municipio", back_populates="nucleos")
 
-from sqlalchemy.dialects.postgresql import JSONB, INET
-
-class TramoNucleo(Base):
+class TramoNucleo(Base, AuditableMixin):
     __tablename__ = "tramo_nucleo"
     id_tramo_nucleo = Column(Integer, primary_key=True, index=True)
     id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
@@ -76,8 +83,8 @@ class TramoNucleo(Base):
     causa_problema = Column(String)
     proyecto_no_afecta_uso_comun = Column(Boolean)
     activo = Column(Boolean, default=True, nullable=False)
-    
-class Usuario(Base):
+
+class Usuario(Base, AuditableMixin):
     __tablename__ = "usuario"
     id_usuario = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(250), nullable=False)
@@ -87,8 +94,9 @@ class Usuario(Base):
     contrasena_hash = Column(String(255), nullable=False)
     rol = Column(String(30), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
+    fecha_alta = Column(DateTime(timezone=True), nullable=False)
 
-class Orv(Base):
+class Orv(Base, AuditableMixin):
     __tablename__ = "orv"
     id_orv = Column(Integer, primary_key=True, index=True)
     id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
@@ -98,17 +106,25 @@ class Orv(Base):
     acta_eleccion_inscrita_ran = Column(Boolean, default=False, nullable=False)
     documentacion_disponible = Column(Boolean, default=False, nullable=False)
     documentacion_faltante = Column(String)
+    comisariado_presidente = Column(String(300))
+    comisariado_secretario = Column(String(300))
+    comisariado_tesorero = Column(String(300))
+    consejo_vigilancia_presidente = Column(String(300))
+    consejo_vigilancia_secretario1 = Column(String(300))
+    consejo_vigilancia_secretario2 = Column(String(300))
     activo = Column(Boolean, default=True, nullable=False)
 
-class PadronHistorial(Base):
+class PadronHistorial(Base, AuditableMixin):
     __tablename__ = "padron_historial"
     id_padron = Column(Integer, primary_key=True, index=True)
     id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
     fecha_padron = Column(Date, nullable=False)
     numero_ejidatarios_comuneros = Column(Integer, nullable=False)
+    id_usuario_registro = Column(Integer, ForeignKey("usuario.id_usuario"))
+    fecha_registro = Column(DateTime(timezone=True), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
 
-class Parcela(Base):
+class Parcela(Base, AuditableMixin):
     __tablename__ = "parcela"
     id_parcela = Column(Integer, primary_key=True, index=True)
     id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
@@ -118,9 +134,11 @@ class Parcela(Base):
     folio_derechos = Column(String(100))
     constancia_vigencia_fecha = Column(Date)
     nombre_titular = Column(String(300))
+    documentacion_disponible = Column(Boolean, default=False, nullable=False)
+    documentacion_faltante = Column(String)
     activo = Column(Boolean, default=True, nullable=False)
 
-class Afectacion(Base):
+class Afectacion(Base, AuditableMixin):
     __tablename__ = "afectacion"
     id_afectacion = Column(Integer, primary_key=True, index=True)
     id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
@@ -140,7 +158,20 @@ class Afectacion(Base):
     origen_registro = Column(String(50), default='captura_sistema', nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
 
-class Asamblea(Base):
+class ActividadCampo(Base, AuditableMixin):
+    __tablename__ = "actividad_campo"
+    id_actividad = Column(Integer, primary_key=True, index=True)
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    tipo_actividad = Column(String(50), nullable=False)
+    contexto_proceso = Column(String(50), nullable=False, default='cop_original')
+    fecha_programada = Column(Date)
+    fecha_realizada = Column(Date)
+    resultado = Column(String)
+    id_usuario_registro = Column(Integer, ForeignKey("usuario.id_usuario"))
+    fecha_registro = Column(DateTime(timezone=True), nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
+
+class Asamblea(Base, AuditableMixin):
     __tablename__ = "asamblea"
     id_asamblea = Column(Integer, primary_key=True, index=True)
     id_nucleo = Column(Integer, nullable=False)
@@ -158,9 +189,13 @@ class Asamblea(Base):
     numero_solicitud_ran = Column(String(100))
     calificacion_registral_ran = Column(String)
     acta_inscripcion_fecha_ran = Column(Date)
+    documentacion_disponible = Column(Boolean, default=False, nullable=False)
+    documentacion_faltante = Column(String)
+    id_padron = Column(Integer, ForeignKey("padron_historial.id_padron"))
+    id_usuario_registro = Column(Integer, ForeignKey("usuario.id_usuario"))
     activo = Column(Boolean, default=True, nullable=False)
 
-class Convenio(Base):
+class Convenio(Base, AuditableMixin):
     __tablename__ = "convenio"
     id_convenio = Column(Integer, primary_key=True, index=True)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
@@ -181,46 +216,12 @@ class Convenio(Base):
     numero_solicitud_ingreso = Column(String(100))
     calificacion_registral = Column(String)
     convenio_inscrito_fecha_ran = Column(Date)
-    activo = Column(Boolean, default=True, nullable=False)
-
-
-class Bitacora(Base):
-    __tablename__ = "bitacora"
-    id_bitacora = Column(Integer, primary_key=True, index=True)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
-    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"))
-    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"))
-    entidad_tipo = Column(String(100), nullable=False)
-    entidad_id = Column(Integer)
-    accion = Column(String(30), nullable=False)
-    detalle_cambio = Column(String)
-    valor_anterior = Column(JSONB)
-    valor_nuevo = Column(JSONB)
-    fecha_hora = Column(DateTime, nullable=False)
-    ip_origen = Column(INET)
-    user_agent = Column(String)
-
-class UsuarioFrente(Base):
-    __tablename__ = "usuario_frente"
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
-    id_frente = Column(Integer, ForeignKey("frente.id_frente"), primary_key=True)
-    fecha_asignacion = Column(DateTime, nullable=False)
-    activo = Column(Boolean, default=True, nullable=False)
-
-class ActividadCampo(Base):
-    __tablename__ = "actividad_campo"
-    id_actividad = Column(Integer, primary_key=True, index=True)
-    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
-    tipo_actividad = Column(String(50), nullable=False)
-    contexto_proceso = Column(String(50), nullable=False, default='cop_original')
-    fecha_programada = Column(Date)
-    fecha_realizada = Column(Date)
-    resultado = Column(String)
+    documentacion_disponible = Column(Boolean, default=False, nullable=False)
+    documentacion_faltante = Column(String)
     id_usuario_registro = Column(Integer, ForeignKey("usuario.id_usuario"))
-    fecha_registro = Column(DateTime, nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
 
-class TramiteFifonafe(Base):
+class TramiteFifonafe(Base, AuditableMixin):
     __tablename__ = "tramite_fifonafe"
     id_tramite_fifonafe = Column(Integer, primary_key=True, index=True)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
@@ -240,7 +241,7 @@ class TramiteFifonafe(Base):
     fecha_oficio_rpta_dgaopr_a_fifonafe = Column(Date)
     activo = Column(Boolean, default=True, nullable=False)
 
-class DocumentacionSoporte(Base):
+class DocumentacionSoporte(Base, AuditableMixin):
     __tablename__ = "documentacion_soporte"
     id_documento = Column(Integer, primary_key=True, index=True)
     entidad_relacionada_id = Column(Integer, nullable=False)
@@ -250,9 +251,9 @@ class DocumentacionSoporte(Base):
     es_critico = Column(Boolean, nullable=False, default=False)
     url_archivo = Column(String)
     activo = Column(Boolean, default=True, nullable=False)
-    fecha_carga = Column(DateTime, nullable=False)
+    fecha_carga = Column(DateTime(timezone=True), nullable=False)
 
-class Alerta(Base):
+class Alertas(Base, AuditableMixin):
     __tablename__ = "alertas"
     id_alerta = Column(Integer, primary_key=True, index=True)
     tipo = Column(String(50), nullable=False)
@@ -262,7 +263,7 @@ class Alerta(Base):
     entidad_relacionada_id = Column(Integer, nullable=False)
     entidad_relacionada_tipo = Column(String(50), nullable=False)
     fecha_evento = Column(Date)
-    fecha_creacion = Column(DateTime, nullable=False)
+    fecha_creacion = Column(DateTime(timezone=True), nullable=False)
     esta_activa = Column(Boolean, default=True, nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
 
@@ -270,4 +271,27 @@ class AlertasVistas(Base):
     __tablename__ = "alertas_vistas"
     id_alerta = Column(Integer, ForeignKey("alertas.id_alerta", ondelete="CASCADE"), primary_key=True)
     id_usuario = Column(Integer, ForeignKey("usuario.id_usuario", ondelete="CASCADE"), primary_key=True)
-    fecha_vista = Column(DateTime, nullable=False)
+    fecha_vista = Column(DateTime(timezone=True), nullable=False)
+
+class Bitacora(Base):
+    __tablename__ = "bitacora"
+    id_bitacora = Column(BigInteger, primary_key=True, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"))
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"))
+    entidad_tipo = Column(String(100), nullable=False)
+    entidad_id = Column(BigInteger)
+    accion = Column(String(30), nullable=False)
+    detalle_cambio = Column(String)
+    valor_anterior = Column(JSONB)
+    valor_nuevo = Column(JSONB)
+    fecha_hora = Column(DateTime(timezone=True), nullable=False)
+    ip_origen = Column(INET)
+    user_agent = Column(String)
+
+class UsuarioFrente(Base):
+    __tablename__ = "usuario_frente"
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    id_frente = Column(Integer, ForeignKey("frente.id_frente"), primary_key=True)
+    fecha_asignacion = Column(DateTime(timezone=True), nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
