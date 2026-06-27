@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Numeric, Date, ForeignKey, DateTime, BigInteger
+from sqlalchemy import Column, CheckConstraint, Integer, String, Boolean, Numeric, Date, ForeignKey, DateTime, BigInteger
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 from sqlalchemy.dialects.postgresql import JSONB, INET
@@ -58,6 +58,7 @@ class Frente(Base, AuditableMixin):
 
 class NucleoAgrario(Base, AuditableMixin):
     __tablename__ = "nucleo_agrario"
+    __table_args__ = (CheckConstraint("tipo_nucleo IN ('ejido', 'comunidad')", name='chk_tipo_nucleo'),)
     id_nucleo = Column(Integer, primary_key=True, index=True)
     id_municipio = Column(Integer, ForeignKey("municipio.id_municipio"), nullable=False)
     nombre_nucleo = Column(String(300), nullable=False)
@@ -140,6 +141,7 @@ class Parcela(Base, AuditableMixin):
 
 class Afectacion(Base, AuditableMixin):
     __tablename__ = "afectacion"
+    __table_args__ = (CheckConstraint("tipo_afectacion IN ('colectivo', 'individual')", name='chk_tipo_afectacion'),)
     id_afectacion = Column(Integer, primary_key=True, index=True)
     id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
@@ -173,6 +175,7 @@ class ActividadCampo(Base, AuditableMixin):
 
 class Asamblea(Base, AuditableMixin):
     __tablename__ = "asamblea"
+    __table_args__ = (CheckConstraint("tipo_asamblea IN ('informacion', 'anuencia', 'retiro_fondos', 'conciliacion', 'no_verificativo')", name='chk_tipo_asamblea'),)
     id_asamblea = Column(Integer, primary_key=True, index=True)
     id_nucleo = Column(Integer, nullable=False)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
@@ -197,6 +200,7 @@ class Asamblea(Base, AuditableMixin):
 
 class Convenio(Base, AuditableMixin):
     __tablename__ = "convenio"
+    __table_args__ = (CheckConstraint("tipo_afectacion IN ('colectivo', 'individual')", name='chk_convenio_tipo_afectacion'), CheckConstraint("tipo_convenio IN ('ocupacion_previa', 'modificatorio', 'superficie_adicional', 'obras_complementarias', 'ampliacion', 'ampliacion_remanentes')", name='chk_tipo_convenio'),)
     id_convenio = Column(Integer, primary_key=True, index=True)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
     id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"), nullable=False)
@@ -223,6 +227,7 @@ class Convenio(Base, AuditableMixin):
 
 class TramiteFifonafe(Base, AuditableMixin):
     __tablename__ = "tramite_fifonafe"
+    __table_args__ = (CheckConstraint("tipo_tramite IN ('indemnizacion', 'informe_no_conflictos')", name='chk_tipo_tramite'),)
     id_tramite_fifonafe = Column(Integer, primary_key=True, index=True)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
     id_convenio = Column(Integer, ForeignKey("convenio.id_convenio"))

@@ -1,9 +1,13 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.exc import InternalError, IntegrityError
 from typing import List, Type, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import pandas as pd
+import io
 
 from .database import engine, Base, get_db
 from . import models, schemas
@@ -16,6 +20,21 @@ app = FastAPI(
     description="Backend con lógica de negocio geoespacial y administrativa",
     version="1.3.1"
 )
+
+
+@app.exception_handler(InternalError)
+def sqlalchemy_internal_error_handler(request, exc: InternalError):
+    msg = str(exc.orig)
+    if "Auditoría fallida" in msg or "Baja lógica denegada" in msg or "no permitida" in msg.lower() or "restricción" in msg.lower():
+        clean_msg = msg.split("CONTEXT:")[0].strip()
+        return JSONResponse(status_code=400, content={"detail": clean_msg})
+    return JSONResponse(status_code=500, content={"detail": "Error interno de base de datos."})
+
+@app.exception_handler(IntegrityError)
+def sqlalchemy_integrity_error_handler(request, exc: IntegrityError):
+    msg = str(exc.orig)
+    clean_msg = msg.split("DETAIL:")[0].strip()
+    return JSONResponse(status_code=400, content={"detail": f"Violación de integridad: {clean_msg}"})
 
 app.add_middleware(
     CORSMiddleware,
@@ -680,3 +699,34 @@ def update_usuario(id_usuario: int, data: schemas.UsuarioUpdate, db: Session = D
 def delete_usuario(id_usuario: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     entity = get_entity_by_id(db, models.Usuario, id_usuario, "id_usuario")
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
+
+# ==================== CATÁLOGOS ==================== #
+@app.get("/api/catalogos/entidades", response_model=List[schemas.EntidadFederativaResponse])
+def get_entidades(db: Session = Depends(get_db)):
+    return db.query(models.EntidadFederativa).filter(models.EntidadFederativa.activo == True).all()
+
+@app.get("/api/catalogos/municipios", response_model=List[schemas.MunicipioResponse])
+def get_municipios(id_entidad: int = Query(None), db: Session = Depends(get_db)):
+    query = db.query(models.Municipio).filter(models.Municipio.activo == True)
+    if id_entidad:
+        query = query.filter(models.Municipio.id_entidad == id_entidad)
+    return query.all()
+
+@app.get("/api/reportes/exportar/tramos")
+def exportar_tramos_csv(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    tramos = db.query(models.Tramo).filter(models.Tramo.activo == True).all()
+    data = []
+    for t in tramos:
+        data.append({
+            "ID Tramo": t.id_tramo,
+            "Clave": t.clave_tramo,
+            "Nombre": t.nombre_tramo,
+            "Ancho de Vía (m)": float(t.ancho_total_derecho_via_m) if t.ancho_total_derecho_via_m else None,
+            "Fecha Registro": t.fecha_registro
+        })
+    df = pd.DataFrame(data)
+    stream = io.StringIO()
+    df.to_csv(stream, index=False)
+    response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=tramos_export.csv"
+    return response

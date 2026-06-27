@@ -429,3 +429,21 @@ class AlertaResponse(AlertaCreate):
     fecha_creacion: datetime
     class Config:
         from_attributes = True
+
+# ==================== CATÁLOGOS ==================== #
+class EntidadFederativaResponse(BaseModel):
+    id_entidad: int
+    clave_inegi: str
+    nombre: str
+    activo: bool
+    class Config:
+        from_attributes = True
+
+class MunicipioResponse(BaseModel):
+    id_municipio: int
+    id_entidad: int
+    clave_inegi: str
+    nombre: str
+    activo: bool
+    class Config:
+        from_attributes = True
