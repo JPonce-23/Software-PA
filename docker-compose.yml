@@ -29,5 +29,31 @@ services:
     depends_on:
       - db
 
+  backend:
+    build: ./backend
+    container_name: trenes_backend_container
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://alfredo:L3cl3rc1614+@db:5432/db_trenes
+      - CORS_ORIGINS=http://localhost:5173
+    depends_on:
+      - db
+    restart: always
+
+  frontend:
+    build: ./frontend
+    container_name: trenes_frontend_container
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: always
+
 volumes:
   postgres_data:

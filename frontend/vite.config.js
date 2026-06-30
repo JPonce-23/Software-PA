@@ -9,7 +9,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000', // Apunta al backend local
+        target: 'http://backend:8000', // Apunta al backend de Docker
         changeOrigin: true,
         secure: false,
       }
