@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { ArrowUpRight, CheckCircle2, Clock, AlertTriangle, Calendar } from 'lucide-react';
 
 function ProjectCard({ tramo }) {
@@ -63,7 +63,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('/api/tramos')
+    api.get('/tramos')
       .then(res => {
         setTramos(res.data);
         setLoading(false);

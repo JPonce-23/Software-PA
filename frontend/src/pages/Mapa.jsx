@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Map as MapIcon, Layers } from 'lucide-react';
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import axios from 'axios';
+import api from '../api/axios';
 import { parse } from 'wellknown';
 
 export default function Mapa() {
@@ -12,7 +12,7 @@ export default function Mapa() {
 
   useEffect(() => {
     // Cargar Tramos
-    axios.get('/api/tramos').then(res => {
+    api.get('/tramos').then(res => {
       const features = res.data.map(t => {
         if (!t.geometria_wkt) return null;
         return {
@@ -26,7 +26,7 @@ export default function Mapa() {
     }).catch(console.error);
 
     // Cargar Núcleos
-    axios.get('/api/nucleos').then(res => {
+    api.get('/nucleos').then(res => {
       const features = res.data.map(n => {
         if (!n.geometria_wkt) return null;
         return {
