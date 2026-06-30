@@ -686,7 +686,15 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     access_token = auth.create_access_token(
         data={"sub": user.correo, "rol": user.rol}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Return user data explicitly for the frontend AuthContext
+    user_data = {
+        "id_usuario": user.id_usuario,
+        "nombre": user.nombre,
+        "apellido_paterno": user.apellido_paterno,
+        "correo": user.correo,
+        "rol": user.rol
+    }
+    return {"access_token": access_token, "token_type": "bearer", "user": user_data}
 
 # ==================== USUARIOS ==================== #
 @app.post("/api/usuarios", response_model=schemas.UsuarioResponse, status_code=status.HTTP_201_CREATED)
