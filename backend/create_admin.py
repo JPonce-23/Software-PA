@@ -1,4 +1,5 @@
 import sys
+from sqlalchemy import text
 from app.database import SessionLocal
 from app.models import Usuario
 from app.auth import get_password_hash
@@ -22,6 +23,7 @@ def create_admin():
         fecha_alta=datetime.now(timezone.utc),
         activo=True
     )
+    db.execute(text("SET LOCAL app.current_user_id = '1'"))
     db.add(nuevo_admin)
     db.commit()
     print("✅ Usuario administrador creado con éxito:")
