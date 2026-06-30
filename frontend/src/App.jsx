@@ -3,6 +3,7 @@ import Dashboard from './pages/Dashboard';
 import Captura from './pages/Captura';
 import Mapa from './pages/Mapa';
 import Login from './pages/Login';
+import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 
 function Sidebar() {
@@ -63,20 +64,22 @@ function Topbar() {
 
 function App() {
   return (
-    <Router>
-      <div className="app-container">
-        <Sidebar />
-        <main className="content">
-          <Topbar />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/captura" element={<Captura />} />
-            <Route path="/mapa" element={<Mapa />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="app-container">
+          <Sidebar />
+          <main className="content">
+            <Topbar />
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/captura" element={<Captura />} />
+              <Route path="/mapa" element={<Mapa />} />
+            </Routes>
+          </main>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

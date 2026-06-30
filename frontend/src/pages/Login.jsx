@@ -1,14 +1,27 @@
 import React from 'react';
 import { ArrowRight, Lock, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../contexts/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = React.useContext(AuthContext);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [errorMsg, setErrorMsg] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // Simulate login and redirect to dashboard
-    navigate('/');
+    setLoading(true);
+    setErrorMsg('');
+    const result = await login(email, password);
+    if (result.success) {
+      navigate('/');
+    } else {
+      setErrorMsg(result.message);
+    }
+    setLoading(false);
   };
 
   return (
@@ -34,12 +47,20 @@ export default function Login() {
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
+          {errorMsg && (
+            <div style={{ background: '#fee2e2', color: '#dc2626', padding: '10px', borderRadius: '8px', fontSize: '14px' }}>
+              {errorMsg}
+            </div>
+          )}
+
           <div style={{ position: 'relative' }}>
             <Mail size={20} color="#888" style={{ position: 'absolute', left: '15px', top: '14px' }} />
             <input 
               type="email" 
               placeholder="usuario@pa.gob.mx" 
               required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               style={{
                 width: '100%',
                 padding: '14px 15px 14px 45px',
@@ -58,6 +79,8 @@ export default function Login() {
               type="password" 
               placeholder="Contraseña" 
               required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               style={{
                 width: '100%',
                 padding: '14px 15px 14px 45px',
@@ -72,7 +95,7 @@ export default function Login() {
 
           <a href="#" style={{ textAlign: 'right', fontSize: '13px', color: '#0bd18d', textDecoration: 'none' }}>¿Olvidaste tu contraseña?</a>
 
-          <button type="submit" style={{
+          <button type="submit" disabled={loading} style={{
             background: '#04734f',
             color: 'white',
             padding: '15px',
@@ -80,15 +103,16 @@ export default function Login() {
             border: 'none',
             fontSize: '16px',
             fontWeight: '600',
-            cursor: 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '10px',
             marginTop: '10px',
-            transition: 'background 0.2s'
+            transition: 'background 0.2s',
+            opacity: loading ? 0.7 : 1
           }}>
-            Iniciar Sesión <ArrowRight size={20} />
+            {loading ? 'Iniciando...' : 'Iniciar Sesión'} <ArrowRight size={20} />
           </button>
         </form>
 
