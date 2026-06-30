@@ -5,6 +5,7 @@ openpyxl
 psycopg2-binary
 sqlalchemy
 python-dotenv
-geoalchemy2python-jose[cryptography]
+geoalchemy2
+python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
