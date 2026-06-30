@@ -9,7 +9,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://host.docker.internal:8000', // Points to FastAPI running on Host machine
+        target: 'http://localhost:8000', // Apunta al backend local
         changeOrigin: true,
         secure: false,
       }
