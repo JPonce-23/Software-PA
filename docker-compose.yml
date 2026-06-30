@@ -37,7 +37,11 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgresql://alfredo:L3cl3rc1614+@db:5432/db_trenes
+      - DB_USER=alfredo
+      - DB_PASSWORD=L3cl3rc1614+
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=db_trenes
       - CORS_ORIGINS=http://localhost:5173
     depends_on:
       - db
