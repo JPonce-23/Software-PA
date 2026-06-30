@@ -1,9 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Captura from './pages/Captura';
 import Mapa from './pages/Mapa';
 import Login from './pages/Login';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, AuthContext } from './contexts/AuthContext';
 import './index.css';
 
 function Sidebar() {
@@ -62,22 +63,37 @@ function Topbar() {
   );
 }
 
+function AppContent() {
+  const { user, loading } = React.useContext(AuthContext);
+  const location = useLocation();
+
+  if (loading) return <div>Cargando...</div>;
+
+  if (!user && location.pathname !== '/login') {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <div className="app-container">
+      <Sidebar />
+      <main className="content">
+        <Topbar />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/captura" element={<Captura />} />
+          <Route path="/mapa" element={<Mapa />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="app-container">
-          <Sidebar />
-          <main className="content">
-            <Topbar />
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/captura" element={<Captura />} />
-              <Route path="/mapa" element={<Mapa />} />
-            </Routes>
-          </main>
-        </div>
+        <AppContent />
       </Router>
     </AuthProvider>
   );
