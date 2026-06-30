@@ -9,3 +9,7 @@ geoalchemy2
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
+
+aiofiles
+pytest
+httpx

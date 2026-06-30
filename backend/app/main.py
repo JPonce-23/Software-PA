@@ -1,4 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File
+import os
+import shutil
+from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -38,11 +41,20 @@ def sqlalchemy_integrity_error_handler(request, exc: IntegrityError):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+os.makedirs("uploads", exist_ok=True)
+
+def validate_wkt(db: Session, wkt: str):
+    if not wkt: return
+    is_valid = db.execute(text("SELECT ST_IsValid(ST_GeomFromText(:wkt, 4326))"), {"wkt": wkt}).scalar()
+    if is_valid is False:
+        raise HTTPException(status_code=400, detail="Geometría WKT inválida topológicamente (ej. cruces, puntos duplicados).")
 
 def set_audit_context(db: Session, user_id: int):
     db.execute(text(f"SET LOCAL app.current_user_id = '{user_id}'"))
@@ -60,6 +72,7 @@ def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
     # Despachar geometria_wkt al campo de geometría correcto según la entidad
     if "geometria_wkt" in update_dict:
         wkt = update_dict.pop("geometria_wkt")
+        validate_wkt(db, wkt)
         if hasattr(entity, "geometria_linea"):
             entity.geometria_linea = wkt
         elif hasattr(entity, "geometria_poligono"):
@@ -88,7 +101,7 @@ def root():
 
 # ==================== TRAMOS ==================== #
 @app.get("/api/tramos", response_model=List[schemas.TramoResponse])
-def get_tramos(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+def get_tramos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     return db.query(
         models.Tramo.id_tramo,
         models.Tramo.clave_tramo,
@@ -97,13 +110,14 @@ def get_tramos(db: Session = Depends(get_db), current_user: models.Usuario = Dep
         models.Tramo.ancho_total_derecho_via_m,
         models.Tramo.activo,
         models.Tramo.geometria_linea.ST_AsText().label('geometria_wkt')
-    ).filter(models.Tramo.activo == True).all()
+    ).filter(models.Tramo.activo == True).offset(skip).limit(limit).all()
 
 @app.post("/api/tramos", response_model=schemas.TramoResponse, status_code=status.HTTP_201_CREATED)
 def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
     data = tramo.model_dump()
     wkt = data.pop("geometria_wkt")
+    validate_wkt(db, wkt)
     db_tramo = models.Tramo(**data, geometria_linea=wkt)
     db_tramo.fecha_registro = datetime.now().date()
     db.add(db_tramo)
@@ -145,6 +159,7 @@ def create_frente(frente: schemas.FrenteCreate, db: Session = Depends(get_db), c
     set_audit_context(db, current_user.id_usuario)
     data = frente.model_dump()
     wkt = data.pop("geometria_wkt")
+    validate_wkt(db, wkt)
     db_frente = models.Frente(**data, geometria_linea=wkt)
     db_frente.fecha_registro = datetime.now().date()
     db.add(db_frente)
@@ -183,6 +198,7 @@ def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get
     set_audit_context(db, current_user.id_usuario)
     data = nucleo.model_dump()
     wkt = data.pop("geometria_wkt")
+    validate_wkt(db, wkt)
     db_nucleo = models.NucleoAgrario(**data, geometria_poligono=wkt)
     db_nucleo.fecha_creacion = datetime.now(timezone.utc)
     db.add(db_nucleo)
@@ -342,7 +358,7 @@ def generar_reporte_resumen(db: Session = Depends(get_db), current_user: models.
 
 # ==================== AFECTACIONES ==================== #
 @app.get("/api/afectaciones", response_model=List[schemas.AfectacionResponse])
-def list_afectaciones(id_tramo_nucleo: int = Query(None), tipo_afectacion: str = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+def list_afectaciones(skip: int = 0, limit: int = 100, id_tramo_nucleo: int = Query(None), tipo_afectacion: str = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     query = db.query(models.Afectacion).filter(models.Afectacion.activo == True)
     if id_tramo_nucleo:
         query = query.filter(models.Afectacion.id_tramo_nucleo == id_tramo_nucleo)
@@ -350,7 +366,7 @@ def list_afectaciones(id_tramo_nucleo: int = Query(None), tipo_afectacion: str =
         query = query.filter(models.Afectacion.tipo_afectacion == tipo_afectacion)
     
     results = []
-    for a in query.all():
+    for a in query.offset(skip).limit(limit).all():
         resp = a.__dict__.copy()
         resp["geometria_wkt"] = None
         results.append(resp)
@@ -687,8 +703,8 @@ def create_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)
     return db_usuario
 
 @app.get("/api/usuarios", response_model=list[schemas.UsuarioResponse])
-def get_usuarios(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
-    return db.query(models.Usuario).filter(models.Usuario.activo == True).all()
+def get_usuarios(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+    return db.query(models.Usuario).filter(models.Usuario.activo == True).offset(skip).limit(limit).all()
 
 @app.put("/api/usuarios/{id_usuario}", response_model=schemas.UsuarioResponse)
 def update_usuario(id_usuario: int, data: schemas.UsuarioUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
@@ -730,3 +746,26 @@ def exportar_tramos_csv(db: Session = Depends(get_db), current_user: models.Usua
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=tramos_export.csv"
     return response
+
+@app.post("/api/documentacion/{id_documento}/archivo")
+def upload_archivo(id_documento: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
+    doc = get_entity_by_id(db, models.DocumentacionSoporte, id_documento, "id_documento")
+    
+    file_extension = os.path.splitext(file.filename)[1]
+    safe_filename = f"doc_{id_documento}{file_extension}"
+    file_path = os.path.join("uploads", safe_filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    set_audit_context(db, current_user.id_usuario)
+    doc.url_archivo = file_path
+    db.commit()
+    return {"status": "success", "url": file_path}
+
+@app.get("/api/documentacion/{id_documento}/archivo")
+def download_archivo(id_documento: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    doc = get_entity_by_id(db, models.DocumentacionSoporte, id_documento, "id_documento")
+    if not doc.url_archivo or not os.path.exists(doc.url_archivo):
+        raise HTTPException(status_code=404, detail="Archivo físico no encontrado.")
+    return FileResponse(doc.url_archivo, filename=os.path.basename(doc.url_archivo))
