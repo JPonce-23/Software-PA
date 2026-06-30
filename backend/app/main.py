@@ -186,7 +186,7 @@ def delete_frente(id_frente: int, motivo: str = Query(...), db: Session = Depend
 
 # ==================== NUCLEOS AGRARIOS ==================== #
 @app.get("/api/nucleos", response_model=List[schemas.NucleoAgrarioResponse])
-def get_nucleos(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+def get_nucleos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     return db.query(
         models.NucleoAgrario.id_nucleo,
         models.NucleoAgrario.nombre_nucleo,
@@ -865,3 +865,69 @@ def importar_geojson(
 
     db.commit()
     return {"status": "success", "mensaje": f"{registros_insertados} registros importados a la tabla {Modelo.__tablename__}."}
+
+# ==================== BITÁCORA ==================== #
+@app.get("/api/bitacora", response_model=List[schemas.BitacoraResponse])
+def get_bitacora(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+    return db.query(models.Bitacora).order_by(models.Bitacora.fecha_hora.desc()).offset(skip).limit(limit).all()
+
+# ==================== ASIGNACIÓN USUARIO-FRENTE ==================== #
+@app.post("/api/frentes/{id_frente}/asignar-usuario", response_model=schemas.UsuarioFrenteResponse)
+def asignar_usuario_frente(id_frente: int, data: schemas.UsuarioFrenteCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+    exists = db.query(models.UsuarioFrente).filter_by(id_frente=id_frente, id_usuario=data.id_usuario).first()
+    if exists:
+        if not exists.activo:
+            exists.activo = True
+            db.commit()
+            db.refresh(exists)
+        return exists
+    nuevo = models.UsuarioFrente(id_frente=id_frente, id_usuario=data.id_usuario)
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+    return nuevo
+
+@app.delete("/api/frentes/{id_frente}/remover-usuario/{id_usuario}")
+def remover_usuario_frente(id_frente: int, id_usuario: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+    exists = db.query(models.UsuarioFrente).filter_by(id_frente=id_frente, id_usuario=id_usuario).first()
+    if not exists:
+        raise HTTPException(status_code=404, detail="Asignación no encontrada.")
+    exists.activo = False
+    db.commit()
+    return {"status": "success", "detail": "Usuario removido del frente."}
+
+# ==================== ALERTAS VISTAS ==================== #
+@app.post("/api/alertas/{id_alerta}/marcar-leida")
+def marcar_alerta_leida(id_alerta: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    alerta = get_entity_by_id(db, models.Alertas, id_alerta, "id_alerta")
+    vista = db.query(models.AlertasVistas).filter_by(id_alerta=id_alerta, id_usuario=current_user.id_usuario).first()
+    if not vista:
+        nueva_vista = models.AlertasVistas(id_alerta=id_alerta, id_usuario=current_user.id_usuario)
+        db.add(nueva_vista)
+        db.commit()
+    return {"status": "success", "detail": "Alerta marcada como leída."}
+
+# ==================== GET BY ID (Líneas Individuales) ==================== #
+@app.get("/api/tramos/{id_tramo}", response_model=schemas.TramoResponse)
+def get_tramo_by_id(id_tramo: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    return get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
+
+@app.get("/api/frentes/{id_frente}", response_model=schemas.FrenteResponse)
+def get_frente_by_id(id_frente: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    return get_entity_by_id(db, models.Frente, id_frente, "id_frente")
+
+@app.get("/api/nucleos/{id_nucleo}", response_model=schemas.NucleoAgrarioResponse)
+def get_nucleo_by_id(id_nucleo: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    return get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
+
+@app.get("/api/afectaciones/{id_afectacion}", response_model=schemas.AfectacionResponse)
+def get_afectacion_by_id(id_afectacion: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    return get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
+
+@app.get("/api/asambleas/{id_asamblea}", response_model=schemas.AsambleaResponse)
+def get_asamblea_by_id(id_asamblea: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    return get_entity_by_id(db, models.Asamblea, id_asamblea, "id_asamblea")
+
+@app.get("/api/convenios/{id_convenio}", response_model=schemas.ConvenioResponse)
+def get_convenio_by_id(id_convenio: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    return get_entity_by_id(db, models.Convenio, id_convenio, "id_convenio")

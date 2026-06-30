@@ -447,3 +447,36 @@ class MunicipioResponse(BaseModel):
     activo: bool
     class Config:
         from_attributes = True
+
+# ==================== BITÁCORA ==================== #
+from typing import Optional, Any
+from pydantic import Json
+
+class BitacoraResponse(BaseModel):
+    id_bitacora: int
+    id_usuario: int
+    id_nucleo: Optional[int] = None
+    id_tramo_nucleo: Optional[int] = None
+    entidad_tipo: str
+    entidad_id: Optional[int] = None
+    accion: str
+    detalle_cambio: Optional[str] = None
+    valor_anterior: Optional[Any] = None
+    valor_nuevo: Optional[Any] = None
+    fecha_hora: datetime
+    ip_origen: Optional[str] = None
+    user_agent: Optional[str] = None
+    class ConfigDict:
+        from_attributes = True
+
+# ==================== USUARIO FRENTE ==================== #
+class UsuarioFrenteCreate(BaseModel):
+    id_usuario: int
+
+class UsuarioFrenteResponse(BaseModel):
+    id_usuario: int
+    id_frente: int
+    fecha_asignacion: datetime
+    activo: bool
+    class ConfigDict:
+        from_attributes = True
