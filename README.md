@@ -19,13 +19,19 @@ El proyecto ha sido modernizado y ahora está completamente contenerizado usando
 - `docker-compose.yml`: Archivo maestro para levantar toda la infraestructura de desarrollo.
 
 ## ¿Cómo ejecutar el proyecto?
-Ya no es necesario instalar Python, Node.js ni bases de datos de forma local. Todo el entorno se levanta automáticamente.
+Ya no es necesario instalar Python, Node.js ni bases de datos de forma local. Todo el entorno se levanta automáticamente mediante contenedores.
 
-1. Asegúrate de tener **Docker** y **Docker Compose** instalados.
-2. Abre una terminal en la raíz del proyecto y ejecuta:
+### Requisitos Previos
+- **Para Windows**: Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/). Asegúrate de tener habilitado WSL2 en la configuración de Docker.
+- **Para Linux**: Instalar Docker Engine y Docker Compose. (Si no tienes a tu usuario en el grupo `docker`, deberás anteponer `sudo` a los siguientes comandos).
+
+### Pasos de Despliegue
+1. Abre una terminal (o PowerShell en Windows) en la raíz del proyecto.
+2. Ejecuta el comando para construir y levantar toda la infraestructura:
    ```bash
    docker-compose up -d --build
    ```
+   *(Nota en Linux: Si tienes problemas de permisos, usa `sudo docker-compose up -d --build`)*
 3. Una vez finalizado el proceso, los servicios estarán disponibles en:
    - **Frontend (Aplicación)**: [http://localhost:5173](http://localhost:5173)
    - **Backend (Documentación API)**: [http://localhost:8000/docs](http://localhost:8000/docs)
