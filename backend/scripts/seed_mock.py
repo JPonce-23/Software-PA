@@ -40,6 +40,7 @@ def seed_db():
         db.add(tramo1)
         db.add(tramo2)
         db.commit()
+        db.execute(text("SET LOCAL app.current_user_id = '1'"))
         db.refresh(tramo1)
         db.refresh(tramo2)
 
@@ -50,6 +51,7 @@ def seed_db():
             entidad = models.EntidadFederativa(clave_inegi="04", nombre="Campeche")
             db.add(entidad)
             db.commit()
+            db.execute(text("SET LOCAL app.current_user_id = '1'"))
             db.refresh(entidad)
         
         municipio = db.query(models.Municipio).filter_by(clave_inegi="003").first()
@@ -57,16 +59,21 @@ def seed_db():
             municipio = models.Municipio(id_entidad=entidad.id_entidad, clave_inegi="003", nombre="Escárcega")
             db.add(municipio)
             db.commit()
+            db.execute(text("SET LOCAL app.current_user_id = '1'"))
             db.refresh(municipio)
 
         print("Insertando núcleo de prueba...")
         nucleo1 = models.NucleoAgrario(
             id_municipio=municipio.id_municipio,
             nombre_nucleo="Ejido Escárcega",
-            tipo_nucleo="ejido"
+            tipo_nucleo="ejido",
+            comunidad_indigena=False,
+            activo=True,
+            fecha_creacion=date(1990, 1, 1)
         )
         db.add(nucleo1)
         db.commit()
+        db.execute(text("SET LOCAL app.current_user_id = '1'"))
         db.refresh(nucleo1)
         
         print("Insertando frente de prueba...")
@@ -78,6 +85,7 @@ def seed_db():
         )
         db.add(frente1)
         db.commit()
+        db.execute(text("SET LOCAL app.current_user_id = '1'"))
         db.refresh(frente1)
         
         print("Insertando tramo_nucleo (relación)...")
@@ -91,6 +99,7 @@ def seed_db():
         )
         db.add(tramo_nucleo1)
         db.commit()
+        db.execute(text("SET LOCAL app.current_user_id = '1'"))
 
         print("¡Base de datos inicializada con datos de simulación!")
         
