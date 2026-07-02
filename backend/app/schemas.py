@@ -61,7 +61,7 @@ class TramoCreate(AuditableCreate):
     descripcion: Optional[str] = None
     ancho_total_derecho_via_m: Optional[Decimal] = 40.00
     fecha_registro: Optional[date] = None
-    geometria_wkt: str # WKT para la BD
+    geometria_wkt: Optional[str] = None # WKT para la BD
 
 class TramoUpdate(AuditableUpdate):
     nombre_tramo: Optional[str] = None
@@ -81,7 +81,7 @@ class FrenteCreate(AuditableCreate):
     nombre_frente: str
     descripcion: Optional[str] = None
     fecha_registro: Optional[date] = None
-    geometria_wkt: str
+    geometria_wkt: Optional[str] = None
 
 class FrenteUpdate(AuditableUpdate):
     nombre_frente: Optional[str] = None
@@ -103,7 +103,7 @@ class NucleoAgrarioCreate(AuditableCreate):
     tipo_nucleo: Literal['ejido', 'comunidad']
     comunidad_indigena: bool = False
     residencia: Optional[str] = None
-    geometria_wkt: str
+    geometria_wkt: Optional[str] = None
 
 class NucleoAgrarioUpdate(AuditableUpdate):
     nombre_nucleo: Optional[str] = None
@@ -222,6 +222,7 @@ class AfectacionCreate(AuditableCreate):
     documentacion_disponible: bool = False
     documentacion_faltante: Optional[str] = None
     origen_registro: Literal['captura_sistema', 'migracion_excel'] = 'captura_sistema'
+    geometria_wkt: Optional[str] = None
 
 class AfectacionUpdate(AuditableUpdate):
     tipo_tenencia: Optional[str] = None
@@ -246,13 +247,13 @@ class AsambleaCreate(AuditableCreate):
     id_tramo_nucleo: int
     contexto_proceso: Literal['cop_original', 'obras_complementarias', 'superficie_adicional'] = 'cop_original'
     tipo_asamblea: Literal['informacion', 'anuencia', 'retiro_fondos', 'conciliacion', 'no_verificativo']
-    resultado_anuencia: Literal['aprobatoria', 'rechazada', 'pendiente'] = "pendiente"
+    resultado_anuencia: Literal['otorgada', 'negada', 'pendiente', 'no_aplica'] = "pendiente"
     fecha_exp_1a: Optional[date] = None
     fecha_prog_1a: Optional[date] = None
     fecha_exp_2a: Optional[date] = None
     fecha_prog_2a: Optional[date] = None
     fecha_realizada: Optional[date] = None
-    estatus_asamblea: Literal['programada', 'celebrada', 'suspendida'] = 'programada'
+    estatus_asamblea: Literal['programado', 'pendiente', 'completo'] = 'programado'
     ingreso_ran_fecha: Optional[date] = None
     numero_solicitud_ran: Optional[str] = None
     calificacion_registral_ran: Optional[str] = None
@@ -262,8 +263,8 @@ class AsambleaCreate(AuditableCreate):
     documentacion_faltante: Optional[str] = None
 
 class AsambleaUpdate(AuditableUpdate):
-    resultado_anuencia: Optional[Literal['aprobatoria', 'rechazada', 'pendiente']] = None
-    estatus_asamblea: Optional[Literal['programada', 'celebrada', 'suspendida']] = None
+    resultado_anuencia: Optional[Literal['otorgada', 'negada', 'pendiente', 'no_aplica']] = None
+    estatus_asamblea: Optional[Literal['programado', 'pendiente', 'completo']] = None
     ingreso_ran_fecha: Optional[date] = None
     numero_solicitud_ran: Optional[str] = None
     calificacion_registral_ran: Optional[str] = None
@@ -282,7 +283,7 @@ class ConvenioCreate(AuditableCreate):
     id_tramo_nucleo: int
     id_afectacion: int
     tipo_afectacion: Literal['colectivo', 'individual']
-    tipo_convenio: Literal['ocupacion_previa', 'modificatorio', 'superficie_adicional', 'obras_complementarias', 'ampliacion', 'ampliacion_remanentes']
+    tipo_convenio: Optional[Literal['cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias', 'ampliacion', 'ampliacion_remanente']] = None
     fecha_firma: Optional[date] = None
     superficie_real_afectada_ha: Optional[Decimal] = None
     superficie_total_ha: Optional[Decimal] = None
@@ -412,17 +413,18 @@ class DocumentacionSoporteResponse(DocumentacionSoporteCreate):
         from_attributes = True
 
 # --- Para Alertas ---
-class AlertaCreate(AuditableCreate):
-    tipo: Literal['vencimiento_orv', 'evento_proximo', 'documento_faltante']
+class AlertaCreate(BaseModel):
+    tipo: Literal['tramite', 'campo', 'legal', 'sistema']
     prioridad: Literal['alta', 'media', 'baja']
     titulo: str
     descripcion: Optional[str] = None
     entidad_relacionada_id: int
-    entidad_relacionada_tipo: str
+    entidad_relacionada_tipo: Literal['nucleo_agrario', 'afectacion', 'convenio', 'orv']
     fecha_evento: Optional[date] = None
 
-class AlertaUpdate(AuditableUpdate):
+class AlertaUpdate(BaseModel):
     esta_activa: Optional[bool] = None
+    activo: Optional[bool] = None
 
 class AlertaResponse(AlertaCreate):
     id_alerta: int

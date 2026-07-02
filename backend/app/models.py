@@ -258,7 +258,7 @@ class DocumentacionSoporte(Base, AuditableMixin):
     activo = Column(Boolean, default=True, nullable=False)
     fecha_carga = Column(DateTime(timezone=True), nullable=False)
 
-class Alertas(Base, AuditableMixin):
+class Alertas(Base):
     __tablename__ = "alertas"
     id_alerta = Column(Integer, primary_key=True, index=True)
     tipo = Column(String(50), nullable=False)

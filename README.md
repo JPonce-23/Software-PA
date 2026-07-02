@@ -27,15 +27,26 @@ Ya no es necesario instalar Python, Node.js ni bases de datos de forma local. To
 
 ### Pasos de Despliegue
 1. Abre una terminal (o PowerShell en Windows) en la raíz del proyecto.
-2. Ejecuta el comando para construir y levantar toda la infraestructura:
+2. Crea tu archivo de variables de entorno copiando el archivo de ejemplo:
+   ```bash
+   cp .env.example .env
+   ```
+3. Ejecuta el comando para construir y levantar toda la infraestructura:
    ```bash
    docker-compose up -d --build
    ```
    *(Nota en Linux: Si tienes problemas de permisos, usa `sudo docker-compose up -d --build`)*
-3. Una vez finalizado el proceso, los servicios estarán disponibles en:
+4. Una vez finalizado el proceso, los servicios estarán disponibles en:
    - **Frontend (Aplicación)**: [http://localhost:5173](http://localhost:5173)
    - **Backend (Documentación API)**: [http://localhost:8000/docs](http://localhost:8000/docs)
    - **PgAdmin (Gestor de BD)**: [http://localhost:5050](http://localhost:5050)
+
+### Comandos Útiles (Docker)
+Si necesitas administrar el entorno o diagnosticar algún problema, puedes usar estos comandos en la terminal (desde la raíz del proyecto):
+- **Ver los logs en tiempo real:** `docker-compose logs -f`
+- **Detener los servicios sin borrar datos:** `docker-compose stop`
+- **Apagar servicios por completo:** `docker-compose down`
+- **Reiniciar base de datos desde cero (borrar volúmenes):** `docker-compose down -v`
 
 ### Credenciales por Defecto
 - **PgAdmin**: `fredy0505.sanchez@gmail.com` / `L3cl3rc1614sf90`

@@ -33,13 +33,19 @@ def sqlalchemy_internal_error_handler(request, exc: InternalError):
     if "Auditoría fallida" in msg or "Baja lógica denegada" in msg or "no permitida" in msg.lower() or "restricción" in msg.lower():
         clean_msg = msg.split("CONTEXT:")[0].strip()
         return JSONResponse(status_code=400, content={"detail": clean_msg})
-    return JSONResponse(status_code=500, content={"detail": "Error interno de base de datos."})
+    return JSONResponse(status_code=500, content={"detail": f"Error DB: {msg}"})
 
 @app.exception_handler(IntegrityError)
 def sqlalchemy_integrity_error_handler(request, exc: IntegrityError):
     msg = str(exc.orig)
     clean_msg = msg.split("DETAIL:")[0].strip()
     return JSONResponse(status_code=400, content={"detail": f"Violación de integridad: {clean_msg}"})
+
+@app.exception_handler(Exception)
+def global_exception_handler(request, exc: Exception):
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 app.add_middleware(
     CORSMiddleware,
@@ -382,10 +388,20 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
     if afectacion.tipo_afectacion == 'individual' and not afectacion.id_parcela:
         raise HTTPException(status_code=400, detail="Una afectación individual requiere id_parcela")
         
-    db_afectacion = models.Afectacion(**afectacion.model_dump())
-    db.add(db_afectacion)
-    db.commit()
-    db.refresh(db_afectacion)
+    data = afectacion.model_dump()
+    wkt = data.pop("geometria_wkt", None)
+    
+    try:
+        db_afectacion = models.Afectacion(**data)
+        if wkt:
+            db_afectacion.geometria_afectacion = wkt
+            
+        db.add(db_afectacion)
+        db.commit()
+        db.refresh(db_afectacion)
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(status_code=500, content={"detail": f"MyError: {str(e)}"})
     resp = db_afectacion.__dict__.copy()
     resp["geometria_wkt"] = None
     return resp
@@ -462,8 +478,8 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
         raise HTTPException(status_code=400, detail="Los convenios modificatorios requieren un id_convenio_padre")
         
     # RN-1: Compatibilidad tipo_convenio vs tipo_afectacion
-    colectivo_permitidos = ['ocupacion_previa', 'modificatorio', 'superficie_adicional', 'obras_complementarias']
-    individual_permitidos = ['ocupacion_previa', 'modificatorio', 'ampliacion', 'ampliacion_remanentes']
+    colectivo_permitidos = ['cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias']
+    individual_permitidos = ['cop_original', 'modificatorio', 'ampliacion', 'ampliacion_remanente']
     if convenio.tipo_afectacion == 'colectivo' and convenio.tipo_convenio not in colectivo_permitidos:
         raise HTTPException(status_code=400, detail=f"tipo_convenio {convenio.tipo_convenio} no permitido para afectación colectivo")
     if convenio.tipo_afectacion == 'individual' and convenio.tipo_convenio not in individual_permitidos:
