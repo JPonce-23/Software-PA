@@ -264,7 +264,6 @@ def get_tramo_detalles(tramo: str = Query(...), db: Session = Depends(get_db), c
         "geometria_wkt": r.geometria_wkt,
         "longitud_km": round(r.longitud_km, 2) if r.longitud_km else 0
     }
-
 @app.post("/api/nucleos", tags=["Nucleos Agrarios"], summary="Crear nucleo agrario", response_model=schemas.NucleoAgrarioResponse, status_code=status.HTTP_201_CREATED)
 def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
