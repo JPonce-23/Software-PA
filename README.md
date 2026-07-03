@@ -41,6 +41,29 @@ Ya no es necesario instalar Python, Node.js ni bases de datos de forma local. To
    - **Backend (Documentación API)**: [http://localhost:8000/docs](http://localhost:8000/docs)
    - **PgAdmin (Gestor de BD)**: [http://localhost:5050](http://localhost:5050)
 
+
+### Inicialización de Datos (primera vez)
+
+Después de levantar los contenedores por primera vez, la base de datos 
+se crea con el esquema completo pero **sin datos**. Es necesario crear
+manualmente al usuario administrador antes de poder iniciar sesión:
+
+```bash
+docker exec -it trenes_backend_container python scripts/create_admin.py
+```
+
+Esto crea el usuario admin del sistema (ver credenciales en la sección
+"Credenciales por Defecto"). Si quieres también datos de prueba
+(tramos, núcleos agrarios, etc.), corre además:
+
+```bash
+docker exec -it trenes_backend_container python scripts/seed_mock.py
+```
+
+**Nota**: `seed_mock.py` requiere que el usuario admin (ID 1) ya exista,
+así que siempre corre `create_admin.py` primero.
+
+
 ### Comandos Útiles (Docker)
 Si necesitas administrar el entorno o diagnosticar algún problema, puedes usar estos comandos en la terminal (desde la raíz del proyecto):
 - **Ver los logs en tiempo real:** `docker-compose logs -f`
