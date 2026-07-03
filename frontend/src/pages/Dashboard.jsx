@@ -2,6 +2,21 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { ArrowUpRight, CheckCircle2, Clock, AlertTriangle, Calendar } from 'lucide-react';
 
+const PROYECTOS_MAESTROS = [
+  "Tren Maya", 
+  "AIFA - Pachuca", 
+  "México - Querétaro", 
+  "Saltillo - Nuevo Laredo", 
+  "Querétaro - Irapuato"
+];
+
+function getProyectoMaestro(nombreTramo) {
+  for (const proyecto of PROYECTOS_MAESTROS) {
+    if (nombreTramo.includes(proyecto)) return proyecto;
+  }
+  return "Proyecto General";
+}
+
 function ProjectCard({ tramo }) {
   // Simulación para métricas visuales
   const avance = Math.floor(Math.random() * 60) + 20;
@@ -9,8 +24,13 @@ function ProjectCard({ tramo }) {
   const pendientes = Math.floor(Math.random() * 300);
   const problemas = Math.floor(Math.random() * 50);
 
+  const proyecto = getProyectoMaestro(tramo.nombre_tramo);
+
   return (
     <article className="project-card">
+      <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#0ea5e9', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>
+        {proyecto}
+      </div>
       <h2>{tramo.nombre_tramo}</h2>
       <div className="metrics">
         
@@ -59,23 +79,18 @@ function ProjectCard({ tramo }) {
 }
 
 export default function Dashboard() {
-  const [tramos, setTramos] = useState([]);
+  const [tramosData, setTramosData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.get('/tramos')
       .then(res => {
-        setTramos(res.data);
+        setTramosData(res.data);
         setLoading(false);
       })
       .catch(err => {
-        console.error('Error al conectar con la API, usando mock:', err);
-        setTramos([
-          { id_tramo: 1, nombre_tramo: 'AIFA - Pachuca' },
-          { id_tramo: 2, nombre_tramo: 'México - Querétaro' },
-          { id_tramo: 3, nombre_tramo: 'Saltillo - Nuevo Laredo' },
-          { id_tramo: 4, nombre_tramo: 'Querétaro - Irapuato' }
-        ]);
+        console.error('Error al conectar con la API:', err);
+        setTramosData([]); // Si falla, que inicie vacío
         setLoading(false);
       });
   }, []);
@@ -83,10 +98,13 @@ export default function Dashboard() {
   if (loading) return <div>Cargando métricas...</div>;
 
   return (
-    <section className="cards">
-      {tramos.map(tramo => (
-        <ProjectCard key={tramo.id_tramo} tramo={tramo} />
-      ))}
-    </section>
+    <div>
+      <h2 style={{marginBottom: '20px'}}>Sectores y Frentes Activos</h2>
+      <section className="cards">
+        {tramosData.map(tramo => (
+          <ProjectCard key={tramo.id_tramo} tramo={tramo} />
+        ))}
+      </section>
+    </div>
   );
 }
