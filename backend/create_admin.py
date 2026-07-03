@@ -26,7 +26,7 @@ def create_admin():
     db.execute(text("SET LOCAL app.current_user_id = '1'"))
     db.add(nuevo_admin)
     db.commit()
-    print("✅ Usuario administrador creado con éxito:")
+    print("   Usuario administrador creado con éxito:")
     print("   Correo: admin@sistema.com")
     print("   Contraseña: Admin123!")
 
