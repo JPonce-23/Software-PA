@@ -23,12 +23,14 @@ function Sidebar() {
         <Link className="captura" to="/captura">Capturar información</Link>
 
         <div className="menu-group" style={{ marginTop: '10px' }}>
-          <h4>Tramos</h4>
-          <ul>
-            <li>AIFA - Pachuca</li>
-            <li>México - Querétaro</li>
-            <li>Saltillo - Nuevo Laredo</li>
-            <li>Querétaro - Irapuato</li>
+          <h4>Proyectos</h4>
+          <ul style={{ listStyle: 'none', paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '8px', margin: '10px 0' }}>
+            <li><Link className="menu-item" style={{padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1'}} to="/">Visión General (Todos)</Link></li>
+            <li><Link className="menu-item" style={{padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1'}} to="/?proyecto=Tren%20Maya">Tren Maya</Link></li>
+            <li><Link className="menu-item" style={{padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1'}} to="/?proyecto=AIFA%20-%20Pachuca">AIFA - Pachuca</Link></li>
+            <li><Link className="menu-item" style={{padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1'}} to="/?proyecto=México%20-%20Querétaro">México - Querétaro</Link></li>
+            <li><Link className="menu-item" style={{padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1'}} to="/?proyecto=Saltillo%20-%20Nuevo%20Laredo">Saltillo - Nuevo Laredo</Link></li>
+            <li><Link className="menu-item" style={{padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1'}} to="/?proyecto=Querétaro%20-%20Irapuato">Querétaro - Irapuato</Link></li>
           </ul>
         </div>
 
