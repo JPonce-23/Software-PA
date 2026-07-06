@@ -105,9 +105,9 @@ export default function Mapa() {
   const onEachNucleo = (feature, layer) => {
     if (feature.properties && feature.properties.name) {
       const estatusText = {
-        'liberado': '✅ Liberado',
-        'en_proceso': '⏳ En Proceso',
-        'problema': '❌ Con Problemas'
+        'liberado': 'Liberado',
+        'en_proceso': 'En Proceso',
+        'problema': 'Con Problemas'
       }[feature.properties.estatus] || 'Pendiente';
 
       layer.bindPopup(`
