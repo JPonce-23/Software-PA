@@ -8,6 +8,7 @@ import { AuthProvider, AuthContext } from './contexts/AuthContext';
 import './index.css';
 
 function Sidebar() {
+  const { logout } = React.useContext(AuthContext);
   const location = useLocation();
 
   if (location.pathname === '/login') return null;
@@ -39,7 +40,7 @@ function Sidebar() {
           <Link className="menu-item" to="/config">Configuración</Link>
         </div>
         
-        <Link className="menu-item logout" to="/login">Cerrar sesión</Link>
+        <Link className="menu-item logout" to="/login" onClick={logout}>Cerrar sesión</Link>
       </nav>
     </aside>
   );
@@ -73,6 +74,10 @@ function AppContent() {
 
   if (!user && location.pathname !== '/login') {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user && location.pathname === '/login') {
+    return <Navigate to="/" replace />;
   }
 
   return (
