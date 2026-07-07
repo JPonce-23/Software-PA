@@ -1,11 +1,18 @@
-Bug: GET/POST/PUT de /api/afectaciones fuerzan geometria_wkt = None 
-en la respuesta (líneas ~406, ~414, y presumiblemente en get_afectacion_by_id),
-en vez de convertir la columna geometria_afectacion a texto WKT como sí 
-se hace en otros endpoints (tramos, frentes, núcleos).
+## Bug: geometria_wkt regresa null en POST y PUT (todos los módulos geoespaciales)
 
-Impacto: cualquier pantalla que dependa de leer la geometría de una 
-afectación (ej. Mapa.jsx) va a recibir null aunque el dato exista 
-correctamente en la base de datos.
+**Alcance**: afecta a tramos, frentes, núcleos, tramo_nucleo y afectaciones.
 
-Fix sugerido: aplicar el mismo patrón de conversión WKT que usan 
-los demás endpoints geoespaciales.
+**Descripción**: los endpoints GET (listar y por ID) devuelven correctamente
+la geometría en formato WKT gracias a `.ST_AsText().label('geometria_wkt')`
+en el query. Sin embargo, los endpoints POST y PUT de estos 5 módulos 
+fuerzan `resp["geometria_wkt"] = None` en la respuesta, en vez de convertir 
+la geometría recién guardada.
+
+**Impacto**: cualquier flujo de frontend que dependa de la respuesta 
+inmediata de un POST/PUT (por ejemplo, para dibujar en el mapa sin 
+tener que recargar con un GET) va a recibir null aunque el dato se 
+haya guardado correctamente.
+
+**Fix sugerido**: en vez de `resp["geometria_wkt"] = None`, hacer una 
+consulta adicional con ST_AsText después del commit, o usar 
+geoalchemy2.shape.to_shape() sobre el objeto recién refrescado.
