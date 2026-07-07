@@ -174,7 +174,9 @@ def create_frente(frente: schemas.FrenteCreate, db: Session = Depends(get_db), c
     db.commit()
     db.refresh(db_frente)
     resp = db_frente.__dict__.copy()
-    resp["geometria_wkt"] = None
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.Frente.geometria_linea.ST_AsText()).filter(models.Frente.id_frente == db_frente.id_frente)
+    )
     return resp
 
 @app.put("/api/frentes/{id_frente}", tags=["Frentes"], summary="Actualizar frente", response_model=schemas.FrenteResponse)
@@ -182,7 +184,9 @@ def update_frente(id_frente: int, data: schemas.FrenteUpdate, db: Session = Depe
     entity = get_entity_by_id(db, models.Frente, id_frente, "id_frente")
     db_frente = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_frente.__dict__.copy()
-    resp["geometria_wkt"] = None
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.Frente.geometria_linea.ST_AsText()).filter(models.Frente.id_frente == db_frente.id_frente)
+    )
     return resp
 
 @app.delete("/api/frentes/{id_frente}", tags=["Frentes"], summary="Eliminar frente")
@@ -359,7 +363,9 @@ def create_tramo_nucleo(tramo_nucleo: schemas.TramoNucleoCreate, db: Session = D
     db.commit()
     db.refresh(db_tn)
     resp = db_tn.__dict__.copy()
-    resp["geometria_wkt"] = None  # la geometría no se serializa al refrescar
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.TramoNucleo.geometria_segmento.ST_AsText()).filter(models.TramoNucleo.id_tramo_nucleo == db_tn.id_tramo_nucleo)
+    )
     return resp
 
 @app.put("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Actualizar tramo-nucleo", response_model=schemas.TramoNucleoResponse)
@@ -367,7 +373,9 @@ def update_tramo_nucleo(id_tramo_nucleo: int, data: schemas.TramoNucleoUpdate, d
     entity = get_entity_by_id(db, models.TramoNucleo, id_tramo_nucleo, "id_tramo_nucleo")
     updated = update_entity(db, entity, data, current_user.id_usuario)
     resp = updated.__dict__.copy()
-    resp["geometria_wkt"] = None
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.TramoNucleo.geometria_segmento.ST_AsText()).filter(models.TramoNucleo.id_tramo_nucleo == updated.id_tramo_nucleo)
+    )
     return resp
 
 @app.delete("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Eliminar tramo-nucleo")
