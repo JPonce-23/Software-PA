@@ -21,7 +21,7 @@ body {
 .sidebar {
   width: 280px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, #04734f, #00523f);
+  background: #006341;
   color: white;
   padding: 30px 24px;
   display: flex;
@@ -60,8 +60,8 @@ body {
 }
 
 .captura {
-  background-color: #0bd18d;
-  color: #00422c;
+  background-color: #A57F2C;
+  color: white;
   font-weight: bold;
   text-align: center;
   border-radius: 8px;
@@ -117,7 +117,7 @@ body {
 }
 
 .topbar h1 {
-  color: #04642d;
+  color: #006341;
   font-size: 26px;
   font-weight: 700;
   margin-bottom: 6px;
@@ -145,7 +145,7 @@ body {
   padding: 24px 30px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
   transition: transform 0.2s, box-shadow 0.2s;
-  border-left: 5px solid #04734f;
+  border-left: 5px solid #006341;
 }
 
 .project-card:hover {
@@ -154,7 +154,7 @@ body {
 }
 
 .project-card h2 {
-  color: #04642d;
+  color: #006341;
   font-size: 18px;
   margin-bottom: 20px;
   border-bottom: 1px solid #eee;
@@ -182,9 +182,10 @@ body {
   justify-content: center;
 }
 
-.icon.green { background: #e6f4ea; color: #04734f; }
+.icon.green { background: #e0f0eb; color: #006341; }
 .icon.yellow { background: #fef5e5; color: #d97706; }
-.icon.red { background: #fee2e2; color: #dc2626; }
+.icon.blue { background: #e0f2fe; color: #0284c7; }
+.icon.dark { background: #f1f5f9; color: #2B292A; }
 
 .metric small {
   display: block;
@@ -196,7 +197,7 @@ body {
 .metric strong {
   display: block;
   font-size: 28px;
-  color: #04642d;
+  color: #2B292A;
 }
 
 .metric .yellow-text { color: #d97706; }
@@ -212,7 +213,7 @@ body {
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #04734f, #0bd18d);
+  background: #006341;
   border-radius: 3px;
   transition: width 1s ease-out;
 }

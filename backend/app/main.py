@@ -191,16 +191,79 @@ def delete_frente(id_frente: int, motivo: str = Query(...), db: Session = Depend
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== NUCLEOS AGRARIOS ==================== #
-@app.get("/api/nucleos", tags=["Nucleos Agrarios"], summary="Listar nucleos agrarios", response_model=List[schemas.NucleoAgrarioResponse])
-def get_nucleos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return db.query(
-        models.NucleoAgrario.id_nucleo,
-        models.NucleoAgrario.nombre_nucleo,
-        models.NucleoAgrario.tipo_nucleo,
-        models.NucleoAgrario.comunidad_indigena,
-        models.NucleoAgrario.geometria_poligono.ST_AsText().label('geometria_wkt')
-    ).filter(models.NucleoAgrario.activo == True).all()
+@app.get("/api/nucleos", tags=["Nucleos Agrarios"], summary="Listar nucleos agrarios")
+def get_nucleos(tramo: str = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    import random
+    from sqlalchemy import text
+    
+    base_sql = """
+        SELECT 
+            n.id_nucleo, 
+            n.nombre_nucleo, 
+            n.tipo_nucleo, 
+            n.comunidad_indigena, 
+            ST_AsText(n.geometria_poligono) as geometria_wkt,
+            (ST_Area(n.geometria_poligono::geography) / 10000.0) as area_ha
+        FROM nucleo_agrario n
+        WHERE n.activo = true
+    """
+    params = {}
+    
+    if tramo:
+        base_sql += """
+            AND ST_Intersects(n.geometria_poligono, (
+                SELECT ST_Union(t.geometria_linea) 
+                FROM tramo t 
+                WHERE t.nombre_tramo = :tramo
+            ))
+        """
+        params["tramo"] = tramo
+        
+    result = db.execute(text(base_sql), params).fetchall()
+    
+    response = []
+    for r in result:
+        random.seed(r.id_nucleo)
+        estatus = random.choices(['liberado', 'en_proceso', 'problema'], weights=[0.6, 0.2, 0.2])[0]
+        
+        response.append({
+            "id_nucleo": r.id_nucleo,
+            "nombre_nucleo": r.nombre_nucleo,
+            "tipo_nucleo": r.tipo_nucleo,
+            "comunidad_indigena": r.comunidad_indigena,
+            "geometria_wkt": r.geometria_wkt,
+            "area_ha": round(r.area_ha, 2) if r.area_ha else 0,
+            "estatus_simulado": estatus
+        })
+        
+    return response
 
+@app.get("/api/tramo-detalles", tags=["Tramos"], summary="Obtener detalles y estadísticas geoespaciales de un tramo específico")
+def get_tramo_detalles(tramo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    from sqlalchemy import text
+    from fastapi import HTTPException
+    
+    sql = text("""
+        SELECT 
+            id_tramo,
+            nombre_tramo,
+            ST_AsText(geometria_linea) as geometria_wkt,
+            (ST_Length(geometria_linea::geography) / 1000.0) as longitud_km
+        FROM tramo
+        WHERE nombre_tramo = :tramo AND activo = true
+        LIMIT 1
+    """)
+    r = db.execute(sql, {"tramo": tramo}).fetchone()
+    
+    if not r:
+        raise HTTPException(status_code=404, detail="Tramo no encontrado")
+        
+    return {
+        "id_tramo": r.id_tramo,
+        "nombre_tramo": r.nombre_tramo,
+        "geometria_wkt": r.geometria_wkt,
+        "longitud_km": round(r.longitud_km, 2) if r.longitud_km else 0
+    }
 @app.post("/api/nucleos", tags=["Nucleos Agrarios"], summary="Crear nucleo agrario", response_model=schemas.NucleoAgrarioResponse, status_code=status.HTTP_201_CREATED)
 def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
