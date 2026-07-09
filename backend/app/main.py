@@ -132,7 +132,9 @@ def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), curr
     db.commit()
     db.refresh(db_tramo)
     resp = db_tramo.__dict__.copy()
-    resp["geometria_wkt"] = None
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.Tramo.geometria_linea.ST_AsText()).filter(models.Tramo.id_tramo == db_tramo.id_tramo)
+    )
     return resp
 
 @app.put("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Actualizar tramo", response_model=schemas.TramoResponse)
@@ -140,7 +142,9 @@ def update_tramo(id_tramo: int, data: schemas.TramoUpdate, db: Session = Depends
     entity = get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
     db_tramo = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_tramo.__dict__.copy()
-    resp["geometria_wkt"] = None
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.Tramo.geometria_linea.ST_AsText()).filter(models.Tramo.id_tramo == db_tramo.id_tramo)
+    )
     return resp
 
 @app.delete("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Eliminar tramo")
@@ -280,7 +284,9 @@ def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get
     db.commit()
     db.refresh(db_nucleo)
     resp = db_nucleo.__dict__.copy()
-    resp["geometria_wkt"] = None
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.NucleoAgrario.geometria_poligono.ST_AsText()).filter(models.NucleoAgrario.id_nucleo == db_nucleo.id_nucleo)
+    )
     return resp
 
 @app.put("/api/nucleos/{id_nucleo}", tags=["Nucleos Agrarios"], summary="Actualizar nucleo agrario", response_model=schemas.NucleoAgrarioResponse)
@@ -288,7 +294,9 @@ def update_nucleo(id_nucleo: int, data: schemas.NucleoAgrarioUpdate, db: Session
     entity = get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
     db_nucleo = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_nucleo.__dict__.copy()
-    resp["geometria_wkt"] = None
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.NucleoAgrario.geometria_poligono.ST_AsText()).filter(models.NucleoAgrario.id_nucleo == db_nucleo.id_nucleo)
+    )
     return resp
 
 @app.delete("/api/nucleos/{id_nucleo}", tags=["Nucleos Agrarios"], summary="Eliminar nucleo agrario")
@@ -447,7 +455,9 @@ def list_afectaciones(skip: int = 0, limit: int = 100, id_tramo_nucleo: int = Qu
     results = []
     for a in query.offset(skip).limit(limit).all():
         resp = a.__dict__.copy()
-        resp["geometria_wkt"] = None
+        resp["geometria_wkt"] = db.scalar(
+            db.query(models.Afectacion.geometria_afectacion.ST_AsText()).filter(models.Afectacion.id_afectacion == a.id_afectacion)
+        )
         results.append(resp)
     return results
 
@@ -474,7 +484,9 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
         db.rollback()
         return JSONResponse(status_code=500, content={"detail": f"MyError: {str(e)}"})
     resp = db_afectacion.__dict__.copy()
-    resp["geometria_wkt"] = None
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.Afectacion.geometria_afectacion.ST_AsText()).filter(models.Afectacion.id_afectacion == db_afectacion.id_afectacion)
+    )
     return resp
 
 @app.put("/api/afectaciones/{id_afectacion}", tags=["Afectaciones"], summary="Actualizar afectación", response_model=schemas.AfectacionResponse)
@@ -482,7 +494,9 @@ def update_afectacion_route(id_afectacion: int, data: schemas.AfectacionUpdate, 
     entity = get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
     db_afectacion = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_afectacion.__dict__.copy()
-    resp["geometria_wkt"] = None
+    resp["geometria_wkt"] = db.scalar(
+        db.query(models.Afectacion.geometria_afectacion.ST_AsText()).filter(models.Afectacion.id_afectacion == db_afectacion.id_afectacion)
+    )
     return resp
 
 @app.delete("/api/afectaciones/{id_afectacion}", tags=["Afectaciones"], summary="Eliminar afectación")
@@ -1006,19 +1020,105 @@ def marcar_alerta_leida(id_alerta: int, db: Session = Depends(get_db), current_u
 # ==================== GET BY ID (Líneas Individuales) ==================== #
 @app.get("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Obtener tramo por ID", response_model=schemas.TramoResponse)
 def get_tramo_by_id(id_tramo: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
+    row = db.query(
+        models.Tramo.id_tramo,
+        models.Tramo.clave_tramo,
+        models.Tramo.nombre_tramo,
+        models.Tramo.descripcion,
+        models.Tramo.ancho_total_derecho_via_m,
+        models.Tramo.geometria_linea.ST_AsText().label('geometria_wkt'),
+        models.Tramo.activo,
+        models.Tramo.fecha_registro,
+        models.Tramo.fecha_baja,
+        models.Tramo.id_usuario_baja,
+        models.Tramo.motivo_baja,
+        models.Tramo.fecha_reactivacion,
+        models.Tramo.id_usuario_reactivacion,
+        models.Tramo.motivo_reactivacion,
+        models.Tramo.observaciones
+    ).filter(models.Tramo.id_tramo == id_tramo, models.Tramo.activo == True).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Tramo not found")
+    return row
 
 @app.get("/api/frentes/{id_frente}", tags=["Frentes"], summary="Obtener frente por ID", response_model=schemas.FrenteResponse)
 def get_frente_by_id(id_frente: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return get_entity_by_id(db, models.Frente, id_frente, "id_frente")
+    row = db.query(
+        models.Frente.id_frente,
+        models.Frente.id_tramo,
+        models.Frente.clave_frente,
+        models.Frente.nombre_frente,
+        models.Frente.descripcion,
+        models.Frente.geometria_linea.ST_AsText().label('geometria_wkt'),
+        models.Frente.activo,
+        models.Frente.fecha_registro,
+        models.Frente.fecha_baja,
+        models.Frente.id_usuario_baja,
+        models.Frente.motivo_baja,
+        models.Frente.fecha_reactivacion,
+        models.Frente.id_usuario_reactivacion,
+        models.Frente.motivo_reactivacion,
+        models.Frente.observaciones
+    ).filter(models.Frente.id_frente == id_frente, models.Frente.activo == True).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Frente not found")
+    return row
 
 @app.get("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Obtener núcleo agrario por ID", response_model=schemas.NucleoAgrarioResponse)
 def get_nucleo_by_id(id_nucleo: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
+    row = db.query(
+        models.NucleoAgrario.id_nucleo,
+        models.NucleoAgrario.id_municipio,
+        models.NucleoAgrario.nombre_nucleo,
+        models.NucleoAgrario.tipo_nucleo,
+        models.NucleoAgrario.comunidad_indigena,
+        models.NucleoAgrario.residencia,
+        models.NucleoAgrario.geometria_poligono.ST_AsText().label('geometria_wkt'),
+        models.NucleoAgrario.fecha_creacion,
+        models.NucleoAgrario.activo,
+        models.NucleoAgrario.fecha_baja,
+        models.NucleoAgrario.id_usuario_baja,
+        models.NucleoAgrario.motivo_baja,
+        models.NucleoAgrario.fecha_reactivacion,
+        models.NucleoAgrario.id_usuario_reactivacion,
+        models.NucleoAgrario.motivo_reactivacion,
+        models.NucleoAgrario.observaciones
+    ).filter(models.NucleoAgrario.id_nucleo == id_nucleo, models.NucleoAgrario.activo == True).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="NucleoAgrario not found")
+    return row
 
 @app.get("/api/afectaciones/{id_afectacion}", tags=["Afectaciones"], summary="Obtener afectación por ID", response_model=schemas.AfectacionResponse)
 def get_afectacion_by_id(id_afectacion: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
+    row = db.query(
+        models.Afectacion.id_afectacion,
+        models.Afectacion.id_nucleo,
+        models.Afectacion.id_tramo_nucleo,
+        models.Afectacion.id_parcela,
+        models.Afectacion.tipo_afectacion,
+        models.Afectacion.tipo_tenencia,
+        models.Afectacion.subtipo_tenencia,
+        models.Afectacion.destino_superficie,
+        models.Afectacion.no_parcela_solar,
+        models.Afectacion.superficie_afectada_ha,
+        models.Afectacion.geometria_afectacion.ST_AsText().label('geometria_wkt'),
+        models.Afectacion.num_personas_afectadas,
+        models.Afectacion.situacion_juridica,
+        models.Afectacion.documentacion_disponible,
+        models.Afectacion.documentacion_faltante,
+        models.Afectacion.origen_registro,
+        models.Afectacion.activo,
+        models.Afectacion.fecha_baja,
+        models.Afectacion.id_usuario_baja,
+        models.Afectacion.motivo_baja,
+        models.Afectacion.fecha_reactivacion,
+        models.Afectacion.id_usuario_reactivacion,
+        models.Afectacion.motivo_reactivacion,
+        models.Afectacion.observaciones
+    ).filter(models.Afectacion.id_afectacion == id_afectacion, models.Afectacion.activo == True).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Afectacion not found")
+    return row
 
 @app.get("/api/asambleas/{id_asamblea}", tags=["Asambleas"], summary="Obtener asamblea por ID", response_model=schemas.AsambleaResponse)
 def get_asamblea_by_id(id_asamblea: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
