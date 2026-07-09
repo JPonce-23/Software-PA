@@ -199,7 +199,7 @@ def delete_frente(id_frente: int, motivo: str = Query(...), db: Session = Depend
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== NUCLEOS AGRARIOS ==================== #
-@app.get("/api/nucleos", tags=["Nucleos Agrarios"], summary="Listar nucleos agrarios")
+@app.get("/api/nucleos", tags=["Núcleos Agrarios"], summary="Listar núcleos agrarios")
 def get_nucleos(tramo: str = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     import random
     from sqlalchemy import text
@@ -272,7 +272,7 @@ def get_tramo_detalles(tramo: str = Query(...), db: Session = Depends(get_db), c
         "geometria_wkt": r.geometria_wkt,
         "longitud_km": round(r.longitud_km, 2) if r.longitud_km else 0
     }
-@app.post("/api/nucleos", tags=["Nucleos Agrarios"], summary="Crear nucleo agrario", response_model=schemas.NucleoAgrarioResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/api/nucleos", tags=["Núcleos Agrarios"], summary="Crear núcleo agrario", response_model=schemas.NucleoAgrarioResponse, status_code=status.HTTP_201_CREATED)
 def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
     data = nucleo.model_dump()
@@ -289,7 +289,7 @@ def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get
     )
     return resp
 
-@app.put("/api/nucleos/{id_nucleo}", tags=["Nucleos Agrarios"], summary="Actualizar nucleo agrario", response_model=schemas.NucleoAgrarioResponse)
+@app.put("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Actualizar núcleo agrario", response_model=schemas.NucleoAgrarioResponse)
 def update_nucleo(id_nucleo: int, data: schemas.NucleoAgrarioUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
     db_nucleo = update_entity(db, entity, data, current_user.id_usuario)
@@ -299,7 +299,7 @@ def update_nucleo(id_nucleo: int, data: schemas.NucleoAgrarioUpdate, db: Session
     )
     return resp
 
-@app.delete("/api/nucleos/{id_nucleo}", tags=["Nucleos Agrarios"], summary="Eliminar nucleo agrario")
+@app.delete("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Eliminar núcleo agrario")
 def delete_nucleo(id_nucleo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
