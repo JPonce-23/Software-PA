@@ -136,11 +136,19 @@ CREATE TABLE bitacora (
 );
 
 CREATE TABLE usuario_frente (
+    id_usuario_frente SERIAL PRIMARY KEY,
     id_usuario INTEGER NOT NULL REFERENCES usuario(id_usuario),
     id_frente INTEGER NOT NULL REFERENCES frente(id_frente),
     fecha_asignacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
-    PRIMARY KEY (id_usuario, id_frente)
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
+    observaciones TEXT,
+    CONSTRAINT uq_usuario_frente UNIQUE (id_usuario, id_frente)
 );
 
 
@@ -466,14 +474,24 @@ CREATE TABLE alertas (
     motivo_baja TEXT,
     fecha_reactivacion TIMESTAMPTZ,
     id_usuario_reactivacion INTEGER,
-    motivo_reactivacion TEXT
+    motivo_reactivacion TEXT,
+    observaciones TEXT
 );
 
 CREATE TABLE alertas_vistas (
-    id_alerta INTEGER NOT NULL REFERENCES alertas(id_alerta) ON DELETE CASCADE,
-    id_usuario INTEGER NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+    id_alerta_vista SERIAL PRIMARY KEY,
+    id_alerta INTEGER NOT NULL REFERENCES alertas(id_alerta),
+    id_usuario INTEGER NOT NULL REFERENCES usuario(id_usuario),
     fecha_vista TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (id_alerta, id_usuario)
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
+    observaciones TEXT,
+    CONSTRAINT uq_alertas_vistas UNIQUE (id_alerta, id_usuario)
 );
 
 -- Validación de referencias dinámicas de documentación soporte
@@ -794,6 +812,9 @@ DECLARE
     current_user_id TEXT;
     pk_column TEXT;
     entidad_pk BIGINT;
+    v_row_data JSONB;
+    v_id_nucleo BIGINT := NULL;
+    v_id_tramo_nucleo BIGINT := NULL;
 BEGIN
     current_user_id := current_setting('app.current_user_id', true);
     IF current_user_id IS NULL OR current_user_id = '' THEN
@@ -805,15 +826,32 @@ BEGIN
         RAISE EXCEPTION 'Auditoría fallida: el trigger debe indicar la columna PK en TG_ARGV[0]';
     END IF;
 
+    -- Extraemos el JSON base dependiendo de la operación
+    IF TG_OP = 'UPDATE' OR TG_OP = 'INSERT' THEN
+        v_row_data := to_jsonb(NEW);
+    ELSIF TG_OP = 'DELETE' THEN
+        v_row_data := to_jsonb(OLD);
+    END IF;
+
+    -- Búsqueda dinámica de las referencias para facilitar el filtrado cruzado en la bitácora
+    BEGIN
+        v_id_nucleo := (v_row_data ->> 'id_nucleo')::BIGINT;
+    EXCEPTION WHEN OTHERS THEN v_id_nucleo := NULL; END;
+    
+    BEGIN
+        v_id_tramo_nucleo := (v_row_data ->> 'id_tramo_nucleo')::BIGINT;
+    EXCEPTION WHEN OTHERS THEN v_id_tramo_nucleo := NULL; END;
+
+    -- Inserciones usando las variables dinámicas
     IF TG_OP = 'INSERT' THEN
-        entidad_pk := (to_jsonb(NEW) ->> pk_column)::BIGINT;
-        INSERT INTO bitacora (id_usuario, entidad_tipo, entidad_id, accion, valor_nuevo)
-        VALUES (current_user_id::INTEGER, TG_TABLE_NAME, entidad_pk, 'insert', row_to_json(NEW));
+        entidad_pk := (v_row_data ->> pk_column)::BIGINT;
+        INSERT INTO bitacora (id_usuario, id_nucleo, id_tramo_nucleo, entidad_tipo, entidad_id, accion, valor_nuevo)
+        VALUES (current_user_id::INTEGER, v_id_nucleo, v_id_tramo_nucleo, TG_TABLE_NAME, entidad_pk, 'insert', v_row_data);
         RETURN NEW;
     ELSIF TG_OP = 'UPDATE' THEN
-        entidad_pk := (to_jsonb(NEW) ->> pk_column)::BIGINT;
-        INSERT INTO bitacora (id_usuario, entidad_tipo, entidad_id, accion, valor_anterior, valor_nuevo)
-        VALUES (current_user_id::INTEGER, TG_TABLE_NAME, entidad_pk, 'update', row_to_json(OLD), row_to_json(NEW));
+        entidad_pk := (v_row_data ->> pk_column)::BIGINT;
+        INSERT INTO bitacora (id_usuario, id_nucleo, id_tramo_nucleo, entidad_tipo, entidad_id, accion, valor_anterior, valor_nuevo)
+        VALUES (current_user_id::INTEGER, v_id_nucleo, v_id_tramo_nucleo, TG_TABLE_NAME, entidad_pk, 'update', row_to_json(OLD), v_row_data);
         RETURN NEW;
     END IF;
     RETURN NULL;
@@ -1008,6 +1046,28 @@ CREATE TRIGGER trg_prevent_delete_alertas
     FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
 CREATE TRIGGER trg_baja_logica_alertas
     BEFORE UPDATE OF activo ON alertas
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- usuario_frente
+CREATE TRIGGER trg_audit_usuario_frente
+    AFTER INSERT OR UPDATE ON usuario_frente
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_usuario_frente');
+CREATE TRIGGER trg_prevent_delete_usuario_frente
+    BEFORE DELETE ON usuario_frente
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_usuario_frente
+    BEFORE UPDATE OF activo ON usuario_frente
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- alertas_vistas
+CREATE TRIGGER trg_audit_alertas_vistas
+    AFTER INSERT OR UPDATE ON alertas_vistas
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_alerta_vista');
+CREATE TRIGGER trg_prevent_delete_alertas_vistas
+    BEFORE DELETE ON alertas_vistas
+    FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
+CREATE TRIGGER trg_baja_logica_alertas_vistas
+    BEFORE UPDATE OF activo ON alertas_vistas
     FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
 
 -- =============================================================
