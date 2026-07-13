@@ -200,7 +200,7 @@ class Asamblea(Base, AuditableMixin):
 
 class Convenio(Base, AuditableMixin):
     __tablename__ = "convenio"
-    __table_args__ = (CheckConstraint("tipo_afectacion IN ('colectivo', 'individual')", name='chk_convenio_tipo_afectacion'), CheckConstraint("tipo_convenio IN ('ocupacion_previa', 'modificatorio', 'superficie_adicional', 'obras_complementarias', 'ampliacion', 'ampliacion_remanentes')", name='chk_tipo_convenio'),)
+    __table_args__ = (CheckConstraint("tipo_afectacion IN ('colectivo', 'individual')", name='chk_convenio_tipo_afectacion'), CheckConstraint("tipo_convenio IN ('cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias', 'ampliacion', 'ampliacion_remanente')", name='chk_tipo_convenio'),)
     id_convenio = Column(Integer, primary_key=True, index=True)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
     id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"), nullable=False)
@@ -258,7 +258,7 @@ class DocumentacionSoporte(Base, AuditableMixin):
     activo = Column(Boolean, default=True, nullable=False)
     fecha_carga = Column(DateTime(timezone=True), nullable=False)
 
-class Alertas(Base):
+class Alertas(Base, AuditableMixin):
     __tablename__ = "alertas"
     id_alerta = Column(Integer, primary_key=True, index=True)
     tipo = Column(String(50), nullable=False)
