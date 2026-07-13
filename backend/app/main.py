@@ -65,7 +65,12 @@ def validate_wkt(db: Session, wkt: str):
         raise HTTPException(status_code=400, detail="Geometría WKT inválida topológicamente (ej. cruces, puntos duplicados).")
 
 def set_audit_context(db: Session, user_id: int):
-    db.execute(text(f"SET LOCAL app.current_user_id = '{user_id}'"))
+    """Inyecta el ID de usuario en la sesión PostgreSQL para auditoría forense (DA-10).
+    Usa parámetros bind para prevenir inyección SQL."""
+    db.execute(
+        text("SET LOCAL \"app.current_user_id\" = :id"),
+        {"id": str(user_id)}
+    )
 
 # ==================== UTILIDAD GENÉRICA CRUD ==================== #
 def get_entity_by_id(db: Session, model: Type[Any], entity_id: int, id_column: str):
@@ -95,11 +100,17 @@ def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
     return entity
 
 def soft_delete_entity(db: Session, entity: Any, user_id: int, motivo: str = "Baja desde API"):
+    """Baja lógica con validación estricta de motivo (DA-9)."""
+    if not motivo or not motivo.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El campo 'motivo' es obligatorio y no puede estar vacío (DA-9)."
+        )
     set_audit_context(db, user_id)
     entity.activo = False
     entity.fecha_baja = datetime.now(timezone.utc)
     entity.id_usuario_baja = user_id
-    entity.motivo_baja = motivo
+    entity.motivo_baja = motivo.strip()
     db.commit()
     return {"status": "success", "message": "Registro eliminado lógicamente"}
 
@@ -201,7 +212,6 @@ def delete_frente(id_frente: int, motivo: str = Query(...), db: Session = Depend
 # ==================== NUCLEOS AGRARIOS ==================== #
 @app.get("/api/nucleos", tags=["Núcleos Agrarios"], summary="Listar núcleos agrarios")
 def get_nucleos(tramo: str = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    import random
     from sqlalchemy import text
     
     base_sql = """
@@ -231,8 +241,9 @@ def get_nucleos(tramo: str = Query(None), db: Session = Depends(get_db), current
     
     response = []
     for r in result:
-        random.seed(r.id_nucleo)
-        estatus = random.choices(['liberado', 'en_proceso', 'problema'], weights=[0.6, 0.2, 0.2])[0]
+        # TODO: Para producción, el estatus debe calcularse a partir de la existencia 
+        # de convenios inscritos en RAN (Req. 11, vista vw_dashboard_liberacion).
+        estatus = 'en_proceso'
         
         response.append({
             "id_nucleo": r.id_nucleo,
@@ -984,14 +995,20 @@ def get_bitacora(skip: int = 0, limit: int = 100, db: Session = Depends(get_db),
 # ==================== ASIGNACIÓN USUARIO-FRENTE ==================== #
 @app.post("/api/frentes/{id_frente}/asignar-usuario", tags=["Frentes"], summary="Asignar usuario a frente", response_model=schemas.UsuarioFrenteResponse)
 def asignar_usuario_frente(id_frente: int, data: schemas.UsuarioFrenteCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+    set_audit_context(db, current_user.id_usuario)
     exists = db.query(models.UsuarioFrente).filter_by(id_frente=id_frente, id_usuario=data.id_usuario).first()
     if exists:
         if not exists.activo:
             exists.activo = True
+            exists.fecha_asignacion = datetime.now(timezone.utc)
             db.commit()
             db.refresh(exists)
         return exists
-    nuevo = models.UsuarioFrente(id_frente=id_frente, id_usuario=data.id_usuario)
+    nuevo = models.UsuarioFrente(
+        id_frente=id_frente, 
+        id_usuario=data.id_usuario,
+        fecha_asignacion=datetime.now(timezone.utc)
+    )
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
@@ -999,6 +1016,7 @@ def asignar_usuario_frente(id_frente: int, data: schemas.UsuarioFrenteCreate, db
 
 @app.delete("/api/frentes/{id_frente}/remover-usuario/{id_usuario}", tags=["Frentes"], summary="Quitar a usuario de frente")
 def remover_usuario_frente(id_frente: int, id_usuario: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+    set_audit_context(db, current_user.id_usuario)
     exists = db.query(models.UsuarioFrente).filter_by(id_frente=id_frente, id_usuario=id_usuario).first()
     if not exists:
         raise HTTPException(status_code=404, detail="Asignación no encontrada.")
@@ -1009,10 +1027,15 @@ def remover_usuario_frente(id_frente: int, id_usuario: int, db: Session = Depend
 # ==================== ALERTAS VISTAS ==================== #
 @app.post("/api/alertas/{id_alerta}/marcar-leida", tags=["Alertas"], summary="Marcar alerta como leída")
 def marcar_alerta_leida(id_alerta: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    set_audit_context(db, current_user.id_usuario)
     alerta = get_entity_by_id(db, models.Alertas, id_alerta, "id_alerta")
     vista = db.query(models.AlertasVistas).filter_by(id_alerta=id_alerta, id_usuario=current_user.id_usuario).first()
     if not vista:
-        nueva_vista = models.AlertasVistas(id_alerta=id_alerta, id_usuario=current_user.id_usuario)
+        nueva_vista = models.AlertasVistas(
+            id_alerta=id_alerta, 
+            id_usuario=current_user.id_usuario,
+            fecha_vista=datetime.now(timezone.utc)
+        )
         db.add(nueva_vista)
         db.commit()
     return {"status": "success", "detail": "Alerta marcada como leída."}
