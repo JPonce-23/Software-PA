@@ -225,6 +225,7 @@ class AfectacionCreate(AuditableCreate):
     geometria_wkt: Optional[str] = None
 
 class AfectacionUpdate(AuditableUpdate):
+    geometria_wkt: Optional[str] = None
     tipo_tenencia: Optional[str] = None
     subtipo_tenencia: Optional[str] = None
     destino_superficie: Optional[str] = None
@@ -263,6 +264,11 @@ class AsambleaCreate(AuditableCreate):
     documentacion_faltante: Optional[str] = None
 
 class AsambleaUpdate(AuditableUpdate):
+    fecha_exp_1a: Optional[date] = None
+    fecha_prog_1a: Optional[date] = None
+    fecha_exp_2a: Optional[date] = None
+    fecha_prog_2a: Optional[date] = None
+    fecha_realizada: Optional[date] = None
     resultado_anuencia: Optional[Literal['otorgada', 'negada', 'pendiente', 'no_aplica']] = None
     estatus_asamblea: Optional[Literal['programado', 'pendiente', 'completo']] = None
     ingreso_ran_fecha: Optional[date] = None
@@ -307,6 +313,12 @@ class ConvenioUpdate(AuditableUpdate):
 class ConvenioResponse(ConvenioCreate):
     id_convenio: int
     fecha_firma: Optional[date] = None
+    ingreso_ran_fecha: Optional[date] = None
+    numero_solicitud_ingreso: Optional[str] = None
+    calificacion_registral: Optional[str] = None
+    convenio_inscrito_fecha_ran: Optional[date] = None
+    documentacion_disponible: Optional[bool] = None
+    documentacion_faltante: Optional[str] = None
     activo: bool
     class Config:
         from_attributes = True
@@ -324,10 +336,18 @@ class OrvCreate(AuditableCreate):
     acta_eleccion_inscrita_ran: Optional[bool] = False
 
 class OrvUpdate(AuditableUpdate):
+    numero_orv: Optional[str] = None
     inicio_vigencia: Optional[date] = None
     fin_vigencia: Optional[date] = None
     comisariado_presidente: Optional[str] = None
+    comisariado_secretario: Optional[str] = None
+    comisariado_tesorero: Optional[str] = None
+    consejo_vigilancia_presidente: Optional[str] = None
+    consejo_vigilancia_secretario1: Optional[str] = None
+    consejo_vigilancia_secretario2: Optional[str] = None
     acta_eleccion_inscrita_ran: Optional[bool] = None
+    documentacion_disponible: Optional[bool] = None
+    documentacion_faltante: Optional[str] = None
 
 class OrvResponse(OrvCreate):
     id_orv: int
@@ -390,6 +410,15 @@ class TramiteFifonafeUpdate(AuditableUpdate):
 
 class TramiteFifonafeResponse(TramiteFifonafeCreate):
     id_tramite_fifonafe: int
+    hay_conflictos: Optional[bool] = None
+    no_oficio_fifonafe_a_dgaopr: Optional[str] = None
+    no_oficio_dgaopr_a_repr: Optional[str] = None
+    no_oficio_rpta_repr_a_dgaopr: Optional[str] = None
+    no_oficio_rpta_dgaopr_a_fifonafe: Optional[str] = None
+    fecha_oficio_fifonafe_a_dgaopr: Optional[date] = None
+    fecha_oficio_dgaopr_a_repr: Optional[date] = None
+    fecha_oficio_rpta_repr_a_dgaopr: Optional[date] = None
+    fecha_oficio_rpta_dgaopr_a_fifonafe: Optional[date] = None
     activo: bool
     class Config:
         from_attributes = True
@@ -414,7 +443,7 @@ class DocumentacionSoporteResponse(DocumentacionSoporteCreate):
 
 # --- Para Alertas ---
 class AlertaCreate(BaseModel):
-    tipo: Literal['tramite', 'campo', 'legal', 'sistema']
+    tipo: Literal['vencimiento_orv', 'evento_proximo', 'documento_faltante']
     prioridad: Literal['alta', 'media', 'baja']
     titulo: str
     descripcion: Optional[str] = None
