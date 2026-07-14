@@ -42,6 +42,7 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - DB_NAME=db_trenes
+      - SECRET_KEY=clavesecretamuysegura_para_el_sistema_pa
       - CORS_ORIGINS=http://localhost:5173
     depends_on:
       - db
