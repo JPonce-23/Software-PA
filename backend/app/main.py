@@ -476,9 +476,28 @@ def list_afectaciones(skip: int = 0, limit: int = 100, id_tramo_nucleo: int = Qu
 def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
     
-    # B9: Individual requiere parcela
-    if afectacion.tipo_afectacion == 'individual' and not afectacion.id_parcela:
-        raise HTTPException(status_code=400, detail="Una afectación individual requiere id_parcela")
+    # Validación de integridad: TramoNucleo debe existir y pertenecer al NucleoAgrario indicado
+    tramo_nucleo_db = db.query(models.TramoNucleo).filter(
+        models.TramoNucleo.id_tramo_nucleo == afectacion.id_tramo_nucleo,
+        models.TramoNucleo.activo == True
+    ).first()
+    if not tramo_nucleo_db:
+        raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
+    if tramo_nucleo_db.id_nucleo != afectacion.id_nucleo:
+        raise HTTPException(status_code=400, detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.")
+    
+    # Validación: Individual requiere parcela y la parcela debe pertenecer al mismo núcleo
+    if afectacion.tipo_afectacion == 'individual':
+        if not afectacion.id_parcela:
+            raise HTTPException(status_code=400, detail="Una afectación individual requiere id_parcela")
+        parcela_db = db.query(models.Parcela).filter(
+            models.Parcela.id_parcela == afectacion.id_parcela,
+            models.Parcela.activo == True
+        ).first()
+        if not parcela_db:
+            raise HTTPException(status_code=404, detail="La Parcela especificada no existe.")
+        if parcela_db.id_nucleo != afectacion.id_nucleo:
+            raise HTTPException(status_code=400, detail="Inconsistencia: La Parcela no pertenece al NucleoAgrario especificado.")
         
     data = afectacion.model_dump()
     wkt = data.pop("geometria_wkt", None)
@@ -526,6 +545,17 @@ def list_asambleas(id_tramo_nucleo: int = Query(None), db: Session = Depends(get
 @app.post("/api/asambleas", tags=["Asambleas"], summary="Crear asamblea", response_model=schemas.AsambleaResponse, status_code=status.HTTP_201_CREATED)
 def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
+    
+    # Validación de integridad: TramoNucleo debe existir y pertenecer al NucleoAgrario indicado
+    tramo_nucleo_db = db.query(models.TramoNucleo).filter(
+        models.TramoNucleo.id_tramo_nucleo == asamblea.id_tramo_nucleo,
+        models.TramoNucleo.activo == True
+    ).first()
+    if not tramo_nucleo_db:
+        raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
+    if tramo_nucleo_db.id_nucleo != asamblea.id_nucleo:
+        raise HTTPException(status_code=400, detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.")
+    
     db_asamblea = models.Asamblea(**asamblea.model_dump())
     db.add(db_asamblea)
     db.commit()
@@ -562,6 +592,24 @@ def list_convenios(
 @app.post("/api/convenios", tags=["Convenios"], summary="Crear convenio", response_model=schemas.ConvenioResponse, status_code=status.HTTP_201_CREATED)
 def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
+    
+    # Validación de integridad: TramoNucleo debe existir
+    tramo_nucleo_db = db.query(models.TramoNucleo).filter(
+        models.TramoNucleo.id_tramo_nucleo == convenio.id_tramo_nucleo,
+        models.TramoNucleo.activo == True
+    ).first()
+    if not tramo_nucleo_db:
+        raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
+    
+    # Validación de integridad: La Afectación debe existir y pertenecer al mismo TramoNucleo
+    afectacion_db = db.query(models.Afectacion).filter(
+        models.Afectacion.id_afectacion == convenio.id_afectacion,
+        models.Afectacion.activo == True
+    ).first()
+    if not afectacion_db:
+        raise HTTPException(status_code=404, detail="La Afectación especificada no existe.")
+    if afectacion_db.id_tramo_nucleo != convenio.id_tramo_nucleo:
+        raise HTTPException(status_code=400, detail="Inconsistencia: La Afectación no pertenece al TramoNucleo especificado.")
     
     # B6 / B7: Asamblea constraint
     if convenio.tipo_afectacion == 'colectivo' and not convenio.id_asamblea_autorizacion:
@@ -680,6 +728,15 @@ def list_actividades(id_tramo_nucleo: int = Query(None), tipo_actividad: str = Q
 @app.post("/api/actividades-campo", tags=["Actividades de Campo"], summary="Crear actividad de campo", response_model=schemas.ActividadCampoResponse, status_code=status.HTTP_201_CREATED)
 def create_actividad(act: schemas.ActividadCampoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
+    
+    # Validación de integridad: TramoNucleo debe existir
+    tramo_nucleo_db = db.query(models.TramoNucleo).filter(
+        models.TramoNucleo.id_tramo_nucleo == act.id_tramo_nucleo,
+        models.TramoNucleo.activo == True
+    ).first()
+    if not tramo_nucleo_db:
+        raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
+    
     db_act = models.ActividadCampo(**act.model_dump())
     db_act.fecha_registro = datetime.now()
     db.add(db_act)
