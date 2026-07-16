@@ -4,9 +4,9 @@ import api from '../api/axios';
 
 const TIPOS_PARCELA = ['individual', 'copropiedad'];
 
-export default function FormAfectacionIndividual({ idNucleo, idTramoNucleo, onSuccess, onClose }) {
-  // Modo: 'buscar' o 'nuevo'
-  const [modoTitular, setModoTitular] = useState('buscar');
+export default function FormAfectacionIndividual({ idNucleo, idTramoNucleo, initialData = null, onSuccess, onClose }) {
+  // Modo: 'buscar', 'nuevo', o 'editar_afectacion'
+  const [modoTitular, setModoTitular] = useState(initialData ? 'editar_afectacion' : 'buscar');
 
   // Estado búsqueda de titular existente
   const [busqueda, setBusqueda] = useState('');
@@ -28,13 +28,13 @@ export default function FormAfectacionIndividual({ idNucleo, idTramoNucleo, onSu
 
   // Datos de la Afectación
   const [afectacion, setAfectacion] = useState({
-    tipo_tenencia: 'Parcelada',
-    subtipo_tenencia: '',
-    no_parcela_solar: '',
-    superficie_afectada_ha: '',
-    situacion_juridica: '',
-    documentacion_disponible: false,
-    documentacion_faltante: '',
+    tipo_tenencia: initialData?.tipo_tenencia || 'Parcelada',
+    subtipo_tenencia: initialData?.subtipo_tenencia || '',
+    no_parcela_solar: initialData?.no_parcela_solar || '',
+    superficie_afectada_ha: initialData?.superficie_afectada_ha || '',
+    situacion_juridica: initialData?.situacion_juridica || '',
+    documentacion_disponible: initialData?.documentacion_disponible || false,
+    documentacion_faltante: initialData?.documentacion_faltante || '',
   });
 
   const [guardando, setGuardando] = useState(false);
@@ -122,7 +122,12 @@ export default function FormAfectacionIndividual({ idNucleo, idTramoNucleo, onSu
         documentacion_faltante: afectacion.documentacion_faltante || null,
         origen_registro: 'captura_sistema',
       };
-      await api.post('/afectaciones', afectacion_payload);
+      if (initialData) {
+        // Solo actualizamos la afectación
+        await api.put(`/afectaciones/${initialData.id_afectacion}`, afectacion_payload);
+      } else {
+        await api.post('/afectaciones', afectacion_payload);
+      }
 
       setExito(true);
       setTimeout(() => {
@@ -138,7 +143,11 @@ export default function FormAfectacionIndividual({ idNucleo, idTramoNucleo, onSu
   };
 
   return (
-    <ModalWrapper titulo="Nueva Afectación Individual" subtitulo="Derechos Parcelarios" onClose={onClose} color="#d97706">
+    <ModalWrapper 
+      titulo={initialData ? "Editar Afectación Individual" : "Nueva Afectación Individual"} 
+      subtitulo="Derechos Parcelarios" 
+      onClose={onClose} color="#d97706"
+    >
       {exito ? (
         <div style={{ textAlign: 'center', padding: '40px 20px' }}>
           <CheckCircle2 size={48} color="#16a34a" style={{ display: 'block', margin: '0 auto 12px auto' }} />
@@ -159,21 +168,34 @@ export default function FormAfectacionIndividual({ idNucleo, idTramoNucleo, onSu
           <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0' }}>
             <SeccionHeader icono={<User size={16} />} titulo="Sección 1 — Datos del Titular" />
 
-            {/* Selector de modo */}
-            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-              <ModoBtn
-                activo={modoTitular === 'buscar'}
-                icono={<Search size={15} />}
-                label="Buscar titular existente"
-                onClick={() => { setModoTitular('buscar'); setParcelaSeleccionada(null); }}
-              />
-              <ModoBtn
-                activo={modoTitular === 'nuevo'}
-                icono={<UserPlus size={15} />}
-                label="Registrar nuevo titular"
-                onClick={() => { setModoTitular('nuevo'); setParcelaSeleccionada(null); setBusqueda(''); }}
-              />
-            </div>
+            {/* Selector de modo (oculto en modo edición) */}
+            {!initialData && (
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <ModoBtn
+                  activo={modoTitular === 'buscar'}
+                  icono={<Search size={15} />}
+                  label="Buscar titular existente"
+                  onClick={() => { setModoTitular('buscar'); setParcelaSeleccionada(null); }}
+                />
+                <ModoBtn
+                  activo={modoTitular === 'nuevo'}
+                  icono={<UserPlus size={15} />}
+                  label="Registrar nuevo titular"
+                  onClick={() => { setModoTitular('nuevo'); setParcelaSeleccionada(null); setBusqueda(''); }}
+                />
+              </div>
+            )}
+
+            {/* ── Modo edición (solo lectura del ID de parcela) ── */}
+            {modoTitular === 'editar_afectacion' && (
+              <div style={{ marginTop: '16px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px 16px' }}>
+                <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 4px 0' }}>Titular vinculado a esta afectación</p>
+                <p style={{ fontSize: '14px', color: '#1e293b', margin: 0, fontWeight: '500' }}>
+                  ID de Parcela: #{initialData.id_parcela}
+                </p>
+                <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 0 0' }}>La edición de datos personales del titular debe realizarse desde su propio registro.</p>
+              </div>
+            )}
 
             {/* ── Modo búsqueda ── */}
             {modoTitular === 'buscar' && (
@@ -306,7 +328,7 @@ export default function FormAfectacionIndividual({ idNucleo, idTramoNucleo, onSu
             <div style={{ display: 'flex', gap: '12px' }}>
               <button type="button" onClick={onClose} style={btnSecundario} disabled={guardando}>Cancelar</button>
               <button type="submit" style={{ ...btnPrimario, background: '#d97706' }} disabled={guardando}>
-                {guardando ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : 'Guardar Afectación Individual'}
+                {guardando ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : initialData ? 'Guardar Cambios' : 'Guardar Afectación Individual'}
               </button>
             </div>
           </div>

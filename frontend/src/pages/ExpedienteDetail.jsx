@@ -8,6 +8,8 @@ import api from '../api/axios';
 import { AuthContext } from '../contexts/AuthContext';
 import FormAfectacionColectiva from './FormAfectacionColectiva';
 import FormAfectacionIndividual from './FormAfectacionIndividual';
+import FormAsamblea from './FormAsamblea';
+import FormConvenio from './FormConvenio';
 
 const TABS = [
   { key: 'general',     label: 'Información General',       icon: Building2 },
@@ -25,11 +27,15 @@ export default function ExpedienteDetail() {
   const [nucleo, setNucleo]               = useState(null);
   const [afectaciones, setAfectaciones]   = useState([]);
   const [asambleas, setAsambleas]         = useState([]);
+  const [convenios, setConvenios]         = useState([]);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState(null);
   const [tabActiva, setTabActiva]         = useState('general');
   const [modalColectiva, setModalColectiva]   = useState(false);
   const [modalIndividual, setModalIndividual] = useState(false);
+  const [modalAsamblea, setModalAsamblea]     = useState(false);
+  // modalConvenio guardará el objeto 'afectacion' que fue seleccionado para crearle el convenio
+  const [modalConvenio, setModalConvenio]     = useState(null);
 
   // Función para refrescar solo las afectaciones (se llama tras guardar un formulario)
   const refrescarAfectaciones = useCallback(async () => {
@@ -38,6 +44,24 @@ export default function ExpedienteDetail() {
       setAfectaciones(res.data);
     } catch (err) {
       console.error('Error al refrescar afectaciones', err);
+    }
+  }, [id_tramo_nucleo]);
+
+  const refrescarAsambleas = useCallback(async () => {
+    try {
+      const res = await api.get(`/asambleas?id_tramo_nucleo=${id_tramo_nucleo}`);
+      setAsambleas(res.data);
+    } catch (err) {
+      console.error('Error al refrescar asambleas', err);
+    }
+  }, [id_tramo_nucleo]);
+
+  const refrescarConvenios = useCallback(async () => {
+    try {
+      const res = await api.get(`/convenios?id_tramo_nucleo=${id_tramo_nucleo}`);
+      setConvenios(res.data);
+    } catch (err) {
+      console.error('Error al refrescar convenios', err);
     }
   }, [id_tramo_nucleo]);
 
@@ -50,12 +74,14 @@ export default function ExpedienteDetail() {
         const nRes = await api.get(`/nucleos/${tnRes.data.id_nucleo}`);
         setNucleo(nRes.data);
 
-        const [afRes, asRes] = await Promise.all([
+        const [afRes, asRes, convRes] = await Promise.all([
           api.get(`/afectaciones?id_tramo_nucleo=${id_tramo_nucleo}`),
           api.get(`/asambleas?id_tramo_nucleo=${id_tramo_nucleo}`),
+          api.get(`/convenios?id_tramo_nucleo=${id_tramo_nucleo}`),
         ]);
         setAfectaciones(afRes.data);
         setAsambleas(asRes.data);
+        setConvenios(convRes.data);
       } catch (err) {
         setError('No se pudo cargar el expediente. Verifique la conexión.');
         console.error(err);
@@ -154,15 +180,16 @@ export default function ExpedienteDetail() {
 
         <div style={{ padding: '30px' }}>
           {tabActiva === 'general'      && <TabGeneral tramoNucleo={tramoNucleo} nucleo={nucleo} />}
-          {tabActiva === 'colectivas'   && <TabAfectaciones tipo="colectivo" items={colectivas} user={user} onNueva={() => setModalColectiva(true)} />}
-          {tabActiva === 'individuales' && <TabAfectaciones tipo="individual" items={individuales} user={user} onNueva={() => setModalIndividual(true)} />}
-          {tabActiva === 'asambleas'    && <TabAsambleas items={asambleas} />}
+          {tabActiva === 'colectivas'   && <TabAfectaciones tipo="colectivo" items={colectivas} convenios={convenios} user={user} onNueva={() => setModalColectiva(true)} onEditar={setModalColectiva} onCrearConvenio={setModalConvenio} />}
+          {tabActiva === 'individuales' && <TabAfectaciones tipo="individual" items={individuales} convenios={convenios} user={user} onNueva={() => setModalIndividual(true)} onEditar={setModalIndividual} onCrearConvenio={setModalConvenio} />}
+          {tabActiva === 'asambleas'    && <TabAsambleas items={asambleas} user={user} onNueva={() => setModalAsamblea(true)} onEditar={setModalAsamblea} />}
 
           {/* Modales de captura */}
           {modalColectiva && tramoNucleo && (
             <FormAfectacionColectiva
               idNucleo={tramoNucleo.id_nucleo}
               idTramoNucleo={Number(id_tramo_nucleo)}
+              initialData={typeof modalColectiva === 'object' ? modalColectiva : null}
               onSuccess={refrescarAfectaciones}
               onClose={() => setModalColectiva(false)}
             />
@@ -171,8 +198,30 @@ export default function ExpedienteDetail() {
             <FormAfectacionIndividual
               idNucleo={tramoNucleo.id_nucleo}
               idTramoNucleo={Number(id_tramo_nucleo)}
+              initialData={typeof modalIndividual === 'object' ? modalIndividual : null}
               onSuccess={refrescarAfectaciones}
               onClose={() => setModalIndividual(false)}
+            />
+          )}
+          {modalAsamblea && tramoNucleo && (
+            <FormAsamblea
+              idNucleo={tramoNucleo.id_nucleo}
+              idTramoNucleo={Number(id_tramo_nucleo)}
+              initialData={typeof modalAsamblea === 'object' ? modalAsamblea : null}
+              onSuccess={refrescarAsambleas}
+              onClose={() => setModalAsamblea(false)}
+            />
+          )}
+          {modalConvenio && tramoNucleo && (
+            <FormConvenio
+              idTramoNucleo={Number(id_tramo_nucleo)}
+              afectacion={modalConvenio.afectacion || modalConvenio}
+              initialData={modalConvenio.isEdit ? modalConvenio.convenio : null}
+              asambleas={asambleas}
+              onSuccess={() => {
+                refrescarConvenios();
+              }}
+              onClose={() => setModalConvenio(null)}
             />
           )}
         </div>
@@ -204,7 +253,7 @@ function TabGeneral({ tramoNucleo, nucleo }) {
 }
 
 /* ────── Pestaña: Afectaciones (Colectivas o Individuales) ────── */
-function TabAfectaciones({ tipo, items, user, onNueva }) {
+function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCrearConvenio }) {
   const esColectivo = tipo === 'colectivo';
   const puedeCapturar = user?.rol && ['admin', 'operador', 'geografo'].includes(user.rol);
 
@@ -242,11 +291,15 @@ function TabAfectaciones({ tipo, items, user, onNueva }) {
               {!esColectivo && <th style={thStyle}>Parcela</th>}
               <th style={thStyle}>Superficie (Ha)</th>
               <th style={thStyle}>Situación Jurídica</th>
-              <th style={thStyle}>Documentación</th>
+              <th style={thStyle}>Convenios</th>
+              {puedeCapturar && <th style={{ ...thStyle, textAlign: 'right' }}>Acciones</th>}
             </tr>
           </thead>
           <tbody>
-            {items.map(a => (
+            {items.map(a => {
+              const convs = convenios.filter(c => c.id_afectacion === a.id_afectacion);
+              const hasConvenio = convs.length > 0;
+              return (
               <tr key={a.id_afectacion} style={{ borderBottom: '1px solid #f1f5f9' }}>
                 <td style={tdStyle}><span style={{ background: '#f1f5f9', color: '#475569', borderRadius: '6px', padding: '3px 8px', fontSize: '12px' }}>#{a.id_afectacion}</span></td>
                 <td style={tdStyle}>{a.tipo_tenencia || '—'}</td>
@@ -254,12 +307,40 @@ function TabAfectaciones({ tipo, items, user, onNueva }) {
                 <td style={tdStyle}>{a.superficie_afectada_ha ? `${a.superficie_afectada_ha} ha` : '—'}</td>
                 <td style={tdStyle}>{a.situacion_juridica || '—'}</td>
                 <td style={tdStyle}>
-                  <span style={{ background: a.documentacion_disponible ? '#dcfce7' : '#fef9c3', color: a.documentacion_disponible ? '#16a34a' : '#92400e', borderRadius: '20px', padding: '3px 10px', fontSize: '12px' }}>
-                    {a.documentacion_disponible ? 'Disponible' : 'Pendiente'}
-                  </span>
+                  {hasConvenio ? (
+                    <span style={{ background: '#ecfdf5', color: '#059669', borderRadius: '20px', padding: '4px 10px', fontSize: '12px', fontWeight: '500' }}>
+                      {convs.length} Registrado(s)
+                    </span>
+                  ) : (
+                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>Ninguno</span>
+                  )}
                 </td>
+                {puedeCapturar && (
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => onEditar(a)}
+                        style={{
+                          background: 'white', color: '#64748b', border: '1px solid #e2e8f0', 
+                          padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer',
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => hasConvenio ? onCrearConvenio({ afectacion: a, convenio: convs[0], isEdit: true }) : onCrearConvenio(a)}
+                        style={{
+                          background: 'white', color: hasConvenio ? '#0ea5e9' : '#059669', border: `1px solid ${hasConvenio ? '#0ea5e9' : '#059669'}`, 
+                          padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                        }}
+                      >
+                        {hasConvenio ? 'Editar Conv.' : '+ Convenio'}
+                      </button>
+                    </div>
+                  </td>
+                )}
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       )}
@@ -268,19 +349,32 @@ function TabAfectaciones({ tipo, items, user, onNueva }) {
 }
 
 /* ────── Pestaña: Asambleas ────── */
-function TabAsambleas({ items }) {
+function TabAsambleas({ items, user, onNueva, onEditar }) {
+  const puedeCapturar = user?.rol && ['admin', 'operador', 'geografo'].includes(user.rol);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <h3 style={{ fontSize: '16px', color: '#1e293b', fontWeight: '600' }}>
-        Asambleas
-        <span style={{ marginLeft: '10px', background: '#f1f5f9', color: '#475569', borderRadius: '20px', padding: '2px 10px', fontSize: '13px', fontWeight: '400' }}>
-          {items.length} registros
-        </span>
-      </h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3 style={{ fontSize: '16px', color: '#1e293b', fontWeight: '600' }}>
+          Asambleas
+          <span style={{ marginLeft: '10px', background: '#f1f5f9', color: '#475569', borderRadius: '20px', padding: '2px 10px', fontSize: '13px', fontWeight: '400' }}>
+            {items.length} registros
+          </span>
+        </h3>
+        {puedeCapturar && (
+          <button
+            style={{ background: '#7c3aed', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}
+            onClick={onNueva}
+          >
+            + Nueva Asamblea
+          </button>
+        )}
+      </div>
       {items.length === 0 ? (
         <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '10px', border: '2px dashed #e2e8f0' }}>
           <ClipboardList size={32} style={{ display: 'block', margin: '0 auto 10px auto', opacity: 0.4 }} />
           <p>No hay asambleas registradas para este expediente.</p>
+          {puedeCapturar && <p style={{ fontSize: '13px', marginTop: '6px' }}>Usa el botón de arriba para registrar la primera asamblea.</p>}
         </div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -291,6 +385,7 @@ function TabAsambleas({ items }) {
               <th style={thStyle}>Resultado</th>
               <th style={thStyle}>Fecha Realizada</th>
               <th style={thStyle}>Estatus</th>
+              {puedeCapturar && <th style={{ ...thStyle, textAlign: 'right' }}>Acciones</th>}
             </tr>
           </thead>
           <tbody>
@@ -305,6 +400,19 @@ function TabAsambleas({ items }) {
                     {a.estatus_asamblea || '—'}
                   </span>
                 </td>
+                {puedeCapturar && (
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <button
+                      onClick={() => onEditar(a)}
+                      style={{
+                        background: 'white', color: '#64748b', border: '1px solid #e2e8f0', 
+                        padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer',
+                      }}
+                    >
+                      Editar
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

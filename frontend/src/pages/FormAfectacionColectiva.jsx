@@ -16,20 +16,20 @@ const SUBTIPOS = [
   'sin asignar',
 ];
 
-export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, onSuccess, onClose }) {
+export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, initialData = null, onSuccess, onClose }) {
   const [guardando, setGuardando]   = useState(false);
   const [exito, setExito]           = useState(false);
   const [error, setError]           = useState(null);
   const [form, setForm] = useState({
-    tipo_tenencia: '',
-    subtipo_tenencia: '',
-    destino_superficie: '',
-    no_parcela_solar: '',
-    superficie_afectada_ha: '',
-    num_personas_afectadas: '',
-    situacion_juridica: '',
-    documentacion_disponible: false,
-    documentacion_faltante: '',
+    tipo_tenencia: initialData?.tipo_tenencia || '',
+    subtipo_tenencia: initialData?.subtipo_tenencia || '',
+    destino_superficie: initialData?.destino_superficie || '',
+    no_parcela_solar: initialData?.no_parcela_solar || '',
+    superficie_afectada_ha: initialData?.superficie_afectada_ha || '',
+    num_personas_afectadas: initialData?.num_personas_afectadas || '',
+    situacion_juridica: initialData?.situacion_juridica || '',
+    documentacion_disponible: initialData?.documentacion_disponible || false,
+    documentacion_faltante: initialData?.documentacion_faltante || '',
   });
 
   const set = (campo, valor) => setForm(prev => ({ ...prev, [campo]: valor }));
@@ -61,7 +61,11 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, onSuc
         origen_registro: 'captura_sistema',
       };
 
-      await api.post('/afectaciones', payload);
+      if (initialData) {
+        await api.put(`/afectaciones/${initialData.id_afectacion}`, payload);
+      } else {
+        await api.post('/afectaciones', payload);
+      }
       setExito(true);
       setTimeout(() => {
         onSuccess();
@@ -76,11 +80,17 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, onSuc
   };
 
   return (
-    <ModalWrapper titulo="Nueva Afectación Colectiva" subtitulo="Tierras de Uso Común" onClose={onClose} color="#0284c7">
+    <ModalWrapper 
+      titulo={initialData ? "Editar Afectación Colectiva" : "Nueva Afectación Colectiva"} 
+      subtitulo="Tierras de Uso Común" 
+      onClose={onClose} color="#0284c7"
+    >
       {exito ? (
         <div style={{ textAlign: 'center', padding: '40px 20px' }}>
           <CheckCircle2 size={48} color="#16a34a" style={{ display: 'block', margin: '0 auto 12px auto' }} />
-          <p style={{ fontSize: '16px', color: '#16a34a', fontWeight: '600' }}>¡Afectación colectiva guardada!</p>
+          <p style={{ fontSize: '16px', color: '#16a34a', fontWeight: '600' }}>
+            ¡Afectación colectiva {initialData ? 'actualizada' : 'guardada'}!
+          </p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -197,7 +207,7 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, onSuc
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', marginTop: '8px' }}>
             <button type="button" onClick={onClose} style={btnSecundario} disabled={guardando}>Cancelar</button>
             <button type="submit" style={btnPrimario} disabled={guardando}>
-              {guardando ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : 'Guardar Afectación Colectiva'}
+              {guardando ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : initialData ? 'Guardar Cambios' : 'Guardar Afectación Colectiva'}
             </button>
           </div>
         </form>
