@@ -20,13 +20,13 @@ function getProyectoMaestro(nombreTramo) {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Map, Files, FileText, Layers } from 'lucide-react';
 
-function ProjectCard({ tramo }) {
+function ProjectCard({ tramo, nucleosTramo }) {
   const navigate = useNavigate();
-  // Simulación de las métricas exigidas por Requerimientos 10 y 11
-  const nucleosTotales = Math.floor(Math.random() * 50) + 10;
-  const conveniosColectivos = Math.floor(Math.random() * 15);
-  const conveniosIndividuales = Math.floor(Math.random() * 100);
-  const superficieLiberada = (Math.random() * 500 + 100).toFixed(2);
+  
+  // Agregamos métricas reales de los tramos-núcleos
+  const nucleosTotales = nucleosTramo.length;
+  const conveniosTotales = nucleosTramo.reduce((acc, curr) => acc + (curr.total_convenios_formalizados_ran || 0), 0);
+  const superficieLiberada = nucleosTramo.reduce((acc, curr) => acc + parseFloat(curr.superficie_liberada_ha || 0), 0).toFixed(2);
 
   const proyecto = getProyectoMaestro(tramo.nombre_tramo);
 
@@ -53,22 +53,12 @@ function ProjectCard({ tramo }) {
           </div>
         </div>
 
-        {/* Requerimiento 10.2 */}
+        {/* Requerimiento 10.2 / 10.1 consolidado */}
         <div className="metric">
           <div className="icon blue"><Files size={20} /></div>
           <div>
-            <small>Conv. Colectivos Formalizados</small>
-            <strong style={{color: '#0284c7'}}>{conveniosColectivos}</strong>
-            <span>Inscritos en RAN</span>
-          </div>
-        </div>
-
-        {/* Requerimiento 10.1 */}
-        <div className="metric">
-          <div className="icon yellow"><FileText size={20} /></div>
-          <div>
-            <small>Conv. Individuales Formalizados</small>
-            <strong className="yellow-text">{conveniosIndividuales}</strong>
+            <small>Convenios Formalizados</small>
+            <strong style={{color: '#0284c7'}}>{conveniosTotales}</strong>
             <span>Inscritos en RAN</span>
           </div>
         </div>
@@ -90,19 +80,25 @@ function ProjectCard({ tramo }) {
 
 export default function Dashboard() {
   const [tramosData, setTramosData] = useState([]);
+  const [metricsData, setMetricsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const proyectoFiltro = searchParams.get('proyecto');
 
   useEffect(() => {
-    api.get('/tramos')
-      .then(res => {
-        setTramosData(res.data);
+    Promise.all([
+      api.get('/tramos'),
+      api.get('/dashboard')
+    ])
+      .then(([resTramos, resMetrics]) => {
+        setTramosData(resTramos.data);
+        setMetricsData(resMetrics.data);
         setLoading(false);
       })
       .catch(err => {
         console.error('Error al conectar con la API:', err);
-        setTramosData([]); // Si falla, que inicie vacío
+        setTramosData([]);
+        setMetricsData([]);
         setLoading(false);
       });
   }, []);
@@ -128,9 +124,10 @@ export default function Dashboard() {
         </div>
       ) : (
         <section className="cards">
-          {tramosFiltrados.map(tramo => (
-            <ProjectCard key={tramo.id_tramo} tramo={tramo} />
-          ))}
+          {tramosFiltrados.map(tramo => {
+            const metricsForTramo = metricsData.filter(m => m.id_tramo === tramo.id_tramo);
+            return <ProjectCard key={tramo.id_tramo} tramo={tramo} nucleosTramo={metricsForTramo} />;
+          })}
         </section>
       )}
     </div>
