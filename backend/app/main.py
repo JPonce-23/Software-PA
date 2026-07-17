@@ -1072,12 +1072,22 @@ def asignar_usuario_frente(id_frente: int, data: schemas.UsuarioFrenteCreate, db
     return nuevo
 
 @app.delete("/api/frentes/{id_frente}/remover-usuario/{id_usuario}", tags=["Frentes"], summary="Quitar a usuario de frente")
-def remover_usuario_frente(id_frente: int, id_usuario: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+def remover_usuario_frente(
+    id_frente: int,
+    id_usuario: int,
+    motivo: str = Query(..., min_length=1, description="Motivo de la remoción"),
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))
+):
     set_audit_context(db, current_user.id_usuario)
     exists = db.query(models.UsuarioFrente).filter_by(id_frente=id_frente, id_usuario=id_usuario).first()
     if not exists:
         raise HTTPException(status_code=404, detail="Asignación no encontrada.")
     exists.activo = False
+    from datetime import datetime
+    exists.fecha_baja = datetime.utcnow()
+    exists.id_usuario_baja = current_user.id_usuario
+    exists.motivo_baja = motivo
     db.commit()
     return {"status": "success", "detail": "Usuario removido del frente."}
 

@@ -296,7 +296,17 @@ class Bitacora(Base):
 
 class UsuarioFrente(Base):
     __tablename__ = "usuario_frente"
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
-    id_frente = Column(Integer, ForeignKey("frente.id_frente"), primary_key=True)
+    id_usuario_frente = Column(Integer, primary_key=True, autoincrement=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_frente = Column(Integer, ForeignKey("frente.id_frente"), nullable=False)
     fecha_asignacion = Column(DateTime(timezone=True), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
+    
+    # Campos para baja lógica (DA-9)
+    fecha_baja = Column(DateTime(timezone=True), nullable=True)
+    id_usuario_baja = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=True)
+    motivo_baja = Column(String, nullable=True)
+    fecha_reactivacion = Column(DateTime(timezone=True), nullable=True)
+    id_usuario_reactivacion = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=True)
+    motivo_reactivacion = Column(String, nullable=True)
+    observaciones = Column(String, nullable=True)
