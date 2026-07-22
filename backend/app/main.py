@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.inspection import inspect
-from sqlalchemy.exc import InternalError, IntegrityError
+from sqlalchemy.exc import InternalError, IntegrityError, DatabaseError
 from typing import List, Type, Any
 from datetime import datetime, timezone, timedelta
 import pandas as pd
@@ -27,19 +27,29 @@ app = FastAPI(
 )
 
 
+import re
+
+def sanitize_pg_error(msg: str) -> str:
+    """
+    Sanitiza mensajes crudos de PostgreSQL para evitar Information Disclosure (Fuga de Información).
+    Elimina prefijos, rastros del stacktrace de BD (CONTEXT, HINT) y nombres internos.
+    """
+    clean_msg = re.sub(r"^(ERROR|FATAL|WARNING):\s+", "", msg, flags=re.IGNORECASE)
+    delimitadores = r"\b(CONTEXT|HINT|DETAIL|STATEMENT|PL/pgSQL function):"
+    clean_msg = re.split(delimitadores, clean_msg)[0]
+    return clean_msg.replace('\n', ' ').strip()
+
 @app.exception_handler(InternalError)
 def sqlalchemy_internal_error_handler(request, exc: InternalError):
-    msg = str(exc.orig)
-    if "Auditoría fallida" in msg or "Baja lógica denegada" in msg or "no permitida" in msg.lower() or "restricción" in msg.lower():
-        clean_msg = msg.split("CONTEXT:")[0].strip()
-        return JSONResponse(status_code=400, content={"detail": clean_msg})
-    return JSONResponse(status_code=500, content={"detail": f"Error DB: {msg}"})
+    raw_msg = str(exc.orig)
+    clean_msg = sanitize_pg_error(raw_msg)
+    return JSONResponse(status_code=400, content={"detail": clean_msg})
 
 @app.exception_handler(IntegrityError)
 def sqlalchemy_integrity_error_handler(request, exc: IntegrityError):
-    msg = str(exc.orig)
-    clean_msg = msg.split("DETAIL:")[0].strip()
-    return JSONResponse(status_code=400, content={"detail": f"Violación de integridad: {clean_msg}"})
+    raw_msg = str(exc.orig)
+    clean_msg = sanitize_pg_error(raw_msg)
+    return JSONResponse(status_code=422, content={"detail": f"Violación de regla de negocio: {clean_msg}"})
 
 @app.exception_handler(Exception)
 def global_exception_handler(request, exc: Exception):
@@ -60,9 +70,21 @@ os.makedirs("uploads", exist_ok=True)
 
 def validate_wkt(db: Session, wkt: str):
     if not wkt: return
-    is_valid = db.execute(text("SELECT ST_IsValid(ST_GeomFromText(:wkt, 4326))"), {"wkt": wkt}).scalar()
-    if is_valid is False:
-        raise HTTPException(status_code=400, detail="Geometría WKT inválida topológicamente (ej. cruces, puntos duplicados).")
+    try:
+        is_valid = db.execute(
+            text("SELECT ST_IsValid(ST_GeomFromText(:wkt, 4326))"), 
+            {"wkt": wkt}
+        ).scalar()
+        if is_valid is False:
+            raise HTTPException(
+                status_code=400, 
+                detail="Geometría WKT inválida topológicamente (ej. cruces, puntos duplicados)."
+            )
+    except DatabaseError:
+        raise HTTPException(
+            status_code=400, 
+            detail="Formato WKT inválido. Verifica la sintaxis de la geometría."
+        )
 
 def set_audit_context(db: Session, user_id: int):
     """Inyecta el ID de usuario en la sesión PostgreSQL para auditoría forense (DA-10).
@@ -79,19 +101,27 @@ def get_entity_by_id(db: Session, model: Type[Any], entity_id: int, id_column: s
         raise HTTPException(status_code=404, detail=f"{model.__name__} not found")
     return entity
 
+GEOMETRY_FIELDS = {
+    models.Tramo: "geometria_linea",
+    models.Frente: "geometria_linea",
+    models.NucleoAgrario: "geometria_poligono",
+    models.TramoNucleo: "geometria_segmento",
+    models.Afectacion: "geometria_afectacion"
+}
+
 def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
     set_audit_context(db, user_id)
     update_dict = update_data.model_dump(exclude_unset=True)
-    # Despachar geometria_wkt al campo de geometría correcto según la entidad
+    
     if "geometria_wkt" in update_dict:
         wkt = update_dict.pop("geometria_wkt")
         validate_wkt(db, wkt)
-        if hasattr(entity, "geometria_linea"):
-            entity.geometria_linea = wkt
-        elif hasattr(entity, "geometria_poligono"):
-            entity.geometria_poligono = wkt
-        elif hasattr(entity, "geometria_segmento"):
-            entity.geometria_segmento = wkt
+        
+        model_class = type(entity)
+        geom_field = GEOMETRY_FIELDS.get(model_class)
+        
+        if geom_field and hasattr(entity, geom_field):
+            setattr(entity, geom_field, wkt)
 
     for key, value in update_dict.items():
         setattr(entity, key, value)
@@ -502,17 +532,16 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
     data = afectacion.model_dump()
     wkt = data.pop("geometria_wkt", None)
     
-    try:
-        db_afectacion = models.Afectacion(**data)
-        if wkt:
-            db_afectacion.geometria_afectacion = wkt
-            
-        db.add(db_afectacion)
-        db.commit()
-        db.refresh(db_afectacion)
-    except Exception as e:
-        db.rollback()
-        return JSONResponse(status_code=500, content={"detail": f"MyError: {str(e)}"})
+    if wkt:
+        validate_wkt(db, wkt)
+        
+    db_afectacion = models.Afectacion(**data)
+    if wkt:
+        db_afectacion.geometria_afectacion = wkt
+        
+    db.add(db_afectacion)
+    db.commit()
+    db.refresh(db_afectacion)
     resp = db_afectacion.__dict__.copy()
     resp["geometria_wkt"] = db.scalar(
         db.query(models.Afectacion.geometria_afectacion.ST_AsText()).filter(models.Afectacion.id_afectacion == db_afectacion.id_afectacion)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Literal
 from decimal import Decimal
 from datetime import date, datetime
@@ -8,9 +8,6 @@ class AuditableCreate(BaseModel):
     observaciones: Optional[str] = None
 
 class AuditableUpdate(BaseModel):
-    activo: Optional[bool] = None
-    motivo_baja: Optional[str] = None
-    motivo_reactivacion: Optional[str] = None
     observaciones: Optional[str] = None
 
 # ----------------- AUTH Y USUARIOS ----------------- #
@@ -216,8 +213,8 @@ class AfectacionCreate(AuditableCreate):
     subtipo_tenencia: Optional[str] = None
     destino_superficie: Optional[str] = None   # Aplica a derechos colectivos
     no_parcela_solar: Optional[str] = None
-    superficie_afectada_ha: Optional[Decimal] = None
-    num_personas_afectadas: Optional[int] = None
+    superficie_afectada_ha: Optional[Decimal] = Field(default=None, ge=0)
+    num_personas_afectadas: Optional[int] = Field(default=None, ge=0)
     situacion_juridica: Optional[str] = None
     documentacion_disponible: bool = False
     documentacion_faltante: Optional[str] = None
@@ -230,8 +227,8 @@ class AfectacionUpdate(AuditableUpdate):
     subtipo_tenencia: Optional[str] = None
     destino_superficie: Optional[str] = None
     no_parcela_solar: Optional[str] = None
-    superficie_afectada_ha: Optional[Decimal] = None
-    num_personas_afectadas: Optional[int] = None
+    superficie_afectada_ha: Optional[Decimal] = Field(default=None, ge=0)
+    num_personas_afectadas: Optional[int] = Field(default=None, ge=0)
     situacion_juridica: Optional[str] = None
     documentacion_disponible: Optional[bool] = None
     documentacion_faltante: Optional[str] = None
