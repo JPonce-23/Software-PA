@@ -489,18 +489,19 @@ def generar_reporte_resumen(db: Session = Depends(get_db), current_user: models.
 # ==================== AFECTACIONES ==================== #
 @app.get("/api/afectaciones", tags=["Afectaciones"], summary="Listar afectaciones", response_model=List[schemas.AfectacionResponse])
 def list_afectaciones(skip: int = 0, limit: int = 100, id_tramo_nucleo: int = Query(None), tipo_afectacion: str = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    query = db.query(models.Afectacion).filter(models.Afectacion.activo == True)
+    query = db.query(
+        models.Afectacion,
+        models.Afectacion.geometria_afectacion.ST_AsText().label('geometria_wkt')
+    ).filter(models.Afectacion.activo == True)
     if id_tramo_nucleo:
         query = query.filter(models.Afectacion.id_tramo_nucleo == id_tramo_nucleo)
     if tipo_afectacion:
         query = query.filter(models.Afectacion.tipo_afectacion == tipo_afectacion)
-    
+
     results = []
-    for a in query.offset(skip).limit(limit).all():
-        resp = a.__dict__.copy()
-        resp["geometria_wkt"] = db.scalar(
-            db.query(models.Afectacion.geometria_afectacion.ST_AsText()).filter(models.Afectacion.id_afectacion == a.id_afectacion)
-        )
+    for afectacion, wkt in query.offset(skip).limit(limit).all():
+        resp = afectacion.__dict__.copy()
+        resp["geometria_wkt"] = wkt
         results.append(resp)
     return results
 
