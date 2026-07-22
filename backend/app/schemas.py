@@ -34,7 +34,8 @@ class UsuarioUpdate(BaseModel):
     apellido_paterno: Optional[str] = None
     apellido_materno: Optional[str] = None
     rol: Optional[Literal['admin', 'operador', 'visualizador', 'geografo']] = None
-    activo: Optional[bool] = None
+    # activo: ELIMINADO intencionalmente. La baja de usuarios es EXCLUSIVA del endpoint
+    # DELETE /api/usuarios/{id} que exige motivo_baja y registra en bitácora (DA-9).
 
 class UsuarioResponse(UsuarioBase):
     id_usuario: int
