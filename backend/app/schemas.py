@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Literal
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, List, Literal, Any
 from decimal import Decimal
 from datetime import date, datetime
 
@@ -480,10 +480,8 @@ class MunicipioResponse(BaseModel):
         from_attributes = True
 
 # ==================== BITÁCORA ==================== #
-from typing import Optional, Any
-from pydantic import Json
-
 class BitacoraResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id_bitacora: int
     id_usuario: int
     id_nucleo: Optional[int] = None
@@ -497,17 +495,14 @@ class BitacoraResponse(BaseModel):
     fecha_hora: datetime
     ip_origen: Optional[str] = None
     user_agent: Optional[str] = None
-    class ConfigDict:
-        from_attributes = True
 
 # ==================== USUARIO FRENTE ==================== #
 class UsuarioFrenteCreate(BaseModel):
     id_usuario: int
 
 class UsuarioFrenteResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id_usuario: int
     id_frente: int
     fecha_asignacion: datetime
     activo: bool
-    class ConfigDict:
-        from_attributes = True
