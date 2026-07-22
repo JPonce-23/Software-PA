@@ -390,8 +390,8 @@ class TramiteFifonafeCreate(AuditableCreate):
     id_tramo_nucleo: int
     id_convenio: Optional[int] = None
     id_afectacion: Optional[int] = None
-    tipo_afectacion: str
-    tipo_tramite: str
+    tipo_afectacion: Literal['colectivo', 'individual']
+    tipo_tramite: Literal['indemnizacion', 'informe_no_conflictos']
     estatus: str = 'pendiente'
 
 class TramiteFifonafeUpdate(AuditableUpdate):
