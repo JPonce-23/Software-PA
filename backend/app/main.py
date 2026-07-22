@@ -114,7 +114,7 @@ def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
     update_dict = update_data.model_dump(exclude_unset=True)
     
     if "geometria_wkt" in update_dict:
-        wkt = update_dict.pop("geometria_wkt")
+        wkt = update_dict.pop("geometria_wkt", None)
         validate_wkt(db, wkt)
         
         model_class = type(entity)
@@ -165,7 +165,7 @@ def get_tramos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), c
 def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
     data = tramo.model_dump()
-    wkt = data.pop("geometria_wkt")
+    wkt = data.pop("geometria_wkt", None)
     validate_wkt(db, wkt)
     db_tramo = models.Tramo(**data, geometria_linea=wkt)
     db_tramo.fecha_registro = datetime.now().date()
@@ -211,7 +211,7 @@ def get_frentes(id_tramo: int = Query(None), db: Session = Depends(get_db), curr
 def create_frente(frente: schemas.FrenteCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
     data = frente.model_dump()
-    wkt = data.pop("geometria_wkt")
+    wkt = data.pop("geometria_wkt", None)
     validate_wkt(db, wkt)
     db_frente = models.Frente(**data, geometria_linea=wkt)
     db_frente.fecha_registro = datetime.now().date()
@@ -317,7 +317,7 @@ def get_tramo_detalles(tramo: str = Query(...), db: Session = Depends(get_db), c
 def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
     data = nucleo.model_dump()
-    wkt = data.pop("geometria_wkt")
+    wkt = data.pop("geometria_wkt", None)
     validate_wkt(db, wkt)
     db_nucleo = models.NucleoAgrario(**data, geometria_poligono=wkt)
     db_nucleo.fecha_creacion = datetime.now(timezone.utc)
