@@ -929,11 +929,18 @@ def delete_usuario(id_usuario: int, motivo: str = Query(...), db: Session = Depe
 
 # ==================== CATÁLOGOS ==================== #
 @app.get("/api/catalogos/entidades", tags=["Catálogos"], summary="Listar entidades federativas", response_model=List[schemas.EntidadFederativaResponse])
-def get_entidades(db: Session = Depends(get_db)):
+def get_entidades(
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))
+):
     return db.query(models.EntidadFederativa).filter(models.EntidadFederativa.activo == True).all()
 
 @app.get("/api/catalogos/municipios", tags=["Catálogos"], summary="Listar municipios", response_model=List[schemas.MunicipioResponse])
-def get_municipios(id_entidad: int = Query(None), db: Session = Depends(get_db)):
+def get_municipios(
+    id_entidad: int = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))
+):
     query = db.query(models.Municipio).filter(models.Municipio.activo == True)
     if id_entidad:
         query = query.filter(models.Municipio.id_entidad == id_entidad)
