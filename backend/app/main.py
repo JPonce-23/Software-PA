@@ -588,6 +588,7 @@ def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_
         raise HTTPException(status_code=400, detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.")
     
     db_asamblea = models.Asamblea(**asamblea.model_dump())
+    db_asamblea.id_usuario_registro = current_user.id_usuario
     db.add(db_asamblea)
     db.commit()
     db.refresh(db_asamblea)
@@ -676,6 +677,7 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
         raise HTTPException(status_code=400, detail="Afectación individual debe usar superficie_total_ha, no superficie_real_afectada_ha")
 
     db_convenio = models.Convenio(**convenio.model_dump())
+    db_convenio.id_usuario_registro = current_user.id_usuario
     db.add(db_convenio)
     db.commit()
     db.refresh(db_convenio)
@@ -730,7 +732,8 @@ def list_padrones(id_nucleo: int = Query(None), db: Session = Depends(get_db), c
 def create_padron(padron: schemas.PadronHistorialCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
     db_padron = models.PadronHistorial(**padron.model_dump())
-    db_padron.fecha_registro = datetime.now()
+    db_padron.fecha_registro = datetime.now(timezone.utc)
+    db_padron.id_usuario_registro = current_user.id_usuario
     db.add(db_padron)
     db.commit()
     db.refresh(db_padron)
@@ -769,7 +772,8 @@ def create_actividad(act: schemas.ActividadCampoCreate, db: Session = Depends(ge
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
     
     db_act = models.ActividadCampo(**act.model_dump())
-    db_act.fecha_registro = datetime.now()
+    db_act.fecha_registro = datetime.now(timezone.utc)
+    db_act.id_usuario_registro = current_user.id_usuario
     db.add(db_act)
     db.commit()
     db.refresh(db_act)
