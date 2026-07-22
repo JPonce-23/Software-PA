@@ -287,7 +287,7 @@ class ConvenioCreate(AuditableCreate):
     id_tramo_nucleo: int
     id_afectacion: int
     tipo_afectacion: Literal['colectivo', 'individual']
-    tipo_convenio: Optional[Literal['cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias', 'ampliacion', 'ampliacion_remanente']] = None
+    tipo_convenio: Literal['cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias', 'ampliacion', 'ampliacion_remanente']
     fecha_firma: Optional[date] = None
     superficie_real_afectada_ha: Optional[Decimal] = None
     superficie_total_ha: Optional[Decimal] = None
