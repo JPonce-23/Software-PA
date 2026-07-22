@@ -451,7 +451,8 @@ class AlertaCreate(BaseModel):
 
 class AlertaUpdate(BaseModel):
     esta_activa: Optional[bool] = None
-    activo: Optional[bool] = None
+    # activo: ELIMINADO intencionalmente. La baja de alertas es EXCLUSIVA del endpoint
+    # DELETE /api/alertas/{id} que exige motivo_baja y registra en bitácora (DA-9).
 
 class AlertaResponse(AlertaCreate):
     id_alerta: int
