@@ -405,6 +405,8 @@ def create_tramo_nucleo(tramo_nucleo: schemas.TramoNucleoCreate, db: Session = D
     set_audit_context(db, current_user.id_usuario)
     data = tramo_nucleo.model_dump()
     wkt = data.pop("geometria_wkt", None)
+    if wkt:
+        validate_wkt(db, wkt)
     db_tn = models.TramoNucleo(**data)
     if wkt:
         db_tn.geometria_segmento = wkt
