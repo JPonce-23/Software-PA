@@ -960,7 +960,14 @@ def exportar_tramos_csv(db: Session = Depends(get_db), current_user: models.Usua
 def upload_archivo(id_documento: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     doc = get_entity_by_id(db, models.DocumentacionSoporte, id_documento, "id_documento")
     
-    file_extension = os.path.splitext(file.filename)[1]
+    EXTENSIONES_PERMITIDAS = {".pdf", ".jpg", ".jpeg", ".png", ".docx"}
+    file_extension = os.path.splitext(file.filename)[1].lower()
+    if file_extension not in EXTENSIONES_PERMITIDAS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido. Solo se aceptan: {', '.join(sorted(EXTENSIONES_PERMITIDAS))}"
+        )
+    
     safe_filename = f"doc_{id_documento}{file_extension}"
     file_path = os.path.join("uploads", safe_filename)
     
