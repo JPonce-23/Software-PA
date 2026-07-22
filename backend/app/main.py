@@ -480,7 +480,7 @@ def get_dashboard_metrics(db: Session = Depends(get_db), current_user: models.Us
 @app.get("/api/reportes/resumen", tags=["Reportes"], summary="Generar reporte resumen")
 def generar_reporte_resumen(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     return {
-        "generado_el": datetime.now(),
+        "generado_el": datetime.now(timezone.utc),
         "total_convenios": db.query(models.Convenio).filter(models.Convenio.activo == True).count(),
         "total_nucleos": db.query(models.NucleoAgrario).filter(models.NucleoAgrario.activo == True).count(),
         "total_afectaciones": db.query(models.Afectacion).filter(models.Afectacion.activo == True).count()
@@ -831,7 +831,7 @@ def list_documentacion(entidad_tipo: str = Query(None), entidad_id: int = Query(
 def create_documentacion(doc: schemas.DocumentacionSoporteCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
     db_doc = models.DocumentacionSoporte(**doc.model_dump())
-    db_doc.fecha_carga = datetime.now()
+    db_doc.fecha_carga = datetime.now(timezone.utc)
     db.add(db_doc)
     db.commit()
     db.refresh(db_doc)
@@ -859,7 +859,7 @@ def list_alertas(activa: bool = Query(True), db: Session = Depends(get_db), curr
 def create_alerta(alerta: schemas.AlertaCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
     db_alerta = models.Alertas(**alerta.model_dump())
-    db_alerta.fecha_creacion = datetime.now()
+    db_alerta.fecha_creacion = datetime.now(timezone.utc)
     db.add(db_alerta)
     db.commit()
     db.refresh(db_alerta)
@@ -1048,10 +1048,11 @@ def importar_geojson(
         if not geometria:
             continue
 
-        # Filtrar propiedades para que solo queden las que existen en el modelo (ignorar id y geom_column)
+        # Filtrar propiedades para que solo queden las que existen en el modelo (ignorar geom_column y Primary Key)
         datos_limpios = {}
+        pk_name = inspect(Modelo).primary_key[0].name
         for k, v in propiedades.items():
-            if k in columnas_validas and k not in ["id", geom_column_name] and not k.startswith("id_"):
+            if k in columnas_validas and k not in [geom_column_name, pk_name]:
                 datos_limpios[k] = v
 
         # Asegurar requerimientos de negocio o defaults
@@ -1134,8 +1135,7 @@ def remover_usuario_frente(
     if not exists:
         raise HTTPException(status_code=404, detail="Asignación no encontrada.")
     exists.activo = False
-    from datetime import datetime
-    exists.fecha_baja = datetime.utcnow()
+    exists.fecha_baja = datetime.now(timezone.utc)
     exists.id_usuario_baja = current_user.id_usuario
     exists.motivo_baja = motivo
     db.commit()
