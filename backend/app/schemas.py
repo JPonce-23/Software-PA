@@ -307,6 +307,13 @@ class ConvenioUpdate(AuditableUpdate):
     convenio_inscrito_fecha_ran: Optional[date] = None
     documentacion_disponible: Optional[bool] = None
     documentacion_faltante: Optional[str] = None
+    superficie_real_afectada_ha: Optional[Decimal] = None
+    superficie_total_ha: Optional[Decimal] = None
+    superficie_adicional_ha: Optional[Decimal] = None
+    superficie_ampliacion_ha: Optional[Decimal] = None
+    monto_100: Optional[Decimal] = None
+    monto_90: Optional[Decimal] = None
+    monto_bdt: Optional[Decimal] = None
 
 class ConvenioResponse(ConvenioCreate):
     id_convenio: int

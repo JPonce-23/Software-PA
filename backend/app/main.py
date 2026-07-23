@@ -587,6 +587,11 @@ def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
     if tramo_nucleo_db.id_nucleo != asamblea.id_nucleo:
         raise HTTPException(status_code=400, detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.")
+        
+    if asamblea.id_padron:
+        padron_db = db.query(models.PadronHistorial).filter_by(id_padron=asamblea.id_padron, activo=True).first()
+        if not padron_db or padron_db.id_nucleo != asamblea.id_nucleo:
+            raise HTTPException(status_code=400, detail="Inconsistencia: El Padrón no existe o no pertenece al NucleoAgrario especificado.")
     
     db_asamblea = models.Asamblea(**asamblea.model_dump())
     db_asamblea.id_usuario_registro = current_user.id_usuario
@@ -598,6 +603,10 @@ def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_
 @app.put("/api/asambleas/{id_asamblea}", tags=["Asambleas"], summary="Actualizar asamblea", response_model=schemas.AsambleaResponse)
 def update_asamblea_route(id_asamblea: int, data: schemas.AsambleaUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.Asamblea, id_asamblea, "id_asamblea")
+    if data.id_padron is not None:
+        padron_db = db.query(models.PadronHistorial).filter_by(id_padron=data.id_padron, activo=True).first()
+        if not padron_db or padron_db.id_nucleo != entity.id_nucleo:
+            raise HTTPException(status_code=400, detail="Inconsistencia: El Padrón no existe o no pertenece al NucleoAgrario de la asamblea.")
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/asambleas/{id_asamblea}", tags=["Asambleas"], summary="Eliminar asamblea")
@@ -643,6 +652,16 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="La Afectación especificada no existe.")
     if afectacion_db.id_tramo_nucleo != convenio.id_tramo_nucleo:
         raise HTTPException(status_code=400, detail="Inconsistencia: La Afectación no pertenece al TramoNucleo especificado.")
+        
+    if convenio.id_convenio_padre:
+        padre_db = db.query(models.Convenio).filter_by(id_convenio=convenio.id_convenio_padre, activo=True).first()
+        if not padre_db or padre_db.id_afectacion != convenio.id_afectacion:
+            raise HTTPException(status_code=400, detail="Inconsistencia: El Convenio Padre no existe o no pertenece a la misma Afectación.")
+            
+    if convenio.id_asamblea_autorizacion:
+        asamblea_db = db.query(models.Asamblea).filter_by(id_asamblea=convenio.id_asamblea_autorizacion, activo=True).first()
+        if not asamblea_db or asamblea_db.id_tramo_nucleo != convenio.id_tramo_nucleo:
+            raise HTTPException(status_code=400, detail="Inconsistencia: La Asamblea no existe o no pertenece al mismo TramoNucleo.")
     
     # B6 / B7: Asamblea constraint
     if convenio.tipo_afectacion == 'colectivo' and not convenio.id_asamblea_autorizacion:
@@ -801,6 +820,22 @@ def list_fifonafe(id_tramo_nucleo: int = Query(None), db: Session = Depends(get_
 @app.post("/api/fifonafe", tags=["Fifonafe"], summary="Crear trámite fifonafe", response_model=schemas.TramiteFifonafeResponse, status_code=status.HTTP_201_CREATED)
 def create_fifonafe(tramite: schemas.TramiteFifonafeCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
+    
+    # Validaciones de coherencia jerárquica
+    tn_db = db.query(models.TramoNucleo).filter_by(id_tramo_nucleo=tramite.id_tramo_nucleo, activo=True).first()
+    if not tn_db:
+        raise HTTPException(status_code=404, detail="El TramoNucleo no existe.")
+        
+    if tramite.id_afectacion:
+        afectacion_db = db.query(models.Afectacion).filter_by(id_afectacion=tramite.id_afectacion, activo=True).first()
+        if not afectacion_db or afectacion_db.id_tramo_nucleo != tramite.id_tramo_nucleo:
+            raise HTTPException(status_code=400, detail="Inconsistencia: La Afectación no existe o no pertenece al TramoNucleo especificado.")
+            
+    if tramite.id_convenio:
+        convenio_db = db.query(models.Convenio).filter_by(id_convenio=tramite.id_convenio, activo=True).first()
+        if not convenio_db or convenio_db.id_tramo_nucleo != tramite.id_tramo_nucleo:
+            raise HTTPException(status_code=400, detail="Inconsistencia: El Convenio no existe o no pertenece al TramoNucleo especificado.")
+            
     db_tram = models.TramiteFifonafe(**tramite.model_dump())
     db.add(db_tram)
     db.commit()
