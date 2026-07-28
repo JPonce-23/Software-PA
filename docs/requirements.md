@@ -9,10 +9,10 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 - **Sistema**: La aplicación web de seguimiento que se está desarrollando
 - **operador**: Usuario de captura de datos que registra información en el sistema
 - **visualizador**: Usuario final/stakeholder que visualiza reportes de progreso y tableros
-- **Geógrafo**: Usuario especializado con permisos para capturar y editar información geográfica/técnica de geometrías de Tramos, Frentes, Núcleos Agrarios y coordenadas geoespaciales
+- **Geógrafo**: Usuario especializado con permisos para capturar y editar información geográfica/técnica de geometrías de Tramos, Núcleos Agrarios y coordenadas geoespaciales
 - **Núcleo_Agrario**: Es la entidad central del sistema que representa a cada ejido o comunidad agraria. Cuentan con personalidad jurídica y patrimonio propio.
+- **Proyecto**: Contenedor jerárquico de mayor nivel que agrupa uno o más tramos ferroviarios.
 - **Tramo**: cada una de las secciones principales que integran el proyecto ferroviario. Constituye la unidad geográfica y operativa de mayor nivel dentro del sistema, y su función principal es facilitar el seguimiento del derecho de vía.
-- **Frente**: porción o subdivisión en la que se divide un tramo.
 - **Tramo_Núcleo**: Representa la intersección entre un Tramo del proyecto ferroviario y un Núcleo Agrario afectado. Mientras que el Tramo es la unidad geográfica/operativa del proyecto y el Núcleo Agrario (ejido o comunidad) es la entidad central atravesada, el Tramo_Núcleo es el nivel relacional donde se abre el expediente administrativo y se capturan el consecutivo, número de tramo, excepciones operativas del cruce y seguimiento territorial.
 - **Afectación**: Superficie afectada - Registro que documenta la superficie, tipo de tenencia y las personas o parcelas afectadas por el paso del proyecto.
 - **Convenio**: Acuerdo que facilita la ocupación de terreno para el inicio de los trabajos operativos, ya que sin él, las obras no pueden comenzar sino hasta el final de todo el proceso legal de expropiación. Los tipos de convenio varían según el tipo de derecho afectado: para derechos colectivos incluye COP, Modificatorio, Superficie Adicional y Obras Complementarias; para derechos individuales incluye COP, Modificatorio, Ampliación y Ampliación Remanente.
@@ -39,7 +39,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 - **WGS84**: Sistema de Coordenadas Mundial 1984 (World Geodetic System 1984) - Sistema de referencia de coordenadas geográficas utilizado globalmente, especificado como EPSG:4326
 - **UTM**: Universal Transverse Mercator - Sistema de coordenadas proyectadas que divide el mundo en zonas, utilizado en documentos jurídicos de liberación en México
 - **Geometría**: Representación espacial de entidades geográficas. Puede ser punto, línea (LineString), polígono (Polygon) o sus versiones múltiples (MultiPoint, MultiLineString, MultiPolygon)
-- **Intersección_Geométrica**: Operación espacial que calcula la superposición entre dos geometrías, utilizada para determinar qué Núcleos Agrarios son afectados por un Frente
+- **Intersección_Geométrica**: Operación espacial que calcula la superposición entre dos geometrías, utilizada para determinar qué Núcleos Agrarios son afectados por un Tramo
 - **Sistema_de_Referencia_de_Coordenadas**: (SRC o CRS) Marco que define cómo las coordenadas se relacionan con ubicaciones en la superficie terrestre
 
 ## Requirements
@@ -56,21 +56,20 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 4. CUANDO un Geógrafo inicie sesión, EL Sistema DEBERÁ otorgar permisos de lectura y escritura sobre geometrías y datos geoespaciales
 5. EL Sistema DEBERÁ autenticar usuarios antes de otorgar acceso
 6. EL Sistema DEBERÁ mantener un registro de auditoría de acciones de usuario
-7. EL Sistema DEBERÁ permitir la asignación de uno o varios Frentes a cada usuario para organizar y delimitar su responsabilidad territorial
+7. EL Sistema DEBERÁ permitir la asignación de uno o varios Tramos a cada usuario para organizar y delimitar su responsabilidad territorial
 
 
-### Requirement 2: Gestión de Estructura del Proyecto Ferroviario
+### Requirement 2: Gestión de Proyectos y Tramos
 
-**User Story:** Como operador, quiero definir y organizar segmentos ferroviarios (Tramos) y sus subdivisiones (Frentes), para poder estructurar el proyecto geográficamente, el proyecto puede tener más de un tramo.
+**User Story:** Como operador, quiero crear proyectos y sus tramos para organizar territorialmente la liberación de derechos de vía.
 
 #### Acceptance Criteria
 
-1. EL Sistema DEBERÁ permitir la creación de registros de Tramo con identificadores únicos
-2. EL Sistema DEBERÁ permitir la creación de registros de Frente asociados a un Tramo
-3. CUANDO se crea un Tramo, EL Sistema DEBERÁ requerir un nombre único y clave. El número de tramo se captura en el registro de la intersección con el Núcleo Agrario.
-4. EL Sistema DEBERÁ soportar múltiples Frentes por Tramo
-5. EL Sistema DEBERÁ mostrar la relación jerárquica entre Tramos y Frentes
-6. EL Sistema DEBERÁ almacenar la geometría del tramo estrictamente como un trazo lineal (MultiLineString). Los polígonos de derecho de vía se calcularán de manera dinámica (on-the-fly) mediante un buffer perimetral (parametrizado en metros por el `ancho_total_derecho_via_m` de cada tramo) sobre el trazo central, usando un casting a "geography" para validaciones exactas sin depender de proyecciones planas.
+1. El Sistema DEBERÁ permitir crear, consultar, editar y dar de baja lógica a Proyectos.
+2. Cada Tramo DEBERÁ pertenecer a un único Proyecto activo.
+3. La clave de Tramo DEBERÁ ser única dentro de su Proyecto.
+4. El Sistema DEBERÁ permitir asignar uno o más usuarios a cada Tramo.
+5. El Sistema DEBERÁ mostrar la jerarquía Proyecto → Tramo.
 
 ### Requirement 3: Registro de Núcleos Agrarios
 
@@ -84,7 +83,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 4. EL Sistema DEBERÁ almacenar información de ORV incluyendo integrantes y fechas de vigencia
 5. EL Sistema DEBERÁ dar seguimiento a información del Padrón incluyendo fecha y número de integrantes
 6. EL Sistema DEBERÁ asociar cada Núcleo_Agrario con uno o más Tramos
-7. El Sistema DEBERÁ permitir que el núcleo agrario sea atravesado por una o más veces por el frente ferroviario.
+7. El Sistema DEBERÁ permitir que el núcleo agrario sea atravesado por una o más veces por el tramo ferroviario.
 
 ### Requirement 4: Registro de Afectaciones
 
@@ -92,12 +91,12 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 #### Criterios de Aceptación
 
-1. EL Sistema DEBERÁ permitir la creación de registros de Afectación vinculados a un Núcleo_Agrario
+1. El Sistema DEBERÁ permitir crear Afectaciones vinculadas obligatoriamente a un Tramo_Núcleo.
 2. CUANDO se crea una Afectación, EL Sistema DEBERÁ capturar superficie afectada en hectáreas o metros cuadrados, tipo de tenencia, subtipo de tenencia y personas considerando si la afectación es sobre derechos colectivos, derechos individuales o tierras de uso común o parcelas afectadas
 3. EL Sistema DEBERÁ clasificar la Afectación como Derecho_Colectivo o Derecho_Individual
 4. DONDE una Afectación se clasifica como Derecho_Individual, EL Sistema DEBERÁ capturar número de parcela, información del titular y documentación de la propiedad
 5. DONDE una Afectación se clasifica como Derecho_Colectivo, EL Sistema DEBERÁ capturar destino de la superficie, número de parcela/solar (si aplica a un área comunal específica), y relacionar el padrón y estatus de ORV vigentes en asambleas.
-6. EL Sistema DEBERÁ permitir múltiples Afectaciones por Núcleo_Agrario
+6. El Sistema DEBERÁ permitir múltiples Afectaciones por Tramo_Núcleo.
 7. EL Sistema DEBERÁ hacer obligatoria la captura del polígono de afectación para altas desde interfaz, garantizando intersección espacial con su Núcleo y su Tramo asociado (`origen_registro IN ('migracion_excel', 'captura_sistema')`). Para importación masiva desde Excel, se permitirá geometrías nulas marcando el expediente como "Pendiente de Digitalización Espacial".
 
 ### Requirement 5: Seguimiento de Proceso de Sensibilización
@@ -197,7 +196,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 2. EL Sistema DEBERÁ mostrar superficies liberadas para Derechos_Colectivos (uso común) con ubicación y metros cuadrados
 3. CUANDO una Afectación tiene un Convenio asociado con fecha de inscripción, EL Sistema DEBERÁ clasificar esa superficie como liberada
 4. EL Sistema DEBERÁ calcular área total liberada por Núcleo_Agrario
-5. EL Sistema DEBERÁ permitir filtrado por Tramo y Frente
+5. EL Sistema DEBERÁ permitir filtrado por Proyecto y Tramo
 
 ### Requirement 12: Visualización de Progreso por Tramo
 
@@ -209,7 +208,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 2. CUANDO se calcula porcentaje liberado, EL Sistema DEBERÁ dividir metros cuadrados liberados totales entre metros cuadrados afectados totales por Tramo
 3. EL Sistema DEBERÁ mostrar tanto superficies liberadas como pendientes en metros cuadrados
 4. EL Sistema DEBERÁ codificar con colores las barras de progreso (por ejemplo, verde para >75%, amarillo para 25-75%, rojo para <25%)
-5. EL Sistema DEBERÁ permitir navegación detallada desde nivel Tramo hasta nivel Frente
+5. EL Sistema DEBERÁ permitir navegación detallada desde nivel Proyecto hasta nivel Tramo
 
 ### Requirement 13: Generación de Reportes
 
@@ -386,17 +385,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 5. CUANDO se importa una geometría, EL Sistema DEBERÁ transformar coordenadas al sistema de referencia estándar del sistema si es necesario
 6. EL Sistema DEBERÁ mostrar advertencias cuando se detecten inconsistencias en el sistema de coordenadas
 
-### Requirement 27: Captura y Edición de Geometrías de Frentes
 
-**Historia de Usuario:** Como Geógrafo, quiero dividir el trazo de Tramos en Frentes, para poder segmentar el proyecto en subdivisiones operativas.
-
-#### Criterios de Aceptación
-
-1. CUANDO el Geógrafo crea un Frente, EL Sistema DEBERÁ almacenar la geometría como segmento de línea del Tramo padre
-2. EL Sistema DEBERÁ validar que la geometría del Frente esté contenida dentro del Tramo correspondiente
-3. CUANDO el Geógrafo modifica un Frente, EL Sistema DEBERÁ permitir edición de su geometría lineal
-4. EL Sistema DEBERÁ calcular la longitud del Frente automáticamente al capturar o modificar su geometría
-5. EL Sistema DEBERÁ permitir al Geógrafo dividir un Tramo en múltiples Frentes de forma interactiva en el mapa
 
 ### Requirement 28: Captura y Edición de Geometrías de Núcleos Agrarios
 
@@ -409,7 +398,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 3. CUANDO se captura una geometría de Núcleo_Agrario, EL Sistema DEBERÁ validar que el sistema de coordenadas sea WGS84 (EPSG:4326) o UTM zona correspondiente
 4. EL Sistema DEBERÁ permitir importar geometrías de Núcleos Agrarios desde archivos Shapefile, KML o GeoJSON
 5. EL Sistema DEBERÁ calcular automáticamente la superficie del polígono en hectáreas y metros cuadrados
-6. EL Sistema DEBERÁ detectar automáticamente intersecciones entre Núcleos Agrarios y Frentes
+6. EL Sistema DEBERÁ detectar automáticamente intersecciones entre Núcleos Agrarios y Tramos
 
 ### Requirement 29: Validación de Sistemas de Coordenadas
 
@@ -425,16 +414,16 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 30: Mapa Interactivo Principal
 
-**Historia de Usuario:** Como visualizador, quiero visualizar un mapa interactivo del proyecto ferroviario, para poder explorar espacialmente el trazo, frentes y núcleos agrarios.
+**Historia de Usuario:** Como visualizador, quiero visualizar un mapa interactivo del proyecto ferroviario, para poder explorar espacialmente el trazo, tramos y núcleos agrarios.
 
 #### Criterios de Aceptación
 
 1. EL Sistema DEBERÁ mostrar un mapa base interactivo con capacidades de zoom y paneo
 2. EL Sistema DEBERÁ renderizar el trazo completo del proyecto ferroviario como líneas sobre el mapa
 3. EL Sistema DEBERÁ mostrar los Tramos como líneas diferenciadas por color o estilo
-4. EL Sistema DEBERÁ mostrar los Frentes como segmentos del trazo con colores codificados según su porcentaje de avance
+4. EL Sistema DEBERÁ mostrar los Tramos como segmentos del proyecto con colores codificados según su porcentaje de avance
 5. EL Sistema DEBERÁ mostrar los Núcleos Agrarios como polígonos sobre el mapa
-6. EL Sistema DEBERÁ proporcionar controles de capas para activar/desactivar la visualización de Tramos, Frentes y Núcleos Agrarios
+6. EL Sistema DEBERÁ proporcionar controles de capas para activar/desactivar la visualización de Tramos y Núcleos Agrarios
 
 ### Requirement 31: Visualización de Núcleos Agrarios en Mapa
 
@@ -455,48 +444,13 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 #### Criterios de Aceptación
 
 1. CUANDO el usuario selecciona un Proyecto, EL Sistema DEBERÁ mostrar todos sus Tramos en el mapa
-2. CUANDO el usuario hace clic en un Tramo, EL Sistema DEBERÁ destacar ese Tramo y mostrar sus Frentes con colores según avance
+2. CUANDO el usuario hace clic en un Tramo, EL Sistema DEBERÁ destacar ese Tramo y mostrar sus Tramos con colores según avance
 3. EL Sistema DEBERÁ mostrar el porcentaje de avance general del Tramo seleccionado en panel informativo
-4. CUANDO el usuario hace clic en un Frente, EL Sistema DEBERÁ mostrar en panel lateral: porcentaje de avance total, porcentaje de superficie de uso común liberada, porcentaje de superficie de uso individual liberada
-5. CUANDO se selecciona un Frente, EL Sistema DEBERÁ listar los Núcleos Agrarios que intersectan ese Frente
+4. CUANDO el usuario hace clic en un Tramo, EL Sistema DEBERÁ mostrar en panel lateral: porcentaje de avance total, porcentaje de superficie de uso común liberada, porcentaje de superficie de uso individual liberada
+5. CUANDO se selecciona un Tramo, EL Sistema DEBERÁ listar los Núcleos Agrarios que intersectan ese Frente
 6. CUANDO el usuario hace clic en un Núcleo_Agrario desde la lista, EL Sistema DEBERÁ centrar el mapa en ese núcleo y abrir su ficha completa
 
-### Requirement 33: Panel de Información Detallada de Frente
 
-**Historia de Usuario:** Como visualizador, quiero ver información detallada de un Frente al seleccionarlo, para poder entender su progreso de liberación.
-
-#### Criterios de Aceptación
-
-1. CUANDO se selecciona un Frente, EL Sistema DEBERÁ mostrar de forma segregada y no excluyente: el Avance Legal y el Avance Geoespacial.
-2. EL Sistema DEBERÁ calcular el porcentaje de Avance Legal como: (superficie liberada inscrita formalmente / superficie total afectada) × 100
-3. EL Sistema DEBERÁ calcular el porcentaje de Avance Geoespacial como: (superficie afectada con geometría validada / superficie total afectada) × 100
-4. EL Sistema DEBERÁ mostrar desglose de superficie de uso común liberada y superficie de uso individual liberada
-5. EL Sistema DEBERÁ listar todos los Núcleos Agrarios que intersectan el Frente con: nombre, superficie afectada y estatus legal/espacial actual.
-
-### Requirement 34: Cálculo Automático de Superficies por Frente
-
-**Historia de Usuario:** Como visualizador, quiero que el sistema calcule automáticamente las superficies afectadas y liberadas por Frente, para obtener métricas de avance precisas.
-
-#### Criterios de Aceptación
-
-1. CUANDO existen geometrías de Frente y Núcleos Agrarios, EL Sistema DEBERÁ calcular automáticamente las intersecciones geométricas
-2. EL Sistema DEBERÁ calcular superficie total afectada por Frente como suma de todas las intersecciones con Núcleos Agrarios
-3. CUANDO un Convenio es inscrito en el RAN, EL Sistema DEBERÁ contabilizar la superficie correspondiente como liberada
-4. EL Sistema DEBERÁ calcular superficie liberada por Frente distinguiendo entre uso común y uso individual
-5. EL Sistema DEBERÁ recalcular automáticamente los porcentajes de avance cuando se actualicen geometrías o se inscriban convenios
-6. EL Sistema DEBERÁ validar que la suma de superficies liberadas no exceda la superficie total afectada del Frente
-
-### Requirement 35: Codificación de Colores por Avance de Frente
-
-**Historia de Usuario:** Como visualizador, quiero ver los Frentes codificados con colores según su porcentaje de avance, para identificar rápidamente el progreso en el mapa.
-
-#### Criterios de Aceptación
-
-1. CUANDO se muestra un Frente en el mapa, EL Sistema DEBERÁ aplicar color según su porcentaje de avance
-2. EL Sistema DEBERÁ usar escala de colores: rojo para avance <25%, amarillo para avance entre 25% y 75%, verde para avance >75%
-3. CUANDO el usuario pase el mouse sobre un Frente, EL Sistema DEBERÁ mostrar tooltip con: nombre del Frente, porcentaje de avance y superficie liberada
-4. EL Sistema DEBERÁ actualizar automáticamente los colores cuando cambien los porcentajes de avance
-5. EL Sistema DEBERÁ proporcionar leyenda visible explicando la escala de colores
 
 ### Requirement 36: Importación de Archivos Geoespaciales
 
@@ -510,7 +464,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 4. CUANDO se importa un archivo, EL Sistema DEBERÁ leer el sistema de coordenadas desde los metadatos del archivo (.prj en Shapefile)
 5. SI el sistema de coordenadas no se puede detectar, ENTONCES EL Sistema DEBERÁ solicitar al Geógrafo que lo especifique manualmente
 6. CUANDO se completa la importación, EL Sistema DEBERÁ mostrar resumen de geometrías importadas: número de elementos, tipo de geometría y sistema de coordenadas
-7. EL Sistema DEBERÁ validar que las geometrías importadas sean del tipo correcto (líneas para Tramos/Frentes, polígonos para Núcleos Agrarios)
+7. EL Sistema DEBERÁ validar que las geometrías importadas sean del tipo correcto (líneas para Tramos, polígonos para Núcleos Agrarios)
 
 
 ---
@@ -567,7 +521,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 **RNF-17:** CUANDO se renderiza un mapa con hasta 100 Núcleos Agrarios, EL Sistema DEBERÁ mostrar las geometrías dentro de 2 segundos.
 
-**RNF-18:** CUANDO se calculan intersecciones geométricas, EL Sistema DEBERÁ completar el cálculo para un Frente con hasta 50 Núcleos Agrarios en menos de 5 segundos.
+**RNF-18:** CUANDO se calculan intersecciones geométricas, EL Sistema DEBERÁ completar el cálculo para un Tramo con hasta 50 Núcleos Agrarios en menos de 5 segundos.
 
 **RNF-19:** EL Sistema DEBERÁ soportar visualización de geometrías con hasta 10,000 vértices sin degradación perceptible de rendimiento.
 
@@ -585,7 +539,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Migración de Datos
 
-La migración desde Excel está **estrictamente acotada a los campos descritos en el formato original operativo** (documentados en `Estructura Datos.md`). Estos campos son puramente administrativos, jurídicos y numéricos. 
+La migración desde Excel está **estrictamente acotada a los campos descritos en el formato original operativo** (documentados en `Estructura Datos.md`). Estos campos son puramente administrativos, jurídicos y numéricos.
 El alcance incluye exclusivamente:
 - Datos Generales de Núcleos Agrarios
 - Seguimiento de Afectación a Derechos Colectivos e Individuales
@@ -597,9 +551,9 @@ El alcance incluye exclusivamente:
 ### Estructura Geográfica
 
 El sistema debe reflejar la jerarquía:
-**Proyecto → Tramos → Frentes → Núcleos Agrarios → Afectaciones**
+**Proyecto → Tramo → Tramo_Núcleo → Afectación → proceso colectivo o individual**
 
-La entidad central que articula esta jerarquía es el **TramoNucleo** (la intersección geográfica y administrativa entre un Frente/Tramo y un Núcleo Agrario). El TramoNucleo genera todo el seguimiento posterior (Caminamiento, Asambleas, Convenios), funcionando como el "eje central" que agrupa las afectaciones y vincula las métricas de avance.
+La entidad central que articula esta jerarquía es el **Tramo_Núcleo** (la intersección geográfica y administrativa entre un Tramo y un Núcleo Agrario). El Tramo_Núcleo genera todo el seguimiento posterior (Caminamiento, Asambleas, Convenios), funcionando como el "eje central" que agrupa las afectaciones y vincula las métricas de avance.
 
 Cada nivel debe permitir agregación de métricas hacia niveles superiores.
 
@@ -627,8 +581,7 @@ El sistema debe manejar:
 ### Cálculos Automáticos de Superficie
 
 El sistema debe calcular automáticamente:
-- Superficie afectada por Frente mediante intersección geométrica con Núcleos Agrarios
-- Superficie liberada por Frente basada en Convenios inscritos en RAN
+- Superficie afectada por Tramo mediante intersección geométrica con Núcleos Agrarios
+- Superficie liberada por Tramo basada en Convenios inscritos en RAN
 - Porcentajes de avance distinguiendo entre uso común e individual
 - Validación de consistencia entre superficies calculadas geométricamente y superficies registradas administrativamente
-

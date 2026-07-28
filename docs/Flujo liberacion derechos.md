@@ -6,6 +6,10 @@ Te presento el procedimiento general detallado y paso a paso para la liberación
 2. Investigación Documental: Se identifican los núcleos agrarios (NA) y polígonos de propiedad social que cruzan el trazo. Se realizan consultas a la Dirección General de Terrenos Nacionales (DGTN) y al Registro Agrario Nacional (RAN).  
 3. Análisis de Condiciones: Se revisan las condiciones sociales, jurídicas y registrales del núcleo agrario, incluyendo el estatus de su padrón y de su Órgano de Representación (ORV).
 
+**Registro del caso en el sistema**
+
+Con el proyecto, tramo y núcleo agrario identificados, se crea el Tramo_Núcleo. Tras el análisis técnico o el caminamiento, se registra la Afectación con su polígono, superficie y tipo: colectiva o individual. Esta clasificación abre la ruta aplicable; no se registra como un resultado tardío del proceso.
+
 **Fase 2: Acercamiento, Sensibilización y Caminamiento**
 
 1. Contacto y Sensibilización: Se realiza un acercamiento inicial contactando a la Procuraduría Agraria (PA) y al Comisariado Ejidal (conformado por el Presidente, Tesorero y Secretario). Se lleva a cabo una reunión de sensibilización con el ORV y otros actores relevantes. La SEDATU, PA y ATTRAPI presentan el proyecto ante el Comisariado.  
@@ -13,7 +17,7 @@ Te presento el procedimiento general detallado y paso a paso para la liberación
 3. Avalúo Maestro: A la par, el INDAABIN se encarga de determinar el monto a pagar por metro cuadrado de afectación mediante un avalúo maestro.
 
 **Fase 3: Bifurcación de Vías (Colectivos vs. Individuales)**  
-Una vez hecho el análisis técnico-jurídico y el avalúo, el proceso se divide rigurosamente en dos rutas dependiendo del tipo de tenencia de la tierra:
+La bifurcación operativa se determina por el tipo de la Afectación previamente registrada. Las afectaciones colectivas corresponden a tierras de uso común; las individuales deben estar asociadas a una parcela y a su titular.
 
 Ruta A: Derechos Colectivos (Tierras de Uso Común)  
 Como estas tierras pertenecen a todo el núcleo, se requiere la aprobación legal de la asamblea.

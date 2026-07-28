@@ -1,3 +1,7 @@
+-- ARCHIVO HISTÓRICO. Representa el modelo anterior con Frente.
+-- No ejecutar en instalaciones actuales.
+-- El esquema vigente está en backend/db/migrations/.
+
 CREATE TABLE entidad_federativa (
     id_entidad SERIAL PRIMARY KEY,
     clave_inegi CHAR(2) UNIQUE NOT NULL,
@@ -1442,4 +1446,3 @@ $$ LANGUAGE plpgsql;
 - **DEBUG**: Información detallada para debugging
 
 **Campos de Log Estándar**:
-

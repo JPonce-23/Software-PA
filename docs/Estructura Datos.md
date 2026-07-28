@@ -1,3 +1,14 @@
+## Contexto común del expediente
+
+Antes de capturar los datos específicos de derechos colectivos o individuales, cada caso debe contar con:
+
+* Proyecto
+* Clave del Tramo
+* Número de Tramo
+* Núcleo Agrario
+* Consecutivo de Tramo_Núcleo
+* Afectación: tipo (`colectivo` o `individual`), superficie y geometría
+
 1. # **SEGUIMIENTO DE AFECTACIÓN A DERECHOS COLECTIVOS**
 
 Datos que  muestran una extensa matriz de seguimiento para derechos colectivos dividida en las siguientes categorías y subcampos.
@@ -18,10 +29,15 @@ Datos que  muestran una extensa matriz de seguimiento para derechos colectivos d
 * Fecha de Vencimiento de ORV  
 * Acta de Elección de ORV Inscrita en el RAN (Sí/No)
 
-**IDENTIFICACIÓN DEL TRAMO:** 
+**CONTEXTO TERRITORIAL Y AFECTACIÓN:**
 
-* Clave del Tramo   
-* Número de Tramo.
+* Proyecto
+* Clave del Tramo
+* Número de Tramo
+* Consecutivo Tramo_Núcleo
+* Tipo de Afectación
+* Superficie afectada
+* Geometría de la afectación
 
 **SENSIBILIZACIÓN:** 
 
@@ -173,10 +189,15 @@ Esta matriz rastrea las afectaciones de manera individualizada con los siguiente
 * Certificado Parcelario  
 * Folio de Derechos
 
-**IDENTIFICACIÓN DEL TRAMO:** 
+**CONTEXTO TERRITORIAL Y AFECTACIÓN:**
 
-* Clave del Tramo  
-* Número de Tramo.
+* Proyecto
+* Clave del Tramo
+* Número de Tramo
+* Consecutivo Tramo_Núcleo
+* Tipo de Afectación
+* Superficie afectada
+* Geometría de la afectación
 
 **CONVENIO DE OCUPACIÓN PREVIA \- INSCRIPCIÓN:** 
 

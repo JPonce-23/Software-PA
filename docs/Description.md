@@ -9,10 +9,15 @@ A través del sistema, nos interesa mostrar en tiempo real:
 
 **Visualización del Avance y Componente Geoespacial**
 El avance general se reflejará a través de gráficos (principalmente circulares o de pastel) mostrando el porcentaje de superficie liberada frente a la afectada. Además, el sistema contará con un motor geoespacial que permitirá visualizar en un mapa interactivo la unidad geográfica y operativa del proyecto:
-* **Tramos:** Los segmentos principales del proyecto ferroviario.
-* **Frentes:** Subdivisiones operativas de cada tramo, las cuales mostrarán su progreso mediante códigos de color.
-* **Polígonos Agrarios:** El sistema calculará automáticamente las intersecciones espaciales entre el paso del tren y las tierras de las comunidades.
+* **Proyectos:** Agrupan los tramos de cada obra ferroviaria.
+* **Tramos:** Segmentos principales del proyecto; constituyen la unidad territorial de consulta, asignación de usuarios y medición de avance.
+* **Cruces Tramo-Núcleo:** Representan los núcleos agrarios intersectados por cada tramo y dan contexto a los expedientes.
+* **Afectaciones:** Polígonos de impacto clasificados desde su alta como colectivos o individuales.
 * *(Nota: Las proporciones del trazo correspondientes a propiedad privada o terrenos nacionales se calcularán de manera dinámica por diferencia contra la longitud total del tramo, manteniendo la captura y el enfoque administrativo estrictamente en la propiedad social).*
+
+**Inicio del expediente**
+
+Después de identificar el cruce entre un tramo y un núcleo agrario, el sistema registra la afectación y su tipo de derecho. A partir de esa decisión, despliega el flujo colectivo —uso común, asamblea y COP colectivo— o el individual —parcela, titular y COP individual—.
 
 **Seguimiento del Proceso Legal**
 El sistema no solo arrojará métricas, sino que auditará el flujo agrario completo: desde el control de vigencia de las autoridades locales (ORV), las reuniones de sensibilización y asambleas, hasta la inscripción de actas en el Registro Agrario Nacional (RAN) y la cadena de oficios para el pago de indemnizaciones (FIFONAFE).

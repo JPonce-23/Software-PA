@@ -1,7 +1,10 @@
 A continuación, te detallo rigurosamente paso a paso cómo interviene la Procuraduría Agraria (PA) y en qué momento exacto se captura cada uno de los datos listados en el documento Estructura [Datos.md]:
 
-Fase 1: Identificación Administrativa y Diagnóstico Legal  
-Todo comienza cuando se recibe el trazo del proyecto y las instituciones deben identificar administrativamente la tierra y verificar el estatus legal de sus representantes en el Registro Agrario Nacional (RAN).
+Fase 1: Configuración territorial y apertura del caso
+
+El sistema registra primero el Proyecto y sus Tramos. Al identificar que un tramo intersecta un Núcleo Agrario, se crea el registro Tramo_Núcleo, que da contexto territorial y administrativo al expediente.
+
+Después del análisis técnico y del caminamiento, se crea una Afectación. La afectación registra la superficie y define desde el inicio si se trata de derechos colectivos o individuales; esa clasificación determina el flujo posterior.
 
 1\. Datos Generales y de Identificación del Tramo: Tanto para la ruta de colectivos como de individuales, se abre un expediente y la PA registra la base territorial:
 
@@ -123,7 +126,13 @@ Proceso de Expropiación sin un Convenio de Ocupación Previa: Las obras no pued
 Procedimiento de Expropiación: Consta de varios pasos formales: Solicitud, verificación de utilidad pública, notificación, instauración, trabajos técnicos, avalúo oficial, publicación del decreto, notificación, pago individual o colectivo (a través de FIFONAFE) y, por último, la ejecución del decreto.
 
 **Conceptos**  
-tramo: Representa cada uno de los tramos principales que conforman el proyecto ferroviario. Constituye la unidad geográfica y operativa de mayor nivel dentro del sistema, para el seguimiento del derecho de vía.  
+proyecto: Unidad de planeación de mayor nivel. Agrupa los tramos que integran una obra o intervención ferroviaria.
+
+tramo: Segmento principal de un proyecto ferroviario. Pertenece a un único proyecto y constituye la unidad territorial para asignar responsables y medir avance.
+
+tramo_núcleo: Expediente territorial y administrativo que vincula un tramo con un núcleo agrario. Es el contexto obligatorio para registrar afectaciones.
+
+afectación: Registro inicial del caso de liberación dentro de un tramo_núcleo. Delimita la superficie afectada y se clasifica como colectiva o individual antes de iniciar las actuaciones específicas de cada vía.
 núcleo agrario: Es la entidad central del sistema. Representa cada ejido o comunidad agraria que es atravesado o afectado por el proyecto ferroviario,. Alrededor del cual se articula Todo el seguimiento de derechos colectivos, e individuales, convenios, asambleas, afectaciones  y documentación relacionada con el derecho de vía.  
 entidad\_federativa: Estado de la República al que se encuentra adscrito registralmente el núcleo agrario para fines de identificación y seguimiento dentro del sistema. Puede diferir de la localización geográfica.  
 municipio: Municipio al que se encuentra adscrito registralmente el núcleo agrario para fines de identificación y seguimiento dentro del sistema. Puede diferir de la localización geográfica.  

@@ -1,12 +1,15 @@
 A continuación, se detalla rigurosamente paso a paso cómo interviene la Procuraduría Agraria (PA) y en qué momento exacto se captura cada uno de los datos en el sistema integral:
 
-Fase 1: Identificación Administrativa, Diagnóstico Legal y Estructura Base
-Todo comienza cuando se recibe el trazo del proyecto y las instituciones deben identificar administrativamente la tierra y verificar el estatus legal de sus representantes en el Registro Agrario Nacional (RAN).
+Fase 1: Configuración territorial y apertura del caso
 
-1. Datos Generales (Multi-Proyecto) y de Identificación del Tramo: Se abre un expediente y la PA registra la base territorial de manera escalable:
-* Proyecto: Identificador del proyecto (ej. "Tren Maya", "Tren Interoceánico") para permitir la escalabilidad del sistema.
-* Clave del Tramo y Frente de Obra (¿necesario?): Subdivisión logística para asignar brigadas y metas.
-* Consecutivo: Número de control interno asignado al registro.
+El sistema registra primero el Proyecto y sus Tramos. Al identificar que un tramo intersecta un Núcleo Agrario, se crea el registro Tramo_Núcleo, que da contexto territorial y administrativo al expediente.
+
+Después del análisis técnico y del caminamiento, se crea una Afectación. La afectación registra la superficie y define desde el inicio si se trata de derechos colectivos o individuales; esa clasificación determina el flujo posterior.
+
+1. Datos Generales y de Identificación del Tramo: Se abre un expediente y la PA registra la base territorial de manera escalable:
+* Proyecto: Unidad de planeación de mayor nivel que agrupa los tramos.
+* Clave del Tramo: Segmento principal del proyecto, unidad territorial para asignar responsables y medir avance.
+* Consecutivo de Tramo_Núcleo: Número de control interno asignado al cruce.
 * Entidad y Municipio: Ubicación registral del núcleo agrario.
 * Residencia: La oficina regional de la PA encargada del seguimiento.
 * Núcleo Agrario: El nombre oficial de la población.
