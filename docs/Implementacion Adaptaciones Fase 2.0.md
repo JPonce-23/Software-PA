@@ -3,6 +3,12 @@
 **Fecha:** 28 de julio de 2026  
 **Estado:** Cortes A, B y C construidos; 004 aplicada a la base activa limpia.
 
+> **Ubicación en el plan maestro:** esta implementación fue una adaptación
+> adicional realizada entre el Corte principal 1 y el Corte principal 2. Los
+> nombres Corte A, B y C de este documento no equivalen a los cortes numerados
+> del proyecto. El plan maestro y el punto de continuación se encuentran en
+> `ESTADO_PROYECTO.md`.
+
 ## 1. Fuente ejecutable de la migración
 
 La única fuente ejecutable del Corte A es:
@@ -451,6 +457,14 @@ La validación del frontend terminó con cero advertencias de `oxlint`. El build
 de producción quedó dividido por ruta y por módulo; ningún chunk supera
 500 kB.
 
+Esos resultados son validaciones técnicas y no sustituyen una prueba funcional
+de todos los recorridos. Durante la actualización documental posterior se
+detectó que `DocumentosPanel.jsx` envía
+`entidad_relacionada_tipo = 'tramo_nucleo'`, mientras que
+`documentacion_soporte` sólo admite `nucleo_agrario`, `afectacion`, `convenio`
+u `orv`. La creación desde ese panel debe considerarse pendiente y corregirse
+en el Corte principal 2 para usar la afectación abierta.
+
 La ejecución diaria de alertas se implementó como servicio independiente:
 
 ```text
@@ -467,6 +481,121 @@ terminó correctamente con cero alertas por generar.
 Los siguientes cortes y tareas permanecen pendientes:
 
 - Validación funcional y de experiencia de usuario con usuarios finales.
-- Conciliación de identidades migradas.
-- Migración 005 de contracción.
+- Conciliación de identidades migradas únicamente cuando existan datos
+  heredados reales que lo requieran.
+- Evaluación de `persona_fuente_legacy`: es trazabilidad de transición, no una
+  tercera tabla maestra de identidad. Puede retirarse en una base limpia si
+  ningún proceso de importación necesita ese linaje.
+- Migración de contracción de columnas heredadas, después del Corte principal
+  2. No asumir que seguirá siendo la versión 005.
+- Corrección y prueba integral del panel documental para relacionarlo con
+  `afectacion`, no con el tipo inválido `tramo_nucleo`.
 - Consolidación posterior de `001_init_schema.sql`.
+
+## 10. Continuidad con el plan maestro
+
+### 10.1 Trabajo ya terminado
+
+```text
+Corte principal 1
+└── Proyecto + Tramo + retiro de Frente + usuario_tramo
+
+Adaptaciones 2.0
+├── Corte A: migración 004
+├── Corte B: backend modular
+└── Corte C: frontend
+```
+
+Commits de referencia:
+
+```text
+d80983a feat: agregar tabla proyecto y eliminar tabla frente
+05919de feat: preparar adaptaciones estructurales fase 2
+f6f7073 feat(backend): implementar adaptaciones fase 2
+e65010d feat(frontend): integrar flujo operativo fase 2
+```
+
+### 10.2 Próximo trabajo: Corte principal 2
+
+La decisión funcional posterior a esta adaptación es convertir
+`afectacion` en la identidad del expediente operativo, manteniendo
+`tramo_nucleo` como agrupador territorial.
+
+Situación implementada actualmente:
+
+```text
+/expedientes
+└── lista registros tramo_nucleo
+
+/expedientes/:id_tramo_nucleo
+├── afectaciones colectivas
+├── afectaciones individuales
+├── asambleas
+├── ORV
+├── minutas
+├── pagos
+└── documentos
+```
+
+Arquitectura objetivo:
+
+```text
+/expedientes
+└── lista afectaciones
+
+/expedientes/:id_afectacion
+├── identidad colectiva o individual
+├── acercamiento y sensibilización
+├── caminamiento
+├── BDT
+├── actividades y minutas
+├── asamblea, cuando corresponda
+├── convenio
+├── FIFONAFE y pagos
+├── documentos
+└── cierre
+```
+
+La sensibilización no se elimina: es la actividad social previa al
+caminamiento. El caminamiento delimita la superficie, confirma la geometría e
+identifica los bienes distintos a la tierra. `monto_bdt` conserva el total
+económico acordado; todavía no hay una tabla de inventario detallado por bien.
+
+El Corte principal 2 debe empezar con una auditoría, no con una migración:
+
+1. Localizar modelos, schemas, endpoints y componentes que usan
+   `id_tramo_nucleo`.
+2. Determinar cuáles registros pertenecen a una afectación concreta.
+3. Mantener como compartidos los catálogos, personas, núcleo y ORV.
+4. Definir backfill sólo donde la relación sea inequívoca.
+5. Proponer una migración expansiva antes de retirar columnas o rutas.
+6. Agregar un endpoint agregado por `id_afectacion`.
+7. Cambiar navegación y filtros del frontend.
+8. Probar que dos afectaciones del mismo cruce no compartan accidentalmente
+   minutas, pagos, documentos o estados.
+9. Corregir `DocumentosPanel.jsx` para enviar
+   `entidad_relacionada_tipo = 'afectacion'` y el `id_afectacion` abierto.
+
+Si el Corte principal 2 requiere cambios de esquema, la recomendación es usar
+la versión 005 para expansión y posponer la contracción de Adaptaciones 2.0 a
+006. Esta numeración debe confirmarse al aprobar el diseño.
+
+### 10.3 Cortes principales posteriores
+
+```text
+Corte 3 — Seguridad inmediata
+  Hecho: handler global sin fuga y escape XSS del mapa.
+  Pendiente: .env, retirar secretos literales y rotarlos.
+
+Corte 4 — Autenticación formal
+  Pendiente: abandonar localStorage, sesiones, revocación, intentos fallidos
+  e inactividad.
+
+Corte 5 — Importación y reportes
+  Pendiente: endurecer GeoJSON y producir dashboard/reportes por proyecto y
+  afectación.
+```
+
+No deben repetirse el módulo Proyecto ni las Adaptaciones A–C. Para el estado
+completo, reglas de migración y orden de lectura consultar
+`ESTADO_PROYECTO.md`.

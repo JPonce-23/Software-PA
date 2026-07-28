@@ -1,5 +1,14 @@
 # Plan de Trabajo Técnico — Adaptaciones Fase 2.0
 
+> **Contexto dentro del plan maestro:** este documento no describe el Corte
+> principal 2 del proyecto. Adaptaciones 2.0 fue un trabajo adicional ejecutado
+> después del Corte principal 1 (Proyecto y retiro de Frente) y antes de
+> retomar el Corte principal 2 (Afectación como origen del expediente).
+> Sus Cortes A, B, C y D son subcortes internos de esta adaptación.
+
+**Estado al 28 de julio de 2026:** Cortes A, B y C construidos y validados;
+Corte D pendiente y subordinado al nuevo flujo por afectación.
+
 ## Objetivo
 
 Incorporar cinco capacidades al sistema sin perder información ni romper la
@@ -110,6 +119,9 @@ Se reutilizan `alertas` y `alertas_vistas`.
 
 ### Corte A — Expansión y migración de datos
 
+**Estado al 28 de julio de 2026: construido, validado y aplicado en la base
+activa local limpia.**
+
 Archivo ejecutable:
 `backend/db/migrations/004_adaptaciones_fase2.sql`
 
@@ -193,16 +205,94 @@ Resultado:
 
 ### Corte D — Contracción
 
-Después de validar producción:
+Después de implementar y validar el Corte principal 2:
 
 1. Confirmar que no existen lecturas/escrituras de los campos heredados.
 2. Confirmar paridad y resolver candidatos duplicados.
-3. Crear una migración 005 que elimine:
+3. Crear una migración de contracción que elimine:
    - Las seis columnas de nombres en `orv`.
    - `parcela.nombre_titular`.
    - `documentacion_soporte.url_archivo`, después de migrar todos los archivos.
-4. Consolidar el esquema final en `001_init_schema.sql` para instalaciones
+4. Evaluar si `persona_fuente_legacy` debe conservarse. En una base limpia sin
+   datos heredados puede retirarse, pero en un entorno migrado conserva el
+   linaje necesario para conciliación.
+5. Consolidar el esquema final en `001_init_schema.sql` para instalaciones
    nuevas.
+
+La contracción se había proyectado inicialmente como migración 005. Esa
+numeración ya no debe darse por definitiva: el Corte principal 2 puede
+necesitar primero una migración expansiva para vincular módulos con
+`afectacion`. La recomendación actual es reservar 005 para esa expansión, si
+la auditoría la confirma, y usar 006 para la contracción.
+
+## Relación con el Corte principal 2
+
+### Estado actual
+
+El frontend sigue usando `tramo_nucleo` como identidad del expediente:
+
+```text
+/expedientes/:id_tramo_nucleo
+```
+
+Dentro de esa pantalla se mezclan afectaciones colectivas e individuales y
+varios módulos se filtran solamente por `id_tramo_nucleo`. La tabla
+`afectacion` ya contiene tipo, tenencia, superficie, geometría y parcela; los
+convenios la referencian obligatoriamente. Sin embargo, todavía funciona como
+un registro secundario dentro del expediente territorial.
+
+Existe además un defecto conocido: `DocumentosPanel.jsx` usa
+`entidad_relacionada_tipo = 'tramo_nucleo'`, valor no admitido por la
+restricción de `documentacion_soporte`. El Corte principal 2 debe corregirlo
+para relacionar los documentos con la afectación abierta y cubrir el recorrido
+con una prueba de integración.
+
+### Decisión aprobada
+
+`tramo_nucleo` se conserva como agrupador territorial y `afectacion` pasa a
+ser el origen del expediente operativo:
+
+```text
+Proyecto
+└── Tramo
+    └── Tramo_Núcleo
+        └── Afectación
+            ├── acercamiento y sensibilización
+            ├── caminamiento
+            ├── BDT, cuando aplique
+            ├── asamblea, cuando aplique
+            ├── minutas y acuerdos
+            ├── convenio
+            ├── FIFONAFE y pagos
+            ├── documentos
+            └── cierre
+```
+
+La ruta objetivo será conceptualmente
+`/expedientes/:id_afectacion`. Una afectación colectiva utilizará el núcleo y
+su representación; una individual utilizará persona, parcela y titularidad.
+ORV seguirá perteneciendo al núcleo porque puede servir a más de una
+afectación y no debe duplicarse.
+
+La sensibilización permanece como etapa social explícita, previa al
+caminamiento. El caminamiento confirma superficie y geometría e identifica
+bienes distintos a la tierra. Actualmente se conserva el resultado económico
+en `convenio.monto_bdt`; un inventario detallado de BDT requiere diseño y
+confirmación funcional antes de agregar tablas.
+
+### Trabajo requerido antes de codificar
+
+1. Auditar todas las FK y consultas que usan `id_tramo_nucleo`.
+2. Clasificar entidades como territoriales, propias de una afectación o
+   compartidas.
+3. Diseñar una transición expandir–migrar–verificar–retirar.
+4. Definir endpoint agregado y estados del expediente por afectación.
+5. Evitar inferir automáticamente relaciones ambiguas en bases con datos.
+6. Probar aislamiento entre dos afectaciones del mismo `tramo_nucleo`.
+7. Corregir la creación y consulta documental para usar la afectación como
+   entidad relacionada.
+
+El detalle y estado del plan maestro se mantiene en `ESTADO_PROYECTO.md`.
 
 ## Pruebas obligatorias
 
@@ -246,4 +336,6 @@ La fase se considera lista cuando:
 - Las pruebas de regresión e integridad pasan.
 - Las alertas tienen ejecución diaria configurada.
 - Existe respaldo previo y procedimiento de restauración probado.
-- Las columnas heredadas están sin uso y listas para retirarse mediante 005.
+- Las columnas heredadas están sin uso y listas para retirarse mediante una
+  migración de contracción posterior. Su número final se decidirá después de
+  diseñar el Corte principal 2.
