@@ -15,3 +15,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Runtime file storage
+uploads/
+backend/uploads/

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 from typing import Optional, List, Literal, Any
 from decimal import Decimal
 from datetime import date, datetime
@@ -41,8 +41,7 @@ class UsuarioResponse(UsuarioBase):
     id_usuario: int
     activo: bool
     fecha_alta: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ----------------- PROYECTO ----------------- #
 class ProyectoBase(BaseModel):
@@ -63,8 +62,7 @@ class ProyectoUpdate(AuditableUpdate):
 
 class ProyectoResponse(ProyectoBase):
     id_proyecto: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ----------------- MAPA Y ENTIDADES BASE ----------------- #
 class TramoBase(BaseModel):
@@ -93,8 +91,7 @@ class TramoResponse(TramoBase):
     id_tramo: int
     id_proyecto: int
     geometria_wkt: Optional[str] = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class NucleoAgrarioCreate(AuditableCreate):
     id_municipio: int
@@ -116,8 +113,7 @@ class NucleoAgrarioResponse(BaseModel):
     tipo_nucleo: Literal['ejido', 'comunidad']
     comunidad_indigena: bool
     geometria_wkt: Optional[str] = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ----------------- TRAMO NUCLEO ----------------- #
 class TramoNucleoCreate(AuditableCreate):
@@ -152,8 +148,7 @@ class TramoNucleoResponse(BaseModel):
     proyecto_no_afecta_uso_comun: Optional[bool] = None
     activo: bool
     observaciones: Optional[str] = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ----------------- PARCELA ----------------- #
 class ParcelaCreate(AuditableCreate):
@@ -180,8 +175,7 @@ class ParcelaUpdate(AuditableUpdate):
 class ParcelaResponse(ParcelaCreate):
     id_parcela: int
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ----------------- DASHBOARD ----------------- #
 class DashboardMetrics(BaseModel):
@@ -199,8 +193,7 @@ class DashboardMetrics(BaseModel):
     porcentaje_avance_legal: Decimal
     porcentaje_avance_geoespacial: Decimal
     total_convenios_formalizados_ran: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ----------------- FLUJO DE LIBERACIÓN ----------------- #
 class AfectacionCreate(AuditableCreate):
@@ -236,8 +229,7 @@ class AfectacionResponse(AfectacionCreate):
     id_afectacion: int
     geometria_wkt: Optional[str] = None
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AsambleaCreate(AuditableCreate):
     id_nucleo: int
@@ -278,8 +270,7 @@ class AsambleaUpdate(AuditableUpdate):
 class AsambleaResponse(AsambleaCreate):
     id_asamblea: int
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ConvenioCreate(AuditableCreate):
     id_tramo_nucleo: int
@@ -323,8 +314,7 @@ class ConvenioResponse(ConvenioCreate):
     documentacion_disponible: Optional[bool] = None
     documentacion_faltante: Optional[str] = None
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OrvCreate(AuditableCreate):
     id_nucleo: int
@@ -337,6 +327,12 @@ class OrvCreate(AuditableCreate):
     consejo_vigilancia_secretario1: Optional[str] = None
     consejo_vigilancia_secretario2: Optional[str] = None
     acta_eleccion_inscrita_ran: Optional[bool] = False
+
+    @model_validator(mode='after')
+    def validar_vigencia(self):
+        if self.fin_vigencia < self.inicio_vigencia:
+            raise ValueError('fin_vigencia no puede ser anterior a inicio_vigencia')
+        return self
 
 class OrvUpdate(AuditableUpdate):
     numero_orv: Optional[str] = None
@@ -355,8 +351,7 @@ class OrvUpdate(AuditableUpdate):
 class OrvResponse(OrvCreate):
     id_orv: int
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PadronHistorialCreate(AuditableCreate):
     id_nucleo: int
@@ -370,8 +365,7 @@ class PadronHistorialUpdate(AuditableUpdate):
 class PadronHistorialResponse(PadronHistorialCreate):
     id_padron: int
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ActividadCampoCreate(AuditableCreate):
     id_tramo_nucleo: int
@@ -388,8 +382,7 @@ class ActividadCampoUpdate(AuditableUpdate):
 class ActividadCampoResponse(ActividadCampoCreate):
     id_actividad: int
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TramiteFifonafeCreate(AuditableCreate):
     id_tramo_nucleo: int
@@ -423,8 +416,7 @@ class TramiteFifonafeResponse(TramiteFifonafeCreate):
     fecha_oficio_rpta_repr_a_dgaopr: Optional[date] = None
     fecha_oficio_rpta_dgaopr_a_fifonafe: Optional[date] = None
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DocumentacionSoporteCreate(AuditableCreate):
     entidad_relacionada_id: int
@@ -432,17 +424,15 @@ class DocumentacionSoporteCreate(AuditableCreate):
     tipo_documento: str
     categoria: str
     es_critico: bool = False
-    url_archivo: Optional[str] = None
 
 class DocumentacionSoporteUpdate(AuditableUpdate):
     categoria: Optional[str] = None
-    url_archivo: Optional[str] = None
 
 class DocumentacionSoporteResponse(DocumentacionSoporteCreate):
     id_documento: int
+    url_archivo: Optional[str] = None
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Para Alertas ---
 class AlertaCreate(BaseModel):
@@ -463,8 +453,383 @@ class AlertaResponse(AlertaCreate):
     id_alerta: int
     esta_activa: bool
     fecha_creacion: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+# ==================== ADAPTACIONES FASE 2 ==================== #
+
+CalidadAgraria = Literal[
+    'ejidatario', 'comunero', 'avecindado', 'posesionario',
+    'representante', 'otro'
+]
+CargoOrv = Literal[
+    'comisariado_presidente', 'comisariado_secretario',
+    'comisariado_tesorero', 'consejo_vigilancia_presidente',
+    'consejo_vigilancia_secretario1', 'consejo_vigilancia_secretario2'
+]
+
+
+class PersonaCreate(AuditableCreate):
+    curp: Optional[str] = None
+    rfc: Optional[str] = None
+    nombre: str = Field(min_length=1, max_length=300)
+    apellido_paterno: Optional[str] = Field(default=None, max_length=200)
+    apellido_materno: Optional[str] = Field(default=None, max_length=200)
+    telefono: Optional[str] = Field(default=None, max_length=20)
+    correo_electronico: Optional[str] = Field(default=None, max_length=320)
+
+    @field_validator(
+        'curp', 'rfc', 'apellido_paterno', 'apellido_materno',
+        'telefono', 'correo_electronico', mode='before'
+    )
+    @classmethod
+    def normalizar_opcionales(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+    @field_validator('curp', 'rfc')
+    @classmethod
+    def normalizar_identificadores(cls, value):
+        return value.upper() if value else None
+
+    @field_validator('nombre')
+    @classmethod
+    def nombre_no_vacio(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError('El nombre no puede estar vacío')
+        return value
+
+
+class PersonaUpdate(BaseModel):
+    curp: Optional[str] = None
+    rfc: Optional[str] = None
+    nombre: Optional[str] = Field(default=None, min_length=1, max_length=300)
+    apellido_paterno: Optional[str] = Field(default=None, max_length=200)
+    apellido_materno: Optional[str] = Field(default=None, max_length=200)
+    telefono: Optional[str] = Field(default=None, max_length=20)
+    correo_electronico: Optional[str] = Field(default=None, max_length=320)
+    observaciones: Optional[str] = None
+
+    @field_validator(
+        'curp', 'rfc', 'apellido_paterno', 'apellido_materno',
+        'telefono', 'correo_electronico', mode='before'
+    )
+    @classmethod
+    def normalizar_texto(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+    @field_validator('curp', 'rfc')
+    @classmethod
+    def normalizar_identificadores(cls, value):
+        return value.upper() if value else None
+
+    @field_validator('nombre', mode='before')
+    @classmethod
+    def nombre_no_nulo(cls, value):
+        if value is None or not isinstance(value, str) or not value.strip():
+            raise ValueError('El nombre no puede ser nulo ni vacío')
+        return value.strip()
+
+
+class PersonaResponse(PersonaCreate):
+    id_persona: int
+    datos_identidad_incompletos: bool
+    origen_registro: Literal['captura_sistema', 'migracion_legacy']
+    activo: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PersonaNucleoCreate(BaseModel):
+    id_nucleo: int
+    calidad_agraria: Optional[CalidadAgraria] = None
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+    observaciones: Optional[str] = None
+
+    @model_validator(mode='after')
+    def validar_fechas(self):
+        if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValueError('fecha_fin no puede ser anterior a fecha_inicio')
+        return self
+
+
+class PersonaNucleoResponse(PersonaNucleoCreate):
+    id_persona_nucleo: int
+    id_persona: int
+    activo: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OrvIntegranteCreate(BaseModel):
+    id_persona: int
+    cargo: CargoOrv
+    calidad_agraria: Optional[CalidadAgraria] = 'representante'
+    observaciones: Optional[str] = None
+
+
+class OrvIntegranteResponse(BaseModel):
+    id_orv_integrante: int
+    id_orv: int
+    id_nucleo: int
+    id_persona: int
+    cargo: CargoOrv
+    activo: bool
+    persona: PersonaResponse
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ParcelaTitularCreate(BaseModel):
+    id_persona: int
+    tipo_derecho: Literal['titular', 'cotitular', 'posesionario', 'otro'] = 'titular'
+    porcentaje_participacion: Optional[Decimal] = Field(
+        default=None, gt=0, le=100, max_digits=7, decimal_places=4
+    )
+    calidad_agraria: Optional[CalidadAgraria] = None
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+    observaciones: Optional[str] = None
+
+    @model_validator(mode='after')
+    def validar_fechas(self):
+        if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValueError('fecha_fin no puede ser anterior a fecha_inicio')
+        return self
+
+
+class ParcelaTitularResponse(ParcelaTitularCreate):
+    id_parcela_titular: int
+    id_parcela: int
+    id_nucleo: int
+    activo: bool
+    persona: PersonaResponse
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ParcelaConTitularCreate(BaseModel):
+    parcela: ParcelaCreate
+    titular: ParcelaTitularCreate
+
+
+class OrvConIntegrantesCreate(BaseModel):
+    orv: OrvCreate
+    integrantes: List[OrvIntegranteCreate] = Field(min_length=1, max_length=6)
+
+    @model_validator(mode='after')
+    def validar_cargos_unicos(self):
+        cargos = [integrante.cargo for integrante in self.integrantes]
+        if len(cargos) != len(set(cargos)):
+            raise ValueError('No se puede repetir un cargo en el mismo ORV')
+        return self
+
+
+class MinutaCreate(AuditableCreate):
+    id_tramo_nucleo: int
+    id_actividad: Optional[int] = None
+    fecha_reunion: date
+    lugar: Optional[str] = Field(default=None, max_length=300)
+    asunto: str = Field(min_length=1, max_length=300)
+    resumen: Optional[str] = None
+    folio: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator('asunto')
+    @classmethod
+    def asunto_no_vacio(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError('El asunto no puede estar vacío')
+        return value
+
+
+class MinutaUpdate(AuditableUpdate):
+    id_actividad: Optional[int] = None
+    fecha_reunion: Optional[date] = None
+    lugar: Optional[str] = Field(default=None, max_length=300)
+    asunto: Optional[str] = Field(default=None, min_length=1, max_length=300)
+    resumen: Optional[str] = None
+    folio: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator('asunto')
+    @classmethod
+    def asunto_no_vacio(cls, value):
+        if value is None:
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError('El asunto no puede estar vacío')
+        return value
+
+
+class MinutaResponse(MinutaCreate):
+    id_minuta: int
+    activo: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AcuerdoCreate(AuditableCreate):
+    descripcion: str = Field(min_length=1)
+    fecha_limite: Optional[date] = None
+    fecha_cumplimiento: Optional[date] = None
+    estatus: Literal['pendiente', 'cumplido', 'cancelado', 'vencido'] = 'pendiente'
+    prioridad: Literal['alta', 'media', 'baja'] = 'media'
+    id_persona_responsable: Optional[int] = None
+    id_usuario_responsable: Optional[int] = None
+    responsable_externo: Optional[str] = Field(default=None, max_length=300)
+
+    @field_validator('descripcion')
+    @classmethod
+    def descripcion_no_vacia(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError('La descripción no puede estar vacía')
+        return value
+
+    @field_validator('responsable_externo', mode='before')
+    @classmethod
+    def normalizar_responsable_externo(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+    @model_validator(mode='after')
+    def validar_responsable_y_cumplimiento(self):
+        responsables = [
+            self.id_persona_responsable is not None,
+            self.id_usuario_responsable is not None,
+            bool(self.responsable_externo and self.responsable_externo.strip()),
+        ]
+        if sum(responsables) != 1:
+            raise ValueError('Debe indicar exactamente un responsable')
+        if (self.estatus == 'cumplido') != (self.fecha_cumplimiento is not None):
+            raise ValueError('Un acuerdo cumplido requiere fecha_cumplimiento')
+        return self
+
+
+class AcuerdoUpdate(BaseModel):
+    descripcion: Optional[str] = Field(default=None, min_length=1)
+    fecha_limite: Optional[date] = None
+    fecha_cumplimiento: Optional[date] = None
+    estatus: Optional[Literal['pendiente', 'cumplido', 'cancelado', 'vencido']] = None
+    prioridad: Optional[Literal['alta', 'media', 'baja']] = None
+    id_persona_responsable: Optional[int] = None
+    id_usuario_responsable: Optional[int] = None
+    responsable_externo: Optional[str] = Field(default=None, max_length=300)
+    observaciones: Optional[str] = None
+
+    @field_validator('descripcion')
+    @classmethod
+    def descripcion_no_vacia(cls, value):
+        if value is None:
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError('La descripción no puede estar vacía')
+        return value
+
+    @field_validator('responsable_externo', mode='before')
+    @classmethod
+    def normalizar_responsable_externo(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+
+class AcuerdoResponse(AcuerdoCreate):
+    id_acuerdo: int
+    id_minuta: int
+    activo: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentoVersionResponse(BaseModel):
+    id_documento_version: int
+    id_documento: int
+    numero_version: int
+    hash_sha256: str
+    tamano_bytes: int
+    nombre_archivo_original: str
+    tipo_mime: Optional[str] = None
+    fecha_carga: datetime
+    activo: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PagoIndemnizacionCreate(AuditableCreate):
+    id_tramite_fifonafe: int
+    monto_pagado: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
+    fecha_pago: date
+    tipo_pago: Literal['anticipo', 'parcial', 'total']
+    medio_pago: Optional[
+        Literal['transferencia', 'cheque', 'deposito', 'otro']
+    ] = None
+    banco_emisor: Optional[str] = Field(default=None, max_length=100)
+    referencia_bancaria: Optional[str] = Field(default=None, max_length=100)
+    id_persona_beneficiaria: Optional[int] = None
+    beneficiario_externo: Optional[str] = Field(default=None, max_length=300)
+
+    @field_validator(
+        'banco_emisor',
+        'referencia_bancaria',
+        'beneficiario_externo',
+        mode='before',
+    )
+    @classmethod
+    def normalizar_textos_opcionales(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+    @model_validator(mode='after')
+    def validar_beneficiario(self):
+        valores = [
+            self.id_persona_beneficiaria is not None,
+            bool(self.beneficiario_externo and self.beneficiario_externo.strip()),
+        ]
+        if sum(valores) != 1:
+            raise ValueError('Debe indicar exactamente un beneficiario')
+        return self
+
+
+class PagoIndemnizacionUpdate(BaseModel):
+    monto_pagado: Optional[Decimal] = Field(
+        default=None, gt=0, max_digits=18, decimal_places=2
+    )
+    fecha_pago: Optional[date] = None
+    tipo_pago: Optional[Literal['anticipo', 'parcial', 'total']] = None
+    medio_pago: Optional[
+        Literal['transferencia', 'cheque', 'deposito', 'otro']
+    ] = None
+    banco_emisor: Optional[str] = Field(default=None, max_length=100)
+    referencia_bancaria: Optional[str] = Field(default=None, max_length=100)
+    id_persona_beneficiaria: Optional[int] = None
+    beneficiario_externo: Optional[str] = Field(default=None, max_length=300)
+    observaciones: Optional[str] = None
+
+    @field_validator(
+        'banco_emisor',
+        'referencia_bancaria',
+        'beneficiario_externo',
+        mode='before',
+    )
+    @classmethod
+    def normalizar_textos_opcionales(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+
+class PagoIndemnizacionResponse(PagoIndemnizacionCreate):
+    id_pago: int
+    activo: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AlertasNoVistasCount(BaseModel):
+    total: int
 
 # ==================== CATÁLOGOS ==================== #
 class EntidadFederativaResponse(BaseModel):
@@ -472,8 +837,7 @@ class EntidadFederativaResponse(BaseModel):
     clave_inegi: str
     nombre: str
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MunicipioResponse(BaseModel):
     id_municipio: int
@@ -481,8 +845,7 @@ class MunicipioResponse(BaseModel):
     clave_inegi: str
     nombre: str
     activo: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ==================== BITÁCORA ==================== #
 class BitacoraResponse(BaseModel):

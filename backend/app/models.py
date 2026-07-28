@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 from sqlalchemy.dialects.postgresql import JSONB, INET
@@ -258,7 +258,11 @@ class DocumentacionSoporte(Base, AuditableMixin):
     es_critico = Column(Boolean, nullable=False, default=False)
     url_archivo = Column(String)
     activo = Column(Boolean, default=True, nullable=False)
-    fecha_carga = Column(DateTime(timezone=True), nullable=False)
+    fecha_carga = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
 class Alertas(Base, AuditableMixin):
     __tablename__ = "alertas"
@@ -274,11 +278,159 @@ class Alertas(Base, AuditableMixin):
     esta_activa = Column(Boolean, default=True, nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
 
-class AlertasVistas(Base):
+class Persona(Base, AuditableMixin):
+    __tablename__ = "persona"
+    id_persona = Column(Integer, primary_key=True, index=True)
+    curp = Column(String(18), nullable=True)
+    rfc = Column(String(13), nullable=True)
+    nombre = Column(String(300), nullable=False)
+    apellido_paterno = Column(String(200), nullable=True)
+    apellido_materno = Column(String(200), nullable=True)
+    telefono = Column(String(20), nullable=True)
+    correo_electronico = Column(String(320), nullable=True)
+    datos_identidad_incompletos = Column(Boolean, nullable=False, default=False)
+    origen_registro = Column(String(30), nullable=False, default="captura_sistema")
+    clave_origen_legacy = Column(String(150), nullable=True, unique=True)
+    activo = Column(Boolean, nullable=False, default=True)
+
+
+class PersonaNucleo(Base, AuditableMixin):
+    __tablename__ = "persona_nucleo"
+    __table_args__ = (
+        UniqueConstraint("id_nucleo", "id_persona", name="uq_persona_nucleo"),
+    )
+    id_persona_nucleo = Column(Integer, primary_key=True, index=True)
+    id_persona = Column(Integer, ForeignKey("persona.id_persona"), nullable=False)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    calidad_agraria = Column(String(30), nullable=True)
+    fecha_inicio = Column(Date, nullable=True)
+    fecha_fin = Column(Date, nullable=True)
+    activo = Column(Boolean, nullable=False, default=True)
+    persona = relationship("Persona")
+    nucleo = relationship("NucleoAgrario")
+
+
+class PersonaFuenteLegacy(Base, AuditableMixin):
+    __tablename__ = "persona_fuente_legacy"
+    id_persona_fuente = Column(Integer, primary_key=True, index=True)
+    id_persona = Column(Integer, ForeignKey("persona.id_persona"), nullable=False)
+    tabla_origen = Column(String(40), nullable=False)
+    id_registro_origen = Column(Integer, nullable=False)
+    campo_origen = Column(String(80), nullable=False)
+    valor_original = Column(Text, nullable=False)
+    valor_normalizado = Column(Text, nullable=False)
+    requiere_revision = Column(Boolean, nullable=False, default=True)
+    activo = Column(Boolean, nullable=False, default=True)
+
+
+class OrvIntegrante(Base, AuditableMixin):
+    __tablename__ = "orv_integrante"
+    id_orv_integrante = Column(Integer, primary_key=True, index=True)
+    id_orv = Column(Integer, ForeignKey("orv.id_orv"), nullable=False)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    id_persona = Column(Integer, ForeignKey("persona.id_persona"), nullable=False)
+    cargo = Column(String(50), nullable=False)
+    activo = Column(Boolean, nullable=False, default=True)
+    orv = relationship("Orv")
+    persona = relationship("Persona")
+
+
+class ParcelaTitular(Base, AuditableMixin):
+    __tablename__ = "parcela_titular"
+    id_parcela_titular = Column(Integer, primary_key=True, index=True)
+    id_parcela = Column(Integer, ForeignKey("parcela.id_parcela"), nullable=False)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    id_persona = Column(Integer, ForeignKey("persona.id_persona"), nullable=False)
+    tipo_derecho = Column(String(30), nullable=False, default="titular")
+    porcentaje_participacion = Column(Numeric(7, 4), nullable=True)
+    fecha_inicio = Column(Date, nullable=True)
+    fecha_fin = Column(Date, nullable=True)
+    activo = Column(Boolean, nullable=False, default=True)
+    parcela = relationship("Parcela")
+    persona = relationship("Persona")
+
+
+class Minuta(Base, AuditableMixin):
+    __tablename__ = "minuta"
+    id_minuta = Column(Integer, primary_key=True, index=True)
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    id_actividad = Column(Integer, ForeignKey("actividad_campo.id_actividad"), nullable=True)
+    fecha_reunion = Column(Date, nullable=False)
+    lugar = Column(String(300), nullable=True)
+    asunto = Column(String(300), nullable=False)
+    resumen = Column(Text, nullable=True)
+    folio = Column(String(100), nullable=True)
+    activo = Column(Boolean, nullable=False, default=True)
+    tramo_nucleo = relationship("TramoNucleo")
+    actividad = relationship("ActividadCampo")
+
+
+class Acuerdo(Base, AuditableMixin):
+    __tablename__ = "acuerdo"
+    id_acuerdo = Column(Integer, primary_key=True, index=True)
+    id_minuta = Column(Integer, ForeignKey("minuta.id_minuta"), nullable=False)
+    descripcion = Column(Text, nullable=False)
+    fecha_limite = Column(Date, nullable=True)
+    fecha_cumplimiento = Column(Date, nullable=True)
+    estatus = Column(String(20), nullable=False, default="pendiente")
+    prioridad = Column(String(10), nullable=False, default="media")
+    id_persona_responsable = Column(Integer, ForeignKey("persona.id_persona"), nullable=True)
+    id_usuario_responsable = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=True)
+    responsable_externo = Column(String(300), nullable=True)
+    activo = Column(Boolean, nullable=False, default=True)
+    minuta = relationship("Minuta")
+    persona_responsable = relationship("Persona")
+    usuario_responsable = relationship("Usuario", foreign_keys=[id_usuario_responsable])
+
+
+class DocumentoVersion(Base, AuditableMixin):
+    __tablename__ = "documento_version"
+    id_documento_version = Column(Integer, primary_key=True, index=True)
+    id_documento = Column(Integer, ForeignKey("documentacion_soporte.id_documento"), nullable=False)
+    numero_version = Column(Integer, nullable=False)
+    hash_sha256 = Column(String(64), nullable=False)
+    tamano_bytes = Column(BigInteger, nullable=False)
+    nombre_archivo_original = Column(String(255), nullable=False)
+    ruta_almacenamiento = Column(Text, nullable=False)
+    tipo_mime = Column(String(150), nullable=True)
+    id_usuario_carga = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    fecha_carga = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    activo = Column(Boolean, nullable=False, default=True)
+    documento = relationship("DocumentacionSoporte")
+
+
+class PagoIndemnizacion(Base, AuditableMixin):
+    __tablename__ = "pago_indemnizacion"
+    id_pago = Column(Integer, primary_key=True, index=True)
+    id_tramite_fifonafe = Column(
+        Integer,
+        ForeignKey("tramite_fifonafe.id_tramite_fifonafe"),
+        nullable=False,
+    )
+    monto_pagado = Column(Numeric(18, 2), nullable=False)
+    fecha_pago = Column(Date, nullable=False)
+    tipo_pago = Column(String(20), nullable=False)
+    medio_pago = Column(String(20), nullable=True)
+    banco_emisor = Column(String(100), nullable=True)
+    referencia_bancaria = Column(String(100), nullable=True)
+    id_persona_beneficiaria = Column(Integer, ForeignKey("persona.id_persona"), nullable=True)
+    beneficiario_externo = Column(String(300), nullable=True)
+    activo = Column(Boolean, nullable=False, default=True)
+    tramite = relationship("TramiteFifonafe")
+    persona_beneficiaria = relationship("Persona")
+
+
+class AlertasVistas(Base, AuditableMixin):
     __tablename__ = "alertas_vistas"
-    id_alerta = Column(Integer, ForeignKey("alertas.id_alerta", ondelete="CASCADE"), primary_key=True)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario", ondelete="CASCADE"), primary_key=True)
+    id_alerta_vista = Column(Integer, primary_key=True, index=True)
+    id_alerta = Column(Integer, ForeignKey("alertas.id_alerta"), nullable=False)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
     fecha_vista = Column(DateTime(timezone=True), nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
 
 class Bitacora(Base):
     __tablename__ = "bitacora"

@@ -1,8 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File
 import os
 import json
-import shutil
-from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -11,6 +9,7 @@ from sqlalchemy.inspection import inspect
 from sqlalchemy.exc import InternalError, IntegrityError, DatabaseError
 from typing import List, Type, Any
 from datetime import datetime, timezone, timedelta
+import logging
 import pandas as pd
 import io
 
@@ -18,6 +17,7 @@ from .database import engine, Base, get_db
 from . import models, schemas
 from fastapi.security import OAuth2PasswordRequestForm
 from . import auth
+from .routers import alertas, documentos, minutas, pagos, personas
 
 
 app = FastAPI(
@@ -26,6 +26,7 @@ app = FastAPI(
     version="1.3.1"
 )
 
+logger = logging.getLogger(__name__)
 
 import re
 
@@ -53,9 +54,16 @@ def sqlalchemy_integrity_error_handler(request, exc: IntegrityError):
 
 @app.exception_handler(Exception)
 def global_exception_handler(request, exc: Exception):
-    import traceback
-    traceback.print_exc()
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
+    logger.exception(
+        "Error no controlado en %s %s",
+        request.method,
+        request.url.path,
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor"},
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -64,6 +72,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(personas.router, prefix="/api")
+app.include_router(minutas.router, prefix="/api")
+app.include_router(pagos.router, prefix="/api")
+app.include_router(documentos.router, prefix="/api")
+app.include_router(alertas.router, prefix="/api")
 
 
 os.makedirs("uploads", exist_ok=True)
@@ -218,9 +232,9 @@ def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), curr
     db.commit()
     db.refresh(db_tramo)
     resp = db_tramo.__dict__.copy()
-    resp["geometria_wkt"] = db.scalar(
-        db.query(models.Tramo.geometria_linea.ST_AsText()).filter(models.Tramo.id_tramo == db_tramo.id_tramo)
-    )
+    resp["geometria_wkt"] = db.query(
+        models.Tramo.geometria_linea.ST_AsText()
+    ).filter(models.Tramo.id_tramo == db_tramo.id_tramo).scalar()
     return resp
 
 @app.put("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Actualizar tramo", response_model=schemas.TramoResponse)
@@ -228,9 +242,9 @@ def update_tramo(id_tramo: int, data: schemas.TramoUpdate, db: Session = Depends
     entity = get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
     db_tramo = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_tramo.__dict__.copy()
-    resp["geometria_wkt"] = db.scalar(
-        db.query(models.Tramo.geometria_linea.ST_AsText()).filter(models.Tramo.id_tramo == db_tramo.id_tramo)
-    )
+    resp["geometria_wkt"] = db.query(
+        models.Tramo.geometria_linea.ST_AsText()
+    ).filter(models.Tramo.id_tramo == db_tramo.id_tramo).scalar()
     return resp
 
 @app.delete("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Eliminar tramo")
@@ -325,9 +339,9 @@ def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get
     db.commit()
     db.refresh(db_nucleo)
     resp = db_nucleo.__dict__.copy()
-    resp["geometria_wkt"] = db.scalar(
-        db.query(models.NucleoAgrario.geometria_poligono.ST_AsText()).filter(models.NucleoAgrario.id_nucleo == db_nucleo.id_nucleo)
-    )
+    resp["geometria_wkt"] = db.query(
+        models.NucleoAgrario.geometria_poligono.ST_AsText()
+    ).filter(models.NucleoAgrario.id_nucleo == db_nucleo.id_nucleo).scalar()
     return resp
 
 @app.put("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Actualizar núcleo agrario", response_model=schemas.NucleoAgrarioResponse)
@@ -335,9 +349,9 @@ def update_nucleo(id_nucleo: int, data: schemas.NucleoAgrarioUpdate, db: Session
     entity = get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
     db_nucleo = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_nucleo.__dict__.copy()
-    resp["geometria_wkt"] = db.scalar(
-        db.query(models.NucleoAgrario.geometria_poligono.ST_AsText()).filter(models.NucleoAgrario.id_nucleo == db_nucleo.id_nucleo)
-    )
+    resp["geometria_wkt"] = db.query(
+        models.NucleoAgrario.geometria_poligono.ST_AsText()
+    ).filter(models.NucleoAgrario.id_nucleo == db_nucleo.id_nucleo).scalar()
     return resp
 
 @app.delete("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Eliminar núcleo agrario")
@@ -409,9 +423,11 @@ def create_tramo_nucleo(tramo_nucleo: schemas.TramoNucleoCreate, db: Session = D
     db.commit()
     db.refresh(db_tn)
     resp = db_tn.__dict__.copy()
-    resp["geometria_wkt"] = db.scalar(
-        db.query(models.TramoNucleo.geometria_segmento.ST_AsText()).filter(models.TramoNucleo.id_tramo_nucleo == db_tn.id_tramo_nucleo)
-    )
+    resp["geometria_wkt"] = db.query(
+        models.TramoNucleo.geometria_segmento.ST_AsText()
+    ).filter(
+        models.TramoNucleo.id_tramo_nucleo == db_tn.id_tramo_nucleo
+    ).scalar()
     return resp
 
 @app.put("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Actualizar tramo-nucleo", response_model=schemas.TramoNucleoResponse)
@@ -419,51 +435,16 @@ def update_tramo_nucleo(id_tramo_nucleo: int, data: schemas.TramoNucleoUpdate, d
     entity = get_entity_by_id(db, models.TramoNucleo, id_tramo_nucleo, "id_tramo_nucleo")
     updated = update_entity(db, entity, data, current_user.id_usuario)
     resp = updated.__dict__.copy()
-    resp["geometria_wkt"] = db.scalar(
-        db.query(models.TramoNucleo.geometria_segmento.ST_AsText()).filter(models.TramoNucleo.id_tramo_nucleo == updated.id_tramo_nucleo)
-    )
+    resp["geometria_wkt"] = db.query(
+        models.TramoNucleo.geometria_segmento.ST_AsText()
+    ).filter(
+        models.TramoNucleo.id_tramo_nucleo == updated.id_tramo_nucleo
+    ).scalar()
     return resp
 
 @app.delete("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Eliminar tramo-nucleo")
 def delete_tramo_nucleo(id_tramo_nucleo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.TramoNucleo, id_tramo_nucleo, "id_tramo_nucleo")
-    return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
-
-# ==================== PARCELAS ==================== #
-@app.get("/api/parcelas", tags=["Parcelas"], summary="Listar parcelas", response_model=List[schemas.ParcelaResponse])
-def list_parcelas(
-    id_nucleo: int = Query(None),
-    tipo_parcela: str = Query(None),
-    db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))
-):
-    query = db.query(models.Parcela).filter(models.Parcela.activo == True)
-    if id_nucleo:
-        query = query.filter(models.Parcela.id_nucleo == id_nucleo)
-    if tipo_parcela:
-        query = query.filter(models.Parcela.tipo_parcela == tipo_parcela)
-    return query.all()
-
-@app.get("/api/parcelas/{id_parcela}", tags=["Parcelas"], summary="Obtener parcela", response_model=schemas.ParcelaResponse)
-def get_parcela(id_parcela: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return get_entity_by_id(db, models.Parcela, id_parcela, "id_parcela")
-
-@app.post("/api/parcelas", tags=["Parcelas"], summary="Crear parcela", response_model=schemas.ParcelaResponse, status_code=status.HTTP_201_CREATED)
-def create_parcela(parcela: schemas.ParcelaCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
-    set_audit_context(db, current_user.id_usuario)
-    db_parcela = models.Parcela(**parcela.model_dump())
-    db.add(db_parcela)
-    db.commit()
-    db.refresh(db_parcela)
-    return db_parcela
-
-@app.put("/api/parcelas/{id_parcela}", tags=["Parcelas"], summary="Actualizar parcela", response_model=schemas.ParcelaResponse)
-def update_parcela(id_parcela: int, data: schemas.ParcelaUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
-    entity = get_entity_by_id(db, models.Parcela, id_parcela, "id_parcela")
-    return update_entity(db, entity, data, current_user.id_usuario)
-
-@app.delete("/api/parcelas/{id_parcela}", tags=["Parcelas"], summary="Eliminar parcela")
-def delete_parcela(id_parcela: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
-    entity = get_entity_by_id(db, models.Parcela, id_parcela, "id_parcela")
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== DASHBOARD & REPORTES ==================== #
@@ -541,9 +522,11 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
     db.commit()
     db.refresh(db_afectacion)
     resp = db_afectacion.__dict__.copy()
-    resp["geometria_wkt"] = db.scalar(
-        db.query(models.Afectacion.geometria_afectacion.ST_AsText()).filter(models.Afectacion.id_afectacion == db_afectacion.id_afectacion)
-    )
+    resp["geometria_wkt"] = db.query(
+        models.Afectacion.geometria_afectacion.ST_AsText()
+    ).filter(
+        models.Afectacion.id_afectacion == db_afectacion.id_afectacion
+    ).scalar()
     return resp
 
 @app.put("/api/afectaciones/{id_afectacion}", tags=["Afectaciones"], summary="Actualizar afectación", response_model=schemas.AfectacionResponse)
@@ -551,9 +534,11 @@ def update_afectacion_route(id_afectacion: int, data: schemas.AfectacionUpdate, 
     entity = get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
     db_afectacion = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_afectacion.__dict__.copy()
-    resp["geometria_wkt"] = db.scalar(
-        db.query(models.Afectacion.geometria_afectacion.ST_AsText()).filter(models.Afectacion.id_afectacion == db_afectacion.id_afectacion)
-    )
+    resp["geometria_wkt"] = db.query(
+        models.Afectacion.geometria_afectacion.ST_AsText()
+    ).filter(
+        models.Afectacion.id_afectacion == db_afectacion.id_afectacion
+    ).scalar()
     return resp
 
 @app.delete("/api/afectaciones/{id_afectacion}", tags=["Afectaciones"], summary="Eliminar afectación")
@@ -708,33 +693,6 @@ def delete_convenio(id_convenio: int, motivo: str = Query(...), db: Session = De
     entity = get_entity_by_id(db, models.Convenio, id_convenio, "id_convenio")
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
-# ==================== ORV ==================== #
-@app.get("/api/orvs", tags=["ORVs"], summary="Listar ORVs", response_model=List[schemas.OrvResponse])
-def list_orvs(id_nucleo: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    query = db.query(models.Orv).filter(models.Orv.activo == True)
-    if id_nucleo:
-        query = query.filter(models.Orv.id_nucleo == id_nucleo)
-    return query.all()
-
-@app.post("/api/orvs", tags=["ORVs"], summary="Crear ORV", response_model=schemas.OrvResponse, status_code=status.HTTP_201_CREATED)
-def create_orv(orv: schemas.OrvCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
-    set_audit_context(db, current_user.id_usuario)
-    db_orv = models.Orv(**orv.model_dump())
-    db.add(db_orv)
-    db.commit()
-    db.refresh(db_orv)
-    return db_orv
-
-@app.put("/api/orvs/{id_orv}", tags=["ORVs"], summary="Actualizar ORV", response_model=schemas.OrvResponse)
-def update_orv_route(id_orv: int, data: schemas.OrvUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
-    entity = get_entity_by_id(db, models.Orv, id_orv, "id_orv")
-    return update_entity(db, entity, data, current_user.id_usuario)
-
-@app.delete("/api/orvs/{id_orv}", tags=["ORVs"], summary="Eliminar ORV")
-def delete_orv(id_orv: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
-    entity = get_entity_by_id(db, models.Orv, id_orv, "id_orv")
-    return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
-
 # ==================== PADRON ==================== #
 @app.get("/api/padrones", tags=["Padrones"], summary="Listar padrones", response_model=List[schemas.PadronHistorialResponse])
 def list_padrones(id_nucleo: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
@@ -872,11 +830,6 @@ def update_documentacion_route(id_documento: int, data: schemas.DocumentacionSop
     entity = get_entity_by_id(db, models.DocumentacionSoporte, id_documento, "id_documento")
     return update_entity(db, entity, data, current_user.id_usuario)
 
-@app.delete("/api/documentacion/{id_documento}", tags=["Documentación"], summary="Eliminar documentación de soporte")
-def delete_documentacion(id_documento: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
-    entity = get_entity_by_id(db, models.DocumentacionSoporte, id_documento, "id_documento")
-    return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
-
 # ==================== ALERTAS ==================== #
 @app.get("/api/alertas", tags=["Alertas"], summary="Listar alertas", response_model=List[schemas.AlertaResponse])
 def list_alertas(activa: bool = Query(True), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
@@ -999,36 +952,6 @@ def exportar_tramos_csv(db: Session = Depends(get_db), current_user: models.Usua
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=tramos_export.csv"
     return response
-
-@app.post("/api/documentacion/{id_documento}/archivo", tags=["Documentación"], summary="Subir archivo")
-def upload_archivo(id_documento: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
-    doc = get_entity_by_id(db, models.DocumentacionSoporte, id_documento, "id_documento")
-    
-    EXTENSIONES_PERMITIDAS = {".pdf", ".jpg", ".jpeg", ".png", ".docx"}
-    file_extension = os.path.splitext(file.filename)[1].lower()
-    if file_extension not in EXTENSIONES_PERMITIDAS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Tipo de archivo no permitido. Solo se aceptan: {', '.join(sorted(EXTENSIONES_PERMITIDAS))}"
-        )
-    
-    safe_filename = f"doc_{id_documento}{file_extension}"
-    file_path = os.path.join("uploads", safe_filename)
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    set_audit_context(db, current_user.id_usuario)
-    doc.url_archivo = file_path
-    db.commit()
-    return {"status": "success", "url": file_path}
-
-@app.get("/api/documentacion/{id_documento}/archivo", tags=["Documentación"], summary="Descargar archivo")
-def download_archivo(id_documento: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    doc = get_entity_by_id(db, models.DocumentacionSoporte, id_documento, "id_documento")
-    if not doc.url_archivo or not os.path.exists(doc.url_archivo):
-        raise HTTPException(status_code=404, detail="Archivo físico no encontrado.")
-    return FileResponse(doc.url_archivo, filename=os.path.basename(doc.url_archivo))
 
 # ==================== GEOJSON IMPORTER ==================== #
 @app.post("/api/geometria/importar-geojson", tags=["Geometría"], summary="Importar GeoJSON")
@@ -1183,22 +1106,6 @@ def remover_usuario_tramo(
     exists.motivo_baja = motivo
     db.commit()
     return {"status": "success", "detail": "Usuario removido del tramo."}
-
-# ==================== ALERTAS VISTAS ==================== #
-@app.post("/api/alertas/{id_alerta}/marcar-leida", tags=["Alertas"], summary="Marcar alerta como leída")
-def marcar_alerta_leida(id_alerta: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    set_audit_context(db, current_user.id_usuario)
-    alerta = get_entity_by_id(db, models.Alertas, id_alerta, "id_alerta")
-    vista = db.query(models.AlertasVistas).filter_by(id_alerta=id_alerta, id_usuario=current_user.id_usuario).first()
-    if not vista:
-        nueva_vista = models.AlertasVistas(
-            id_alerta=id_alerta, 
-            id_usuario=current_user.id_usuario,
-            fecha_vista=datetime.now(timezone.utc)
-        )
-        db.add(nueva_vista)
-        db.commit()
-    return {"status": "success", "detail": "Alerta marcada como leída."}
 
 # ==================== GET BY ID (Líneas Individuales) ==================== #
 @app.get("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Obtener tramo por ID", response_model=schemas.TramoResponse)
