@@ -4,8 +4,8 @@ import api from '../api/axios';
 import {
   ModalWrapper, SeccionHeader, Campo,
   ErrorBanner, ExitoMsg, BotonesAccion,
-  inputStyle, gridDos,
 } from '../components/FormUI';
+import { gridDos, inputStyle } from '../components/formStyles';
 
 const TIPOS_ASAMBLEA = [
   { value: 'informacion',    label: 'Asamblea de Información' },

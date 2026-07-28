@@ -2,20 +2,30 @@ import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Users, FileText, ClipboardList,
-  Loader2, AlertCircle, Building2, Layers, Calendar
+  Loader2, AlertCircle, Building2, Layers, Calendar,
+  Banknote, FileClock, ShieldCheck,
 } from 'lucide-react';
 import api from '../api/axios';
-import { AuthContext } from '../contexts/AuthContext';
+import AuthContext from '../contexts/auth-context';
 import FormAfectacionColectiva from './FormAfectacionColectiva';
 import FormAfectacionIndividual from './FormAfectacionIndividual';
 import FormAsamblea from './FormAsamblea';
 import FormConvenio from './FormConvenio';
+
+const OrvPanel = React.lazy(() => import('../components/fase2/OrvPanel'));
+const MinutasPanel = React.lazy(() => import('../components/fase2/MinutasPanel'));
+const PagosPanel = React.lazy(() => import('../components/fase2/PagosPanel'));
+const DocumentosPanel = React.lazy(() => import('../components/fase2/DocumentosPanel'));
 
 const TABS = [
   { key: 'general',     label: 'Información General',       icon: Building2 },
   { key: 'colectivas',  label: 'Afectaciones Colectivas',   icon: Layers },
   { key: 'individuales',label: 'Afectaciones Individuales', icon: Users },
   { key: 'asambleas',   label: 'Asambleas',                 icon: Calendar },
+  { key: 'orv',          label: 'Representación',            icon: ShieldCheck },
+  { key: 'minutas',      label: 'Minutas',                   icon: ClipboardList },
+  { key: 'pagos',        label: 'Pagos',                     icon: Banknote },
+  { key: 'documentos',   label: 'Documentos',                icon: FileClock },
 ];
 
 export default function ExpedienteDetail() {
@@ -112,6 +122,7 @@ export default function ExpedienteDetail() {
 
   const colectivas   = afectaciones.filter(a => a.tipo_afectacion === 'colectivo');
   const individuales = afectaciones.filter(a => a.tipo_afectacion === 'individual');
+  const canWrite = user?.rol && ['admin', 'operador', 'geografo'].includes(user.rol);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -154,13 +165,16 @@ export default function ExpedienteDetail() {
 
       {/* Pestañas */}
       <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', borderBottom: '2px solid #f1f5f9', padding: '0 16px' }}>
+        <div role="tablist" aria-label="Secciones del expediente" style={{ display: 'flex', overflowX: 'auto', borderBottom: '2px solid #f1f5f9', padding: '0 16px' }}>
           {TABS.map(tab => {
             const Icon = tab.icon;
             const activa = tabActiva === tab.key;
             return (
               <button
                 key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={activa}
                 onClick={() => setTabActiva(tab.key)}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
@@ -178,11 +192,17 @@ export default function ExpedienteDetail() {
           })}
         </div>
 
-        <div style={{ padding: '30px' }}>
+        <div role="tabpanel" style={{ padding: '30px' }}>
           {tabActiva === 'general'      && <TabGeneral tramoNucleo={tramoNucleo} nucleo={nucleo} />}
           {tabActiva === 'colectivas'   && <TabAfectaciones tipo="colectivo" items={colectivas} convenios={convenios} user={user} onNueva={() => setModalColectiva(true)} onEditar={setModalColectiva} onCrearConvenio={setModalConvenio} />}
           {tabActiva === 'individuales' && <TabAfectaciones tipo="individual" items={individuales} convenios={convenios} user={user} onNueva={() => setModalIndividual(true)} onEditar={setModalIndividual} onCrearConvenio={setModalConvenio} />}
           {tabActiva === 'asambleas'    && <TabAsambleas items={asambleas} user={user} onNueva={() => setModalAsamblea(true)} onEditar={setModalAsamblea} />}
+          <React.Suspense fallback={<div className="panel-loading"><Loader2 className="spin" /> Cargando módulo…</div>}>
+            {tabActiva === 'orv'           && <OrvPanel idNucleo={tramoNucleo.id_nucleo} canWrite={canWrite} />}
+            {tabActiva === 'minutas'       && <MinutasPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite} />}
+            {tabActiva === 'pagos'         && <PagosPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite && user?.rol !== 'geografo'} />}
+            {tabActiva === 'documentos'    && <DocumentosPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite && user?.rol !== 'geografo'} />}
+          </React.Suspense>
 
           {/* Modales de captura */}
           {modalColectiva && tramoNucleo && (

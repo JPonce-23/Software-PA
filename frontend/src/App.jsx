@@ -1,13 +1,16 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import Mapa from './pages/Mapa';
 import Login from './pages/Login';
-import ExpedientesList from './pages/ExpedientesList';
-import ExpedienteDetail from './pages/ExpedienteDetail';
-import { AuthProvider, AuthContext } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import AuthContext from './contexts/auth-context';
 import api from './api/axios';
+import AlertCenter from './components/AlertCenter';
 import './index.css';
+
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Mapa = React.lazy(() => import('./pages/Mapa'));
+const ExpedientesList = React.lazy(() => import('./pages/ExpedientesList'));
+const ExpedienteDetail = React.lazy(() => import('./pages/ExpedienteDetail'));
 
 const ROL_LABELS = {
   admin: 'Administrador',
@@ -101,10 +104,13 @@ function Topbar() {
         <h1>{getTitulo()}</h1>
         <p>Sistema Interno de Reportes para la Procuraduría Agraria</p>
       </div>
-      <div className="user-box">
-        <div className="user-info">
-          <h3>{nombreUsuario}</h3>
-          {rolUsuario && <p>{rolUsuario}</p>}
+      <div className="topbar-actions">
+        <AlertCenter />
+        <div className="user-box">
+          <div className="user-info">
+            <h3>{nombreUsuario}</h3>
+            {rolUsuario && <p>{rolUsuario}</p>}
+          </div>
         </div>
       </div>
     </header>
@@ -130,13 +136,15 @@ function AppContent() {
       <Sidebar />
       <main className="content">
         <Topbar />
-        <Routes>
-          <Route path="/login"                        element={<Login />} />
-          <Route path="/"                             element={<Dashboard />} />
-          <Route path="/mapa"                         element={<Mapa />} />
-          <Route path="/expedientes"                  element={<ExpedientesList />} />
-          <Route path="/expedientes/:id_tramo_nucleo" element={<ExpedienteDetail />} />
-        </Routes>
+        <React.Suspense fallback={<div className="panel-loading">Cargando módulo…</div>}>
+          <Routes>
+            <Route path="/login"                        element={<Login />} />
+            <Route path="/"                             element={<Dashboard />} />
+            <Route path="/mapa"                         element={<Mapa />} />
+            <Route path="/expedientes"                  element={<ExpedientesList />} />
+            <Route path="/expedientes/:id_tramo_nucleo" element={<ExpedienteDetail />} />
+          </Routes>
+        </React.Suspense>
       </main>
     </div>
   );

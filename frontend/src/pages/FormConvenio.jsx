@@ -4,8 +4,8 @@ import api from '../api/axios';
 import {
   ModalWrapper, SeccionHeader, Campo,
   ErrorBanner, ExitoMsg, BotonesAccion,
-  inputStyle, gridDos,
 } from '../components/FormUI';
+import { gridDos, inputStyle } from '../components/formStyles';
 
 // NOTA: Se agrega 'ampliacion_remanente' que faltaba (corrige defecto auditado en Fase 0)
 const TIPOS_CONVENIO = [

@@ -1,170 +1,173 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, Search, User, UserPlus, FileText } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { FileText, Loader2, MapPinned, UserRound } from 'lucide-react';
 import api from '../api/axios';
+import PersonaSelector from '../components/PersonaSelector';
+import { nombreCompleto } from '../utils/personas';
 import {
-  ModalWrapper, SeccionHeader, Campo, ModoBtn,
-  ErrorBanner, ExitoMsg,
-  inputStyle, gridDos,
+  Campo,
+  ErrorBanner,
+  ExitoMsg,
+  ModalWrapper,
+  SeccionHeader,
 } from '../components/FormUI';
+import { gridDos, inputStyle } from '../components/formStyles';
 
-const TIPOS_PARCELA = ['individual', 'copropiedad'];
+const EMPTY_PARCELA = {
+  tipo_parcela: 'individual',
+  no_parcela_ppt: '',
+  certificado_parcelario: '',
+  folio_derechos: '',
+  constancia_vigencia_fecha: '',
+  documentacion_disponible: false,
+  documentacion_faltante: '',
+};
 
-// Botón de acciones personalizado: tiene nota de pasos + botones con color ámbar
-function BotonesIndividual({ onClose, guardando, labelGuardar, modoTitular }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
-      <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
-        {modoTitular === 'nuevo'
-          ? '* Se crearán la parcela y la afectación en 2 pasos automáticos.'
-          : '* Se creará la afectación vinculada al titular seleccionado.'}
-      </p>
-      <div style={{ display: 'flex', gap: '12px' }}>
-        <button
-          type="button" onClick={onClose} disabled={guardando}
-          style={{ background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '11px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit" disabled={guardando}
-          style={{ background: '#d97706', color: 'white', border: 'none', padding: '11px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          {guardando
-            ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</>
-            : labelGuardar}
-        </button>
-      </div>
-    </div>
-  );
+function nullable(value) {
+  return typeof value === 'string' ? value.trim() || null : value;
 }
 
-export default function FormAfectacionIndividual({ idNucleo, idTramoNucleo, initialData = null, onSuccess, onClose }) {
-  // Modo: 'buscar', 'nuevo', o 'editar_afectacion'
-  const [modoTitular, setModoTitular] = useState(initialData ? 'editar_afectacion' : 'buscar');
-
-  // Estado búsqueda de titular existente
-  const [busqueda, setBusqueda]                 = useState('');
-  const [resultados, setResultados]             = useState([]);
-  const [buscando, setBuscando]                 = useState(false);
-  const [parcelaSeleccionada, setParcelaSeleccionada] = useState(null);
-
-  // Formulario nuevo titular
-  const [titular, setTitular] = useState({
-    nombre_titular:           '',
-    tipo_parcela:             '',
-    no_parcela_ppt:           '',
-    certificado_parcelario:   '',
-    folio_derechos:           '',
-    constancia_vigencia_fecha: '',
-    documentacion_disponible: false,
-    documentacion_faltante:   '',
-  });
-
-  // Datos de la Afectación
+export default function FormAfectacionIndividual({
+  idNucleo,
+  idTramoNucleo,
+  initialData = null,
+  onSuccess,
+  onClose,
+}) {
+  const [personaSelection, setPersonaSelection] = useState(null);
+  const [parcelas, setParcelas] = useState([]);
+  const [idParcelaSeleccionada, setIdParcelaSeleccionada] = useState('');
+  const [crearParcela, setCrearParcela] = useState(false);
+  const [parcela, setParcela] = useState(EMPTY_PARCELA);
   const [afectacion, setAfectacion] = useState({
-    tipo_tenencia:           initialData?.tipo_tenencia           || 'Parcelada',
-    subtipo_tenencia:        initialData?.subtipo_tenencia        || '',
-    no_parcela_solar:        initialData?.no_parcela_solar        || '',
-    superficie_afectada_ha:  initialData?.superficie_afectada_ha  || '',
-    situacion_juridica:      initialData?.situacion_juridica      || '',
+    tipo_tenencia: initialData?.tipo_tenencia || 'Parcelada',
+    subtipo_tenencia: initialData?.subtipo_tenencia || '',
+    no_parcela_solar: initialData?.no_parcela_solar || '',
+    superficie_afectada_ha: initialData?.superficie_afectada_ha || '',
+    situacion_juridica: initialData?.situacion_juridica || '',
     documentacion_disponible: initialData?.documentacion_disponible || false,
-    documentacion_faltante:  initialData?.documentacion_faltante  || '',
+    documentacion_faltante: initialData?.documentacion_faltante || '',
   });
-
+  const [loadingParcelas, setLoadingParcelas] = useState(false);
   const [guardando, setGuardando] = useState(false);
-  const [exito, setExito]         = useState(false);
-  const [error, setError]         = useState(null);
+  const [error, setError] = useState(null);
+  const [exito, setExito] = useState(false);
 
-  const setT = (campo, valor) => setTitular(prev => ({ ...prev, [campo]: valor }));
-  const setA = (campo, valor) => setAfectacion(prev => ({ ...prev, [campo]: valor }));
-
-  // Buscar parcelas existentes con debounce de 400ms
   useEffect(() => {
-    if (modoTitular !== 'buscar' || busqueda.length < 2) {
-      setResultados([]);
-      return;
+    const idPersona = personaSelection?.persona?.id_persona;
+    if (!idPersona || initialData) {
+      setParcelas([]);
+      return undefined;
     }
-    const timer = setTimeout(async () => {
-      setBuscando(true);
-      try {
-        const res = await api.get(`/parcelas?id_nucleo=${idNucleo}`);
-        const filtradas = res.data.filter(p =>
-          (p.nombre_titular        || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-          (p.no_parcela_ppt        || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-          (p.certificado_parcelario || '').toLowerCase().includes(busqueda.toLowerCase())
-        );
-        setResultados(filtradas);
-      } catch {
-        setResultados([]);
-      } finally {
-        setBuscando(false);
-      }
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [busqueda, idNucleo, modoTitular]);
+    let active = true;
+    setLoadingParcelas(true);
+    api.get('/parcelas', { params: { id_nucleo: idNucleo, id_persona: idPersona } })
+      .then(({ data }) => {
+        if (!active) return;
+        setParcelas(data);
+        if (data.length === 0) setCrearParcela(true);
+      })
+      .catch(() => {
+        if (active) setParcelas([]);
+      })
+      .finally(() => {
+        if (active) setLoadingParcelas(false);
+      });
+    return () => { active = false; };
+  }, [idNucleo, initialData, personaSelection?.persona?.id_persona]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const updateParcela = (field, value) => {
+    setParcela((current) => ({ ...current, [field]: value }));
+  };
+  const updateAfectacion = (field, value) => {
+    setAfectacion((current) => ({ ...current, [field]: value }));
+  };
+
+  const createPersonaIfNeeded = async () => {
+    if (personaSelection?.mode === 'existing') return personaSelection.persona;
+    const draft = personaSelection?.data;
+    if (!draft?.nombre?.trim()) {
+      throw new Error('Captura el nombre de la persona titular.');
+    }
+    const response = await api.post('/personas', {
+      ...draft,
+      nombre: draft.nombre.trim(),
+      apellido_paterno: nullable(draft.apellido_paterno),
+      apellido_materno: nullable(draft.apellido_materno),
+      curp: nullable(draft.curp),
+      rfc: nullable(draft.rfc),
+      telefono: nullable(draft.telefono),
+      correo_electronico: nullable(draft.correo_electronico),
+    });
+    return response.data;
+  };
+
+  const createParcelaFor = async (persona) => {
+    const response = await api.post('/parcelas/con-titular', {
+      parcela: {
+        id_nucleo: idNucleo,
+        tipo_parcela: parcela.tipo_parcela,
+        no_parcela_ppt: nullable(parcela.no_parcela_ppt),
+        certificado_parcelario: nullable(parcela.certificado_parcelario),
+        folio_derechos: nullable(parcela.folio_derechos),
+        constancia_vigencia_fecha: nullable(parcela.constancia_vigencia_fecha),
+        documentacion_disponible: parcela.documentacion_disponible,
+        documentacion_faltante: nullable(parcela.documentacion_faltante),
+      },
+      titular: {
+        id_persona: persona.id_persona,
+        tipo_derecho: 'titular',
+      },
+    });
+    return response.data;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError(null);
-
-    if (modoTitular === 'buscar' && !parcelaSeleccionada) {
-      setError('Selecciona un titular de la lista o cambia al modo "Registrar Nuevo Titular".');
-      return;
-    }
-    if (modoTitular === 'nuevo' && !titular.nombre_titular.trim()) {
-      setError('El nombre del titular es obligatorio.');
-      return;
-    }
-
     setGuardando(true);
     try {
-      let idParcela;
-
-      if (modoTitular === 'buscar') {
-        idParcela = parcelaSeleccionada.id_parcela;
-      } else {
-        // PASO 1: Crear la parcela (nuevo titular)
-        const parcelaRes = await api.post('/parcelas', {
-          id_nucleo:                idNucleo,
-          nombre_titular:           titular.nombre_titular.trim(),
-          tipo_parcela:             titular.tipo_parcela             || null,
-          no_parcela_ppt:           titular.no_parcela_ppt           || null,
-          certificado_parcelario:   titular.certificado_parcelario   || null,
-          folio_derechos:           titular.folio_derechos           || null,
-          constancia_vigencia_fecha: titular.constancia_vigencia_fecha || null,
-          documentacion_disponible: titular.documentacion_disponible,
-          documentacion_faltante:   titular.documentacion_faltante   || null,
-        });
-        idParcela = parcelaRes.data.id_parcela;
+      let idParcela = initialData?.id_parcela;
+      if (!initialData) {
+        if (!personaSelection) throw new Error('Selecciona o registra a la persona titular.');
+        const persona = await createPersonaIfNeeded();
+        if (crearParcela || personaSelection.mode === 'new') {
+          const nuevaParcela = await createParcelaFor(persona);
+          idParcela = nuevaParcela.id_parcela;
+        } else {
+          idParcela = Number(idParcelaSeleccionada);
+        }
+        if (!idParcela) throw new Error('Selecciona una parcela o registra una nueva.');
       }
 
-      // PASO 2: Crear / actualizar la afectación
-      const afectacionPayload = {
-        id_nucleo:               idNucleo,
-        id_tramo_nucleo:         idTramoNucleo,
-        id_parcela:              idParcela,
-        tipo_afectacion:         'individual',
-        tipo_tenencia:           afectacion.tipo_tenencia || 'Parcelada',
-        subtipo_tenencia:        afectacion.subtipo_tenencia        || null,
-        no_parcela_solar:        afectacion.no_parcela_solar        || null,
-        superficie_afectada_ha:  afectacion.superficie_afectada_ha  ? Number(afectacion.superficie_afectada_ha) : null,
-        situacion_juridica:      afectacion.situacion_juridica      || null,
+      const payload = {
+        id_nucleo: idNucleo,
+        id_tramo_nucleo: idTramoNucleo,
+        id_parcela: idParcela,
+        tipo_afectacion: 'individual',
+        tipo_tenencia: afectacion.tipo_tenencia || 'Parcelada',
+        subtipo_tenencia: nullable(afectacion.subtipo_tenencia),
+        no_parcela_solar: nullable(afectacion.no_parcela_solar),
+        superficie_afectada_ha: afectacion.superficie_afectada_ha
+          ? Number(afectacion.superficie_afectada_ha)
+          : null,
+        situacion_juridica: nullable(afectacion.situacion_juridica),
         documentacion_disponible: afectacion.documentacion_disponible,
-        documentacion_faltante:  afectacion.documentacion_faltante  || null,
-        origen_registro:         'captura_sistema',
+        documentacion_faltante: nullable(afectacion.documentacion_faltante),
+        origen_registro: 'captura_sistema',
       };
-
       if (initialData) {
-        await api.put(`/afectaciones/${initialData.id_afectacion}`, afectacionPayload);
+        await api.put(`/afectaciones/${initialData.id_afectacion}`, payload);
       } else {
-        await api.post('/afectaciones', afectacionPayload);
+        await api.post('/afectaciones', payload);
       }
-
       setExito(true);
-      setTimeout(() => { onSuccess(); onClose(); }, 1200);
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Error al guardar. Intente de nuevo.';
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+      window.setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 900);
+    } catch (requestError) {
+      const detail = requestError.response?.data?.detail || requestError.message;
+      setError(detail || 'No fue posible guardar la afectación.');
     } finally {
       setGuardando(false);
     }
@@ -172,178 +175,201 @@ export default function FormAfectacionIndividual({ idNucleo, idTramoNucleo, init
 
   return (
     <ModalWrapper
-      titulo={initialData ? 'Editar Afectación Individual' : 'Nueva Afectación Individual'}
-      subtitulo="Derechos Parcelarios"
+      titulo={initialData ? 'Editar afectación individual' : 'Nueva afectación individual'}
+      subtitulo="La persona y su titularidad se registran como relaciones normalizadas."
       onClose={onClose}
       color="#d97706"
-      maxWidth="740px"
+      maxWidth="780px"
     >
-      {exito ? (
-        <ExitoMsg mensaje="¡Afectación individual guardada!" />
-      ) : (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
+      {exito ? <ExitoMsg mensaje="Afectación individual guardada" /> : (
+        <form className="form-stack" onSubmit={handleSubmit}>
           <ErrorBanner mensaje={error} />
 
-          {/* ── SECCIÓN 1: Datos del Titular / Parcela ── */}
-          <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0' }}>
-            <SeccionHeader icono={<User size={16} />} titulo="Sección 1 — Datos del Titular" />
-
-            {/* Selector de modo (oculto en modo edición) */}
-            {!initialData && (
-              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <ModoBtn
-                  activo={modoTitular === 'buscar'}
-                  icono={<Search size={15} />}
-                  label="Buscar titular existente"
-                  onClick={() => { setModoTitular('buscar'); setParcelaSeleccionada(null); }}
-                />
-                <ModoBtn
-                  activo={modoTitular === 'nuevo'}
-                  icono={<UserPlus size={15} />}
-                  label="Registrar nuevo titular"
-                  onClick={() => { setModoTitular('nuevo'); setParcelaSeleccionada(null); setBusqueda(''); }}
-                />
+          <section className="form-section">
+            <SeccionHeader icono={<UserRound size={16} />} titulo="Persona titular" />
+            {initialData ? (
+              <div className="selection-card">
+                <strong>Parcela #{initialData.id_parcela}</strong>
+                <span>La titularidad se administra desde la parcela.</span>
               </div>
+            ) : (
+              <PersonaSelector
+                label="Titular"
+                value={personaSelection}
+                onChange={(nextValue) => {
+                  setPersonaSelection(nextValue);
+                  setIdParcelaSeleccionada('');
+                  setCrearParcela(nextValue?.mode === 'new');
+                }}
+              />
             )}
+          </section>
 
-            {/* Modo edición — solo lectura */}
-            {modoTitular === 'editar_afectacion' && (
-              <div style={{ marginTop: '16px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px 16px' }}>
-                <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 4px 0' }}>Titular vinculado a esta afectación</p>
-                <p style={{ fontSize: '14px', color: '#1e293b', margin: 0, fontWeight: '500' }}>
-                  ID de Parcela: #{initialData.id_parcela}
-                </p>
-                <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 0 0' }}>La edición de datos personales del titular debe realizarse desde su propio registro.</p>
-              </div>
-            )}
-
-            {/* Modo búsqueda */}
-            {modoTitular === 'buscar' && (
-              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ position: 'relative' }}>
-                  <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input
-                    type="text"
-                    value={busqueda}
-                    onChange={e => setBusqueda(e.target.value)}
-                    placeholder="Buscar por nombre, No. PPT o certificado..."
-                    style={{ ...inputStyle, paddingLeft: '38px' }}
-                  />
-                </div>
-                {buscando && <span style={{ fontSize: '13px', color: '#94a3b8' }}>Buscando...</span>}
-                {resultados.length > 0 && (
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', maxHeight: '200px', overflowY: 'auto' }}>
-                    {resultados.map(p => (
-                      <div
-                        key={p.id_parcela}
-                        onClick={() => { setParcelaSeleccionada(p); setBusqueda(p.nombre_titular || ''); setResultados([]); }}
-                        style={{
-                          padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
-                          background: parcelaSeleccionada?.id_parcela === p.id_parcela ? '#f0fdf4' : 'white',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                        onMouseLeave={e => e.currentTarget.style.background = parcelaSeleccionada?.id_parcela === p.id_parcela ? '#f0fdf4' : 'white'}
+          {!initialData && personaSelection?.mode === 'existing' && (
+            <section className="form-section">
+              <SeccionHeader icono={<MapPinned size={16} />} titulo="Parcela del titular" />
+              {loadingParcelas ? <p className="field-hint">Consultando parcelas…</p> : (
+                <>
+                  {parcelas.length > 0 && (
+                    <Campo label="Parcela existente">
+                      <select
+                        value={idParcelaSeleccionada}
+                        disabled={crearParcela}
+                        onChange={(event) => setIdParcelaSeleccionada(event.target.value)}
+                        style={inputStyle}
                       >
-                        <div style={{ fontWeight: '500', color: '#1e293b', fontSize: '14px' }}>{p.nombre_titular || '—'}</div>
-                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                          PPT: {p.no_parcela_ppt || '—'} · Cert: {p.certificado_parcelario || '—'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {parcelaSeleccionada && (
-                  <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '12px 16px' }}>
-                    <p style={{ fontSize: '13px', color: '#16a34a', fontWeight: '600', margin: '0 0 4px 0' }}>✓ Titular seleccionado</p>
-                    <p style={{ fontSize: '14px', color: '#1e293b', margin: 0 }}>
-                      {parcelaSeleccionada.nombre_titular} · Parcela #{parcelaSeleccionada.id_parcela}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Modo nuevo titular */}
-            {modoTitular === 'nuevo' && (
-              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <Campo label="Nombre completo del titular *">
-                  <input
-                    type="text" required
-                    value={titular.nombre_titular}
-                    onChange={e => setT('nombre_titular', e.target.value)}
-                    placeholder="Nombre completo del ejidatario o comunero"
-                    style={inputStyle}
-                  />
-                </Campo>
-                <div style={gridDos}>
-                  <Campo label="Tipo de Parcela">
-                    <select value={titular.tipo_parcela} onChange={e => setT('tipo_parcela', e.target.value)} style={inputStyle}>
-                      <option value="">Seleccione...</option>
-                      {TIPOS_PARCELA.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </Campo>
-                  <Campo label="No. Parcela PPT">
-                    <input type="text" value={titular.no_parcela_ppt} onChange={e => setT('no_parcela_ppt', e.target.value)} placeholder="Ej. 125" style={inputStyle} />
-                  </Campo>
-                  <Campo label="Certificado Parcelario">
-                    <input type="text" value={titular.certificado_parcelario} onChange={e => setT('certificado_parcelario', e.target.value)} placeholder="Ej. 0815-CP-0025" style={inputStyle} />
-                  </Campo>
-                  <Campo label="Folio de Derechos">
-                    <input type="text" value={titular.folio_derechos} onChange={e => setT('folio_derechos', e.target.value)} placeholder="Folio" style={inputStyle} />
-                  </Campo>
-                  <Campo label="Constancia Vigencia (fecha)">
-                    <input type="date" value={titular.constancia_vigencia_fecha} onChange={e => setT('constancia_vigencia_fecha', e.target.value)} style={inputStyle} />
-                  </Campo>
-                </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
-                  <input type="checkbox" checked={titular.documentacion_disponible} onChange={e => setT('documentacion_disponible', e.target.checked)} style={{ width: '18px', height: '18px' }} />
-                  <span style={{ fontSize: '14px', color: '#334155' }}>¿Documentación del titular disponible?</span>
-                </label>
-                {!titular.documentacion_disponible && (
-                  <Campo label="Documentación faltante del titular">
-                    <textarea value={titular.documentacion_faltante} onChange={e => setT('documentacion_faltante', e.target.value)} placeholder="Qué falta por obtener..." rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
-                  </Campo>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ── SECCIÓN 2: Datos de la Afectación ── */}
-          <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0' }}>
-            <SeccionHeader icono={<FileText size={16} />} titulo="Sección 2 — Datos de la Afectación" />
-            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={gridDos}>
-                <Campo label="Superficie Afectada (Ha)">
-                  <input type="number" step="0.0001" min="0" value={afectacion.superficie_afectada_ha} onChange={e => setA('superficie_afectada_ha', e.target.value)} placeholder="0.0000" style={inputStyle} />
-                </Campo>
-                <Campo label="No. de Parcela / Solar">
-                  <input type="text" value={afectacion.no_parcela_solar} onChange={e => setA('no_parcela_solar', e.target.value)} placeholder="Ej. 25-B" style={inputStyle} />
-                </Campo>
-              </div>
-              <Campo label="Situación Jurídica">
-                <textarea value={afectacion.situacion_juridica} onChange={e => setA('situacion_juridica', e.target.value)} placeholder="Conflictos, amparos, sucesiones en trámite..." rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
-              </Campo>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
-                <input type="checkbox" checked={afectacion.documentacion_disponible} onChange={e => setA('documentacion_disponible', e.target.checked)} style={{ width: '18px', height: '18px' }} />
-                <span style={{ fontSize: '14px', color: '#334155' }}>¿Documentación de la afectación disponible?</span>
-              </label>
-              {!afectacion.documentacion_disponible && (
-                <Campo label="Documentación faltante de la afectación">
-                  <textarea value={afectacion.documentacion_faltante} onChange={e => setA('documentacion_faltante', e.target.value)} placeholder="Qué falta por obtener..." rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
-                </Campo>
+                        <option value="">Seleccione…</option>
+                        {parcelas.map((item) => (
+                          <option key={item.id_parcela} value={item.id_parcela}>
+                            Parcela #{item.id_parcela} · PPT {item.no_parcela_ppt || 'sin dato'}
+                          </option>
+                        ))}
+                      </select>
+                    </Campo>
+                  )}
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={crearParcela}
+                      onChange={(event) => setCrearParcela(event.target.checked)}
+                    />
+                    Registrar una parcela nueva para {nombreCompleto(personaSelection.persona)}
+                  </label>
+                </>
               )}
-            </div>
-          </div>
+            </section>
+          )}
 
-          <BotonesIndividual
-            onClose={onClose}
-            guardando={guardando}
-            labelGuardar={initialData ? 'Guardar Cambios' : 'Guardar Afectación Individual'}
-            modoTitular={modoTitular}
-          />
+          {!initialData && (personaSelection?.mode === 'new' || crearParcela) && (
+            <ParcelaFields value={parcela} onChange={updateParcela} />
+          )}
+
+          <section className="form-section">
+            <SeccionHeader icono={<FileText size={16} />} titulo="Datos de la afectación" />
+            <div style={gridDos}>
+              <Campo label="Superficie afectada (ha)">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  value={afectacion.superficie_afectada_ha}
+                  onChange={(event) => updateAfectacion('superficie_afectada_ha', event.target.value)}
+                  style={inputStyle}
+                />
+              </Campo>
+              <Campo label="No. de parcela / solar">
+                <input
+                  value={afectacion.no_parcela_solar}
+                  onChange={(event) => updateAfectacion('no_parcela_solar', event.target.value)}
+                  style={inputStyle}
+                />
+              </Campo>
+            </div>
+            <Campo label="Situación jurídica">
+              <textarea
+                rows={3}
+                value={afectacion.situacion_juridica}
+                onChange={(event) => updateAfectacion('situacion_juridica', event.target.value)}
+                style={inputStyle}
+              />
+            </Campo>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={afectacion.documentacion_disponible}
+                onChange={(event) => updateAfectacion('documentacion_disponible', event.target.checked)}
+              />
+              Documentación de la afectación disponible
+            </label>
+            {!afectacion.documentacion_disponible && (
+              <Campo label="Documentación faltante">
+                <textarea
+                  rows={2}
+                  value={afectacion.documentacion_faltante}
+                  onChange={(event) => updateAfectacion('documentacion_faltante', event.target.value)}
+                  style={inputStyle}
+                />
+              </Campo>
+            )}
+          </section>
+
+          <div className="form-actions">
+            <p>La afectación solo se crea después de confirmar persona y parcela.</p>
+            <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="button warning" disabled={guardando}>
+              {guardando && <Loader2 size={16} className="spin" />}
+              {guardando ? 'Guardando…' : 'Guardar afectación'}
+            </button>
+          </div>
         </form>
       )}
     </ModalWrapper>
+  );
+}
+
+function ParcelaFields({ value, onChange }) {
+  return (
+    <section className="form-section">
+      <SeccionHeader icono={<MapPinned size={16} />} titulo="Nueva parcela" />
+      <div style={gridDos}>
+        <Campo label="Tipo de parcela">
+          <select
+            value={value.tipo_parcela}
+            onChange={(event) => onChange('tipo_parcela', event.target.value)}
+            style={inputStyle}
+          >
+            <option value="individual">Individual</option>
+            <option value="copropiedad">Copropiedad</option>
+          </select>
+        </Campo>
+        <Campo label="No. parcela PPT">
+          <input
+            value={value.no_parcela_ppt}
+            onChange={(event) => onChange('no_parcela_ppt', event.target.value)}
+            style={inputStyle}
+          />
+        </Campo>
+        <Campo label="Certificado parcelario">
+          <input
+            value={value.certificado_parcelario}
+            onChange={(event) => onChange('certificado_parcelario', event.target.value)}
+            style={inputStyle}
+          />
+        </Campo>
+        <Campo label="Folio de derechos">
+          <input
+            value={value.folio_derechos}
+            onChange={(event) => onChange('folio_derechos', event.target.value)}
+            style={inputStyle}
+          />
+        </Campo>
+        <Campo label="Constancia de vigencia">
+          <input
+            type="date"
+            value={value.constancia_vigencia_fecha}
+            onChange={(event) => onChange('constancia_vigencia_fecha', event.target.value)}
+            style={inputStyle}
+          />
+        </Campo>
+      </div>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={value.documentacion_disponible}
+          onChange={(event) => onChange('documentacion_disponible', event.target.checked)}
+        />
+        Documentación de la parcela disponible
+      </label>
+      {!value.documentacion_disponible && (
+        <Campo label="Documentación faltante">
+          <textarea
+            rows={2}
+            value={value.documentacion_faltante}
+            onChange={(event) => onChange('documentacion_faltante', event.target.value)}
+            style={inputStyle}
+          />
+        </Campo>
+      )}
+    </section>
   );
 }

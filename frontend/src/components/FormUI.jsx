@@ -13,12 +13,9 @@
  *   - ExitoMsg       → Mensaje de éxito con ícono centrado, post-guardado.
  *   - BotonesAccion  → Fila de botones Cancelar / Guardar al pie del formulario.
  *
- * Estilos compartidos exportados:
- *   - inputStyle     → Estilo base para inputs, selects y textareas.
- *   - gridDos        → Grid de 2 columnas para campos en pares.
  */
 
-import React from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { X, Loader2, CheckCircle2 } from 'lucide-react';
 
 // ─── ModalWrapper ─────────────────────────────────────────────────────────────
@@ -31,16 +28,57 @@ import { X, Loader2, CheckCircle2 } from 'lucide-react';
  * @param {string}    [maxWidth] - Ancho máximo del panel (default '680px').
  */
 export function ModalWrapper({ titulo, subtitulo, onClose, color, children, maxWidth = '680px' }) {
+  const panelRef = useRef(null);
+  const closeRef = useRef(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = panelRef.current?.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href]',
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-    }}>
-      <div style={{
-        background: 'white', borderRadius: '16px', width: '100%', maxWidth,
-        maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-        boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
-      }}>
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+      }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        style={{
+          background: 'white', borderRadius: '16px', width: '100%', maxWidth,
+          maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
+        }}
+      >
         {/* Cabecera con acento de color */}
         <div style={{
           padding: '24px 28px', borderBottom: '1px solid #f1f5f9',
@@ -48,12 +86,14 @@ export function ModalWrapper({ titulo, subtitulo, onClose, color, children, maxW
           borderLeft: `5px solid ${color}`,
         }}>
           <div>
-            <h2 style={{ fontSize: '18px', color: '#0f172a', fontWeight: '700', margin: 0 }}>{titulo}</h2>
+            <h2 id={titleId} style={{ fontSize: '18px', color: '#0f172a', fontWeight: '700', margin: 0 }}>{titulo}</h2>
             {subtitulo && (
               <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>{subtitulo}</p>
             )}
           </div>
           <button
+            ref={closeRef}
+            type="button"
             onClick={onClose}
             aria-label="Cerrar modal"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '6px' }}
@@ -96,10 +136,15 @@ export function SeccionHeader({ icono, titulo }) {
  * @param {ReactNode} children - El input, select o textarea.
  */
 export function Campo({ label, children }) {
+  const generatedId = useId();
+  const controlId = children?.props?.id || generatedId;
+  const control = React.isValidElement(children)
+    ? React.cloneElement(children, { id: controlId })
+    : children;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      <label style={{ fontSize: '13px', color: '#475569', fontWeight: '500' }}>{label}</label>
-      {children}
+      <label htmlFor={controlId} style={{ fontSize: '13px', color: '#475569', fontWeight: '500' }}>{label}</label>
+      {control}
     </div>
   );
 }
@@ -199,18 +244,6 @@ export function BotonesAccion({ onClose, guardando, labelGuardar, color = '#0063
     </div>
   );
 }
-
-// ─── Estilos compartidos ──────────────────────────────────────────────────────
-
-/** Estilo base para inputs, selects y textareas. */
-export const inputStyle = {
-  padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0',
-  outline: 'none', fontSize: '14px', color: '#1e293b', background: 'white',
-  width: '100%', boxSizing: 'border-box',
-};
-
-/** Grid de 2 columnas para campos en pares. */
-export const gridDos = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' };
 
 // Estilos de botones (usados internamente en BotonesAccion)
 const btnPrimario = {

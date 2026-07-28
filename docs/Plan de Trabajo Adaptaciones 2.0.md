@@ -130,6 +130,8 @@ implementar mecanismos temporales de doble escritura.
 
 ### Corte B — Backend
 
+**Estado al 28 de julio de 2026: construido y validado.**
+
 1. Mapear `Persona`, `PersonaNucleo`, `PersonaFuenteLegacy`,
    `OrvIntegrante`, `ParcelaTitular`, `Minuta`, `Acuerdo`,
    `DocumentoVersion` y `PagoIndemnizacion`.
@@ -151,10 +153,22 @@ implementar mecanismos temporales de doble escritura.
 7. Calcular hash y tamaño por bloques al guardar archivos.
 8. Crear nuevas versiones documentales sin sobrescribir archivos.
 9. Proporcionar un endpoint de alertas no vistas para el usuario autenticado.
-10. Mantener temporalmente los campos heredados solo para compatibilidad de
-    lectura; las escrituras nuevas se realizan sobre el modelo normalizado.
+10. Mantener temporalmente los campos heredados para compatibilidad con el
+    frontend vigente. Los endpoints normalizados escriben únicamente el modelo
+    nuevo; los endpoints heredados de ORV y parcela realizan doble escritura
+    transaccional hasta completar el Corte C.
+
+Validación realizada sobre una copia temporal de la base activa:
+
+- 87 pruebas de regresión e integración aprobadas.
+- Carga concurrente de documentos sin colisiones de versión.
+- Paridad completa entre columnas ORM y tablas de la migración 004.
+- Cero combinaciones duplicadas de ruta y método en FastAPI.
+- Base activa sin datos de prueba después de la validación.
 
 ### Corte C — Frontend
+
+**Estado al 28 de julio de 2026: construido y validado técnicamente.**
 
 1. Crear un selector accesible de personas con búsqueda paginada.
 2. Refactorizar ORV para administrar cargos normalizados.
@@ -165,6 +179,17 @@ implementar mecanismos temporales de doble escritura.
 7. Mostrar alertas no vistas y permitir marcarlas como leídas.
 8. Extraer estilos reutilizables; evitar componentes monolíticos con lógica de
    API, modal y presentación en un solo archivo.
+
+Resultado:
+
+- Selector accesible de personas con búsqueda paginada y alta normalizada.
+- Afectación individual basada en persona, parcela y titularidad.
+- Pestañas independientes para ORV, minutas, pagos y documentos.
+- Centro global de alertas no vistas.
+- Módulos cargados bajo demanda para mantener pequeño el paquete inicial.
+- `oxlint`: cero errores y cero advertencias.
+- Build de producción exitoso, sin chunks mayores a 500 kB.
+- Operaciones compuestas de parcela/titular y ORV/integrantes en el backend.
 
 ### Corte D — Contracción
 

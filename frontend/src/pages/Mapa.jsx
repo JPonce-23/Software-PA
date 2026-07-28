@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Map as MapIcon, Layers, Maximize, CheckCircle } from 'lucide-react';
+import { Layers, Maximize, CheckCircle } from 'lucide-react';
 import { MapContainer, TileLayer, GeoJSON, LayersControl, useMap } from 'react-leaflet';
 import { useSearchParams } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';

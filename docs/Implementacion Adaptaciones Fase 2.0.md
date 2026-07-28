@@ -1,7 +1,7 @@
 # Implementación — Adaptaciones Fase 2.0
 
 **Fecha:** 28 de julio de 2026  
-**Estado:** Corte A construido, validado y aplicado a la base activa limpia.
+**Estado:** Cortes A, B y C construidos; 004 aplicada a la base activa limpia.
 
 ## 1. Fuente ejecutable de la migración
 
@@ -375,13 +375,98 @@ Antes de aplicar en la base activa:
 No ejecutar 004 desde una interfaz que ignore errores o continúe después de
 una sentencia fallida. `ON_ERROR_STOP=1` es obligatorio.
 
-## 7. Trabajo aún pendiente
+## 7. Resultado del Corte B
 
-El Corte A está construido. Antes de aplicar 004 en producción todavía deben
-implementarse:
+El backend del Corte B se implementó con routers y servicios por dominio:
 
-- Modelos, schemas, routers y servicios del Corte B.
-- Formularios y módulos del Corte C.
+```text
+backend/app/routers/
+├── personas.py
+├── minutas.py
+├── documentos.py
+├── pagos.py
+└── alertas.py
+
+backend/app/services/
+├── common.py
+├── personas.py
+├── minutas.py
+├── documentos.py
+└── pagos.py
+```
+
+`main.py` conserva el ensamblaje de la aplicación y los módulos heredados que
+aún no forman parte de este corte. Se retiraron de él las rutas duplicadas de
+ORV, parcelas, archivos, bajas documentales y lectura de alertas.
+
+La transición con el frontend actual funciona así:
+
+- Los endpoints nuevos de personas, integrantes y titulares escriben en las
+  tablas normalizadas.
+- Los formularios heredados de ORV y parcela mantienen temporalmente una doble
+  escritura atómica para no interrumpir la operación.
+- `documentacion_soporte.url_archivo` ya no se acepta en escrituras de API; las
+  cargas crean versiones inmutables.
+- Las bajas que romperían relaciones activas se rechazan con `409`.
+- Los conflictos de CURP, cargo y referencia bancaria se traducen a `409`.
+
+La carga documental valida extensión, MIME y firma, limita tamaño, calcula
+SHA-256 por bloques, usa movimiento atómico y bloquea el documento para
+reservar versiones concurrentes. Los pagos usan `Decimal` en la API y conservan
+en PostgreSQL la validación definitiva del límite
+`monto_100 + monto_bdt`.
+
+La regresión se ejecutó sobre
+`db_trenes_codex_test_20260728`, una copia temporal exacta de la base activa:
+
+```text
+87 pruebas aprobadas
+0 rutas duplicadas
+0 columnas ORM faltantes en la base
+```
+
+La copia temporal fue eliminada después de las pruebas. La base activa conservó
+un usuario, un proyecto, siete tramos y cero registros operativos de prueba.
+
+## 8. Resultado del Corte C
+
+El expediente incorpora módulos cargados bajo demanda para:
+
+- Buscar o registrar personas y crear parcelas con titularidad normalizada.
+- Registrar ORV con uno a seis integrantes y cargos no repetidos.
+- Crear minutas, acuerdos y marcar compromisos cumplidos.
+- Consultar trámites de indemnización y registrar pagos.
+- Crear documentos, cargar versiones y descargar evidencia autenticada.
+- Consultar y marcar alertas no vistas desde la barra superior.
+
+Se agregaron operaciones compuestas para evitar que la UI deje relaciones
+parciales:
+
+```text
+POST /api/parcelas/con-titular
+POST /api/orvs/con-integrantes
+```
+
+La validación del frontend terminó con cero advertencias de `oxlint`. El build
+de producción quedó dividido por ruta y por módulo; ningún chunk supera
+500 kB.
+
+La ejecución diaria de alertas se implementó como servicio independiente:
+
+```text
+backend/app/jobs/alertas_scheduler.py
+docker compose: alertas_scheduler
+```
+
+El servicio reutiliza la imagen del backend, ejecuta una vez al iniciar y luego
+cada 86,400 segundos. El 28 de julio de 2026 quedó activo y su primer ciclo
+terminó correctamente con cero alertas por generar.
+
+## 9. Trabajo aún pendiente
+
+Los siguientes cortes y tareas permanecen pendientes:
+
+- Validación funcional y de experiencia de usuario con usuarios finales.
 - Conciliación de identidades migradas.
 - Migración 005 de contracción.
 - Consolidación posterior de `001_init_schema.sql`.
