@@ -44,6 +44,28 @@ class UsuarioResponse(UsuarioBase):
     class Config:
         from_attributes = True
 
+# ----------------- PROYECTO ----------------- #
+class ProyectoBase(BaseModel):
+    clave_proyecto: str
+    nombre_proyecto: str
+    descripcion: Optional[str] = None
+    activo: bool = True
+    fecha_registro: date
+
+class ProyectoCreate(AuditableCreate):
+    clave_proyecto: str
+    nombre_proyecto: str
+    descripcion: Optional[str] = None
+
+class ProyectoUpdate(AuditableUpdate):
+    nombre_proyecto: Optional[str] = None
+    descripcion: Optional[str] = None
+
+class ProyectoResponse(ProyectoBase):
+    id_proyecto: int
+    class Config:
+        from_attributes = True
+
 # ----------------- MAPA Y ENTIDADES BASE ----------------- #
 class TramoBase(BaseModel):
     clave_tramo: str
@@ -51,15 +73,15 @@ class TramoBase(BaseModel):
     descripcion: Optional[str] = None
     ancho_total_derecho_via_m: Optional[Decimal] = 40.00
     activo: bool = True
-    fecha_registro: Optional[date] = None
+    fecha_registro: date
 
 class TramoCreate(AuditableCreate):
+    id_proyecto: int
     clave_tramo: str
     nombre_tramo: str
     descripcion: Optional[str] = None
     ancho_total_derecho_via_m: Optional[Decimal] = 40.00
-    fecha_registro: Optional[date] = None
-    geometria_wkt: Optional[str] = None # WKT para la BD
+    geometria_wkt: Optional[str] = None
 
 class TramoUpdate(AuditableUpdate):
     nombre_tramo: Optional[str] = None
@@ -69,28 +91,7 @@ class TramoUpdate(AuditableUpdate):
 
 class TramoResponse(TramoBase):
     id_tramo: int
-    geometria_wkt: Optional[str] = None
-    class Config:
-        from_attributes = True
-
-class FrenteCreate(AuditableCreate):
-    id_tramo: int
-    clave_frente: str
-    nombre_frente: str
-    descripcion: Optional[str] = None
-    fecha_registro: Optional[date] = None
-    geometria_wkt: Optional[str] = None
-
-class FrenteUpdate(AuditableUpdate):
-    nombre_frente: Optional[str] = None
-    descripcion: Optional[str] = None
-    geometria_wkt: Optional[str] = None
-
-class FrenteResponse(BaseModel):
-    id_frente: int
-    id_tramo: int
-    clave_frente: str
-    nombre_frente: str
+    id_proyecto: int
     geometria_wkt: Optional[str] = None
     class Config:
         from_attributes = True
@@ -121,7 +122,6 @@ class NucleoAgrarioResponse(BaseModel):
 # ----------------- TRAMO NUCLEO ----------------- #
 class TramoNucleoCreate(AuditableCreate):
     id_tramo: int
-    id_frente: int
     id_nucleo: int
     consecutivo: int
     numero_tramo: Optional[str] = None
@@ -142,7 +142,6 @@ class TramoNucleoUpdate(AuditableUpdate):
 class TramoNucleoResponse(BaseModel):
     id_tramo_nucleo: int
     id_tramo: int
-    id_frente: int
     id_nucleo: int
     consecutivo: int
     numero_tramo: Optional[str] = None
@@ -189,7 +188,6 @@ class DashboardMetrics(BaseModel):
     id_tramo_nucleo: int
     id_tramo: int
     clave_tramo: str
-    id_frente: int
     id_nucleo: int
     nombre_nucleo: str
     entidad_federativa: str
@@ -503,13 +501,15 @@ class BitacoraResponse(BaseModel):
     ip_origen: Optional[str] = None
     user_agent: Optional[str] = None
 
-# ==================== USUARIO FRENTE ==================== #
-class UsuarioFrenteCreate(BaseModel):
+# ==================== USUARIO TRAMO ==================== #
+class UsuarioTramoCreate(BaseModel):
     id_usuario: int
+    motivo_reactivacion: Optional[str] = Field(default=None, min_length=1)
 
-class UsuarioFrenteResponse(BaseModel):
+class UsuarioTramoResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    id_usuario_tramo: int
     id_usuario: int
-    id_frente: int
+    id_tramo: int
     fecha_asignacion: datetime
     activo: bool

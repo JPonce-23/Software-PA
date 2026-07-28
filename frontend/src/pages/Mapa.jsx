@@ -17,6 +17,16 @@ const coloresPorTramo = {
   "Tren Maya tramo 7": "#9B2247" // Guinda Institucional (reemplaza al morado)
 };
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;',
+  }[character]));
+}
+
 // Componente para auto-ajustar el zoom al polígono del tramo
 function MapFitter({ geojsonData }) {
   const map = useMap();
@@ -35,7 +45,7 @@ function MapFitter({ geojsonData }) {
 
 export default function Mapa() {
   const [searchParams] = useSearchParams();
-  const tramoParam = searchParams.get('tramo');
+  const idTramo = Number(searchParams.get('id_tramo')) || null;
   
   const [tramosGeoJSON, setTramosGeoJSON] = useState(null);
   const [nucleosGeoJSON, setNucleosGeoJSON] = useState(null);
@@ -44,8 +54,8 @@ export default function Mapa() {
 
   useEffect(() => {
     // 1. Cargar el Tramo principal (o todos si no hay param)
-    if (tramoParam) {
-      api.get(`/tramo-detalles?tramo=${encodeURIComponent(tramoParam)}`).then(res => {
+    if (idTramo) {
+      api.get(`/tramo-detalles?id_tramo=${idTramo}`).then(res => {
         setTramoDetalle(res.data);
         if (res.data.geometria_wkt) {
           setTramosGeoJSON({
@@ -73,7 +83,7 @@ export default function Mapa() {
     }
 
     // 2. Cargar Núcleos Agrarios (filtrados por tramo)
-    const urlNucleos = tramoParam ? `/nucleos?tramo=${encodeURIComponent(tramoParam)}` : '/nucleos';
+    const urlNucleos = idTramo ? `/nucleos?id_tramo=${idTramo}` : '/nucleos';
     api.get(urlNucleos).then(res => {
       const features = res.data.map(n => {
         if (!n.geometria_wkt) return null;
@@ -100,7 +110,7 @@ export default function Mapa() {
 
       setNucleosGeoJSON({ type: "FeatureCollection", features });
     }).catch(console.error);
-  }, [tramoParam]);
+  }, [idTramo]);
 
   const onEachNucleo = (feature, layer) => {
     if (feature.properties && feature.properties.name) {
@@ -112,11 +122,11 @@ export default function Mapa() {
 
       layer.bindPopup(`
         <div style="font-family: Inter, sans-serif;">
-          <h3 style="margin:0 0 5px 0; color: #1e293b;">${feature.properties.name}</h3>
-          <p style="margin:0; font-size: 12px; color: #64748b; text-transform: capitalize;">${feature.properties.tipo}</p>
+          <h3 style="margin:0 0 5px 0; color: #1e293b;">${escapeHtml(feature.properties.name)}</h3>
+          <p style="margin:0; font-size: 12px; color: #64748b; text-transform: capitalize;">${escapeHtml(feature.properties.tipo)}</p>
           <hr style="margin: 8px 0; border: 0; border-top: 1px solid #e2e8f0;" />
           <p style="margin:4px 0;"><strong>Estatus:</strong> ${estatusText}</p>
-          <p style="margin:4px 0;"><strong>Superficie Afectada:</strong> ${feature.properties.area_ha} hectáreas</p>
+          <p style="margin:4px 0;"><strong>Superficie Afectada:</strong> ${escapeHtml(feature.properties.area_ha)} hectáreas</p>
         </div>
       `);
     }
@@ -138,7 +148,7 @@ export default function Mapa() {
       <div style={{ flex: '1', position: 'relative', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', minHeight: '600px' }}>
         
         {/* PANEL TÉCNICO GLASSMORPHISM */}
-        {tramoParam && tramoDetalle && (
+        {idTramo && tramoDetalle && (
           <div style={{
             position: 'absolute', top: '20px', left: '60px', zIndex: 1000,
             background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(12px)',
@@ -146,7 +156,7 @@ export default function Mapa() {
             boxShadow: '0 8px 32px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.8)',
             fontFamily: 'Inter, sans-serif'
           }}>
-            <h2 style={{ margin: '0 0 5px 0', fontSize: '20px', color: '#0f172a' }}>{tramoParam}</h2>
+            <h2 style={{ margin: '0 0 5px 0', fontSize: '20px', color: '#0f172a' }}>{tramoDetalle.nombre_tramo}</h2>
             <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b' }}>Análisis Geoespacial en Vivo</p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -236,7 +246,7 @@ export default function Mapa() {
             {nucleosGeoJSON && (
               <LayersControl.Overlay checked name="Núcleos Agrarios">
                 <GeoJSON 
-                  key={tramoParam ? tramoParam + "-nucleos" : "all-nucleos"} 
+                  key={idTramo ? `${idTramo}-nucleos` : "all-nucleos"}
                   data={nucleosGeoJSON} 
                   style={styleFeature} 
                   onEachFeature={onEachNucleo} 
@@ -247,7 +257,7 @@ export default function Mapa() {
             {tramosGeoJSON && (
               <LayersControl.Overlay checked name="Trazo Ferroviario">
                 <GeoJSON 
-                  key={tramoParam ? tramoParam + "-tramo" : "all-tramos"}
+                  key={idTramo ? `${idTramo}-tramo` : "all-tramos"}
                   data={tramosGeoJSON} 
                   style={styleFeature} 
                 />

@@ -17,9 +17,26 @@ CREATE TABLE municipio (
     CONSTRAINT uq_municipio_entidad_clave UNIQUE (id_entidad, clave_inegi)
 );
 
+CREATE TABLE proyecto (
+    id_proyecto SERIAL PRIMARY KEY,
+    clave_proyecto VARCHAR(30) UNIQUE NOT NULL,
+    nombre_proyecto VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_registro DATE NOT NULL DEFAULT CURRENT_DATE,
+    fecha_baja TIMESTAMPTZ,
+    id_usuario_baja INTEGER,
+    motivo_baja TEXT,
+    fecha_reactivacion TIMESTAMPTZ,
+    id_usuario_reactivacion INTEGER,
+    motivo_reactivacion TEXT,
+    observaciones TEXT
+);
+
 CREATE TABLE tramo (
     id_tramo SERIAL PRIMARY KEY,
-    clave_tramo VARCHAR(20) UNIQUE NOT NULL,
+    id_proyecto INTEGER NOT NULL REFERENCES proyecto(id_proyecto),
+    clave_tramo VARCHAR(20) NOT NULL,
     nombre_tramo VARCHAR(200) NOT NULL,
     descripcion TEXT,
     ancho_total_derecho_via_m NUMERIC(6,2) DEFAULT 40.00 CHECK (ancho_total_derecho_via_m > 0),
@@ -32,27 +49,8 @@ CREATE TABLE tramo (
     fecha_reactivacion TIMESTAMPTZ,
     id_usuario_reactivacion INTEGER,
     motivo_reactivacion TEXT,
-    observaciones TEXT
-);
-
-CREATE TABLE frente (
-    id_frente SERIAL PRIMARY KEY,
-    id_tramo INTEGER NOT NULL REFERENCES tramo(id_tramo),
-    clave_frente VARCHAR(30) NOT NULL,
-    nombre_frente VARCHAR(200) NOT NULL,
-    descripcion TEXT,
-    geometria_linea GEOMETRY(MULTILINESTRING, 4326),
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    fecha_registro DATE NOT NULL DEFAULT CURRENT_DATE,
-    fecha_baja TIMESTAMPTZ,
-    id_usuario_baja INTEGER,
-    motivo_baja TEXT,
-    fecha_reactivacion TIMESTAMPTZ,
-    id_usuario_reactivacion INTEGER,
-    motivo_reactivacion TEXT,
     observaciones TEXT,
-    CONSTRAINT uq_frente_tramo_clave UNIQUE (id_tramo, clave_frente),
-    CONSTRAINT uq_frente_tramo_id UNIQUE (id_tramo, id_frente)
+    CONSTRAINT uq_tramo_proyecto_clave UNIQUE (id_proyecto, clave_tramo)
 );
 
 CREATE TABLE nucleo_agrario (
@@ -77,7 +75,6 @@ CREATE TABLE nucleo_agrario (
 CREATE TABLE tramo_nucleo (
     id_tramo_nucleo SERIAL PRIMARY KEY,
     id_tramo INTEGER NOT NULL REFERENCES tramo(id_tramo),
-    id_frente INTEGER NOT NULL REFERENCES frente(id_frente),
     id_nucleo INTEGER NOT NULL REFERENCES nucleo_agrario(id_nucleo),
     consecutivo INTEGER NOT NULL,
     numero_tramo VARCHAR(50),
@@ -95,8 +92,6 @@ CREATE TABLE tramo_nucleo (
     motivo_reactivacion TEXT,
     observaciones TEXT,
     CONSTRAINT uq_tramo_nucleo_consecutivo UNIQUE (id_tramo, consecutivo),
-    CONSTRAINT fk_tramo_nucleo_frente_mismo_tramo
-        FOREIGN KEY (id_tramo, id_frente) REFERENCES frente(id_tramo, id_frente),
     CONSTRAINT uq_tramo_nucleo_nucleo_id UNIQUE (id_nucleo, id_tramo_nucleo)
 );
 
@@ -135,10 +130,10 @@ CREATE TABLE bitacora (
     user_agent TEXT
 );
 
-CREATE TABLE usuario_frente (
-    id_usuario_frente SERIAL PRIMARY KEY,
+CREATE TABLE usuario_tramo (
+    id_usuario_tramo SERIAL PRIMARY KEY,
     id_usuario INTEGER NOT NULL REFERENCES usuario(id_usuario),
-    id_frente INTEGER NOT NULL REFERENCES frente(id_frente),
+    id_tramo INTEGER NOT NULL REFERENCES tramo(id_tramo),
     fecha_asignacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_baja TIMESTAMPTZ,
@@ -148,7 +143,7 @@ CREATE TABLE usuario_frente (
     id_usuario_reactivacion INTEGER,
     motivo_reactivacion TEXT,
     observaciones TEXT,
-    CONSTRAINT uq_usuario_frente UNIQUE (id_usuario, id_frente)
+    CONSTRAINT uq_usuario_tramo UNIQUE (id_usuario, id_tramo)
 );
 
 
@@ -516,7 +511,6 @@ FOR EACH ROW EXECUTE FUNCTION fn_validar_documentacion_soporte_referencia();
 
 -- Índices Espaciales y de Rendimiento
 CREATE INDEX idx_tramo_geometria ON tramo USING GIST (geometria_linea);
-CREATE INDEX idx_frente_geometria ON frente USING GIST (geometria_linea);
 CREATE INDEX idx_nucleo_geometria ON nucleo_agrario USING GIST (geometria_poligono);
 CREATE INDEX idx_tramo_nucleo_geometria ON tramo_nucleo USING GIST (geometria_segmento);
 
@@ -894,15 +888,15 @@ CREATE TRIGGER trg_baja_logica_tramo
     BEFORE UPDATE OF activo ON tramo
     FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
 
--- frente
-CREATE TRIGGER trg_audit_frente
-    AFTER INSERT OR UPDATE ON frente
-    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_frente');
-CREATE TRIGGER trg_prevent_delete_frente
-    BEFORE DELETE ON frente
+-- proyecto
+CREATE TRIGGER trg_audit_proyecto
+    AFTER INSERT OR UPDATE ON proyecto
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_proyecto');
+CREATE TRIGGER trg_prevent_delete_proyecto
+    BEFORE DELETE ON proyecto
     FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
-CREATE TRIGGER trg_baja_logica_frente
-    BEFORE UPDATE OF activo ON frente
+CREATE TRIGGER trg_baja_logica_proyecto
+    BEFORE UPDATE OF activo ON proyecto
     FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
 
 -- nucleo_agrario
@@ -1048,15 +1042,15 @@ CREATE TRIGGER trg_baja_logica_alertas
     BEFORE UPDATE OF activo ON alertas
     FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
 
--- usuario_frente
-CREATE TRIGGER trg_audit_usuario_frente
-    AFTER INSERT OR UPDATE ON usuario_frente
-    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_usuario_frente');
-CREATE TRIGGER trg_prevent_delete_usuario_frente
-    BEFORE DELETE ON usuario_frente
+-- usuario_tramo
+CREATE TRIGGER trg_audit_usuario_tramo
+    AFTER INSERT OR UPDATE ON usuario_tramo
+    FOR EACH ROW EXECUTE FUNCTION fn_audit_log('id_usuario_tramo');
+CREATE TRIGGER trg_prevent_delete_usuario_tramo
+    BEFORE DELETE ON usuario_tramo
     FOR EACH ROW EXECUTE FUNCTION fn_prevent_physical_delete();
-CREATE TRIGGER trg_baja_logica_usuario_frente
-    BEFORE UPDATE OF activo ON usuario_frente
+CREATE TRIGGER trg_baja_logica_usuario_tramo
+    BEFORE UPDATE OF activo ON usuario_tramo
     FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
 
 -- alertas_vistas
@@ -1069,6 +1063,10 @@ CREATE TRIGGER trg_prevent_delete_alertas_vistas
 CREATE TRIGGER trg_baja_logica_alertas_vistas
     BEFORE UPDATE OF activo ON alertas_vistas
     FOR EACH ROW EXECUTE FUNCTION fn_validar_baja_logica();
+
+-- Índices de navegación territorial y asignación operativa
+CREATE INDEX idx_tramo_id_proyecto ON tramo(id_proyecto);
+CREATE INDEX idx_usuario_tramo_id_tramo ON usuario_tramo(id_tramo);
 
 -- =============================================================
 -- C-02: PROTECCIÓN CONTRA REGRESIÓN DE ESTADO DE CONVENIO
@@ -1125,7 +1123,6 @@ CREATE OR REPLACE VIEW vw_tramo_nucleo_estado AS
 SELECT
     tn.id_tramo_nucleo,
     tn.id_tramo,
-    tn.id_frente,
     tn.id_nucleo,
     tn.consecutivo,
     tn.longitud_m,
@@ -1202,9 +1199,11 @@ AgrupacionLiberada AS (
 )
 SELECT
     v.id_tramo_nucleo,
+    p.id_proyecto,
+    p.clave_proyecto,
+    p.nombre_proyecto,
     t.id_tramo,
     t.clave_tramo,
-    f.id_frente,
     n.id_nucleo,
     n.nombre_nucleo,
     ef.nombre AS entidad_federativa,
@@ -1228,7 +1227,7 @@ SELECT
     COALESCE(al.total_individual_ha, 0) AS total_individual_ha
 FROM vw_tramo_nucleo_estado v
 JOIN tramo t ON t.id_tramo = v.id_tramo AND t.activo = TRUE
-JOIN frente f ON f.id_frente = v.id_frente AND f.activo = TRUE
+JOIN proyecto p ON p.id_proyecto = t.id_proyecto AND p.activo = TRUE
 JOIN nucleo_agrario n ON n.id_nucleo = v.id_nucleo AND n.activo = TRUE
 JOIN municipio m ON m.id_municipio = n.id_municipio AND m.activo = TRUE
 JOIN entidad_federativa ef ON ef.id_entidad = m.id_entidad AND ef.activo = TRUE

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, CheckConstraint, Integer, String, Boolean, Numeric, Date, ForeignKey, DateTime, BigInteger
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 from sqlalchemy.dialects.postgresql import JSONB, INET
@@ -32,29 +32,31 @@ class Municipio(Base):
     entidad = relationship("EntidadFederativa", back_populates="municipios")
     nucleos = relationship("NucleoAgrario", back_populates="municipio")
 
+class Proyecto(Base, AuditableMixin):
+    __tablename__ = "proyecto"
+    id_proyecto = Column(Integer, primary_key=True, index=True)
+    clave_proyecto = Column(String(30), unique=True, nullable=False)
+    nombre_proyecto = Column(String(200), nullable=False)
+    descripcion = Column(String)
+    activo = Column(Boolean, default=True, nullable=False)
+    fecha_registro = Column(Date, nullable=False)
+    tramos = relationship("Tramo", back_populates="proyecto")
+
 class Tramo(Base, AuditableMixin):
     __tablename__ = "tramo"
+    __table_args__ = (
+        UniqueConstraint("id_proyecto", "clave_tramo", name="uq_tramo_proyecto_clave"),
+    )
     id_tramo = Column(Integer, primary_key=True, index=True)
-    clave_tramo = Column(String(20), unique=True, nullable=False)
+    id_proyecto = Column(Integer, ForeignKey("proyecto.id_proyecto"), nullable=False)
+    clave_tramo = Column(String(20), nullable=False)
     nombre_tramo = Column(String(200), nullable=False)
     descripcion = Column(String)
     ancho_total_derecho_via_m = Column(Numeric(6, 2), default=40.00)
     geometria_linea = Column(Geometry(geometry_type='MULTILINESTRING', srid=4326))
     activo = Column(Boolean, default=True, nullable=False)
     fecha_registro = Column(Date, nullable=False)
-    frentes = relationship("Frente", back_populates="tramo")
-
-class Frente(Base, AuditableMixin):
-    __tablename__ = "frente"
-    id_frente = Column(Integer, primary_key=True, index=True)
-    id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
-    clave_frente = Column(String(30), nullable=False)
-    nombre_frente = Column(String(200), nullable=False)
-    descripcion = Column(String)
-    geometria_linea = Column(Geometry(geometry_type='MULTILINESTRING', srid=4326))
-    activo = Column(Boolean, default=True, nullable=False)
-    fecha_registro = Column(Date, nullable=False)
-    tramo = relationship("Tramo", back_populates="frentes")
+    proyecto = relationship("Proyecto", back_populates="tramos")
 
 class NucleoAgrario(Base, AuditableMixin):
     __tablename__ = "nucleo_agrario"
@@ -74,7 +76,7 @@ class TramoNucleo(Base, AuditableMixin):
     __tablename__ = "tramo_nucleo"
     id_tramo_nucleo = Column(Integer, primary_key=True, index=True)
     id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
-    id_frente = Column(Integer, ForeignKey("frente.id_frente"), nullable=False)
+
     id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
     consecutivo = Column(Integer, nullable=False)
     numero_tramo = Column(String(50))
@@ -294,11 +296,14 @@ class Bitacora(Base):
     ip_origen = Column(INET)
     user_agent = Column(String)
 
-class UsuarioFrente(Base):
-    __tablename__ = "usuario_frente"
-    id_usuario_frente = Column(Integer, primary_key=True, autoincrement=True)
+class UsuarioTramo(Base):
+    __tablename__ = "usuario_tramo"
+    __table_args__ = (
+        UniqueConstraint("id_usuario", "id_tramo", name="uq_usuario_tramo"),
+    )
+    id_usuario_tramo = Column(Integer, primary_key=True, autoincrement=True)
     id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
-    id_frente = Column(Integer, ForeignKey("frente.id_frente"), nullable=False)
+    id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
     fecha_asignacion = Column(DateTime(timezone=True), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
     

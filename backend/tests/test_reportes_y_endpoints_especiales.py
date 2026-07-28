@@ -5,7 +5,7 @@ Cubre:
   - Dashboard y reportes de resumen.
   - Exportación CSV de tramos.
   - Bitácora de auditoría.
-  - Asignación/remoción de usuarios a frentes.
+  - Asignación/remoción de usuarios a tramos.
 """
 
 import pytest
@@ -68,13 +68,13 @@ class TestBitacora:
             assert "fecha_hora" in entry
 
 
-class TestAsignacionUsuarioFrente:
-    """Asignación y remoción de usuarios a frentes."""
+class TestAsignacionUsuarioTramo:
+    """Asignación y remoción de usuarios a tramos."""
 
-    def test_asignar_usuario_a_frente(
-        self, client, admin_headers, seed_frente
+    def test_asignar_usuario_a_tramo(
+        self, client, admin_headers, seed_tramo
     ):
-        """Debe poder asignar un usuario a un frente."""
+        """Debe poder asignar un usuario a un tramo."""
         # Obtener el id del usuario admin
         login_res = client.post(
             "/api/auth/login",
@@ -83,17 +83,17 @@ class TestAsignacionUsuarioFrente:
         user_id = login_res.json()["user"]["id_usuario"]
 
         res = client.post(
-            f"/api/frentes/{seed_frente['id_frente']}/asignar-usuario",
+            f"/api/tramos/{seed_tramo['id_tramo']}/asignar-usuario",
             json={"id_usuario": user_id},
             headers=admin_headers,
         )
         assert res.status_code == 200
         assert res.json()["activo"] is True
 
-    def test_remover_usuario_de_frente(
-        self, client, admin_headers, seed_frente
+    def test_remover_usuario_de_tramo(
+        self, client, admin_headers, seed_tramo
     ):
-        """Debe poder remover al usuario del frente."""
+        """Debe poder remover al usuario del tramo."""
         login_res = client.post(
             "/api/auth/login",
             data={"username": "admin@sistema.com", "password": "Admin123!"},
@@ -101,28 +101,57 @@ class TestAsignacionUsuarioFrente:
         user_id = login_res.json()["user"]["id_usuario"]
 
         res = client.delete(
-            f"/api/frentes/{seed_frente['id_frente']}/remover-usuario/{user_id}?motivo=Prueba",
+            f"/api/tramos/{seed_tramo['id_tramo']}/remover-usuario/{user_id}?motivo=Prueba",
             headers=admin_headers,
         )
         assert res.status_code == 200
         assert res.json()["status"] == "success"
 
-    def test_remover_asignacion_inexistente(self, client, admin_headers, seed_frente):
+    def test_remover_asignacion_inexistente(self, client, admin_headers, seed_tramo):
         """Remover un usuario no asignado devuelve 404."""
         res = client.delete(
-            f"/api/frentes/{seed_frente['id_frente']}/remover-usuario/999999?motivo=Prueba",
+            f"/api/tramos/{seed_tramo['id_tramo']}/remover-usuario/999999?motivo=Prueba",
             headers=admin_headers,
         )
         assert res.status_code == 404
+
+    def test_reactivar_asignacion_exige_motivo_y_registra_reactivacion(
+        self, client, admin_headers, seed_tramo
+    ):
+        login_res = client.post(
+            "/api/auth/login",
+            data={"username": "admin@sistema.com", "password": "Admin123!"},
+        )
+        user_id = login_res.json()["user"]["id_usuario"]
+        endpoint = f"/api/tramos/{seed_tramo['id_tramo']}/asignar-usuario"
+
+        sin_motivo = client.post(endpoint, json={"id_usuario": user_id}, headers=admin_headers)
+        assert sin_motivo.status_code == 400
+
+        reactivada = client.post(
+            endpoint,
+            json={
+                "id_usuario": user_id,
+                "motivo_reactivacion": "Se reasigna al responsable territorial.",
+            },
+            headers=admin_headers,
+        )
+        assert reactivada.status_code == 200
+        assert reactivada.json()["activo"] is True
+
+        limpieza = client.delete(
+            f"/api/tramos/{seed_tramo['id_tramo']}/remover-usuario/{user_id}?motivo=Limpieza",
+            headers=admin_headers,
+        )
+        assert limpieza.status_code == 200
 
 
 class TestTramoDetalles:
     """Endpoint de detalles geoespaciales de tramo."""
 
     def test_tramo_detalles_existente(self, client, admin_headers, seed_tramo):
-        nombre = seed_tramo["nombre_tramo"]
         res = client.get(
-            f"/api/tramo-detalles?tramo={nombre}",
+            f"/api/tramo-detalles?id_tramo={seed_tramo['id_tramo']}",
             headers=admin_headers,
         )
         assert res.status_code == 200
@@ -132,7 +161,7 @@ class TestTramoDetalles:
 
     def test_tramo_detalles_inexistente(self, client, admin_headers):
         res = client.get(
-            "/api/tramo-detalles?tramo=Tramo Que No Existe",
+            "/api/tramo-detalles?id_tramo=999999",
             headers=admin_headers,
         )
         assert res.status_code == 404

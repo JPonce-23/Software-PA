@@ -26,9 +26,10 @@ _ids: dict[str, int] = {}
 class TestCRUDTramos:
     """Ciclo de vida de Tramos."""
 
-    def test_crear_tramo(self, client, admin_headers, cleanup):
+    def test_crear_tramo(self, client, admin_headers, cleanup, seed_proyecto):
         uid = _uid()
         payload = {
+            "id_proyecto": seed_proyecto["id_proyecto"],
             "clave_tramo": f"CRD-{uid}",
             "nombre_tramo": f"Tramo CRUD {uid}",
             "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
@@ -60,6 +61,15 @@ class TestCRUDTramos:
         )
         assert res.status_code == 200
         assert res.json()["nombre_tramo"] == "Tramo CRUD Actualizado"
+
+    def test_no_permite_baja_de_proyecto_con_tramos_activos(
+        self, client, admin_headers, seed_proyecto
+    ):
+        res = client.delete(
+            f"/api/proyectos/{seed_proyecto['id_proyecto']}?motivo=Prueba",
+            headers=admin_headers,
+        )
+        assert res.status_code == 409
 
     def test_tramo_inexistente_devuelve_404(self, client, admin_headers):
         res = client.get("/api/tramos/999999", headers=admin_headers)

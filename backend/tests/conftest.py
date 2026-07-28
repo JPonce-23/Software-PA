@@ -79,10 +79,10 @@ def cleanup():
 # ────────── Datos semilla (cadena de dependencias) ────────── #
 
 @pytest.fixture(scope="session")
-def seed_municipio_id(client):
+def seed_municipio_id(client, admin_headers):
     """Obtiene un id_municipio existente del catálogo.
     No crea nada, solo lee lo que ya existe."""
-    res = client.get("/api/catalogos/municipios")
+    res = client.get("/api/catalogos/municipios", headers=admin_headers)
     assert res.status_code == 200
     municipios = res.json()
     assert len(municipios) > 0, (
@@ -92,10 +92,26 @@ def seed_municipio_id(client):
 
 
 @pytest.fixture(scope="session")
-def seed_tramo(client, admin_headers, cleanup):
+def seed_proyecto(client, admin_headers, cleanup):
+    """Crea un proyecto de prueba para toda la sesión."""
+    uid = _uid()
+    payload = {
+        "clave_proyecto": f"PRY-{uid}",
+        "nombre_proyecto": f"Proyecto Pruebas {uid}",
+    }
+    res = client.post("/api/proyectos", json=payload, headers=admin_headers)
+    assert res.status_code == 201, f"No se pudo crear proyecto semilla: {res.text}"
+    data = res.json()
+    cleanup.register("/api/proyectos", data["id_proyecto"])
+    return data
+
+
+@pytest.fixture(scope="session")
+def seed_tramo(client, admin_headers, cleanup, seed_proyecto):
     """Crea un tramo de prueba para toda la sesión."""
     uid = _uid()
     payload = {
+        "id_proyecto": seed_proyecto["id_proyecto"],
         "clave_tramo": f"TST-{uid}",
         "nombre_tramo": f"Tramo Pruebas {uid}",
         "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
@@ -106,25 +122,6 @@ def seed_tramo(client, admin_headers, cleanup):
     data = res.json()
     cleanup.register("/api/tramos", data["id_tramo"])
     return data
-
-
-@pytest.fixture(scope="session")
-def seed_frente(client, admin_headers, cleanup, seed_tramo):
-    """Crea un frente de prueba vinculado al tramo semilla."""
-    uid = _uid()
-    payload = {
-        "id_tramo": seed_tramo["id_tramo"],
-        "clave_frente": f"TF-{uid}",
-        "nombre_frente": f"Frente Pruebas {uid}",
-        "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
-    }
-    res = client.post("/api/frentes", json=payload, headers=admin_headers)
-    assert res.status_code == 201, f"No se pudo crear frente semilla: {res.text}"
-    data = res.json()
-    cleanup.register("/api/frentes", data["id_frente"])
-    return data
-
-
 @pytest.fixture(scope="session")
 def seed_nucleo(client, admin_headers, cleanup, seed_municipio_id):
     """Crea un núcleo agrario de prueba."""
@@ -143,11 +140,10 @@ def seed_nucleo(client, admin_headers, cleanup, seed_municipio_id):
 
 
 @pytest.fixture(scope="session")
-def seed_tramo_nucleo(client, admin_headers, cleanup, seed_tramo, seed_frente, seed_nucleo):
+def seed_tramo_nucleo(client, admin_headers, cleanup, seed_tramo, seed_nucleo):
     """Crea la relación tramo-núcleo necesaria para afectaciones."""
     payload = {
         "id_tramo": seed_tramo["id_tramo"],
-        "id_frente": seed_frente["id_frente"],
         "id_nucleo": seed_nucleo["id_nucleo"],
         "consecutivo": int(_uid()),
         "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",

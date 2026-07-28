@@ -1,26 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { ArrowUpRight, CheckCircle2, Clock, AlertTriangle, Calendar } from 'lucide-react';
-
-const PROYECTOS_MAESTROS = [
-  "Tren Maya", 
-  "AIFA - Pachuca", 
-  "México - Querétaro", 
-  "Saltillo - Nuevo Laredo", 
-  "Querétaro - Irapuato"
-];
-
-function getProyectoMaestro(nombreTramo) {
-  for (const proyecto of PROYECTOS_MAESTROS) {
-    if (nombreTramo.includes(proyecto)) return proyecto;
-  }
-  return "Proyecto General";
-}
-
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Map, Files, FileText, Layers } from 'lucide-react';
+import { Files, Layers, Map } from 'lucide-react';
 
-function ProjectCard({ tramo, nucleosTramo }) {
+function ProjectCard({ tramo, proyecto, nucleosTramo }) {
   const navigate = useNavigate();
   
   // Agregamos métricas reales de los tramos-núcleos
@@ -28,16 +11,14 @@ function ProjectCard({ tramo, nucleosTramo }) {
   const conveniosTotales = nucleosTramo.reduce((acc, curr) => acc + (curr.total_convenios_formalizados_ran || 0), 0);
   const superficieLiberada = nucleosTramo.reduce((acc, curr) => acc + parseFloat(curr.superficie_liberada_ha || 0), 0).toFixed(2);
 
-  const proyecto = getProyectoMaestro(tramo.nombre_tramo);
-
   return (
     <article 
       className="project-card" 
-      onClick={() => navigate(`/mapa?tramo=${encodeURIComponent(tramo.nombre_tramo)}`)}
+      onClick={() => navigate(`/mapa?id_tramo=${tramo.id_tramo}`)}
       style={{ cursor: 'pointer', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-5px)' } }}
     >
       <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>
-        {proyecto}
+        {proyecto?.nombre_proyecto || 'Proyecto sin asignar'}
       </div>
       <h2>{tramo.nombre_tramo}</h2>
       
@@ -80,24 +61,28 @@ function ProjectCard({ tramo, nucleosTramo }) {
 
 export default function Dashboard() {
   const [tramosData, setTramosData] = useState([]);
+  const [proyectosData, setProyectosData] = useState([]);
   const [metricsData, setMetricsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
-  const proyectoFiltro = searchParams.get('proyecto');
+  const proyectoFiltro = Number(searchParams.get('id_proyecto')) || null;
 
   useEffect(() => {
     Promise.all([
       api.get('/tramos'),
+      api.get('/proyectos'),
       api.get('/dashboard')
     ])
-      .then(([resTramos, resMetrics]) => {
+      .then(([resTramos, resProyectos, resMetrics]) => {
         setTramosData(resTramos.data);
+        setProyectosData(resProyectos.data);
         setMetricsData(resMetrics.data);
         setLoading(false);
       })
       .catch(err => {
         console.error('Error al conectar con la API:', err);
         setTramosData([]);
+        setProyectosData([]);
         setMetricsData([]);
         setLoading(false);
       });
@@ -106,13 +91,14 @@ export default function Dashboard() {
   if (loading) return <div>Cargando métricas...</div>;
 
   // Filtramos la lista de tarjetas si existe un parámetro en la URL
-  const tramosFiltrados = proyectoFiltro 
-    ? tramosData.filter(tramo => getProyectoMaestro(tramo.nombre_tramo) === proyectoFiltro)
+  const proyectoSeleccionado = proyectosData.find((proyecto) => proyecto.id_proyecto === proyectoFiltro);
+  const tramosFiltrados = proyectoFiltro
+    ? tramosData.filter((tramo) => tramo.id_proyecto === proyectoFiltro)
     : tramosData;
 
-  const titulo = proyectoFiltro 
-    ? `Sectores y Frentes Activos: ${proyectoFiltro}`
-    : `Sectores y Frentes Activos (Visión General)`;
+  const titulo = proyectoSeleccionado
+    ? `Tramos activos: ${proyectoSeleccionado.nombre_proyecto}`
+    : 'Tramos activos (visión general)';
 
   return (
     <div>
@@ -126,7 +112,8 @@ export default function Dashboard() {
         <section className="cards">
           {tramosFiltrados.map(tramo => {
             const metricsForTramo = metricsData.filter(m => m.id_tramo === tramo.id_tramo);
-            return <ProjectCard key={tramo.id_tramo} tramo={tramo} nucleosTramo={metricsForTramo} />;
+            const proyecto = proyectosData.find((item) => item.id_proyecto === tramo.id_proyecto);
+            return <ProjectCard key={tramo.id_tramo} tramo={tramo} proyecto={proyecto} nucleosTramo={metricsForTramo} />;
           })}
         </section>
       )}

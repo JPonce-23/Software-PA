@@ -22,8 +22,20 @@ def seed_db():
             print(f"Ya existen {tramos_count} tramos. No es necesario insertar mock data.")
             return
 
-        print("Insertando tramos de prueba...")
+        print("Insertando proyecto y tramos de prueba...")
+        proyecto = models.Proyecto(
+            clave_proyecto="PROY-MOCK",
+            nombre_proyecto="Proyecto de Prueba",
+            descripcion="Datos de simulación",
+            fecha_registro=date.today(),
+        )
+        db.add(proyecto)
+        db.commit()
+        db.execute(text("SET LOCAL app.current_user_id = '1'"))
+        db.refresh(proyecto)
+
         tramo1 = models.Tramo(
+            id_proyecto=proyecto.id_proyecto,
             clave_tramo="T1",
             nombre_tramo="Tramo 1 (Palenque - Escárcega)",
             descripcion="Tramo de prueba",
@@ -31,6 +43,7 @@ def seed_db():
             fecha_registro=date.today()
         )
         tramo2 = models.Tramo(
+            id_proyecto=proyecto.id_proyecto,
             clave_tramo="T2",
             nombre_tramo="Tramo 2 (Escárcega - Calkiní)",
             descripcion="Tramo de prueba",
@@ -76,22 +89,9 @@ def seed_db():
         db.execute(text("SET LOCAL app.current_user_id = '1'"))
         db.refresh(nucleo1)
         
-        print("Insertando frente de prueba...")
-        frente1 = models.Frente(
-            id_tramo=tramo1.id_tramo,
-            clave_frente="F1-01",
-            nombre_frente="Frente 1 Inicial",
-            fecha_registro=date.today()
-        )
-        db.add(frente1)
-        db.commit()
-        db.execute(text("SET LOCAL app.current_user_id = '1'"))
-        db.refresh(frente1)
-        
         print("Insertando tramo_nucleo (relación)...")
         tramo_nucleo1 = models.TramoNucleo(
             id_tramo=tramo1.id_tramo,
-            id_frente=frente1.id_frente,
             id_nucleo=nucleo1.id_nucleo,
             consecutivo=1,
             numero_tramo="T1-01",

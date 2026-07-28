@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import ExpedientesList from './pages/ExpedientesList';
 import ExpedienteDetail from './pages/ExpedienteDetail';
 import { AuthProvider, AuthContext } from './contexts/AuthContext';
+import api from './api/axios';
 import './index.css';
 
 const ROL_LABELS = {
@@ -18,6 +19,16 @@ const ROL_LABELS = {
 function Sidebar() {
   const { logout } = React.useContext(AuthContext);
   const location = useLocation();
+  const [proyectos, setProyectos] = React.useState([]);
+
+  React.useEffect(() => {
+    if (location.pathname === '/login') return undefined;
+
+    api.get('/proyectos')
+      .then(({ data }) => setProyectos(data))
+      .catch(() => setProyectos([]));
+    return undefined;
+  }, [location.pathname]);
 
   if (location.pathname === '/login') return null;
 
@@ -45,11 +56,13 @@ function Sidebar() {
           <h4>Proyectos</h4>
           <ul style={{ listStyle: 'none', paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '8px', margin: '10px 0' }}>
             <li><Link className="menu-item" style={{ padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1' }} to="/">Visión General (Todos)</Link></li>
-            <li><Link className="menu-item" style={{ padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1' }} to="/?proyecto=Tren%20Maya">Tren Maya</Link></li>
-            <li><Link className="menu-item" style={{ padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1' }} to="/?proyecto=AIFA%20-%20Pachuca">AIFA - Pachuca</Link></li>
-            <li><Link className="menu-item" style={{ padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1' }} to="/?proyecto=México%20-%20Querétaro">México - Querétaro</Link></li>
-            <li><Link className="menu-item" style={{ padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1' }} to="/?proyecto=Saltillo%20-%20Nuevo%20Laredo">Saltillo - Nuevo Laredo</Link></li>
-            <li><Link className="menu-item" style={{ padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1' }} to="/?proyecto=Querétaro%20-%20Irapuato">Querétaro - Irapuato</Link></li>
+            {proyectos.map((proyecto) => (
+              <li key={proyecto.id_proyecto}>
+                <Link className="menu-item" style={{ padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1' }} to={`/?id_proyecto=${proyecto.id_proyecto}`}>
+                  {proyecto.nombre_proyecto}
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
 

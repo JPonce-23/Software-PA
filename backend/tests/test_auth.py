@@ -60,7 +60,7 @@ class TestProteccionRutas:
 
     @pytest.mark.parametrize("ruta", [
         "/api/tramos",
-        "/api/frentes",
+        "/api/proyectos",
         "/api/tramos-nucleos",
         "/api/parcelas",
         "/api/afectaciones",
@@ -97,13 +97,13 @@ class TestRutasPublicas:
         assert res.status_code == 200
         assert "message" in res.json()
 
-    def test_catalogos_entidades_accesible(self, client):
-        """Los catálogos geográficos son públicos."""
-        res = client.get("/api/catalogos/entidades")
+    def test_catalogos_entidades_requiere_autenticacion(self, client, admin_headers):
+        """Los catálogos geográficos requieren un usuario autenticado."""
+        res = client.get("/api/catalogos/entidades", headers=admin_headers)
         assert res.status_code == 200
         assert isinstance(res.json(), list)
 
-    def test_catalogos_municipios_accesible(self, client):
-        res = client.get("/api/catalogos/municipios")
+    def test_catalogos_municipios_requiere_autenticacion(self, client, admin_headers):
+        res = client.get("/api/catalogos/municipios", headers=admin_headers)
         assert res.status_code == 200
         assert isinstance(res.json(), list)
