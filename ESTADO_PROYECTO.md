@@ -4,13 +4,20 @@
 > Leer completo antes de proponer o modificar código. No asumir que la
 > numeración de las fases operativas, los cortes principales y los subcortes de
 > Adaptaciones 2.0 significan lo mismo.
+>
+> **Fuente única vigente:** este archivo concentra el estado actual, las
+> decisiones aprobadas y el trabajo futuro. Los detalles de los subcortes A,
+> B y C ya ejecutados se conservan únicamente como registro cerrado en
+> `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
+> segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 28 de julio de 2026
+**Última actualización:** 29 de julio de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Próximo trabajo funcional:** Corte principal 2, expediente maestro de
-Tramo_Núcleo y subexpedientes operativos por afectación.
+**Próximo trabajo funcional:** Corte principal 2, comenzando por reforzar la
+separación entre afectaciones colectivas e individuales antes de reorganizar
+el expediente maestro y sus subexpedientes.
 
 ## 1. Objetivo y dominio
 
@@ -108,13 +115,14 @@ Orden recomendado para recuperar contexto:
 4. `docs/Estructura Datos.md`.
 5. `docs/requirements.md`.
 6. `docs/design.md`.
-7. `docs/Plan de Trabajo Adaptaciones 2.0.md`.
-8. `docs/Implementacion Adaptaciones Fase 2.0.md`.
-9. Las migraciones `001`, `002`, `003` y `004` en orden.
+7. Las migraciones `001`, `002`, `003` y `004` en orden.
 
-`docs/Plan de Trabajo Adaptaciones 2.0.md` describe un trabajo adicional que
-se ejecutó entre los cortes principales 1 y 2. Sus subcortes A, B y C no son
-los cortes principales 2, 3 y 4.
+Cuando se investigue la migración 004 o las decisiones de Adaptaciones 2.0,
+consultar adicionalmente
+`docs/historico/Adaptaciones 2.0 - Implementación.md`. Es un registro
+histórico opcional: sus subcortes A, B y C no son los cortes principales 2, 3
+y 4, y cualquier diferencia con este archivo se resuelve a favor de
+`ESTADO_PROYECTO.md`.
 
 ## 4. Reglas de negocio y técnicas obligatorias
 
@@ -379,6 +387,67 @@ Al diseñar el corte:
 No comenzar eliminando `tramo_nucleo` ni trasladando ciegamente todas las FK a
 `afectacion`.
 
+#### Subcorte 2A aprobado — Reforzar afectación colectiva e individual
+
+Este es el primer trabajo aprobado dentro del Corte principal 2. Su propósito
+es cerrar la ambigüedad actual sin confundir derechos colectivos con una
+parcela en copropiedad:
+
+```text
+afectación colectiva
+  = derechos del núcleo agrario
+  = no usa una parcela normalizada
+
+afectación individual
+  = derechos parcelarios
+  = requiere una parcela
+  = la parcela puede ser individual o estar en copropiedad
+```
+
+Regla de integridad objetivo:
+
+```sql
+CHECK (
+    (tipo_afectacion = 'colectivo' AND id_parcela IS NULL)
+    OR
+    (tipo_afectacion = 'individual' AND id_parcela IS NOT NULL)
+)
+```
+
+Alcance aprobado:
+
+1. Sustituir `chk_individual_requiere_parcela` por una restricción
+   bidireccional que también prohíba parcela en la afectación colectiva.
+2. Mantener la FK compuesta que garantiza que la parcela individual y el
+   `tramo_nucleo` pertenecen al mismo núcleo.
+3. Fortalecer la validación de la parcela individual: debe estar activa,
+   tener número PPT, soporte o justificación registral y titulares activos.
+4. Exigir al menos dos titulares activos para usar una parcela marcada como
+   `copropiedad` en una afectación. La operación compuesta debe ejecutarse en
+   una sola transacción.
+5. Impedir que se inactive la parcela o su último titular mientras exista una
+   afectación individual activa.
+6. Separar los contratos de entrada del backend en colectivo e individual,
+   discriminados por `tipo_afectacion`; el contrato colectivo no debe exponer
+   `id_parcela`.
+7. Retirar del formulario colectivo los subtipos `individual` y
+   `copropiedad`, que pertenecen a `parcela.tipo_parcela`.
+8. Permitir que el formulario individual capture una parcela en copropiedad
+   con varios titulares antes de crear la afectación.
+9. No duplicar `parcela.no_parcela_ppt` en la afectación individual.
+   `afectacion.no_parcela_solar` se conserva temporalmente como referencia
+   textual de las matrices colectivas hasta definir un nombre menos ambiguo.
+10. Agregar pruebas de API y de PostgreSQL para todas las combinaciones
+    válidas e inválidas.
+
+La migración debe ejecutar primero una prevalidación y abortar si encuentra
+colectivas con parcela o individuales sin parcela. No debe reclasificar ni
+corregir filas silenciosamente. Aunque la base local no contiene expedientes
+operativos, la migración debe ser segura para otros entornos.
+
+Este subcorte no incluye todavía padrón nominal, participantes de asamblea,
+firmantes de convenio ni rediseño registral; son decisiones separadas.
+
 ### Corte 3 — Seguridad inmediata: parcial
 
 Ya realizado:
@@ -418,6 +487,61 @@ No copiar las credenciales actuales a documentación nueva.
 - Dashboard y reportes por proyecto.
 - Indicadores por afectación y agregados por tramo/proyecto.
 
+#### Componente aprobado — Derecho de vía versionado
+
+El Corte 5 debe sustituir gradualmente el cálculo implícito basado únicamente
+en `tramo.geometria_linea` y `tramo.ancho_total_derecho_via_m` por una franja
+oficial versionada. El nombre propuesto para la nueva entidad es
+`franja_derecho_via`.
+
+Modelo mínimo:
+
+```text
+franja_derecho_via
+├── id_franja
+├── id_tramo
+├── version
+├── ancho_izquierdo_m
+├── ancho_derecho_m
+├── geometria_poligono
+├── fuente
+├── fecha_vigencia_inicio
+├── fecha_vigencia_fin
+├── activo
+└── ciclo de vida y auditoría
+```
+
+Reglas objetivo:
+
+1. Cada versión pertenece a un tramo y conserva la fuente oficial que la
+   originó.
+2. La geometría debe ser Polygon o MultiPolygon válido con SRID 4326.
+3. Los anchos deben ser positivos cuando se proporcionen.
+4. No puede haber más de una versión activa para el mismo tramo.
+5. Las fechas de vigencia no pueden invertirse.
+6. Las afectaciones confirmadas deben intersectar la franja activa; una vez
+   completada la transición no se validarán contra un búfer implícito.
+7. Las versiones anteriores no se sobrescriben ni eliminan: se desactivan con
+   trazabilidad.
+8. El importador GeoJSON debe validar la entidad, geometría, versión, fuente y
+   tramo antes de insertar.
+
+La transición será de expansión:
+
+```text
+crear franja versionada
+→ generar o importar versión inicial desde los datos vigentes
+→ comparar contra el búfer actual
+→ desplegar backend y frontend
+→ cambiar la validación espacial de afectación
+→ retirar el uso operativo del ancho simple sólo después de validar
+```
+
+`tramo.ancho_total_derecho_via_m` y el comportamiento actual no deben
+eliminarse en la primera migración. Servirán como compatibilidad y fuente para
+la versión inicial hasta comprobar que todos los tramos cuentan con una
+franja válida.
+
 ## 9. Trabajo técnico transversal pendiente
 
 - Validación funcional y de experiencia con usuarios finales.
@@ -446,5 +570,11 @@ Antes de implementar el Corte principal 2:
 5. No editar ni ejecutar una migración hasta validar esa propuesta con el
    usuario.
 
-Después de aprobar el diseño se implementará el Corte 2 con pruebas de
-integridad, regresión, autorización y aislamiento entre afectaciones.
+El Subcorte 2A ya tiene alcance funcional aprobado en la sección 8, pero su
+migración y contratos concretos todavía deben presentarse para autorización
+antes de editar o ejecutar SQL. Después se implementará el resto del Corte 2
+con pruebas de integridad, regresión, autorización y aislamiento entre
+afectaciones.
+
+El derecho de vía versionado está aprobado como componente futuro del Corte
+5. No debe mezclarse en la migración del Subcorte 2A.
