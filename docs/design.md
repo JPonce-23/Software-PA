@@ -33,7 +33,7 @@ El sistema gestiona el proceso legal y administrativo de liberación de derechos
 - **FIFONAFE**: Proceso de pago de indemnizaciones a través del fideicomiso
 
 **Análisis Geoespacial:**
-- **Intersecciones Geométricas**: Cálculo automático de áreas afectadas mediante intersección de Frentes con Núcleos Agrarios
+- **Intersecciones Geométricas**: Análisis de cruces y afectaciones mediante geometrías de Tramo, Tramo_Núcleo, Núcleo Agrario y Afectación
 - **Transformación de Coordenadas**: Conversión entre WGS84 (visualización web) y UTM (documentos jurídicos)
 - **Cálculo de Superficies**: Determinación automática de hectáreas y metros cuadrados afectados
 - **Validación Topológica**: Verificación de geometrías válidas sin auto-intersecciones
@@ -41,25 +41,45 @@ El sistema gestiona el proceso legal y administrativo de liberación de derechos
 **Actores del Sistema:**
 - **Administradores**: Gestionan usuarios y configuración del sistema
 - **Usuarios de Captura**: Registran y actualizan información del proceso
-- **Geógrafos**: Capturan y editan geometrías de Tramos, Frentes y Núcleos Agrarios
+- **Geógrafos**: Capturan y editan geometrías de Tramos, Tramo_Núcleo, Núcleos Agrarios y Afectaciones
 - **Usuarios Visualizadores**: Consultan reportes, tableros de progreso y mapas interactivos
 
 ### Contexto del Dominio
 
 #### Flujo de Proceso Integrado
 
-El sistema sigue el proceso operativo descrito en `Descripción proceso.md`, el cual se estructura en 4 fases principales:
+El sistema sigue el proceso operativo descrito en `Descripción proceso.md`,
+fuente funcional canónica. `tramo_nucleo` es el expediente maestro territorial
+que articula la investigación, sensibilización, caminamiento y seguimiento
+global de la liberación en el cruce. La afectación se registra después, cuando
+esa investigación confirma el derecho afectado y ya se conocen su superficie,
+geometría y sujetos; cada registro abre un subexpediente operativo.
 
-**Fase 1: Identificación Administrativa y Diagnóstico Legal**
-- Captura de datos generales: Consecutivo, Entidad/Municipio, Residencia, Núcleo Agrario, E/C, Tramo
+La navegación objetivo es:
+
+```text
+Proyecto → Tramo → Tramo_Núcleo (expediente maestro)
+                         └── Afectación (subexpediente)
+```
+
+El expediente maestro conserva los antecedentes compartidos. Cada
+subexpediente presenta los que le aplican junto con sus actuaciones
+específicas, sin duplicar ni trasladar automáticamente la información común.
+
+**Fase 1: Configuración e investigación territorial**
+- Selección de Proyecto, Tramo, Tramo_Núcleo y Núcleo Agrario
+- Identificación y análisis de posibles afectaciones dentro del expediente
+  maestro, sin crear todavía subexpedientes
 - Control de ORV (Órganos de Representación y Vigilancia): Verificación de vigencia de autoridades
 - Control de Padrón: Número de ejidatarios/comuneros para cálculo de quórum
 - Documentación soporte y excepciones (Comunidad Indígena, Expropiación Directa)
 
-**Fase 2: Acercamiento en Campo**
+**Fase 2: Acercamiento, campo y confirmación**
 - **Sensibilización**: Reuniones informativas con el núcleo agrario
-- **Caminamiento**: Inspecciones técnicas de campo para marcaje topográfico
-- A partir de aquí el proceso se **bifurca** según el tipo de derecho:
+- **Caminamiento**: Inspecciones técnicas que delimitan superficie, geometría,
+  sujetos y BDT
+- **Afectación confirmada**: Su registro abre un subexpediente operativo
+- Cada subexpediente se **bifurca** según el tipo de derecho:
 
 **Fase 3A: Matriz de Derechos Colectivos (Uso Común)**
 - **COP Original**: Asamblea anuencia → Firma → Inscripción RAN (acta y convenio)
@@ -68,7 +88,7 @@ El sistema sigue el proceso operativo descrito en `Descripción proceso.md`, el 
 - **Obras Complementarias**: **Nuevo ciclo completo** (asamblea + RAN) modelado como registros independientes de Asamblea y Convenio vinculados al mismo Tramo_Núcleo, preservando intacto el COP original
 
 **Fase 3B: Matriz de Derechos Individuales (Parcelas)**
-- **COP Original**: Negociación privada → Firma → Inscripción RAN
+- **COP Original**: Negociación directa con el titular → Firma → Inscripción RAN
 - **Modificatorio Individual**: Solo ajuste de montos (sin superficie ni BDT)
 - **Ampliación**: Nueva superficie afectada de la misma parcela
 - **Ampliación Remanente**: Superficie remanente de ampliación
@@ -484,7 +504,7 @@ interface Convenio {
   /**
    * superficie_total_ha: Usado EXCLUSIVAMENTE para afectaciones INDIVIDUALES (derechos individuales)
    * Representa la superficie específica de la PARCELA afectada que tiene un dueño particular.
-   * Se captura en expedientes privados mediante negociación directa con el titular.
+   * Se captura en expedientes individuales de propiedad social mediante negociación directa con el titular.
    * La distinción es jurídica: estas parcelas tienen titular específico y no requieren asamblea.
    * 
    * IMPORTANTE: No usar para afectaciones colectivas. Ver superficie_real_afectada_ha.
@@ -619,6 +639,14 @@ erDiagram
     usuario }o--o{ alertas_vistas : "lee"
     alertas ||--o{ alertas_vistas : "leída_por"
 ```
+
+El diagrama anterior distingue la estructura física vigente de la experiencia
+funcional objetivo. Algunas entidades de antecedentes, como
+`actividad_campo`, conservan actualmente su llave hacia `tramo_nucleo`. Esto
+es consistente con su papel como expediente maestro. En el Corte 2 los
+antecedentes compartidos deben permanecer en ese nivel y ser consultables
+desde las afectaciones a las que apliquen; sólo las actuaciones exclusivas
+deben vincularse directamente con un subexpediente concreto.
 
 ### Entidades de Base de Datos
 
@@ -801,8 +829,11 @@ Esta sección documenta las reglas de negocio críticas que se implementan media
 - **Derechos Colectivos**: 'cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias'
 - **Derechos Individuales**: 'cop_original', 'modificatorio', 'ampliacion', 'ampliacion_remanente'
 
-**Fuente**: `Descripción proceso.md`, líneas 35-39
-> "Los tipos de convenio varían según el tipo de derecho afectado: para derechos colectivos incluye COP, Modificatorio, Superficie Adicional y Obras Complementarias; para derechos individuales incluye COP, Modificatorio, Ampliación y Ampliación Remanente."
+**Fuente**: `Descripción proceso.md`, secciones “5.2 Variantes colectivas” y
+“6.1 Variantes individuales”.
+> Colectivos: COP original, modificatorio, superficie adicional y obras
+> complementarias. Individuales: COP original, modificatorio, ampliación y
+> ampliación remanente.
 
 **Implementación**:
 ```sql
@@ -823,8 +854,9 @@ CONSTRAINT chk_tipo_convenio_por_afectacion CHECK (
 
 **Regla**: Los convenios de tipo 'obras_complementarias' NO deben tener valor en el campo `monto_bdt`. Este campo debe ser NULL para este tipo de convenio.
 
-**Fuente**: `Descripción proceso.md`, línea 48
-> "Se captura el Convenio Firmado (Fecha), montos (90%, 100%) y la Superficie Total Real Afectada (Ha). (Nota: En esta variante no se captura Monto BDT)."
+**Fuente**: `Descripción proceso.md`, sección “5.2 Variantes colectivas”.
+> En obras complementarias no se captura `monto_bdt`. El pago corresponde
+> solamente al valor pactado por la superficie.
 
 **Implementación**:
 ```sql
@@ -853,8 +885,9 @@ CONSTRAINT chk_bdt_no_obras_complementarias CHECK (
 
 Solo se requieren: `fecha_firma`, `monto_90`, `monto_100`
 
-**Fuente**: `Descripción proceso.md`, línea 59
-> "Convenio Modificatorio: A diferencia de otros, el modificatorio individual solo requiere tres datos: Convenio Modificatorio (Fecha), Convenio Monto 90% y Convenio Monto 100%."
+**Fuente**: `Descripción proceso.md`, sección “6.1 Variantes individuales”.
+> El modificatorio individual ajusta fecha y montos; no registra nueva
+> superficie ni BDT.
 
 **Implementación**:
 ```sql
@@ -922,7 +955,7 @@ Las Obras Complementarias representan **una nueva ocupación de tierras de uso c
 - **Excepción**: Modificatorio Individual no usa ningún campo de superficie
 
 **Fuente**: `Descripción proceso.md` y confirmación del stakeholder:
-> "La distinción principal es jurídica. Superficie Total Real Afectada (Ha) mide el impacto sobre las tierras inalienables que son de uso comunal y requieren asambleas, mientras que Superficie Total (Ha.) se captura en expedientes privados para medir la afectación de una parcela particular con un dueño específico."
+> "La distinción principal es jurídica. Superficie Total Real Afectada (Ha) mide el impacto sobre las tierras inalienables que son de uso comunal y requieren asambleas, mientras que Superficie Total (Ha.) se captura en expedientes individuales de propiedad social para medir la afectación de una parcela con titular específico."
 
 **Contexto Jurídico Detallado**:
 
@@ -931,9 +964,9 @@ Los dos campos de superficie reflejan una diferencia fundamental en el derecho a
 1. **`superficie_total_ha` - Para Derechos INDIVIDUALES (Parcelas)**:
    - Mide la superficie específica de una **parcela con titular registrado**
    - El titular es una persona física identificada (ejidatario o comunero)
-   - Se captura en **expedientes privados** mediante negociación directa
+   - Se captura en **expedientes individuales de propiedad social** mediante negociación directa
    - **NO requiere asamblea** - la autorización la da el titular directamente
-   - Proceso: Sensibilización → Caminamiento → Negociación privada → Firma
+   - Proceso: Sensibilización → Caminamiento → Negociación directa con el titular → Firma
    - Ejemplo: "Parcela 45-Z, titular Juan Pérez, 2.5 hectáreas afectadas"
 
 2. **`superficie_real_afectada_ha` - Para Derechos COLECTIVOS (Uso Común)**:
@@ -1001,7 +1034,7 @@ Esta sección documenta decisiones arquitectónicas clave relacionadas con las r
 - Esto subsana los problemas de normalización inherentes al antiguo sistema en Excel.
 
 **3. Restricciones RAN en Modificatorios Individuales**:
-- El Modificatorio Individual (al ser un mero ajuste económico privado sin afectación adicional de superficie) NO requiere inscripción en el RAN, según lo define el proceso (Fase 3B). El diseño exige estrictamente que sus campos registrales queden nulos a través del constraint `chk_modificatorio_individual_restricciones`.
+- El Modificatorio Individual (al ser un ajuste económico individual sin afectación adicional de superficie) NO requiere inscripción en el RAN, según lo define el proceso (Fase 3B). El diseño exige estrictamente que sus campos registrales queden nulos a través del constraint `chk_modificatorio_individual_restricciones`.
 
 **4. Ubicación Normalizada de "No. de Parcela / Solar"**:
 - El número de parcela/solar (cuando aplica a tierras colectivas) describe funcionalmente el "Destino de la Superficie" en la asamblea de Derechos Colectivos (Fase 3A). Se movió lógicamente hacia la tabla `afectacion` junto al campo `destino_superficie`, ya que pertenece puramente a los datos formales de la afectación y no al registro genérico del cruce `tramo_nucleo`.
@@ -1062,14 +1095,14 @@ El proceso requiere que Obras Complementarias detone un **nuevo ciclo completo**
 
 Según el stakeholder y el documento `Descripción proceso.md`, la distinción es **jurídica** y refleja diferencias fundamentales en el derecho agrario mexicano:
 
-> "Superficie Total Real Afectada (Ha) mide el impacto sobre las tierras inalienables que son de uso comunal y requieren asambleas, mientras que Superficie Total (Ha.) se captura en expedientes privados para medir la afectación de una parcela particular con un dueño específico."
+> "Superficie Total Real Afectada (Ha) mide el impacto sobre las tierras inalienables que son de uso comunal y requieren asambleas, mientras que Superficie Total (Ha.) se captura en expedientes individuales de propiedad social para medir la afectación de una parcela con titular específico."
 
 **Regla Implementada**:
 - **`superficie_total_ha`**: Se usa SOLO para afectaciones INDIVIDUALES
   - Mide la superficie de una **parcela con titular específico** (ejidatario o comunero identificado)
-  - Se captura en **expedientes privados** mediante negociación directa
+  - Se captura en **expedientes individuales de propiedad social** mediante negociación directa
   - **NO requiere asamblea** - la autorización la da el titular directamente
-  - Proceso: Sensibilización → Caminamiento → Negociación privada → Firma
+  - Proceso: Sensibilización → Caminamiento → Negociación directa con el titular → Firma
   
 - **`superficie_real_afectada_ha`**: Se usa SOLO para afectaciones COLECTIVAS
   - Mide la superficie de **tierras de uso común** del núcleo agrario completo

@@ -3,11 +3,12 @@
 > **Contexto dentro del plan maestro:** este documento no describe el Corte
 > principal 2 del proyecto. Adaptaciones 2.0 fue un trabajo adicional ejecutado
 > después del Corte principal 1 (Proyecto y retiro de Frente) y antes de
-> retomar el Corte principal 2 (Afectación como origen del expediente).
+> retomar el Corte principal 2 (expediente maestro de Tramo_Núcleo y
+> subexpedientes por afectación).
 > Sus Cortes A, B, C y D son subcortes internos de esta adaptación.
 
 **Estado al 28 de julio de 2026:** Cortes A, B y C construidos y validados;
-Corte D pendiente y subordinado al nuevo flujo por afectación.
+Corte D pendiente y subordinado al diseño maestro–subexpediente del Corte 2.
 
 ## Objetivo
 
@@ -221,44 +222,47 @@ Después de implementar y validar el Corte principal 2:
 
 La contracción se había proyectado inicialmente como migración 005. Esa
 numeración ya no debe darse por definitiva: el Corte principal 2 puede
-necesitar primero una migración expansiva para vincular módulos con
-`afectacion`. La recomendación actual es reservar 005 para esa expansión, si
-la auditoría la confirma, y usar 006 para la contracción.
+necesitar primero una migración expansiva para distinguir módulos y documentos
+compartidos del expediente maestro de aquellos propios de una `afectacion`.
+La recomendación actual es reservar 005 para esa expansión, si la auditoría la
+confirma, y usar 006 para la contracción.
 
 ## Relación con el Corte principal 2
 
 ### Estado actual
 
-El frontend sigue usando `tramo_nucleo` como identidad del expediente:
+El frontend ya utiliza `tramo_nucleo` como identidad del expediente maestro:
 
 ```text
 /expedientes/:id_tramo_nucleo
 ```
 
-Dentro de esa pantalla se mezclan afectaciones colectivas e individuales y
+El problema no es conservar esa ruta, sino que dentro de una misma pantalla se
+mezclan las actuaciones propias de afectaciones colectivas e individuales y
 varios módulos se filtran solamente por `id_tramo_nucleo`. La tabla
 `afectacion` ya contiene tipo, tenencia, superficie, geometría y parcela; los
-convenios la referencian obligatoriamente. Sin embargo, todavía funciona como
-un registro secundario dentro del expediente territorial.
+convenios la referencian obligatoriamente. Sin embargo, todavía no dispone de
+un subexpediente operativo claramente separado.
 
 Existe además un defecto conocido: `DocumentosPanel.jsx` usa
 `entidad_relacionada_tipo = 'tramo_nucleo'`, valor no admitido por la
-restricción de `documentacion_soporte`. El Corte principal 2 debe corregirlo
-para relacionar los documentos con la afectación abierta y cubrir el recorrido
-con una prueba de integración.
+restricción de `documentacion_soporte`. El Corte principal 2 debe corregir el
+contrato para admitir documentos compartidos del expediente maestro y
+documentos específicos de una afectación, y cubrir ambos recorridos con
+pruebas de integración.
 
 ### Decisión aprobada
 
-`tramo_nucleo` se conserva como agrupador territorial y `afectacion` pasa a
-ser el origen del expediente operativo:
+`tramo_nucleo` es el expediente maestro territorial de la liberación y cada
+`afectacion` confirmada abre un subexpediente operativo:
 
 ```text
 Proyecto
 └── Tramo
     └── Tramo_Núcleo
+        ├── investigación, sensibilización y caminamiento compartidos
         └── Afectación
-            ├── acercamiento y sensibilización
-            ├── caminamiento
+            ├── consulta de antecedentes compartidos aplicables
             ├── BDT, cuando aplique
             ├── asamblea, cuando aplique
             ├── minutas y acuerdos
@@ -268,17 +272,26 @@ Proyecto
             └── cierre
 ```
 
-La ruta objetivo será conceptualmente
-`/expedientes/:id_afectacion`. Una afectación colectiva utilizará el núcleo y
-su representación; una individual utilizará persona, parcela y titularidad.
-ORV seguirá perteneciendo al núcleo porque puede servir a más de una
-afectación y no debe duplicarse.
+La ruta del expediente maestro seguirá siendo
+`/expedientes/:id_tramo_nucleo`. Cada subexpediente podrá abrirse mediante una
+ruta anidada como
+`/expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion`. Una afectación
+colectiva utilizará el núcleo y su representación; una individual utilizará
+persona, parcela y titularidad. ORV seguirá perteneciendo al núcleo porque
+puede servir a más de una afectación y no debe duplicarse.
 
 La sensibilización permanece como etapa social explícita, previa al
 caminamiento. El caminamiento confirma superficie y geometría e identifica
-bienes distintos a la tierra. Actualmente se conserva el resultado económico
-en `convenio.monto_bdt`; un inventario detallado de BDT requiere diseño y
-confirmación funcional antes de agregar tablas.
+bienes distintos a la tierra. Sólo después se registra `afectacion` y nace su
+subexpediente operativo; no se crean afectaciones preliminares. Actualmente se
+conserva el resultado económico en `convenio.monto_bdt`; un inventario
+detallado de BDT requiere diseño y confirmación funcional antes de agregar
+tablas.
+
+El orden anterior es cronológico. Para el usuario, la navegación permanece
+`Proyecto → Tramo → Tramo_Núcleo → Afectación`. `tramo_nucleo` conserva el
+expediente maestro y sus antecedentes compartidos; cada afectación abre su
+subexpediente y muestra los antecedentes que le resulten aplicables.
 
 ### Trabajo requerido antes de codificar
 
@@ -286,11 +299,12 @@ confirmación funcional antes de agregar tablas.
 2. Clasificar entidades como territoriales, propias de una afectación o
    compartidas.
 3. Diseñar una transición expandir–migrar–verificar–retirar.
-4. Definir endpoint agregado y estados del expediente por afectación.
+4. Definir el endpoint agregado y estados del expediente maestro y de cada
+   subexpediente por afectación.
 5. Evitar inferir automáticamente relaciones ambiguas en bases con datos.
 6. Probar aislamiento entre dos afectaciones del mismo `tramo_nucleo`.
-7. Corregir la creación y consulta documental para usar la afectación como
-   entidad relacionada.
+7. Corregir la creación y consulta documental para distinguir documentos del
+   expediente maestro y documentos de una afectación.
 
 El detalle y estado del plan maestro se mantiene en `ESTADO_PROYECTO.md`.
 

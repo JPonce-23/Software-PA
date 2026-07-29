@@ -13,8 +13,8 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 - **Núcleo_Agrario**: Es la entidad central del sistema que representa a cada ejido o comunidad agraria. Cuentan con personalidad jurídica y patrimonio propio.
 - **Proyecto**: Contenedor jerárquico de mayor nivel que agrupa uno o más tramos ferroviarios.
 - **Tramo**: cada una de las secciones principales que integran el proyecto ferroviario. Constituye la unidad geográfica y operativa de mayor nivel dentro del sistema, y su función principal es facilitar el seguimiento del derecho de vía.
-- **Tramo_Núcleo**: Representa la intersección entre un Tramo del proyecto ferroviario y un Núcleo Agrario afectado. Mientras que el Tramo es la unidad geográfica/operativa del proyecto y el Núcleo Agrario (ejido o comunidad) es la entidad central atravesada, el Tramo_Núcleo es el nivel relacional donde se abre el expediente administrativo y se capturan el consecutivo, número de tramo, excepciones operativas del cruce y seguimiento territorial.
-- **Afectación**: Superficie afectada - Registro que documenta la superficie, tipo de tenencia y las personas o parcelas afectadas por el paso del proyecto.
+- **Tramo_Núcleo**: Representa la intersección entre un Tramo del proyecto ferroviario y un Núcleo Agrario. Es el eje territorial y el expediente maestro de la liberación de derecho de vía en ese cruce. Conserva el consecutivo, número de tramo, excepciones operativas, antecedentes compartidos y seguimiento global, y agrupa una o más afectaciones.
+- **Afectación**: Subexpediente operativo confirmado que nace dentro de un Tramo_Núcleo y documenta una superficie y un derecho afectado —colectivo o individual—, su geometría y, cuando corresponde, las personas o parcelas involucradas.
 - **Convenio**: Acuerdo que facilita la ocupación de terreno para el inicio de los trabajos operativos, ya que sin él, las obras no pueden comenzar sino hasta el final de todo el proceso legal de expropiación. Los tipos de convenio varían según el tipo de derecho afectado: para derechos colectivos incluye COP, Modificatorio, Superficie Adicional y Obras Complementarias; para derechos individuales incluye COP, Modificatorio, Ampliación y Ampliación Remanente.
 - **COP**: Convenio de Ocupación Previa - Es un acuerdo formal donde un núcleo agrario o titular parcelario da permiso para ocupar temporalmente sus tierras mientras se tramita el proceso de expropiación.
 - **RAN**: Registro Agrario Nacional - Entidad que controla la tenencia de la tierra, resguarda la seguridad documental
@@ -29,7 +29,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 - **Derechos_Individuales**: área parcelada, es decir, tierras que tienen un titular específico o dueño particular (como un ejidatario)
 - **Indemnización**: pago o compensación económica que el Estado otorga a los sujetos o núcleos agrarios a cambio de adquirir sus bienes o tierras por causas de utilidad pública, concretamente a través del proceso legal de expropiación
 - **Monto BDT**: corresponde a la indemnización de Bienes Distintos a la Tierra
-- **superficie_total_ha**: Campo usado en convenios de afectación INDIVIDUAL. Mide la superficie de la parcela particular afectada con un dueño específico. Se captura en expedientes privados.
+- **superficie_total_ha**: Campo usado en convenios de afectación INDIVIDUAL dentro de propiedad social. Mide la superficie afectada de una parcela con titular específico. Se captura en expedientes individuales.
 - **superficie_ampliacion_ha**: Campo usado en convenios de afectación INDIVIDUAL (Ampliación o Ampliación Remanente). Mide la nueva superficie afectada que se adiciona a la original.
 - **superficie_real_afectada_ha**: Campo usado en convenios de afectación COLECTIVA. Mide el impacto sobre las tierras inalienables de uso común que requieren asambleas. La distinción es jurídica: estas tierras pertenecen al núcleo agrario completo, no a individuos.
 - **Expropiación**: Es la forma legal en la que el Estado adquiere bienes por causas de utilidad pública a cambio de una indemnización
@@ -553,7 +553,14 @@ El alcance incluye exclusivamente:
 El sistema debe reflejar la jerarquía:
 **Proyecto → Tramo → Tramo_Núcleo → Afectación → proceso colectivo o individual**
 
-La entidad central que articula esta jerarquía es el **Tramo_Núcleo** (la intersección geográfica y administrativa entre un Tramo y un Núcleo Agrario). El Tramo_Núcleo genera todo el seguimiento posterior (Caminamiento, Asambleas, Convenios), funcionando como el "eje central" que agrupa las afectaciones y vincula las métricas de avance.
+**Tramo_Núcleo** representa la intersección geográfica y administrativa entre
+un Tramo y un Núcleo Agrario. Es el expediente maestro territorial de la
+liberación y articula la investigación, sensibilización, caminamiento,
+seguimiento global y afectaciones del cruce. Cada **Afectación** confirmada
+abre un subexpediente operativo colectivo o individual. La navegación debe
+permitir consultar el expediente maestro, abrir sus afectaciones y distinguir
+los antecedentes compartidos de las actuaciones propias de cada
+subexpediente.
 
 Cada nivel debe permitir agregación de métricas hacia niveles superiores.
 
@@ -563,10 +570,11 @@ El sistema debe documentar y rastrear el estado esperado en cada fase del proces
 1. **Identificación**: Identificación inicial del Núcleo Agrario afectado y su registro.
 2. **Sensibilización**: Reuniones informativas y acercamiento social inicial.
 3. **Caminamiento**: Recorrido técnico en campo para determinar la afectación real.
-4. **Asamblea**: Obtención de anuencias y aprobaciones formales.
-5. **Convenio**: Firma del acuerdo (COP, modificatorio, etc.) con sus respectivos montos.
-6. **RAN**: Ingreso e inscripción de las actas de asamblea y convenios.
-7. **FIFONAFE**: (Para colectivos) Trámite de retiro de fondos y pago de indemnización a través de la cadena de oficios.
+4. **Afectación confirmada**: Registro de la afectación y apertura de su subexpediente operativo dentro del expediente maestro de Tramo_Núcleo, con geometría, superficie y sujetos confirmados.
+5. **Asamblea**: Obtención de anuencias y aprobaciones formales cuando corresponda.
+6. **Convenio**: Firma del acuerdo (COP, modificatorio, etc.) con sus respectivos montos.
+7. **RAN**: Ingreso e inscripción de las actas de asamblea y convenios.
+8. **FIFONAFE**: (Para colectivos) Trámite de retiro de fondos y pago de indemnización a través de la cadena de oficios.
 
 ### Consideraciones Geoespaciales
 

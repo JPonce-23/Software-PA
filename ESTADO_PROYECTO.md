@@ -9,8 +9,8 @@
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Próximo trabajo funcional:** Corte principal 2, afectación como origen del
-expediente operativo.
+**Próximo trabajo funcional:** Corte principal 2, expediente maestro de
+Tramo_Núcleo y subexpedientes operativos por afectación.
 
 ## 1. Objetivo y dominio
 
@@ -25,15 +25,24 @@ Proyecto → Tramo → Tramo_Núcleo
 ```
 
 `tramo_nucleo` representa el cruce territorial de un tramo con un núcleo
-agrario. No debe eliminarse. La decisión funcional vigente es que
-`afectacion` represente el expediente operativo de liberación dentro de ese
-cruce.
+agrario. Es el expediente maestro territorial de la liberación de derecho de
+vía en ese cruce y no debe eliminarse ni reducirse a un selector.
+`afectacion` representa cada subexpediente operativo confirmado, colectivo o
+individual, que nace dentro de él.
+
+La investigación de posibles afectaciones, la sensibilización y el
+caminamiento ocurren dentro del expediente maestro y cronológicamente antes
+de crear un subexpediente de afectación.
+`afectacion` se crea únicamente cuando ya se confirmaron el derecho afectado,
+la superficie, la geometría y los sujetos. Una vez creada, su subexpediente
+debe mostrar las actuaciones compartidas aplicables como antecedentes, sin
+trasladarlas ni duplicarlas fuera de `tramo_nucleo`.
 
 ```text
 Proyecto
 └── Tramo
-    └── Tramo_Núcleo                 agrupador territorial
-        └── Afectación               expediente operativo
+    └── Tramo_Núcleo                 expediente maestro territorial
+        └── Afectación               subexpediente operativo confirmado
             ├── colectiva
             └── individual
 ```
@@ -180,13 +189,14 @@ ejecución.
 
 No crear todavía la migración de contracción que antes se había llamado
 `005`. El Corte principal 2 puede necesitar una migración expansiva para
-relacionar actividades y módulos con `afectacion`.
+distinguir datos compartidos del expediente maestro y datos propios de una
+`afectacion`.
 
 Antes de asignar número debe definirse el diseño. La secuencia recomendada es:
 
 ```text
-005  expansión para expediente por afectación, si la auditoría confirma
-     que hacen falta nuevas FK o estados
+005  expansión para expediente maestro y subexpedientes, si la auditoría
+     confirma que hacen falta nuevas FK, tipos documentales o estados
 006  contracción de columnas heredadas de Adaptaciones 2.0
 ```
 
@@ -257,6 +267,19 @@ Las 87 pruebas siguen siendo el resultado técnico ejecutado, pero no cubrieron
 este recorrido completo de la interfaz. No deben interpretarse como validación
 funcional de usuario final.
 
+Validación posterior de la captura de afectaciones confirmadas:
+
+```text
+backend:  89 pruebas aprobadas
+frontend: 0 errores y 0 advertencias de oxlint
+build:    producción exitosa
+```
+
+El alta de `afectacion` ahora exige geometría WKT y valida en PostGIS que sea
+un polígono o multipolígono válido y no vacío. Los formularios colectivo e
+individual capturan y envían esa geometría. Esta corrección no cambia la
+limitación pendiente del panel documental descrita arriba.
+
 ## 7. Estado de la base local validada
 
 El 28 de julio de 2026 la base activa local fue reiniciada de forma controlada.
@@ -283,53 +306,56 @@ volúmenes de PostgreSQL. Una base que sólo tiene 002 debe aplicar 003 y luego
 
 Proyecto + Tramo + Tramo_Núcleo sin Frente + `usuario_tramo`.
 
-### Corte 2 — Afectación como expediente operativo: siguiente
+### Corte 2 — Expediente maestro y subexpedientes por afectación: siguiente
 
 Decisión aprobada:
 
 ```text
-tramo_nucleo = agrupador territorial
-afectacion   = origen e identidad del expediente operativo
+tramo_nucleo = expediente maestro territorial de liberación
+afectacion   = subexpediente operativo confirmado
 ```
 
 Situación actual:
 
 - `/expedientes` lista `tramo_nucleo`.
-- `/expedientes/:id_tramo_nucleo` mezcla todas sus afectaciones.
+- `/expedientes/:id_tramo_nucleo` abre el expediente maestro, pero su pantalla
+  mezcla las actuaciones propias de todas sus afectaciones.
 - Asambleas, actividades, minutas, pagos y documentos se consultan
   principalmente por `id_tramo_nucleo`.
 - `afectacion` ya es obligatoria en convenio y opcional en FIFONAFE, pero aún
   funciona como registro secundario de la pantalla.
-- El panel documental usa actualmente el tipo inválido `tramo_nucleo`; el
-  modelo ya admite documentos relacionados con `afectacion`, que es el vínculo
-  que debe usar el nuevo expediente.
+- El panel documental usa actualmente el tipo inválido `tramo_nucleo`. El
+  Corte 2 debe soportar expresamente documentos compartidos del expediente
+  maestro y documentos propios de una afectación.
 
 Resultado esperado:
 
 ```text
-Nueva afectación
-├── seleccionar Proyecto, Tramo y Tramo_Núcleo
-├── elegir colectiva o individual
-├── colectiva: Núcleo + representación aplicable
-└── individual: Persona + Parcela + titularidad
-        ↓
-Expediente /expedientes/:id_afectacion
-├── acercamiento y sensibilización
-├── caminamiento
-├── inventario/valoración de BDT, cuando aplique
-├── actividades y minutas
-├── asamblea, solamente cuando corresponda
-├── convenio
-├── FIFONAFE y pagos
-├── documentos
-└── cierre
+Proyecto
+└── Tramo
+    └── Tramo_Núcleo
+        ├── Expediente maestro /expedientes/:id_tramo_nucleo
+        └── Afectación confirmada
+            └── Subexpediente
+                /expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion
+                ├── antecedentes de sensibilización
+                ├── antecedentes de caminamiento y análisis
+                ├── inventario/valoración de BDT, cuando aplique
+                ├── actuaciones y minutas posteriores
+                ├── asamblea, solamente cuando corresponda
+                ├── convenio
+                ├── FIFONAFE y pagos
+                ├── documentos
+                └── cierre
 ```
 
 La sensibilización sigue siendo una etapa explícita previa al caminamiento.
 El caminamiento delimita superficie y geometría e identifica bienes distintos
-a la tierra. Actualmente sólo existe `convenio.monto_bdt`; no hay inventario
-detallado de cada BDT. Antes de crearlo se debe confirmar el nivel de detalle
-requerido por usuarios.
+a la tierra. No se crea una afectación preliminar; al registrar la afectación
+confirmada, las etapas compartidas permanecen en el expediente maestro y
+quedan accesibles desde el subexpediente como antecedentes. Actualmente sólo
+existe `convenio.monto_bdt`; no hay inventario detallado de cada BDT. Antes de
+crearlo se debe confirmar el nivel de detalle requerido por usuarios.
 
 Al diseñar el corte:
 
@@ -337,8 +363,10 @@ Al diseñar el corte:
    compartidas.
 2. Mantener ORV en el nivel del núcleo; no duplicarla por afectación.
 3. Definir una transición compatible y una migración expansiva si hace falta.
-4. Agregar un endpoint agregado de expediente por `id_afectacion`.
-5. Cambiar lista, navegación y estado para trabajar por afectación.
+4. Mantener un endpoint agregado del expediente maestro y agregar el detalle
+   operativo por `id_afectacion`.
+5. Cambiar navegación y estado para abrir afectaciones dentro de su
+   `tramo_nucleo`, sin eliminar la vista maestra.
 6. Mostrar sólo las etapas aplicables al tipo colectivo o individual.
 7. Calcular avance legal, geoespacial y financiero por afectación.
 8. Migrar o vincular datos existentes sin inferir relaciones ambiguas.

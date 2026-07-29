@@ -97,8 +97,12 @@ menos un titular y una persona activos.
 
 ### 2.4 Minutas y acuerdos
 
-Una `minuta` pertenece a un `tramo_nucleo` y puede relacionarse con una
-`actividad_campo` del mismo expediente.
+Una `minuta` pertenece actualmente a un `tramo_nucleo` y puede relacionarse
+con una `actividad_campo` del mismo expediente maestro. En el Corte 2, las
+minutas compartidas deben permanecer en ese nivel y ser consultables desde las
+afectaciones aplicables. Sólo una minuta exclusiva de una afectación requerirá
+una asociación explícita con ese subexpediente; no debe inferirse por simples
+coincidencias territoriales.
 
 Un `acuerdo` pertenece a una minuta y exige exactamente uno de:
 
@@ -517,9 +521,9 @@ e65010d feat(frontend): integrar flujo operativo fase 2
 
 ### 10.2 Próximo trabajo: Corte principal 2
 
-La decisión funcional posterior a esta adaptación es convertir
-`afectacion` en la identidad del expediente operativo, manteniendo
-`tramo_nucleo` como agrupador territorial.
+La decisión funcional posterior a esta adaptación es conservar
+`tramo_nucleo` como expediente maestro territorial de la liberación y
+convertir cada `afectacion` confirmada en un subexpediente operativo.
 
 Situación implementada actualmente:
 
@@ -541,25 +545,39 @@ Arquitectura objetivo:
 
 ```text
 /expedientes
-└── lista afectaciones
+└── lista expedientes maestros tramo_nucleo
 
-/expedientes/:id_afectacion
-├── identidad colectiva o individual
-├── acercamiento y sensibilización
-├── caminamiento
-├── BDT
-├── actividades y minutas
-├── asamblea, cuando corresponda
-├── convenio
-├── FIFONAFE y pagos
-├── documentos
-└── cierre
+/expedientes/:id_tramo_nucleo
+├── contexto y avance global
+├── antecedentes compartidos
+└── afectaciones
+    └── /afectaciones/:id_afectacion
+        ├── identidad colectiva o individual
+        ├── antecedentes compartidos aplicables
+        ├── BDT
+        ├── actuaciones y minutas específicas
+        ├── asamblea, cuando corresponda
+        ├── convenio
+        ├── FIFONAFE y pagos
+        ├── documentos
+        └── cierre
 ```
 
 La sensibilización no se elimina: es la actividad social previa al
 caminamiento. El caminamiento delimita la superficie, confirma la geometría e
-identifica los bienes distintos a la tierra. `monto_bdt` conserva el total
-económico acordado; todavía no hay una tabla de inventario detallado por bien.
+identifica los bienes distintos a la tierra. Sólo después de confirmar la
+afectación se crea su subexpediente. Las actuaciones compartidas permanecen en
+el expediente maestro y se muestran como antecedentes aplicables; sólo las
+actuaciones exclusivas deben vincularse directamente con la afectación.
+`monto_bdt` conserva el total económico acordado; todavía no hay una tabla de
+inventario detallado por bien.
+
+La navegación objetivo se mantiene:
+
+```text
+Proyecto → Tramo → Tramo_Núcleo (expediente maestro)
+                         └── Afectación (subexpediente)
+```
 
 El Corte principal 2 debe empezar con una auditoría, no con una migración:
 
@@ -569,8 +587,9 @@ El Corte principal 2 debe empezar con una auditoría, no con una migración:
 3. Mantener como compartidos los catálogos, personas, núcleo y ORV.
 4. Definir backfill sólo donde la relación sea inequívoca.
 5. Proponer una migración expansiva antes de retirar columnas o rutas.
-6. Agregar un endpoint agregado por `id_afectacion`.
-7. Cambiar navegación y filtros del frontend.
+6. Mantener el endpoint agregado por `id_tramo_nucleo` y agregar el detalle
+   del subexpediente por `id_afectacion`.
+7. Cambiar navegación y filtros del frontend sin eliminar la vista maestra.
 8. Probar que dos afectaciones del mismo cruce no compartan accidentalmente
    minutas, pagos, documentos o estados.
 9. Corregir `DocumentosPanel.jsx` para enviar

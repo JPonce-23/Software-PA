@@ -1,159 +1,452 @@
-A continuación, te detallo rigurosamente paso a paso cómo interviene la Procuraduría Agraria (PA) y en qué momento exacto se captura cada uno de los datos listados en el documento Estructura [Datos.md]:
+# Descripción canónica del proceso de liberación de derecho de vía
 
-Fase 1: Configuración territorial y apertura del caso
+> **Fuente funcional oficial del proyecto.**
+> Describe el proceso objetivo aprobado y, cuando es necesario, distingue ese
+> objetivo del estado actual de la implementación.
 
-El sistema registra primero el Proyecto y sus Tramos. Al identificar que un tramo intersecta un Núcleo Agrario, se crea el registro Tramo_Núcleo, que da contexto territorial y administrativo al expediente.
+## 1. Principio rector
 
-Después del análisis técnico y del caminamiento, se crea una Afectación. La afectación registra la superficie y define desde el inicio si se trata de derechos colectivos o individuales; esa clasificación determina el flujo posterior.
+La jerarquía territorial es:
 
-1\. Datos Generales y de Identificación del Tramo: Tanto para la ruta de colectivos como de individuales, se abre un expediente y la PA registra la base territorial:
+```text
+Proyecto → Tramo → Tramo_Núcleo
+```
 
-* Consecutivo: Número de control interno asignado al registro.  
-* Entidad y Municipio: Ubicación registral del núcleo agrario.  
-* Residencia: La oficina regional de la PA encargada del seguimiento.  
-* Núcleo Agrario: El nombre oficial de la población.  
-* E/C (Ejido/Comunidad): Régimen legal al que pertenece.  
-* Clave del Tramo y Número de Tramo: Se capturan para saber qué porción exacta del proyecto ferroviario pasa por ahí.
+- `proyecto` agrupa los tramos de una obra ferroviaria.
+- `tramo` es la unidad territorial utilizada para asignar responsables y
+  medir avance.
+- `tramo_nucleo` representa el cruce territorial y administrativo entre un
+  tramo y un núcleo agrario y constituye el expediente maestro territorial de
+  su liberación de derecho de vía.
+- `afectacion` representa un derecho y una superficie confirmados y constituye
+  un subexpediente operativo colectivo o individual dentro de ese expediente
+  maestro.
 
-2\. Control de Órganos de Representación y Vigilancia (ORV) y Padrón: La PA investiga en el RAN quién tiene la autoridad legal para firmar y cuántas personas conforman la comunidad. En una matriz dedicada exclusivamente a los ORV, se capturan:
+Por tanto:
 
-* Num: Identificador numérico de esta pestaña.  
-* Comisariado\_Presidente, Comisariado\_Secretario, Comisariado\_Tesorero: Nombres exactos de quienes ejecutan los acuerdos.  
-* Consejo\_Vigilancia\_Presidente, Consejo\_Vigilancia\_Secretario1, Consejo\_Vigilancia\_Secretario2: Nombres de quienes supervisan al Comisariado.  
-* Inicio Vigencia y Fin Vigencia: Cuándo empezaron y cuándo terminan su periodo.  
-* ORV Vigentes (Sí/No) Estatus, Fecha de Vencimiento de ORV y Acta de Elección de ORV Inscrita en el RAN (Sí/No): Para garantizar que sus firmas tendrán validez legal.  
-* Fecha de Padrón y Padrón: Número de Ejidatarios/Comuneros: Para saber cuántos votos conforman el quórum de una asamblea.
+```text
+tramo_nucleo = expediente maestro territorial de liberación
+afectacion   = subexpediente operativo confirmado
+```
 
-3\. Soporte Documental y Excepciones: A lo largo de todo el proceso, las tres matrices (Colectivos, Individuales y ORV) llevan un control físico del expediente:
+Una afectación no sustituye a Proyecto, Tramo o Tramo_Núcleo. Es el registro
+que abre una rama operativa dentro del expediente maestro cuando el
+caminamiento y el análisis territorial y jurídico ya confirmaron el derecho
+afectado, su superficie, geometría y sujetos involucrados.
 
-* Documentación Disponible y Documentación Faltante: Para llevar un checklist de los papeles.  
-* Observaciones: Un campo de texto libre contemplado en el formato.  
-* Categoría Sin Nombre: Un bloque especial que usa la PA para catalogar excepciones operativas: Comunidad Indígena (si requieren protocolos especiales), El Proyecto Ferroviario No Afecta Tierras de Uso Común (si el tren solo toca parcelas privadas) o Expropiación Directa (cuando fracasa el acuerdo y se debe forzar el juicio expropiatorio desde cero).
+Antes de esa confirmación, las posibles afectaciones se investigan dentro del
+contexto de `tramo_nucleo`. La sensibilización y el caminamiento ocurren en esa
+etapa del expediente maestro y no crean subexpedientes preliminares. Cuando se
+registra una afectación confirmada, las actuaciones compartidas permanecen en
+`tramo_nucleo` y deben ser visibles desde el subexpediente como antecedentes;
+las actuaciones exclusivas se relacionan con la afectación correspondiente.
 
-Fase 2: Acercamiento en Campo (Sensibilización y Caminamiento)  
-La PA y la SEDATU acuden al territorio para marcar la tierra y convencer a la gente de autorizar el Convenio de Ocupación Previa (COP). Se captura sistemáticamente:
+## 2. Secuencia general
 
-* Reunión Programada (Fecha) y Reunión Realizada (Fecha): Para registrar los eventos de "Sensibilización".  
-* Programado (Fecha) / Caminamiento Programado (Fecha) y Realizado (Fecha) / Caminamiento Realizado (Fecha): Para registrar el marcaje topográfico en campo.
+```text
+Configuración territorial
+        ↓
+Identificación territorial de posibles afectaciones
+        ↓
+Acercamiento y sensibilización
+        ↓
+Caminamiento y análisis territorial y jurídico
+        ↓
+Confirmación de superficie, geometría, sujetos y BDT
+        ↓
+Registro de la afectación y apertura del subexpediente operativo
+        ↓
+Ruta colectiva o individual
+        ↓
+Convenio y formalización registral
+        ↓
+FIFONAFE, pagos y cierre
+```
 
-A partir de este recorrido, el proceso se bifurca en dos grandes matrices:
+La sensibilización no se elimina ni se reemplaza por el caminamiento. Es una
+etapa social previa. El caminamiento es una actividad técnica de campo.
 
-Fase 3A: Matriz de Seguimiento a Derechos Colectivos (Uso Común)  
-Como las tierras de uso común son de todos, la PA debe recabar información técnica específica de esa área común: Destino de la Superficie y, si aplica para un área comunal específica, el No. de Parcela/Solar. Todo debe ser autorizado por la Asamblea.  
-1\. Convenio de Ocupación Previa (Original):
+La secuencia anterior expresa el orden real del proceso. La navegación para el
+usuario final conserva una jerarquía más directa:
 
-* Asamblea: La PA documenta el esfuerzo para lograr el quórum capturando Asamblea Programada 1ra (Fecha), Asamblea Programada 2da (Fecha) y la Asamblea Realizada (Fecha) donde se otorga la anuencia.  
-* RAN (Acta): El acta de esa asamblea se ingresa al registro capturando: Ingresado al RAN (Fecha), Número de Solicitud de Ingreso, Calificación Registral y Acta Inscrita en el RAN (Fecha).  
-* Firma y Montos: Se captura el Convenio Firmado (Fecha), la Superficie Total Real Afectada (Ha), y los montos del avalúo: Convenio Monto 90%, Convenio Monto 100% y Monto BDT (Bienes Distintos a la Tierra).  
-* RAN (Convenio): El convenio también se inscribe en el RAN rastreando los mismos 4 campos: Ingresado al RAN (Fecha), Número de Solicitud de Ingreso, Calificación Registral y Convenio Inscrito en el RAN (Fecha).
+```text
+Proyecto
+└── Tramo
+    └── Tramo_Núcleo
+        ├── Expediente maestro territorial
+        └── Afectación confirmada
+            └── Subexpediente operativo
+```
 
-2\. Variantes de Convenios Colectivos (Nuevos ciclos): Si el proyecto sufre alteraciones, la matriz detalla sub-procesos específicos. Cada uno (excepto el modificatorio) requiere detonar de nuevo los campos de Sensibilización, Caminamiento, Asamblea, Firmas e Inscripción al RAN:
+El usuario entra al expediente maestro del cruce, consulta sus antecedentes y
+registra las afectaciones con datos confirmados. Desde ahí abre cada
+subexpediente colectivo o individual. En éste puede consultar los antecedentes
+compartidos que le aplican, además de sus actuaciones posteriores.
 
-* Convenio Modificatorio: Solo se capturan los ajustes al acuerdo inicial: Convenio Modificatorio Firmado (Fecha), los montos (90%, 100%, Monto BDT) y la Superficie Total Real Afectada (Ha), junto con sus respectivos campos de ingreso e inscripción al RAN.  
-* Convenio Superficie Adicional: Se reinicia el ciclo de asamblea y RAN. Se captura el Convenio Sup. Adicional Firmado (Fecha), los montos (90%, 100%, BDT) y la Superficie Adicional (Ha).  
-* Convenio Obras Complementarias: Al representar una nueva ocupación en tierras de uso común, se abandona la captura en columnas paralelas. Se debe detonar un **nuevo ciclo relacional independiente**, registrando una nueva Asamblea de Anuencia y un nuevo Convenio vinculados al núcleo agrario, preservando intacto el COP original. Se captura el Convenio Firmado (Fecha), montos (90%, 100%) y la Superficie Total Real Afectada (Ha). (Nota: En esta variante no se captura Monto BDT).
+## 3. Fase 1 — Configuración e investigación territorial
 
-Fase 3B: Matriz de Seguimiento a Derechos Individuales (Parcelas)  
-Como las parcelas tienen un dueño asignado, no interviene la asamblea. Tras el caminamiento, la PA crea un expediente privado.
+### 3.1 Proyecto, tramo y núcleo
 
-1\. Datos Generales de la Parcela: Para validar que el trato es con la persona correcta, la PA captura: Tipo de Parcela (Individual), No. de Parcela PPT, Nombre de la Persona Titular de la Parcela, Constancia de Vigencia de Derechos (Fecha), el Certificado Parcelario y el Folio de Derechos.
+La Procuraduría Agraria registra o selecciona:
 
-2\. Convenio de Ocupación Previa Individual (y sus variantes): Tras negociar en privado, se recaban los datos del acuerdo, los cuales tienen ligeras variaciones a lo colectivo:
+- Proyecto.
+- Tramo.
+- Núcleo agrario.
+- Entidad federativa y municipio de adscripción registral.
+- Residencia u oficina regional responsable.
+- Tipo de núcleo: ejido o comunidad.
+- Cruce `tramo_nucleo`, con consecutivo, longitud y geometría.
+- Condiciones especiales: comunidad indígena, expropiación o proyecto que no
+  afecta tierras de uso común.
 
-* COP Original: Se captura Convenio Firmado (Fecha), montos (Convenio Monto 90%, Convenio Monto 100%, Monto BDT) y la Superficie Total (Ha.). Se inscribe rastreando: Convenio Ingresado al RAN (Fecha), No. de Solicitud de Ingreso, Calificación Registral y Convenio Inscrito en el RAN (Fecha).  
-* Convenio Modificatorio: A diferencia de otros, el modificatorio individual solo requiere tres datos: Convenio Modificatorio (Fecha), Convenio Monto 90% y Convenio Monto 100%.  
-* Convenio Ampliación y Convenio Ampliación \- Remanente: Se utilizan cuando hay cambios en la afectación de la parcela. En ambos se captura el Convenio Ampliación (Fecha), los tres montos (90%, 100%, Monto BDT), la Superficie de Ampliación, y los cuatro campos del trámite de inscripción ante el RAN.
+La asignación de usuarios se realiza por tramo mediante `usuario_tramo`. El
+modelo vigente no utiliza Frente.
 
-Fase 4: Matriz de FIFONAFE, Informes de No Conflictos y Cierres  
-Antes de que la indemnización sea pagada, el FIFONAFE (que administra los recursos) exige a la PA garantizar la paz social. Esto detona una matriz exclusiva de control de pagos y oficios.
+### 3.2 Identificación de posibles afectaciones
 
-1\. Informe de No Conflictos (Cruces de oficios para ambas vías): Se rastrea toda la cadena de comunicación interinstitucional rellenando rigurosamente:
+El cruce `tramo_nucleo` permite investigar si el proyecto afecta derechos
+colectivos o parcelas individualizadas. En esta etapa se reúnen antecedentes,
+se revisan las condiciones del núcleo y se programan las actuaciones de campo.
 
-* No. de Oficio FIFONAFE a DGAOPR/Representación y Fecha: El FIFONAFE pregunta si se puede pagar.  
-* No. de Oficio DGAOPR a Representación y Fecha: La SEDATU solicita a la PA que revise la zona.  
-* Respuesta Representación a DGAOPR No. de Oficio y Fecha: La PA valida que no hay conflictos sociales o legales.  
-* Respuesta DGAOPR/Representación a FIFONAFE No. de Oficio y Fecha: Se le da luz verde definitiva al fideicomiso.
+Una posible afectación todavía no es una fila de `afectacion` ni un
+subexpediente operativo.
+Si el análisis posterior concluye que no existe afectación, las actuaciones
+territoriales permanecen como evidencia del expediente maestro sin crear un
+subexpediente operativo inexistente.
 
-2\. El Cierre y Dispersión de Fondos: Una vez que los oficios fluyen, el dinero se mueve:
+### 3.3 Identidad y representación
 
-* Para Derechos Individuales, el FIFONAFE paga directamente a la persona. El proceso culmina actualizando el campo Indemnización: Estatus (Completo, Pendiente, Programado).  
-* Para Derechos Colectivos, como el dinero va a un fondo común, el campo Indemnización: Estatus (Completo, Pendiente, Programado) marca el depósito general, pero la comunidad aún no puede usarlo. La PA debe organizar una reunión final para decidir el reparto, llenando el campo Asamblea Retiro de Fondos: Estatus (Completo, Pendiente, Programado).
+Las personas se registran una sola vez en el catálogo `persona`. Su relación
+con un núcleo y su calidad agraria se registra en `persona_nucleo`.
 
-De esta forma, cada uno de los datos del archivo Estructura Datos.md cumple una función específica, cronológica y auditable dentro del gran engranaje de liberación de tierras.
+```text
+persona
+├── persona_nucleo
+├── parcela_titular
+└── orv_integrante
+```
 
-**Introducción agraria básica.**  
-Artículo 27 Constitucional: Establece que la Nación es dueña originaria de las tierras y regula la propiedad ejidal y comunal, prohibiendo los latifundios y facultando al Estado para expropiar tierras por utilidad pública.  
-Las reformas de 1992 finalizaron el reparto agrario, permitieron la conversión de ejidos en propiedad privada para el mercado y crearon instituciones como la Procuraduría Agraria (PA) y los Tribunales Agrarios.
+- `parcela_titular` permite titular, cotitulares o posesionarios.
+- `orv_integrante` asigna los cargos del Comisariado y Consejo de Vigilancia.
+- ORV pertenece al núcleo, no a una afectación particular, porque puede
+  respaldar varias actuaciones mientras se encuentre vigente.
+- El padrón registra su fecha y número de ejidatarios o comuneros para apoyar
+  el cálculo del quórum.
 
-Instancias del Sector Agrario: El sector está conformado por la SEDATU (encargada del desarrollo territorial), la Procuraduría Agraria (defiende los derechos de los sujetos agrarios), el Registro Agrario Nacional o RAN (controla la tenencia de la tierra y la seguridad documental) y el FIFONAFE (administra los fondos comunes de los núcleos agrarios).
+No se fusionan identidades únicamente porque coincida el nombre. CURP válida,
+RFC, documentos, núcleo, parcela y vigencia son evidencia para una
+conciliación.
 
-Los Núcleos Agrarios: Engloban a los ejidos y comunidades; cuentan con personalidad jurídica y patrimonio propio, y son los propietarios de las tierras que se les dotaron.
+## 4. Fase 2 — Acercamiento, sensibilización y caminamiento
 
-Los Órganos del Núcleo Agrario: La Asamblea es el órgano supremo de decisión (puede ser de formalidades simples o especiales).  
-El Comisariado Ejidal / de Bienes Comunales ejecuta los acuerdos de la asamblea y representa al núcleo; mientras que el Consejo de Vigilancia se encarga de supervisar las acciones del Comisariado.  
-Estos órganos de representación duran 3 años.
+### 4.1 Acercamiento y sensibilización
 
-Los Sujetos Agrarios: Se clasifican en Ejidatarios (titulares de derechos en ejidos), Comuneros (titulares en comunidades agrarias), Avecindados (personas reconocidas con más de un año de residencia) y Posesionarios (poseen terrenos sin ser forzosamente ejidatarios o avecindados).
+La PA y las instituciones participantes informan al núcleo o a los titulares:
 
-Tipos de tierras: También conocidas como "Grandes Áreas", se dividen en: Tierras de uso común (sustento inalienable y económico de la comunidad), Área parcelada (tierras destinadas al cultivo de manera individual) y Área de Asentamientos Humanos (necesarias para la vida comunitaria y la urbanización).
+- Alcance y ubicación aproximada del proyecto.
+- Motivo de la ocupación.
+- Derechos de las personas afectadas.
+- Proceso de levantamiento y valuación.
+- Documentación requerida.
+- Próximas reuniones, recorridos o asambleas.
+- Mecanismo de negociación de la tierra y de los BDT.
 
-Acciones agrarias: Son procesos que alteran la geografía o tenencia del núcleo. Pueden sumar superficie (dotación, ITRE, ampliación), restar superficie (dominio pleno, división de ejido, expropiación, titulación de asentamientos) o no afectar la superficie (certificaciones como PROCEDE o reversiones).
+La sensibilización puede necesitar varias reuniones. Cada actividad debe
+registrar como mínimo:
 
-De la Expropiación de Bienes Ejidales y Comunales: Trámite ante la SEDATU fundamentado en el artículo 93 por causas de utilidad pública (ej. vías de transporte). Debe realizarse mediante un decreto presidencial publicado en el Diario Oficial, y a cambio se otorga una indemnización.
+- Fecha programada y realizada.
+- Lugar.
+- Responsable.
+- Resultado y observaciones.
+- Acuerdos y próxima acción.
+- Evidencia documental.
 
-REGLAMENTO DE LA LEY AGRARIA EN MATERIA DE ORDENAMIENTO DE LA PROPIEDAD RURAL: Estipula que durante o antes del procedimiento expropiatorio, se pueden celebrar convenios de ocupación previa para usar las tierras.  
-Además, define los requisitos formales (Art. 57 y Art. 61\) para suscribir el convenio y solicitar la expropiación mediante escrito libre.
+Las minutas conservan los acuerdos. Cada acuerdo tiene un responsable y puede
+registrar prioridad, fecha límite, estatus y fecha de cumplimiento.
 
-**CONVENIOS DE OCUPACIÓN PREVIA Y EL PROCEDIMIENTO DE EXPROPIACIÓN**  
-Introducción: La expropiación es la forma en que el Estado adquiere bienes por utilidad pública con indemnización. Los convenios de ocupación previa permiten al Estado ocupar dichas tierras agrarias antes de que concluya ese proceso legal de expropiación.
+Una lista estructurada de participantes por actividad es una capacidad
+planeada; no debe asumirse implementada mientras no exista su modelo.
 
-Marco Jurídico: Sustentado en el Art. 27 Constitucional, los artículos 93 al 96 de la Ley Agraria (que hablan de causas de utilidad pública y avalúos) y el Título Tercero del Reglamento de la Ley Agraria en Materia de Ordenamiento de la Propiedad Rural.
+### 4.2 Caminamiento
 
-Convenio de Ocupación Previa: Es un acuerdo formal donde el núcleo agrario (o el titular parcelario) da permiso a un promovente para ocupar temporalmente las tierras mientras se tramita o en su defecto se cancela el proceso expropiatorio.
+El caminamiento es la inspección física con representantes, titulares y
+personal técnico. Permite:
 
-Contenido de un Convenio de Ocupación Previa: Legalmente debe incluir la superficie y ubicación geográfica, si es gratuito u oneroso (con monto y garantía de pago), vigencia, compromiso de iniciar la expropiación y el proceso para pago de daños en caso de cancelación.
+- Verificar por dónde cruza el proyecto.
+- Delimitar la superficie realmente afectada.
+- Confirmar o corregir la geometría.
+- Identificar parcelas y sujetos involucrados.
+- Detectar desacuerdos o conflictos.
+- Identificar bienes distintos a la tierra.
 
-Estructura de un Convenio de Ocupación Previa: Se compone de un Proemio (partes y tipo de convenio), Declaraciones (datos de la parcela y organización promovente), Cláusulas (que definen forma de pago, uso para utilidad pública, obligaciones, plazo máximo de 3 años ante SEDATU, daños a la naturaleza, etc.) y la firma de los involucrados.
+Sus resultados permiten determinar si existe una afectación cierta y reúnen la
+información necesaria para crearla por la vía colectiva o individual.
 
-Convenio de Ocupación Previa (Derechos colectivos): Cuando se afectan tierras de uso común, se requiere realizar asambleas de información y de anuencia para autorizar al Comisariado a firmar. El monto pactado se deposita en el FIFONAFE, requiriendo otra asamblea para el retiro de los fondos.
+### 4.3 Bienes Distintos a la Tierra
 
-Convenio de Ocupación Previa (Derechos individuales): Para la afectación de parcelas, se sensibiliza al titular, se redacta el convenio y la firma se realiza directamente con la persona afectada, tras lo cual se inscribe en el RAN.
+Los BDT son bienes adheridos al terreno cuyo valor es independiente del suelo,
+por ejemplo:
 
-Proceso de Expropiación con un Convenio de Ocupación Previa: Facilita el inicio de los trabajos operativos. El flujo es: Formalización del convenio de ocupación \-\> Desarrollo de las obras \-\> Inicio del proceso de expropiación \-\> Ejecución de la expropiación.
+- Cultivos y árboles.
+- Cercas, corrales y caminos interiores.
+- Pozos y sistemas de riego.
+- Construcciones.
+- Infraestructura eléctrica, hidráulica o productiva.
 
-Proceso de Expropiación sin un Convenio de Ocupación Previa: Las obras no pueden iniciar sino hasta el final del proceso legal. El flujo es: Inicio del proceso de expropiación \-\> Ejecución de la expropiación \-\> Desarrollo de las obras.
+El caminamiento identifica los bienes; posteriormente se valoran y negocian.
+El resultado económico acordado se registra en `convenio.monto_bdt`.
 
-Procedimiento de Expropiación: Consta de varios pasos formales: Solicitud, verificación de utilidad pública, notificación, instauración, trabajos técnicos, avalúo oficial, publicación del decreto, notificación, pago individual o colectivo (a través de FIFONAFE) y, por último, la ejecución del decreto.
+Actualmente no existe un inventario estructurado por cada bien. Si los
+usuarios requieren esa trazabilidad, debe diseñarse una entidad de inventario
+y valuación vinculada a la afectación.
 
-**Conceptos**  
-proyecto: Unidad de planeación de mayor nivel. Agrupa los tramos que integran una obra o intervención ferroviaria.
+### 4.4 Registro de la afectación confirmada
 
-tramo: Segmento principal de un proyecto ferroviario. Pertenece a un único proyecto y constituye la unidad territorial para asignar responsables y medir avance.
+La afectación se crea únicamente cuando el caminamiento y el análisis
+territorial y jurídico confirmaron el derecho afectado. En ese momento nace su
+subexpediente operativo dentro de `tramo_nucleo` y el usuario selecciona su
+vía:
 
-tramo_núcleo: Expediente territorial y administrativo que vincula un tramo con un núcleo agrario. Es el contexto obligatorio para registrar afectaciones.
+```text
+afectacion.tipo_afectacion
+├── colectivo
+└── individual
+```
 
-afectación: Registro inicial del caso de liberación dentro de un tramo_núcleo. Delimita la superficie afectada y se clasifica como colectiva o individual antes de iniciar las actuaciones específicas de cada vía.
-núcleo agrario: Es la entidad central del sistema. Representa cada ejido o comunidad agraria que es atravesado o afectado por el proyecto ferroviario,. Alrededor del cual se articula Todo el seguimiento de derechos colectivos, e individuales, convenios, asambleas, afectaciones  y documentación relacionada con el derecho de vía.  
-entidad\_federativa: Estado de la República al que se encuentra adscrito registralmente el núcleo agrario para fines de identificación y seguimiento dentro del sistema. Puede diferir de la localización geográfica.  
-municipio: Municipio al que se encuentra adscrito registralmente el núcleo agrario para fines de identificación y seguimiento dentro del sistema. Puede diferir de la localización geográfica.  
-residencia: Oficina o Unidad administrativa regional de la Procuraduría Agraria encargada de la atención y seguimiento al núcleo agrario dentro del proyecto.  
-nombre\_nucleo: Nombre oficial del ejido o comunidad conforme a sus asientos registrales. Verificable en el PHINA  
-anuencia: Indica si el núcleo agrario ha otorgado su anuencia para el desarrollo del proyecto (sí/no).  
-es\_expropiacion: Indica si el procedimiento correspondiente se lleva a cabo mediante  expropiación directa,  derivado de la falta de celebración de un convenio.  
-geometria\_poligono: Es muy importante definir el sistema de coordenadas de entrada, para garantizar la entrada de información conforme a los distintos productos cartográficos. Considerar que la mayoría de usuarios y mapas base trabajan con coordenadas geográficas basadas en  WGS84; en tanto los documentos jurídicos utilizados en la liberación utilizan coordenadas UTM. En su caso, debe vigilarse la correcta zonificación y características específicas del SRC  
-afectación: Registra la superficie, tipo de tenencia propiedad y personas o/parcelas afectadas por el paso del tramo ferroviario dentro de un núcleo agrario, considerando derechos colectivos, individuales y tierras de uso común sujetas al régimen de propiedad social.  
-tipo\_tenencia: Indica la modalidad de tenencia de la superficie afectada dentro del núcleo agrario, como tierra parcelada individual, parcelada colectiva o de uso común.  
-subtipo\_tenencia: Clasificación específica: individual, copropiedad, infraestructura, parcela no asignada, parcela con destino específico, tierra no registrada, etc.  
-sensibilización: Registra las reuniones de sensibilización realizadas con el núcleo agrario, en las que se informa sobre el derecho de vía y el proyecto ferroviario, con el objetivo de generar entendimiento y disposición respecto al mismo.  
-fecha\_reunion\_programada: Fecha programada para la realización de la reunión.  
-fecha\_reunion\_realizada: Fecha de realización de la reunión.  
-caminamiento: Registro de recorridos técnicos en campo  para la verificación topográfica del trazo ferroviario y la delimitación de posibles afectaciones en el territorio del núcleo agrario  
-asamblea: Registra las asambleas ejidales o comunales del núcleo agrario en el marco del proceso de autorización del proyecto y obtención de la anuencia. incluyendo primera convocatoria, segunda convocatoria y asamblea realizada.  
-Fecha\_exp\_1a: Fecha de expedición de la primera convocatoria para la realización de la asamblea, conforme al art. 26 de la Ley Agraria.  
-Fecha\_prog\_1a: Fecha en que se espera desahogar la asamblea por primera convocatoria, conforme al art. 26 de la Ley Agraria.  
-Fecha\_exp\_2a: Fecha de expedición de la segunda convocatoria para la realización de la asamblea, conforme al art. 26 de la Ley Agraria.  
-Fecha\_prog\_2a: Fecha en que se espera desahogar la asamblea por segunda convocatoria, conforme al art. 26 de la Ley Agraria.  
-Tipo de convenio: COP (Convenio de Ocupación Previa): Original, modificatorio, superficie adicional u obras complementarias.  
-convenio\_monto\_90: Monto pactado equivalente al 90% del valor del convenio. En ocasiones no aplica, depende del acuerdo con el núcleo agrario.  
-convenio\_monto\_100: Monto pactado equivalente al 100% del valor del convenio.  
-monto\_bdt: Monto correspondiente a la indemnización de Bienes Distintos a la Tierra.  
+La captura requiere:
+
+- Tramo_Núcleo y núcleo agrario.
+- Tipo y subtipo de tenencia.
+- Destino de la superficie, cuando corresponda.
+- Superficie confirmada.
+- Geometría poligonal confirmada.
+- Situación jurídica.
+- Documentación disponible y faltante.
+- Parcela y titulares, cuando sea individual.
+
+Una afectación colectiva corresponde normalmente a tierras de uso común y
+requiere actuaciones del núcleo agrario. Una afectación individual corresponde
+a una parcela o derecho con uno o varios titulares identificables.
+
+## 5. Fase 3A — Derechos colectivos
+
+Las tierras de uso común pertenecen al núcleo agrario. Su autorización requiere
+las actuaciones colectivas y registrales aplicables.
+
+### 5.1 COP original colectivo
+
+El ciclo contempla:
+
+1. Sensibilización y caminamiento.
+2. Convocatorias y asamblea de anuencia.
+3. Registro del quórum y resultado.
+4. Ingreso, calificación e inscripción del acta ante el RAN.
+5. Firma del Convenio de Ocupación Previa.
+6. Captura de superficie real afectada.
+7. Captura independiente del valor de tierra y de BDT.
+8. Ingreso, calificación e inscripción del convenio ante el RAN.
+
+### 5.2 Variantes colectivas
+
+Los tipos permitidos son:
+
+```text
+cop_original
+modificatorio
+superficie_adicional
+obras_complementarias
+```
+
+- **Modificatorio:** ajusta el convenio original y conserva su linaje.
+- **Superficie adicional:** incorpora nueva superficie y detona las
+  actuaciones que correspondan, incluida una nueva asamblea cuando aplique.
+- **Obras complementarias:** crea un ciclo relacional independiente con nueva
+  asamblea y nuevo convenio; no sobrescribe el COP original.
+
+En obras complementarias no se captura `monto_bdt`. El pago corresponde
+solamente al valor pactado por la superficie.
+
+No deben recrearse columnas paralelas con sufijos como `_2`. Cada nuevo ciclo
+se representa mediante nuevas filas relacionadas.
+
+## 6. Fase 3B — Derechos individuales
+
+La afectación individual se vincula con una parcela y al menos un titular
+activo. Puede soportar copropiedad mediante varios registros en
+`parcela_titular`.
+
+La PA verifica:
+
+- Número o identificación de parcela.
+- Certificado parcelario.
+- Folio de derechos.
+- Constancia de vigencia.
+- Titular, cotitulares o posesionarios.
+- Superficie y geometría afectadas.
+
+La negociación se realiza directamente con los titulares y no requiere una
+asamblea del núcleo para autorizar el convenio individual.
+
+### 6.1 Variantes individuales
+
+Los tipos permitidos son:
+
+```text
+cop_original
+modificatorio
+ampliacion
+ampliacion_remanente
+```
+
+- **COP original:** registra firma, superficie, valor de tierra, BDT y
+  seguimiento registral.
+- **Modificatorio individual:** ajusta fecha y montos; no registra nueva
+  superficie ni BDT y no requiere inscripción ante el RAN conforme a la regla
+  actualmente modelada.
+- **Ampliación y ampliación remanente:** registran la nueva superficie,
+  montos y seguimiento registral correspondiente.
+
+## 7. Fase 4 — FIFONAFE, pagos y cierre
+
+### 7.1 Informe de no conflictos
+
+Se conserva la cadena de oficios entre FIFONAFE, DGAOPR y la representación de
+la PA:
+
+- Oficio de FIFONAFE a DGAOPR o representación y fecha.
+- Oficio de DGAOPR a representación y fecha.
+- Respuesta de la representación a DGAOPR y fecha.
+- Respuesta final a FIFONAFE y fecha.
+
+El objetivo es acreditar que existen condiciones para continuar con el pago.
+
+### 7.2 Paquete económico
+
+El paquete de indemnización tiene conceptos complementarios:
+
+```text
+valor de la tierra       = convenio.monto_100
+anticipo de la tierra    = convenio.monto_90
+bienes distintos tierra = convenio.monto_bdt
+límite pagable           = monto_100 + monto_bdt
+```
+
+`monto_90` es un anticipo incluido dentro de `monto_100`; no se suma como un
+tercer concepto.
+
+Reglas por convenio:
+
+- COP original colectivo o individual: `monto_100` y `monto_bdt` se capturan
+  de forma independiente, aunque BDT pueda valer cero.
+- Ampliaciones: aplican ambos conceptos.
+- Obras complementarias: BDT no aplica y debe ser nulo.
+- Modificatorio individual: no captura BDT.
+
+### 7.3 Pagos
+
+Cada pago de indemnización se relaciona con un trámite FIFONAFE de tipo
+`indemnizacion`, que a su vez debe tener un convenio.
+
+Se registra:
+
+- Monto y fecha.
+- Tipo: anticipo, parcial o total.
+- Medio de pago.
+- Banco y referencia.
+- Persona beneficiaria o beneficiario externo.
+
+La suma de pagos activos no puede exceder `monto_100 + monto_bdt`. Tampoco
+pueden reducirse los montos del convenio por debajo de lo ya pagado.
+
+Para derechos individuales el pago se dirige al titular o beneficiario
+correspondiente. Para derechos colectivos el proceso incluye el depósito y la
+asamblea de retiro de fondos cuando proceda.
+
+## 8. Documentación, alertas y auditoría
+
+- La documentación puede relacionarse con núcleo, afectación, convenio u ORV.
+- Cada carga crea una versión inmutable con nombre original, tamaño, MIME,
+  SHA-256, usuario y fecha.
+- Una nueva versión nunca sobrescribe físicamente la anterior.
+- Las alertas de vencimiento de ORV se generan al modificar el ORV y mediante
+  una tarea diaria.
+- Cada usuario consulta sus alertas no vistas.
+- Las altas, modificaciones y bajas lógicas deben conservar actor y
+  trazabilidad en bitácora.
+- No se realiza borrado físico de entidades operativas.
+
+## 9. Estado actual frente al proceso objetivo
+
+### Implementado
+
+- Proyecto → Tramo → Tramo_Núcleo, sin Frente.
+- Personas, relaciones con núcleo, titulares e integrantes ORV.
+- Afectaciones colectivas e individuales.
+- Actividades de sensibilización y caminamiento.
+- Minutas y acuerdos.
+- Convenios y variantes.
+- Trámite FIFONAFE y pagos.
+- Documentos versionados.
+- Alertas y scheduler diario.
+
+### Pendiente del Corte principal 2
+
+El frontend ya abre el expediente maestro por `tramo_nucleo`, pero todavía
+mezcla dentro de una sola vista todas sus afectaciones:
+
+```text
+expediente maestro: /expedientes/:id_tramo_nucleo
+subexpediente:      /expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion
+```
+
+Se debe:
+
+- Conservar y fortalecer el expediente maestro de `tramo_nucleo`.
+- Listar dentro de él sus afectaciones y abrir cada subexpediente.
+- Mantener sensibilización, caminamiento y minutas compartidas en el
+  expediente maestro y mostrarlas como antecedentes en los subexpedientes a
+  los que apliquen.
+- Asociar con claridad documentos, convenios, pagos y estados posteriores con
+  la afectación correspondiente.
+- Mostrar únicamente etapas aplicables a la vía colectiva o individual.
+- Mantener ORV como información compartida del núcleo.
+- Calcular avance legal, geoespacial y financiero por afectación.
+- Corregir el panel documental: debe admitir documentos del expediente maestro
+  y documentos propios de una afectación, sin asignarlos todos
+  indiscriminadamente a un solo nivel.
+
+### Capacidades que requieren diseño adicional
+
+- Lista estructurada de asistencia por actividad.
+- Inventario y valuación detallada de cada BDT.
+- Tablero de seguimiento visual de acuerdos.
+- Avalúo estructurado con sus datos y documentos propios.
+
+No deben presentarse como terminadas hasta contar con modelo, API, interfaz y
+pruebas.
+
+## 10. Conceptos fundamentales
+
+- **Núcleo agrario:** ejido o comunidad con personalidad jurídica y patrimonio
+  propio.
+- **ORV:** órganos de representación y vigilancia del núcleo.
+- **Asamblea:** órgano colectivo que autoriza las actuaciones que legalmente le
+  corresponden.
+- **Sujeto agrario:** persona con una calidad contextual como ejidatario,
+  comunero, avecindado o posesionario.
+- **Tierras de uso común:** superficie de aprovechamiento colectivo.
+- **Parcela:** superficie con derechos individualizados o compartidos.
+- **COP:** Convenio de Ocupación Previa.
+- **RAN:** Registro Agrario Nacional.
+- **FIFONAFE:** institución que interviene en la administración y dispersión de
+  recursos conforme al tipo de afectación.
+- **BDT:** Bienes Distintos a la Tierra.
+
+El contexto jurídico ampliado se conserva en:
+
+- `docs/Introducción agraria básica.md`.
+- `docs/CONVENIOS DE OCUPACIÓN PREVIA.md`.
+- `docs/Conceptos.md`.
+
+Las reglas legales deben ser confirmadas por el área jurídica cuando cambie la
+normativa o antes de un despliegue con datos reales.

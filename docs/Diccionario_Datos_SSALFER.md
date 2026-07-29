@@ -94,7 +94,7 @@ Antes de detallar las tablas, es crucial entender por qué el sistema SSALFER es
 
 | Campo | Tipo | PK | FK | NN | Descripción y Justificación |
 | :---- | :---- | :---- | :---- | :---- | :---- |
-| id_tramo_nucleo | SERIAL | ✔ | | ✔ | Identificador único del expediente maestro. |
+| id_tramo_nucleo | SERIAL | ✔ | | ✔ | Identificador único del cruce y del expediente maestro territorial de liberación de derecho de vía. |
 | id_tramo | INTEGER | | ✔ | ✔ | Tramo que causa la afectación. |
 | id_frente | INTEGER | | ✔ | ✔ | Frente responsable de la gestión y negociación en campo. |
 | id_nucleo | INTEGER | | ✔ | ✔ | Núcleo agrario afectado que deberá otorgar anuencia. |
@@ -141,7 +141,7 @@ Antes de detallar las tablas, es crucial entender por qué el sistema SSALFER es
 | :---- | :---- | :---- | :---- | :---- | :---- |
 | id_afectacion | SERIAL | ✔ | | ✔ | Identificador único. |
 | id_nucleo | INTEGER | | ✔ | ✔ | FK de seguridad para evitar cruces de datos entre expedientes de distintos núcleos. |
-| id_tramo_nucleo | INTEGER | | ✔ | ✔ | Expediente pivote al que pertenece la afectación. |
+| id_tramo_nucleo | INTEGER | | ✔ | ✔ | Expediente maestro territorial al que pertenece el subexpediente de afectación. |
 | id_parcela | INTEGER | | ✔ | | Si es afectación individual, exige este vínculo. Si es colectivo, debe ser NULL. |
 | tipo_afectacion | VARCHAR(20) | | | ✔ | 'colectivo' o 'individual'. Define qué reglas de negocio (triggers) se le aplican. |
 | superficie_afectada_ha | NUMERIC(12,4) | | | | Hectáreas calculadas matemáticamente a partir del polígono de afectación. |
