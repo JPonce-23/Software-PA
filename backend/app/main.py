@@ -82,22 +82,48 @@ app.include_router(alertas.router, prefix="/api")
 
 os.makedirs("uploads", exist_ok=True)
 
-def validate_wkt(db: Session, wkt: str):
-    if not wkt: return
+def validate_wkt(
+    db: Session,
+    wkt: str,
+    allowed_geometry_types: set[str] | None = None,
+):
+    if not wkt:
+        return
     try:
-        is_valid = db.execute(
-            text("SELECT ST_IsValid(ST_GeomFromText(:wkt, 4326))"), 
+        geometry = db.execute(
+            text(
+                """
+                SELECT
+                    ST_IsValid(geom) AS is_valid,
+                    ST_IsEmpty(geom) AS is_empty,
+                    ST_GeometryType(geom) AS geometry_type
+                FROM (
+                    SELECT ST_GeomFromText(:wkt, 4326) AS geom
+                ) parsed
+                """
+            ),
             {"wkt": wkt}
-        ).scalar()
-        if is_valid is False:
+        ).mappings().one()
+        if not geometry["is_valid"] or geometry["is_empty"]:
             raise HTTPException(
-                status_code=400, 
-                detail="Geometría WKT inválida topológicamente (ej. cruces, puntos duplicados)."
+                status_code=400,
+                detail="La geometría WKT debe ser válida y no estar vacía.",
+            )
+        if (
+            allowed_geometry_types
+            and geometry["geometry_type"] not in allowed_geometry_types
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "La geometría de una afectación debe ser un polígono "
+                    "o multipolígono."
+                ),
             )
     except DatabaseError:
         raise HTTPException(
-            status_code=400, 
-            detail="Formato WKT inválido. Verifica la sintaxis de la geometría."
+            status_code=400,
+            detail="Formato WKT inválido. Verifica la sintaxis de la geometría.",
         )
 
 def set_audit_context(db: Session, user_id: int):
@@ -128,9 +154,14 @@ def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
     
     if "geometria_wkt" in update_dict:
         wkt = update_dict.pop("geometria_wkt", None)
-        validate_wkt(db, wkt)
-        
         model_class = type(entity)
+        allowed_geometry_types = (
+            {"ST_Polygon", "ST_MultiPolygon"}
+            if model_class is models.Afectacion
+            else None
+        )
+        validate_wkt(db, wkt, allowed_geometry_types)
+
         geom_field = GEOMETRY_FIELDS.get(model_class)
         
         if geom_field and hasattr(entity, geom_field):
@@ -512,7 +543,7 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
     wkt = data.pop("geometria_wkt", None)
     
     if wkt:
-        validate_wkt(db, wkt)
+        validate_wkt(db, wkt, {"ST_Polygon", "ST_MultiPolygon"})
         
     db_afectacion = models.Afectacion(**data)
     if wkt:

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { FileText, Loader2, MapPinned, UserRound } from 'lucide-react';
 import api from '../api/axios';
+import AfectacionGeometryField from '../components/AfectacionGeometryField';
 import PersonaSelector from '../components/PersonaSelector';
+import { normalizePolygonWkt } from '../utils/geometry';
 import { nombreCompleto } from '../utils/personas';
 import {
   Campo,
@@ -44,6 +46,7 @@ export default function FormAfectacionIndividual({
     no_parcela_solar: initialData?.no_parcela_solar || '',
     superficie_afectada_ha: initialData?.superficie_afectada_ha || '',
     situacion_juridica: initialData?.situacion_juridica || '',
+    geometria_wkt: initialData?.geometria_wkt || '',
     documentacion_disponible: initialData?.documentacion_disponible || false,
     documentacion_faltante: initialData?.documentacion_faltante || '',
   });
@@ -124,6 +127,15 @@ export default function FormAfectacionIndividual({
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
+
+    let geometriaWkt;
+    try {
+      geometriaWkt = normalizePolygonWkt(afectacion.geometria_wkt);
+    } catch (geometryError) {
+      setError(geometryError.message);
+      return;
+    }
+
     setGuardando(true);
     try {
       let idParcela = initialData?.id_parcela;
@@ -151,6 +163,7 @@ export default function FormAfectacionIndividual({
           ? Number(afectacion.superficie_afectada_ha)
           : null,
         situacion_juridica: nullable(afectacion.situacion_juridica),
+        geometria_wkt: geometriaWkt,
         documentacion_disponible: afectacion.documentacion_disponible,
         documentacion_faltante: nullable(afectacion.documentacion_faltante),
         origen_registro: 'captura_sistema',
@@ -273,6 +286,10 @@ export default function FormAfectacionIndividual({
                 style={inputStyle}
               />
             </Campo>
+            <AfectacionGeometryField
+              value={afectacion.geometria_wkt}
+              onChange={(value) => updateAfectacion('geometria_wkt', value)}
+            />
             <label className="check-row">
               <input
                 type="checkbox"

@@ -156,6 +156,7 @@ class TestValidacionAfectaciones:
             "tipo_afectacion": "individual",
             "tipo_tenencia": "Parcelaria",
             "origen_registro": "migracion_excel",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
             # Sin id_parcela
         }
         res = client.post("/api/afectaciones", json=payload, headers=admin_headers)
@@ -172,6 +173,7 @@ class TestValidacionAfectaciones:
             "tipo_afectacion": "colectivo",
             "tipo_tenencia": "Uso Común",
             "origen_registro": "migracion_excel",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
         }
         res = client.post("/api/afectaciones", json=payload, headers=admin_headers)
         assert res.status_code == 400
@@ -187,9 +189,36 @@ class TestValidacionAfectaciones:
             "tipo_afectacion": "colectivo",
             "tipo_tenencia": "Uso Común",
             "origen_registro": "migracion_excel",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
         }
         res = client.post("/api/afectaciones", json=payload, headers=admin_headers)
         assert res.status_code == 404
+
+    def test_geometria_confirmada_es_obligatoria(
+        self, client, admin_headers, seed_nucleo, seed_tramo_nucleo,
+    ):
+        payload = {
+            "id_nucleo": seed_nucleo["id_nucleo"],
+            "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
+            "tipo_afectacion": "colectivo",
+            "tipo_tenencia": "Uso Común",
+        }
+        res = client.post("/api/afectaciones", json=payload, headers=admin_headers)
+        assert res.status_code == 422
+
+    def test_geometria_de_afectacion_debe_ser_poligonal(
+        self, client, admin_headers, seed_nucleo, seed_tramo_nucleo,
+    ):
+        payload = {
+            "id_nucleo": seed_nucleo["id_nucleo"],
+            "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
+            "tipo_afectacion": "colectivo",
+            "tipo_tenencia": "Uso Común",
+            "geometria_wkt": "LINESTRING(0 0, 1 1)",
+        }
+        res = client.post("/api/afectaciones", json=payload, headers=admin_headers)
+        assert res.status_code == 400
+        assert "polígono" in res.json()["detail"].lower()
 
 
 class TestValidacionAsambleas:

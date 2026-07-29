@@ -5,7 +5,9 @@ import {
   ModalWrapper, SeccionHeader, Campo,
   ErrorBanner, ExitoMsg, BotonesAccion,
 } from '../components/FormUI';
+import AfectacionGeometryField from '../components/AfectacionGeometryField';
 import { gridDos, inputStyle } from '../components/formStyles';
+import { normalizePolygonWkt } from '../utils/geometry';
 
 const TIPOS_TENENCIA = [
   'Tierras de Uso Común',
@@ -29,6 +31,7 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, initi
     superficie_afectada_ha:  initialData?.superficie_afectada_ha  || '',
     num_personas_afectadas:  initialData?.num_personas_afectadas  || '',
     situacion_juridica:      initialData?.situacion_juridica      || '',
+    geometria_wkt:           initialData?.geometria_wkt           || '',
     documentacion_disponible: initialData?.documentacion_disponible || false,
     documentacion_faltante:  initialData?.documentacion_faltante  || '',
   });
@@ -41,6 +44,14 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, initi
 
     if (!form.tipo_tenencia) {
       setError('El Tipo de Tenencia es obligatorio.');
+      return;
+    }
+
+    let geometriaWkt;
+    try {
+      geometriaWkt = normalizePolygonWkt(form.geometria_wkt);
+    } catch (geometryError) {
+      setError(geometryError.message);
       return;
     }
 
@@ -57,6 +68,7 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, initi
         superficie_afectada_ha:  form.superficie_afectada_ha  ? Number(form.superficie_afectada_ha) : null,
         num_personas_afectadas:  form.num_personas_afectadas  ? Number(form.num_personas_afectadas) : null,
         situacion_juridica:      form.situacion_juridica      || null,
+        geometria_wkt:           geometriaWkt,
         documentacion_disponible: form.documentacion_disponible,
         documentacion_faltante:  form.documentacion_faltante  || null,
         origen_registro:         'captura_sistema',
@@ -162,6 +174,11 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, initi
               style={{ ...inputStyle, resize: 'vertical' }}
             />
           </Campo>
+
+          <AfectacionGeometryField
+            value={form.geometria_wkt}
+            onChange={(value) => set('geometria_wkt', value)}
+          />
 
           {/* SECCIÓN 3: Documentación */}
           <SeccionHeader icono={<Layers size={16} />} titulo="Soporte Documental" />

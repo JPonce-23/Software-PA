@@ -211,7 +211,17 @@ class AfectacionCreate(AuditableCreate):
     documentacion_disponible: bool = False
     documentacion_faltante: Optional[str] = None
     origen_registro: Literal['captura_sistema', 'migracion_excel'] = 'captura_sistema'
-    geometria_wkt: Optional[str] = None
+    geometria_wkt: str = Field(min_length=1)
+
+    @field_validator('geometria_wkt')
+    @classmethod
+    def normalizar_geometria_wkt(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError('La geometría confirmada es obligatoria')
+        return value
 
 class AfectacionUpdate(AuditableUpdate):
     geometria_wkt: Optional[str] = None
