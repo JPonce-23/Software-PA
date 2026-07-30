@@ -1,80 +1,117 @@
+x-backend-environment: &backend-environment
+  DB_USER: ${DB_USER:?Define DB_USER en el archivo .env}
+  DB_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en el archivo .env}
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_NAME: ${DB_NAME:-db_trenes}
+  SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en el archivo .env}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: ${DOCKER_LOG_MAX_SIZE:-10m}
+    max-file: ${DOCKER_LOG_MAX_FILES:-3}
+
 services:
   db:
-    # Usamos la imagen oficial que ya incluye PostgreSQL + PostGIS preconfigurado
     image: postgis/postgis:15-3.3
-    container_name: trenes_db_container
     restart: always
     environment:
-      POSTGRES_USER: alfredo
-      POSTGRES_PASSWORD: L3cl3rc1614+
-      POSTGRES_DB: db_trenes
+      POSTGRES_USER: ${DB_USER:?Define DB_USER en el archivo .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en el archivo .env}
+      POSTGRES_DB: ${DB_NAME:-db_trenes}
     ports:
-      # Exponemos en el puerto 5433 de tu PC para no chocar con tu Postgres local
-      - "5433:5432"
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/db/migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql
+      - ./backend/db/migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging: *default-logging
 
   pgadmin:
     image: dpage/pgadmin4
-    container_name: trenes_pgadmin_container
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: fredy0505.sanchez@gmail.com
-      PGADMIN_DEFAULT_PASSWORD: L3cl3rc1614sf90
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Define PGADMIN_DEFAULT_EMAIL en el archivo .env}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Define PGADMIN_DEFAULT_PASSWORD en el archivo .env}
     ports:
-      - "5050:80"
+      - "127.0.0.1:${PGADMIN_HOST_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python3 -c "import urllib.request; urllib.request.urlopen('http://localhost/misc/ping', timeout=3).read()"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging: *default-logging
 
   backend:
-    build: ./backend
-    container_name: trenes_backend_container
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend:/app
-    environment:
-      - DB_USER=alfredo
-      - DB_PASSWORD=L3cl3rc1614+
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=db_trenes
-      - SECRET_KEY=clavesecretamuysegura_para_el_sistema_pa
-      - CORS_ORIGINS=http://localhost:5173
-    depends_on:
-      - db
+    image: software-pa-backend
+    build:
+      context: ./backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     restart: always
+    environment:
+      <<: *backend-environment
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      UPLOAD_ROOT: ${UPLOAD_ROOT:-/app/uploads}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-26214400}
+    ports:
+      - "127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=3).read()"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging: *default-logging
 
   alertas_scheduler:
     image: software-pa-backend
-    container_name: trenes_alertas_scheduler
-    command: python -m app.jobs.alertas_scheduler
-    volumes:
-      - ./backend:/app
-    environment:
-      - DB_USER=alfredo
-      - DB_PASSWORD=L3cl3rc1614+
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=db_trenes
-      - SECRET_KEY=clavesecretamuysegura_para_el_sistema_pa
-      - ALERTAS_INTERVAL_SECONDS=86400
-    depends_on:
-      - db
+    build:
+      context: ./backend
+    command: ["python", "-m", "app.jobs.alertas_scheduler"]
     restart: always
+    environment:
+      <<: *backend-environment
+      ALERTAS_INTERVAL_SECONDS: ${ALERTAS_INTERVAL_SECONDS:-86400}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os; os.kill(1, 0)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging: *default-logging
 
   frontend:
-    build: ./frontend
-    container_name: trenes_frontend_container
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
+    build:
+      context: ./frontend
     restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging: *default-logging
 
 volumes:
   postgres_data:
+  pgadmin_data:

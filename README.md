@@ -1,87 +1,228 @@
 # Software para la Procuraduría Agraria (PA)
 
-## Objetivo
-Repositorio para organizar el desarrollo y pruebas del proyecto de liberación de derechos de vía.
+Sistema para organizar el desarrollo y las pruebas del proyecto de liberación
+de derechos de vía.
 
-## Arquitectura y Tecnologías
-El proyecto ha sido modernizado y ahora está completamente contenerizado usando **Docker**.
+## Arquitectura
 
-- **Frontend**: React.js con Vite (conservando el diseño original en HTML/CSS puro).
-- **Backend**: Python con FastAPI y SQLAlchemy.
-- **Base de Datos**: PostgreSQL con extensión PostGIS para datos geoespaciales.
-- **Gestor DB**: PgAdmin4.
-- **Orquestación**: Docker Compose.
+El entorno se ejecuta con Docker Compose y contiene cinco servicios:
 
-## Estructura del Proyecto
-- `backend/`: Código fuente de la API en FastAPI, modelos de datos, migraciones espaciales y scripts ETL.
-- `frontend/`: Interfaz de usuario en React, vistas principales (Dashboard, Login, Mapa) y configuración de Vite.
-- `docs/`: Documentación técnica y decisiones de arquitectura.
-- `docker-compose.yml`: Archivo maestro para levantar toda la infraestructura de desarrollo.
+| Servicio | Función | Puerto local predeterminado |
+| --- | --- | --- |
+| `frontend` | React 19 y Vite; Nginx en modo producción | `5173` |
+| `backend` | API FastAPI y SQLAlchemy | `8000` |
+| `alertas_scheduler` | Generación periódica de alertas ORV | No publica puerto |
+| `db` | PostgreSQL 15 con PostGIS 3.3 | `5433` |
+| `pgadmin` | Administración web de PostgreSQL | `5050` |
 
-## ¿Cómo ejecutar el proyecto?
-Ya no es necesario instalar Python, Node.js ni bases de datos de forma local. Todo el entorno se levanta automáticamente mediante contenedores.
+Los servicios se comunican por sus nombres DNS de Compose (`db`, `backend`).
+`localhost` se usa únicamente desde la computadora anfitriona.
 
-### Requisitos Previos
-- **Para Windows**: Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/). Asegúrate de tener habilitado WSL2 en la configuración de Docker.
-- **Para Linux**: Instalar Docker Engine y Docker Compose. (Si no tienes a tu usuario en el grupo `docker`, deberás anteponer `sudo` a los siguientes comandos).
+## Requisitos
 
-### Pasos de Despliegue
-1. Abre una terminal (o PowerShell en Windows) en la raíz del proyecto.
-2. Crea tu archivo de variables de entorno copiando el archivo de ejemplo:
-   ```bash
-   cp .env.example .env
-   ```
-3. Ejecuta el comando para construir y levantar toda la infraestructura:
-   ```bash
-   docker-compose up -d --build
-   ```
-   *(Nota en Linux: Si tienes problemas de permisos, usa `sudo docker-compose up -d --build`)*
-4. Una vez finalizado el proceso, los servicios estarán disponibles en:
-   - **Frontend (Aplicación)**: [http://localhost:5173](http://localhost:5173)
-   - **Backend (Documentación API)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-   - **PgAdmin (Gestor de BD)**: [http://localhost:5050](http://localhost:5050)
-
-
-### Inicialización de Datos (primera vez)
-
-Después de levantar los contenedores por primera vez, la base de datos 
-se crea con el esquema completo pero **sin datos**. Es necesario crear
-manualmente al usuario administrador antes de poder iniciar sesión:
+Se necesita Docker con el plugin oficial de Compose. Comprueba la instalación:
 
 ```bash
-docker exec -it trenes_backend_container python scripts/create_admin.py
+docker version
+docker compose version
 ```
 
-Esto crea el usuario admin del sistema (ver credenciales en la sección
-"Credenciales por Defecto"). Si quieres también datos de prueba
-(tramos, núcleos agrarios, etc.), corre además:
+En Windows existen dos alternativas válidas. La elección queda a consideración
+de quien instala el entorno:
+
+1. **Docker Desktop con backend WSL2.** Es la opción con interfaz gráfica y
+   administración integrada. Debe habilitarse la integración con la
+   distribución WSL que contiene el repositorio.
+2. **Docker Engine instalado directamente dentro de WSL2, sin Docker
+   Desktop.** Ofrece un flujo muy parecido a Linux nativo y menor integración
+   gráfica. Requiere habilitar `systemd` en WSL2 e instalar Engine, Buildx y el
+   plugin Compose desde el repositorio oficial de Docker.
+
+No es necesario instalar ambas opciones. Si se usa Docker Engine dentro de
+WSL2, todos los comandos Docker deben ejecutarse en la terminal de esa
+distribución. Consulta las guías oficiales:
+
+- [Docker Desktop para Windows](https://docs.docker.com/desktop/setup/install/windows-install/)
+- [Docker Engine para Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+- [Docker Engine después de la instalación](https://docs.docker.com/engine/install/linux-postinstall/)
+
+En Linux nativo se recomienda Docker Engine. No se recomienda ejecutar Docker
+permanentemente como `root`; agrega el usuario al grupo `docker` siguiendo la
+guía oficial.
+
+### Ubicación recomendada en WSL2
+
+Clona el repositorio dentro del sistema de archivos Linux:
 
 ```bash
-docker exec -it trenes_backend_container python scripts/seed_mock.py
+mkdir -p ~/proyectos
+cd ~/proyectos
+git clone <URL_DEL_REPOSITORIO>
+cd Software-PA
 ```
 
-**Nota**: `seed_mock.py` requiere que el usuario admin (ID 1) ya exista,
-así que siempre corre `create_admin.py` primero.
+Una ruta bajo `/home` ofrece mejor rendimiento para bind mounts, hot reload e
+`inotify` que `/mnt/c`. Desde VS Code para Windows, instala la extensión WSL y
+abre el proyecto desde Ubuntu con `code .`.
 
+## Configuración
 
-### Comandos Útiles (Docker)
-Si necesitas administrar el entorno o diagnosticar algún problema, puedes usar estos comandos en la terminal (desde la raíz del proyecto):
-- **Ver los logs en tiempo real:** `docker-compose logs -f`
-- **Detener los servicios sin borrar datos:** `docker-compose stop`
-- **Apagar servicios por completo:** `docker-compose down`
-- **Reiniciar base de datos desde cero (borrar volúmenes):** `docker-compose down -v`
+Desde la raíz del repositorio:
 
-### Credenciales por Defecto
-- **PgAdmin**: `fredy0505.sanchez@gmail.com` / `L3cl3rc1614sf90`
-- **Base de Datos**: Usuario: `alfredo` / Password: `L3cl3rc1614+` / DB: `db_trenes` / Host: `db`
-- **Sistema (Admin)**: `admin@sistema.com` / `Admin123!`
+```bash
+cp .env.example .env
+```
 
-## Reglas de Colaboración (IMPORTANTE)
-- No trabajar directo en la rama `main`.
-- Cada rama debe tener su tarea específica (ej. `feature/nombre-tarea`).
-- Los commits deben seguir convenciones ordenadas (`feat:`, `fix:`, `docs:`, etc.).
-- Documentar en la carpeta `docs/` cada decisión importante de diseño.
+Edita `.env` y reemplaza todos los valores que comienzan con `change_me`.
+Genera `SECRET_KEY`, por ejemplo, con:
 
-## Creado por
+```bash
+openssl rand -hex 32
+```
+
+El archivo `.env` contiene secretos, está ignorado por Git y no debe
+confirmarse. Comprueba antes de iniciar:
+
+```bash
+docker compose config --quiet
+```
+
+Compose detendrá la validación si falta una variable obligatoria.
+
+Si ya existe un volumen `postgres_data`, configura inicialmente `DB_USER`,
+`DB_PASSWORD` y `DB_NAME` con los valores que usa esa base. Las variables
+`POSTGRES_*` solo crean el rol y la base durante la primera inicialización del
+volumen; cambiarlas después no actualiza PostgreSQL. Consulta el procedimiento
+de rotación segura en [docs/migraciones.md](docs/migraciones.md).
+
+## Desarrollo
+
+`docker-compose.override.yml` se carga automáticamente. Mantiene los bind
+mounts y el hot reload del backend y frontend:
+
+```bash
+docker compose up -d --build
+docker compose ps
+docker compose logs -f
+```
+
+Servicios disponibles:
+
+- Frontend: <http://localhost:5173>
+- API y documentación: <http://localhost:8000/docs>
+- PgAdmin: <http://localhost:5050>
+- PostgreSQL para herramientas locales: `localhost:5433`
+
+Los puertos se publican únicamente en `127.0.0.1`. Pueden cambiarse en `.env`.
+
+## Ejecución sin bind mounts
+
+La configuración `docker-compose.prod.yml` construye un frontend estático con
+Nginx y ejecuta el backend sin hot reload:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Esta variante es útil para validar imágenes inmutables. Antes de un despliegue
+expuesto a Internet todavía deben definirse TLS, gestión externa de secretos,
+respaldos y una política de publicación de puertos.
+
+Para detener esta variante usa los mismos archivos:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+```
+
+## Base de datos, migraciones y datos iniciales
+
+La migración `001_init_schema.sql` se ejecuta automáticamente **solo cuando el
+volumen de PostgreSQL está vacío**. Una instalación nueva requiere después
+crear el usuario técnico y aplicar la migración `004`.
+
+La secuencia exacta, las comprobaciones para bases existentes y los comandos de
+respaldo están documentados en [docs/migraciones.md](docs/migraciones.md).
+
+Resumen para una instalación nueva:
+
+```bash
+docker compose up -d --build db backend
+docker compose exec backend python scripts/create_admin.py
+docker compose exec -T db sh -lc \
+  'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  < backend/db/migrations/004_adaptaciones_fase2.sql
+docker compose up -d
+```
+
+Los datos de prueba son opcionales y deben cargarse después del administrador:
+
+```bash
+docker compose exec backend python scripts/seed_mock.py
+```
+
+Las credenciales no se documentan en el repositorio. PgAdmin y PostgreSQL usan
+los valores definidos localmente en `.env`. Antes de ejecutar
+`scripts/create_admin.py` en un entorno compartido, revisa y sustituye las
+credenciales de desarrollo que actualmente define ese script.
+
+## Operación diaria
+
+```bash
+# Iniciar o actualizar servicios
+docker compose up -d
+
+# Estado y salud
+docker compose ps
+
+# Logs de todos los servicios o de uno
+docker compose logs -f
+docker compose logs -f backend
+
+# Reconstruir únicamente backend y scheduler, que comparten imagen
+docker compose build backend alertas_scheduler
+docker compose up -d backend alertas_scheduler
+
+# Reconstruir únicamente frontend
+docker compose up -d --build frontend
+
+# Detener sin eliminar contenedores ni datos
+docker compose stop
+
+# Eliminar contenedores y red, conservando volúmenes
+docker compose down
+```
+
+Advertencia: el siguiente comando elimina los volúmenes de PostgreSQL y
+PgAdmin. Supone pérdida de datos y configuraciones persistentes:
+
+```bash
+docker compose down -v
+```
+
+## Validación rápida
+
+```bash
+docker compose ps
+docker compose logs --tail=100 db backend alertas_scheduler frontend pgadmin
+curl --fail http://localhost:8000/
+curl --fail http://localhost:5173/
+docker compose exec db sh -lc \
+  'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+docker compose exec frontend \
+  node -e "fetch('http://backend:8000/').then(r=>{console.log(r.status);process.exit(r.ok?0:1)})"
+```
+
+Todos los servicios deben aparecer activos y saludables, sin reinicios
+constantes.
+
+## Reglas de colaboración
+
+- No trabajar directamente en la rama `main`.
+- Crear una rama por tarea, por ejemplo `feature/nombre-tarea`.
+- Usar commits descriptivos (`feat:`, `fix:`, `docs:`, entre otros).
+- Documentar en `docs/` las decisiones importantes de arquitectura.
+
+## Autores
+
 - Jonathan Ponce
 - Alfredo Cruz

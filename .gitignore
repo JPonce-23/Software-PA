@@ -19,3 +19,4 @@ Thumbs.db
 # Runtime file storage
 uploads/
 backend/uploads/
+backups/
