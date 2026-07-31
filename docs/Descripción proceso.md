@@ -56,18 +56,32 @@ Confirmación de superficie, geometría, sujetos y BDT
         ↓
 Registro de la afectación y apertura del subexpediente operativo
         ↓
-Ruta colectiva o individual
-        ↓
-Convenio y formalización registral
-        ↓
-FIFONAFE, pagos y cierre
+Clasificación de la ruta aplicable
+    ├── Expropiación directa
+    │       └── Salida terminal fuera del seguimiento de la PA
+    ├── Comunidad indígena
+    │       └── Salida terminal fuera del seguimiento de la PA
+    └── Ruta ordinaria colectiva o individual
+                ↓
+      Firma del convenio
+                ↓
+      Consolidación y seguimiento registral ante el RAN
+                ↓
+      FIFONAFE, pago de indemnización y cierre
+                ↓
+             Liberado
 ```
 
 La sensibilización no se elimina ni se reemplaza por el caminamiento. Es una
 etapa social previa. El caminamiento es una actividad técnica de campo.
 
-La secuencia anterior expresa el orden real del proceso. La navegación para el
-usuario final conserva una jerarquía más directa:
+La secuencia anterior expresa el orden obligatorio de las etapas aplicables.
+Una actuación posterior no sustituye ni presume cumplidas las anteriores.
+Expropiación directa y comunidad indígena son salidas terminales: se conserva
+su clasificación y evidencia, pero el sistema de la PA no continúa el flujo
+ordinario de convenio, RAN, FIFONAFE y pago.
+
+La navegación para el usuario final conserva una jerarquía más directa:
 
 ```text
 Proyecto
@@ -101,6 +115,22 @@ La Procuraduría Agraria registra o selecciona:
 
 La asignación de usuarios se realiza por tramo mediante `usuario_tramo`. El
 modelo vigente no utiliza Frente.
+
+La condición especial debe registrarse en el nivel al que realmente aplica:
+
+- `nucleo_agrario` cuando la condición corresponde al núcleo completo.
+- `tramo_nucleo` cuando corresponde a todo el cruce territorial.
+- `afectacion` cuando sólo una afectación colectiva o una parcela
+  individualizada sale del flujo ordinario.
+
+Una afectación marcada para expropiación directa o por comunidad indígena
+conserva sus antecedentes, observaciones, documentos y trazabilidad, pero no
+continúa hacia convenio, RAN, FIFONAFE ni pago dentro del sistema de la PA. La
+salida no equivale a liberación ni a un problema pendiente.
+
+Cuando el proyecto no afecta tierras de uso común, no se abre la ruta
+colectiva. Esto no impide continuar con afectaciones individuales sobre
+parcelas cuando existan.
 
 ### 3.2 Identificación de posibles afectaciones
 
@@ -240,11 +270,12 @@ El ciclo contempla:
 1. Sensibilización y caminamiento.
 2. Convocatorias y asamblea de anuencia.
 3. Registro del quórum y resultado.
-4. Ingreso, calificación e inscripción del acta ante el RAN.
-5. Firma del Convenio de Ocupación Previa.
-6. Captura de superficie real afectada.
-7. Captura independiente del valor de tierra y de BDT.
-8. Ingreso, calificación e inscripción del convenio ante el RAN.
+4. Confirmación y captura de la superficie real afectada.
+5. Captura independiente del valor de tierra y de BDT.
+6. Conformación del Acta de Asamblea y firma del Convenio de Ocupación Previa.
+7. Consolidación y gestión del acta y del COP.
+8. Ingreso y seguimiento ante el RAN del Acta de Asamblea y del COP colectivo.
+9. Obtención del aviso y verificación de la inscripción.
 
 ### 5.2 Variantes colectivas
 
@@ -258,16 +289,20 @@ obras_complementarias
 ```
 
 - **Modificatorio:** ajusta el convenio original y conserva su linaje.
-- **Superficie adicional:** incorpora nueva superficie y detona las
-  actuaciones que correspondan, incluida una nueva asamblea cuando aplique.
-- **Obras complementarias:** crea un ciclo relacional independiente con nueva
-  asamblea y nuevo convenio; no sobrescribe el COP original.
+- **Superficie adicional:** incorpora nueva superficie y abre un nuevo ciclo
+  de sensibilización, caminamiento, asamblea, convenio y seguimiento ante el
+  RAN.
+- **Obras complementarias:** crea un ciclo relacional independiente con
+  sensibilización, caminamiento, nueva asamblea, nuevo convenio y seguimiento
+  ante el RAN; no sobrescribe el COP original.
 
 En obras complementarias no se captura `monto_bdt`. El pago corresponde
 solamente al valor pactado por la superficie.
 
 No deben recrearse columnas paralelas con sufijos como `_2`. Cada nuevo ciclo
-se representa mediante nuevas filas relacionadas.
+se representa mediante nuevas filas relacionadas. Las actividades y asambleas
+del ciclo utilizan su `contexto_proceso`; el convenio utiliza el
+`tipo_convenio` correspondiente.
 
 ## 6. Fase 3B — Derechos individuales
 
@@ -287,7 +322,22 @@ La PA verifica:
 La negociación se realiza directamente con los titulares y no requiere una
 asamblea del núcleo para autorizar el convenio individual.
 
-### 6.1 Variantes individuales
+### 6.1 COP original individual
+
+La ruta individual contempla:
+
+1. Confirmación de la parcela, titulares, superficie y situación jurídica.
+2. Integración de la documentación disponible y faltante del subexpediente.
+3. Firma del Convenio de Ocupación Previa individual.
+4. Consolidación y gestión del COP.
+5. Ingreso y seguimiento del convenio ante el RAN.
+6. Obtención del aviso y verificación de la inscripción.
+7. Continuidad hacia FIFONAFE y el pago de indemnización.
+
+La ruta utiliza `afectacion`, `parcela`, `parcela_titular`, `convenio`,
+`tramite_fifonafe` y `pago_indemnizacion`. No requiere una asamblea de anuencia.
+
+### 6.2 Variantes individuales
 
 Los tipos permitidos son:
 
@@ -362,6 +412,46 @@ Para derechos individuales el pago se dirige al titular o beneficiario
 correspondiente. Para derechos colectivos el proceso incluye el depósito y la
 asamblea de retiro de fondos cuando proceda.
 
+### 7.4 Liberación y salidas terminales
+
+Para el flujo ordinario descrito en el flujograma de propiedad social, una
+afectación se considera liberada cuando concluyeron las etapas que le resultan
+aplicables:
+
+```text
+Convenio firmado
+        ↓
+Consolidación y seguimiento ante el RAN
+        ↓
+Aviso y verificación de inscripción
+        ↓
+Informe de no conflictos
+        ↓
+Pago de indemnización concluido
+        ↓
+Liberado
+```
+
+Los hitos intermedios deben conservarse de forma independiente:
+
+- `convenio.fecha_firma`: convenio firmado.
+- `convenio.ingreso_ran_fecha`: convenio ingresado al RAN.
+- `convenio.calificacion_registral`: resultado del seguimiento registral.
+- `convenio.convenio_inscrito_fecha_ran`: inscripción registrada.
+- `tramite_fifonafe`: informe de no conflictos e indemnización.
+- `pago_indemnizacion`: resultado financiero.
+
+El estado no sustituye esos datos ni se captura como una afirmación aislada; se
+calcula a partir de los hitos aplicables. Un `tramo_nucleo` sólo puede
+considerarse liberado cuando todas sus afectaciones activas están liberadas.
+Cuando combina afectaciones liberadas con salidas terminales debe reportarse
+como un expediente mixto, sin ocultar las afectaciones que quedaron fuera del
+seguimiento.
+
+Las afectaciones con salida por expropiación directa o comunidad indígena no
+son liberadas. Se reportan mediante un estado terminal fuera del seguimiento
+de la PA y no continúan acumulando avance ordinario.
+
 ## 8. Documentación, alertas y auditoría
 
 - La documentación puede relacionarse con núcleo, afectación, convenio u ORV.
@@ -411,6 +501,11 @@ Se debe:
 - Mostrar únicamente etapas aplicables a la vía colectiva o individual.
 - Mantener ORV como información compartida del núcleo.
 - Calcular avance legal, geoespacial y financiero por afectación.
+- Aplicar el orden obligatorio entre sensibilización, caminamiento,
+  afectación, asamblea cuando corresponda, convenio, RAN, FIFONAFE y pago.
+- Calcular el estado de liberación a partir de los hitos aplicables.
+- Detener el flujo ordinario y conservar la trazabilidad cuando una afectación
+  salga por expropiación directa o comunidad indígena.
 - Corregir el panel documental: debe admitir documentos del expediente maestro
   y documentos propios de una afectación, sin asignarlos todos
   indiscriminadamente a un solo nivel.
