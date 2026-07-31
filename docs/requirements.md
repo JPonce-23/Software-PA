@@ -2,7 +2,23 @@
 
 ## Introduction
 
-Este documento especifica los requerimientos para un sistema web multiusuario de seguimiento del proceso de liberación de derechos de vía de un proyecto ferroviario que afecta propiedad social (ejidos y comunidades) en México. El sistema reemplazará el seguimiento actual basado en Excel, proporcionando gestión centralizada de datos, tableros de control y capacidades de reporteo para múltiples actores.
+Este documento especifica los requerimientos para un sistema web multiusuario
+de seguimiento del proceso de liberación de derechos de vía de un proyecto
+ferroviario que afecta propiedad social (ejidos y comunidades) en México. El
+sistema reemplazará el seguimiento actual basado en Excel, proporcionando
+gestión centralizada de datos, tableros de control y capacidades de reporteo
+para múltiples actores.
+
+El alcance se limita a derechos colectivos e individuales de propiedad
+social. No incluye la gestión de propiedad privada, catastro, Registro Público
+de la Propiedad, procedimientos de expropiación ni procesos propios de otras
+instituciones. En expropiación directa y comunidad indígena sólo se conserva
+el marcador terminal y su trazabilidad.
+
+La fuente funcional es `flujograma propiedad social.pdf`, resumida en
+`Descripción proceso.md`. Las migraciones aplicadas determinan la estructura
+ejecutable de la base de datos; este documento define el comportamiento
+objetivo y no prueba por sí mismo que ya esté implementado.
 
 ## Glossary
 
@@ -105,9 +121,9 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 #### Criterios de Aceptación
 
-1. EL Sistema DEBERÁ permitir el registro de eventos de Sensibilización vinculados a un Núcleo_Agrario
+1. EL Sistema DEBERÁ permitir el registro de eventos de Sensibilización vinculados al contexto de un Tramo_Núcleo
 2. CUANDO se registra una Sensibilización, EL Sistema DEBERÁ capturar fecha programada y fecha realizada
-3. EL Sistema DEBERÁ permitir múltiples eventos de Sensibilización por Núcleo_Agrario
+3. EL Sistema DEBERÁ permitir múltiples eventos de Sensibilización por Tramo_Núcleo y contexto de proceso
 4. EL Sistema DEBERÁ mostrar estatus de completitud basado en si la fecha realizada está poblada
 
 
@@ -117,9 +133,9 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 #### Criterios de Aceptación
 
-1. EL Sistema DEBERÁ permitir el registro de eventos de Caminamiento vinculados a un Núcleo_Agrario
+1. EL Sistema DEBERÁ permitir el registro de eventos de Caminamiento vinculados al contexto de un Tramo_Núcleo
 2. CUANDO se registra un Caminamiento, EL Sistema DEBERÁ capturar fecha programada y fecha realizada
-3. EL Sistema DEBERÁ permitir múltiples Caminamientos por Núcleo_Agrario
+3. EL Sistema DEBERÁ permitir múltiples Caminamientos por Tramo_Núcleo y contexto de proceso
 4. EL Sistema DEBERÁ mostrar estatus de completitud basado en si la fecha realizada está poblada
 
 ### Requirement 7: Registro de Asambleas
@@ -128,11 +144,12 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 #### Criterios de Aceptación
 
-1. EL Sistema DEBERÁ permitir la creación de registros de Asamblea vinculados a un Núcleo_Agrario
+1. EL Sistema DEBERÁ permitir la creación de registros de Asamblea vinculados a una Afectación colectiva y al Tramo_Núcleo al que pertenece
 2. CUANDO se crea una Asamblea, EL Sistema DEBERÁ capturar: fecha de primera convocatoria, fecha de segunda convocatoria y fecha de realización
 3. EL Sistema DEBERÁ dar seguimiento a fecha de ingreso al RAN, número de solicitud, calificación registral y fecha de inscripción
 4. EL Sistema DEBERÁ asociar cada Asamblea con un propósito (por ejemplo, aprobación de COP, aprobación de superficie adicional o por obras complementarias)
 5. EL Sistema DEBERÁ mostrar specíficamente para la afectación de derechos colectivos que involucra al FIFONAFE, se documenta el estatus de la asamblea requerida para retirar los recursos, indicando si el trámite está "Completo", "Pendiente" o "Programado"
+6. EL Sistema NO DEBERÁ exigir ni crear Asamblea para la ruta de derechos individuales
 
 ### Requirement 8: Gestión de Convenios
 
@@ -155,6 +172,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
     - Superficie Adicional y Obras Complementarias SOLO aplican a Derechos Colectivos
     - Ampliación y Ampliación Remanente SOLO aplican a Derechos Individuales
 11. CUANDO se crea un Convenio variante (Modificatorio, Superficie Adicional, Obras Complementarias, Ampliación), EL Sistema DEBERÁ permitir vincularlo con su Convenio COP padre mediante referencia. En el caso del Modificatorio Colectivo, este puede apuntar y modificar a un `cop_original`, una `superficie_adicional` o unas `obras_complementarias`, siempre que dicho padre cuente con una Asamblea autorizadora válida.
+12. EL Sistema NO DEBERÁ permitir el ingreso de un Convenio al RAN antes de registrar su firma
 
 ### Requirement 9: Seguimiento de Indemnizaciones y FIFONAFE
 
@@ -172,6 +190,8 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 4. EL Sistema DEBERÁ dar seguimiento a informes de no conflictos a través de la cadena de oficios antes mencionada, manejando estos flujos de oficios de forma paralela y completamente independiente para afectaciones individuales y colectivas.
 5. EL Sistema DEBERÁ mostrar estatus de completitud de pago por Afectación
 6. EL Sistema DEBERÁ rechazar (mediante restricción estricta en Base de Datos) cualquier intento de marcar el estatus de Indemnización como 'Completo' si no se han capturado los cuatro números de oficio de la cadena de FIFONAFE y sus respectivas fechas.
+7. EL Sistema DEBERÁ representar el trámite de FIFONAFE y el pago para las rutas colectiva e individual, en expedientes independientes
+8. EL Sistema NO DEBERÁ permitir registrar el pago como completo antes de la conclusión registral aplicable y de los informes de no conflictos
 
 
 ### Requirement 10: Tablero de Convenios Formalizados
@@ -194,9 +214,12 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 1. EL Sistema DEBERÁ mostrar superficies liberadas para Derechos_Individuales con ubicación y metros cuadrados
 2. EL Sistema DEBERÁ mostrar superficies liberadas para Derechos_Colectivos (uso común) con ubicación y metros cuadrados
-3. CUANDO una Afectación tiene un Convenio asociado con fecha de inscripción, EL Sistema DEBERÁ clasificar esa superficie como liberada
+3. CUANDO una Afectación tiene un Convenio firmado e inscrito en el RAN, los informes de no conflictos requeridos y el pago aplicable completado, EL Sistema DEBERÁ clasificar esa superficie como liberada
 4. EL Sistema DEBERÁ calcular área total liberada por Núcleo_Agrario
 5. EL Sistema DEBERÁ permitir filtrado por Proyecto y Tramo
+6. La fecha de inscripción ante el RAN DEBERÁ representar avance registral y NO DEBERÁ, por sí sola, clasificar la superficie como liberada
+7. Una Afectación terminal por expropiación directa o comunidad indígena NO DEBERÁ contabilizarse como liberada ni pendiente del flujo ordinario
+8. Cuando un Tramo_Núcleo contenga afectaciones en estados diferentes, EL Sistema DEBERÁ mostrar un estado mixto y conservar el detalle de cada una
 
 ### Requirement 12: Visualización de Progreso por Tramo
 
@@ -286,17 +309,23 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 ### Requirement 19: Indicadores de Excepciones Operativas
 
-**Historia de Usuario:** Como operador, quiero marcar excepciones operativas en el nivel jurídico correcto: Comunidad Indígena a nivel Núcleo_Agrario, y Expropiación Directa o No Afecta Tierras de Uso Común a nivel Tramo_Núcleo, para distinguir procedimientos especiales sin reclasificar indebidamente todo el núcleo agrario.
+**Historia de Usuario:** Como operador, quiero registrar excepciones en el
+nivel donde realmente ocurren, para detener el seguimiento ordinario sin
+perder trazabilidad ni reclasificar afectaciones no involucradas.
 
 #### Criterios de Aceptación
 
-1. EL Sistema DEBERÁ permitir marcar un Tramo_Núcleo como sujeto a expropiación directa (esta bandera funciona únicamente como marcador de excepción; el sistema no rastrea el paso a paso del juicio expropiatorio).
-2. EL Sistema DEBERÁ permitir marcar un Núcleo_Agrario como Comunidad Indígena
+1. EL Sistema DEBERÁ permitir marcar un Tramo_Núcleo completo o una Afectación específica como sujeto a expropiación directa; el sistema sólo registra la salida y no rastrea el juicio expropiatorio
+2. EL Sistema DEBERÁ permitir marcar un Núcleo_Agrario completo o una Afectación específica como comunidad indígena; el sistema sólo registra la salida y no rastrea el proceso de otras instituciones
 3. EL Sistema DEBERÁ permitir indicar si El Proyecto Ferroviario No Afecta Tierras de Uso Común para un Tramo_Núcleo específico
 4. CUANDO se active alguna de estas excepciones, EL Sistema DEBERÁ mostrar un indicador visual distintivo
-5. EL Sistema DEBERÁ filtrar reportes y tableros por tipo de procedimiento (convenio vs expropiación)
-6. EL Sistema DEBERÁ registrar razón o motivo de la expropiación directa en el Tramo_Núcleo correspondiente
-7. EL Sistema DEBERÁ generar estadísticas separadas para cruces Tramo_Núcleo bajo expropiación directa, sin reclasificar automáticamente todo el Núcleo_Agrario
+5. EL Sistema DEBERÁ filtrar reportes y tableros por flujo ordinario, expropiación directa y comunidad indígena
+6. EL Sistema DEBERÁ registrar razón o motivo de la expropiación directa en el Tramo_Núcleo o la Afectación correspondiente
+7. EL Sistema DEBERÁ generar estadísticas separadas para Tramos_Núcleos y Afectaciones bajo expropiación directa, sin reclasificar automáticamente todo el Núcleo_Agrario
+8. Cuando la excepción sólo aplique a una parcela o superficie, EL Sistema DEBERÁ registrarla en la Afectación vinculada a esa parcela, no como atributo global de la parcela
+9. `fuera_seguimiento_expropiacion` y `fuera_seguimiento_comunidad_indigena` DEBERÁN ser estados terminales distintos de `liberado`, `problema` y `pendiente`
+10. Después de una salida terminal, EL Sistema DEBERÁ impedir nuevas actuaciones del flujo ordinario, pero permitirá notas, documentos y auditoría
+11. La marca “No afecta tierras de uso común” DEBERÁ impedir la ruta colectiva, pero NO DEBERÁ bloquear una afectación individual válida
 
 ### Requirement 20: Seguimiento de Obras Complementarias
 
@@ -306,7 +335,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 
 1. EL Sistema DEBERÁ soportar creación de Convenios tipo Obras Complementarias
 2. CUANDO se crea un Convenio de Obras Complementarias, EL Sistema DEBERÁ capturar superficie total real afectada
-3. EL Sistema DEBERÁ detonar un nuevo ciclo relacional completo creando registros independientes de Asamblea y Convenio para las Obras Complementarias, preservando intacto el COP original y abandonando la captura en campos paralelos duplicados.
+3. EL Sistema DEBERÁ detonar un nuevo contexto de proceso con sensibilización, caminamiento, Asamblea, Convenio, RAN, FIFONAFE y pago, preservando la Afectación y el COP originales y abandonando la captura en campos paralelos duplicados.
 4. EL Sistema DEBERÁ calcular montos específicos (90%, 100%) para Obras Complementarias
 5. EL Sistema DEBERÁ mostrar en reportes separación entre convenios COP estándar y Obras Complementarias
 
@@ -319,8 +348,9 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 1. EL Sistema DEBERÁ soportar creación de Convenios tipo Superficie Adicional
 2. CUANDO se registra Superficie Adicional, EL Sistema DEBERÁ capturar hectáreas adicionales afectadas
 3. EL Sistema DEBERÁ vincular la Superficie Adicional con el Convenio COP original
-4. EL Sistema DEBERÁ actualizar superficie total liberada al inscribirse Convenio de Superficie Adicional
+4. EL Sistema DEBERÁ actualizar la superficie registral al inscribirse el Convenio de Superficie Adicional y la superficie liberada sólo después de completar FIFONAFE y el pago aplicable
 5. EL Sistema DEBERÁ mostrar histórico de expansiones de superficie por Núcleo_Agrario
+6. EL Sistema DEBERÁ representar la Superficie Adicional como un nuevo contexto de sensibilización, caminamiento, Asamblea, Convenio, RAN, FIFONAFE y pago, sin sobrescribir el ciclo original
 
 
 ### Requirement 22: Alertas y Notificaciones de Vencimientos
@@ -344,7 +374,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 1. EL Sistema DEBERÁ capturar monto 90% para cada Convenio cuando aplique
 2. EL Sistema DEBERÁ capturar monto 100% para cada Convenio
 3. EL Sistema DEBERÁ capturar monto BDT (Bienes Distintos a la Tierra) cuando aplique
-4. EL Sistema DEBERÁ calcular monto total por Convenio sumando componentes aplicables
+4. EL Sistema DEBERÁ calcular el límite pagable como `monto_100 + monto_bdt`; `monto_90` es un anticipo incluido en `monto_100` y NO DEBERÁ sumarse nuevamente
 5. EL Sistema DEBERÁ generar reporte de montos totales comprometidos por Tramo
 
 ### Requirement 24: Búsqueda y Filtrado Avanzado
@@ -447,7 +477,7 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 2. CUANDO el usuario hace clic en un Tramo, EL Sistema DEBERÁ destacar ese Tramo y mostrar sus Tramos con colores según avance
 3. EL Sistema DEBERÁ mostrar el porcentaje de avance general del Tramo seleccionado en panel informativo
 4. CUANDO el usuario hace clic en un Tramo, EL Sistema DEBERÁ mostrar en panel lateral: porcentaje de avance total, porcentaje de superficie de uso común liberada, porcentaje de superficie de uso individual liberada
-5. CUANDO se selecciona un Tramo, EL Sistema DEBERÁ listar los Núcleos Agrarios que intersectan ese Frente
+5. CUANDO se selecciona un Tramo, EL Sistema DEBERÁ listar los Núcleos Agrarios que intersectan ese Tramo
 6. CUANDO el usuario hace clic en un Núcleo_Agrario desde la lista, EL Sistema DEBERÁ centrar el mapa en ese núcleo y abrir su ficha completa
 
 
@@ -465,6 +495,36 @@ Este documento especifica los requerimientos para un sistema web multiusuario de
 5. SI el sistema de coordenadas no se puede detectar, ENTONCES EL Sistema DEBERÁ solicitar al Geógrafo que lo especifique manualmente
 6. CUANDO se completa la importación, EL Sistema DEBERÁ mostrar resumen de geometrías importadas: número de elementos, tipo de geometría y sistema de coordenadas
 7. EL Sistema DEBERÁ validar que las geometrías importadas sean del tipo correcto (líneas para Tramos, polígonos para Núcleos Agrarios)
+
+### Requirement 37: Secuencia obligatoria y estado del proceso
+
+**Historia de Usuario:** Como responsable del seguimiento, quiero que el
+sistema respete la secuencia del flujograma y derive el estado con evidencia,
+para evitar expedientes adelantados o cierres manuales inconsistentes.
+
+#### Criterios de Aceptación
+
+1. EL Sistema DEBERÁ exigir una Sensibilización realizada en el mismo
+   Tramo_Núcleo y contexto de proceso antes de completar un Caminamiento.
+2. EL Sistema DEBERÁ exigir un Caminamiento realizado antes de crear una
+   Afectación confirmada.
+3. Para una Afectación colectiva, EL Sistema DEBERÁ exigir una Asamblea con
+   resultado aprobatorio antes del Convenio.
+4. Para una Afectación individual, EL Sistema DEBERÁ exigir parcela y
+   titulares válidos, y NO DEBERÁ insertar una Asamblea en la secuencia.
+5. EL Sistema DEBERÁ exigir firma de Convenio antes de su ingreso al RAN e
+   ingreso al RAN antes de su inscripción.
+6. EL Sistema DEBERÁ exigir la conclusión registral aplicable antes del
+   trámite de FIFONAFE, y los informes de no conflictos antes del pago.
+7. EL Sistema DEBERÁ derivar por Afectación estados separados de avance
+   operativo, registral, financiero y terminal; el estado no deberá depender
+   de una selección manual sin evidencia.
+8. EL Sistema DEBERÁ clasificar una Afectación como `liberada` sólo después de
+   completar el pago aplicable.
+9. CUANDO se registre expropiación directa o comunidad indígena, EL Sistema
+   DEBERÁ detener la secuencia ordinaria para el alcance afectado.
+10. EL Sistema DEBERÁ agregar los estados por Tramo_Núcleo, Tramo y Proyecto
+    sin ocultar afectaciones pendientes, liberadas o terminales.
 
 
 ---
@@ -574,7 +634,11 @@ El sistema debe documentar y rastrear el estado esperado en cada fase del proces
 5. **Asamblea**: Obtención de anuencias y aprobaciones formales cuando corresponda.
 6. **Convenio**: Firma del acuerdo (COP, modificatorio, etc.) con sus respectivos montos.
 7. **RAN**: Ingreso e inscripción de las actas de asamblea y convenios.
-8. **FIFONAFE**: (Para colectivos) Trámite de retiro de fondos y pago de indemnización a través de la cadena de oficios.
+8. **FIFONAFE y pago**: Trámite e indemnización para los expedientes colectivos e individuales.
+9. **Liberado**: Cierre derivado después del pago aplicable.
+
+Expropiación directa y comunidad indígena interrumpen esta secuencia y quedan
+registradas como salidas terminales fuera del seguimiento ordinario.
 
 ### Consideraciones Geoespaciales
 
@@ -590,6 +654,7 @@ El sistema debe manejar:
 
 El sistema debe calcular automáticamente:
 - Superficie afectada por Tramo mediante intersección geométrica con Núcleos Agrarios
-- Superficie liberada por Tramo basada en Convenios inscritos en RAN
+- Superficie con avance registral por Tramo basada en Convenios inscritos en RAN
+- Superficie liberada por Tramo basada en Afectaciones con pago aplicable completado
 - Porcentajes de avance distinguiendo entre uso común e individual
 - Validación de consistencia entre superficies calculadas geométricamente y superficies registradas administrativamente

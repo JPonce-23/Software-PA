@@ -4,6 +4,21 @@
 
 Este documento presenta el diseño técnico de un sistema web multiusuario para el seguimiento del proceso de liberación de derechos de vía de proyectos ferroviarios que afectan propiedad social (ejidos y comunidades) en México. El sistema reemplaza el actual seguimiento basado en Excel, proporcionando gestión centralizada de datos, control de acceso basado en roles, tableros de control en tiempo real, visualización geográfica interactiva y capacidades completas de reporteo.
 
+> **Estado y autoridad del documento.** La fuente funcional es `flujograma
+> propiedad social.pdf`, resumida en `Descripción proceso.md`; el esquema
+> ejecutable se determina exclusivamente por las migraciones aplicadas. Este
+> documento conserva ejemplos conceptuales e históricos de una etapa anterior
+> —incluidos fragmentos con `Frente`, contratos TypeScript y pruebas
+> hipotéticas— que no describen necesariamente el código vigente. Para el
+> Corte 2 sólo son normativas las secciones marcadas como diseño objetivo y el
+> alcance de `ESTADO_PROYECTO.md`; los ejemplos históricos no deben copiarse ni
+> ejecutarse.
+
+El alcance funcional actual es exclusivamente propiedad social, tanto
+derechos colectivos como individuales. No se modela la gestión de propiedad
+privada, catastro, Registro Público de la Propiedad, juicio expropiatorio ni
+procesos propios de otras instituciones.
+
 **Objetivos Principales:**
 - Centralizar el seguimiento de liberación de derechos de vía en una base de datos relacional con capacidades geoespaciales
 - Proporcionar acceso concurrente a múltiples usuarios con control basado en roles (incluyendo rol de Geógrafo para gestión cartográfica)
@@ -20,9 +35,11 @@ Este documento presenta el diseño técnico de un sistema web multiusuario para 
 El sistema gestiona el proceso legal y administrativo de liberación de derechos de vía para proyectos ferroviarios en México. Este proceso involucra:
 
 **Entidades Territoriales:**
+- **Proyectos**: Contenedores de los tramos ferroviarios
 - **Tramos**: Segmentos principales del proyecto ferroviario con representación geométrica (líneas)
-- **Frentes**: Subdivisiones de los tramos con geometrías lineales propias
+- **Tramo_Núcleo**: Cruce de un tramo con un núcleo agrario y expediente maestro territorial
 - **Núcleos Agrarios**: Ejidos y comunidades (entidades de propiedad social) afectados por el proyecto, representados como polígonos georreferenciados
+- **Afectaciones**: Subexpedientes confirmados, colectivos o individuales, dentro de un Tramo_Núcleo
 
 **Procesos Documentales:**
 - **Sensibilización**: Reuniones de concientización con las comunidades
@@ -82,10 +99,10 @@ específicas, sin duplicar ni trasladar automáticamente la información común.
 - Cada subexpediente se **bifurca** según el tipo de derecho:
 
 **Fase 3A: Matriz de Derechos Colectivos (Uso Común)**
-- **COP Original**: Asamblea anuencia → Firma → Inscripción RAN (acta y convenio)
+- **COP Original**: Asamblea de anuencia → Firma → Inscripción RAN (acta y convenio)
 - **Modificatorio**: Ajustes al COP original (montos, superficie)
 - **Superficie Adicional**: Nueva asamblea + nuevo ciclo RAN para superficie descubierta posteriormente
-- **Obras Complementarias**: **Nuevo ciclo completo** (asamblea + RAN) modelado como registros independientes de Asamblea y Convenio vinculados al mismo Tramo_Núcleo, preservando intacto el COP original
+- **Obras Complementarias**: **Nuevo contexto completo** con las etapas aplicables, modelado mediante registros independientes y preservando intacto el COP original
 
 **Fase 3B: Matriz de Derechos Individuales (Parcelas)**
 - **COP Original**: Negociación directa con el titular → Firma → Inscripción RAN
@@ -95,9 +112,19 @@ específicas, sin duplicar ni trasladar automáticamente la información común.
 
 **Fase 4: Matriz FIFONAFE e Informes de No Conflictos**
 - Cadena de oficios interinstitucionales (FIFONAFE ↔ DGAOPR ↔ PA)
-- Dispersión de fondos:
-  - **Individuales**: Pago directo al titular
-  - **Colectivos**: Depósito en FIFONAFE → Asamblea de retiro de fondos → Distribución
+- Seguimiento independiente para afectaciones colectivas e individuales
+- Pago de la indemnización aplicable
+- **Liberado** se deriva después del pago; la inscripción ante el RAN sólo
+  representa avance registral
+
+**Salidas terminales fuera del seguimiento ordinario**
+- **Expropiación directa**: se registra el supuesto y se detiene el flujo
+  gestionado por la PA
+- **Comunidad indígena**: se registra el supuesto y se detiene el flujo
+  gestionado por la PA
+- La salida puede abarcar todo el expediente maestro o sólo una afectación.
+  En este último caso las demás afectaciones continúan y el agregado se
+  presenta como mixto.
 
 **Puntos Críticos del Flujo**:
 1. Las tierras de uso común (colectivas) son **inalienables** - requieren asamblea obligatoriamente
@@ -112,7 +139,7 @@ El sistema sigue una arquitectura de tres capas con extensiones geoespaciales:
 ```
 ┌──────────────────────────────────────────────────────┐
 │            Capa de Presentación                      │
-│   (Aplicación Web Responsiva - React/Vue)            │
+│   (Aplicación Web Responsiva - React 19)              │
 │   - Mapa Interactivo (Leaflet.js)                    │
 │   - Herramientas de Dibujo Geográfico                │
 │   - Paneles de Información Contextual                │
@@ -121,7 +148,7 @@ El sistema sigue una arquitectura de tres capas con extensiones geoespaciales:
                       ↓
 ┌──────────────────────────────────────────────────────┐
 │            Capa de Aplicación                        │
-│  (REST API - Node.js/Express o Python/FastAPI)       │
+│  (REST API - Python/FastAPI)                         │
 │  - Servicios de Negocio                              │
 │  - Servicio GIS (Transformación de Coordenadas)      │
 │  - Motor de Cálculos Geoespaciales                   │
@@ -304,7 +331,7 @@ interface Municipio {
 }
 ```
 
-### Módulo de Gestión Territorial (Tramos y Frentes)
+### Módulo de Gestión Territorial (Proyecto, Tramo y Tramo_Núcleo)
 
 ```typescript
 interface TerritorialService {
@@ -331,6 +358,7 @@ interface UsuarioTramo {
 
 interface Tramo {
   id_tramo: number // PK SERIAL
+  id_proyecto: number // FK a Proyecto
   clave_tramo: string
   nombre_tramo: string
   descripcion: string | null
@@ -652,14 +680,23 @@ deben vincularse directamente con un subexpediente concreto.
 
 El esquema SQL ejecutable y vigente se mantiene exclusivamente en:
 
-- `backend/db/migrations/001_init_schema.sql` para instalaciones nuevas.
-- `backend/db/migrations/003_add_proyecto_drop_frente.sql` para actualizar instalaciones previas.
+- `backend/db/migrations/001_init_schema.sql`, como línea base.
+- `backend/db/migrations/002_apply_audit_fixes.sql`, como correcciones de
+  integridad y auditoría.
+- `backend/db/migrations/003_add_proyecto_drop_frente.sql`, que incorpora
+  Proyecto y retira Frente.
+- `backend/db/migrations/004_adaptaciones_fase2.sql`, que agrega las
+  adaptaciones estructurales posteriores.
 
 Este documento describe decisiones de arquitectura; no es fuente ejecutable del esquema.
 
 ### Vistas de Base de Datos
 
-Las vistas integran el cálculo espacial y las relaciones del esquema final (usando `vw_dashboard_liberacion` y dependencias) para proveer datos a los tableros de control.
+Las vistas ejecutables deben consultarse en las migraciones aplicadas. Los
+fragmentos SQL que siguen son referencias históricas: los ejemplos de
+`vw_tramo_nucleo_estado` y `vw_dashboard_liberacion` todavía contienen
+`id_frente` y equiparan inscripción ante el RAN con liberación, por lo que no
+representan el diseño objetivo ni deben ejecutarse.
 
 **Vista: vw_convenio_estado**
 Calcula el estado del flujo de trabajo de cada convenio basado en fechas clave.
@@ -817,6 +854,27 @@ LEFT JOIN (
 LEFT JOIN AgrupacionLiberada al ON al.id_tramo_nucleo = v.id_tramo_nucleo;
 ```
 
+#### Diseño objetivo de estados para el Corte 2
+
+Las vistas nuevas o reconstruidas deberán partir de `Proyecto → Tramo →
+Tramo_Núcleo → Afectación`, sin `Frente`, y separar estas dimensiones:
+
+```text
+estado_operativo   sensibilización, caminamiento, afectación y asamblea
+estado_registral   borrador, firmado, ingresado_ran, inscrito_ran
+estado_financiero  pendiente_fifonafe, listo_pago, pagado
+estado_terminal    ordinario, fuera_seguimiento_expropiacion,
+                   fuera_seguimiento_comunidad_indigena
+estado_liberacion  pendiente, en_proceso, liberado, no_aplica_terminal
+```
+
+Una afectación ordinaria sólo será `liberada` cuando exista evidencia del pago
+aplicable. La inscripción ante el RAN alimenta `estado_registral`, pero no
+cierra `estado_liberacion`. El estado de Tramo_Núcleo será una agregación que
+puede ser mixta y nunca deberá ocultar afectaciones terminales. El SQL exacto
+se definirá en la propuesta de migración expansiva y no forma parte de este
+ajuste documental.
+
 ## Reglas de Negocio Implementadas en Base de Datos
 
 Esta sección documenta las reglas de negocio críticas que se implementan mediante CHECK constraints en PostgreSQL para garantizar integridad de datos desde la capa de persistencia. Estas reglas provienen directamente del proceso descrito en `Descripción proceso.md` (fuente de verdad).
@@ -867,7 +925,9 @@ CONSTRAINT chk_bdt_no_obras_complementarias CHECK (
 )
 ```
 
-**Justificación**: Las obras complementarias tienen una naturaleza distinta donde no se evalúan Bienes Distintos a la Tierra (BDT) en el avalúo. Esta restricción previene la captura errónea de montos BDT que no deberían existir en este tipo de convenio.
+**Justificación**: En el alcance funcional vigente, las obras complementarias
+no capturan `monto_bdt`. Esta restricción previene registrar un componente
+económico que no corresponde, sin modelar inventarios ni procesos de avalúo.
 
 **Nota de Implementación**: Esta validación se realiza en base de datos para garantizar integridad incluso si múltiples aplicaciones o scripts acceden directamente a la BD.
 
@@ -1042,8 +1102,14 @@ Esta sección documenta decisiones arquitectónicas clave relacionadas con las r
 **5. Trazabilidad Determinista del Quórum (id_padron)**:
 - Se añadió explícitamente una llave foránea `id_padron` en la tabla `asamblea`. Aunque el sistema podría derivar el padrón cruzando la fecha de la asamblea con la fecha del padrón, esta llave foránea asegura inmutabilidad jurídica. Hace que cada acta de asamblea esté unida irrefutablemente a una versión histórica del censo de población para probar la legalidad del quórum.
 
-**6. Excepciones Operativas Reforzadas mediante Triggers**:
-- Las banderas booleanas para excepciones como `es_expropiacion` y `proyecto_no_afecta_uso_comun` ahora actúan como validadores absolutos en el motor de base de datos a través de *Triggers* automáticos (`fn_validar_convenio_expropiacion`, `fn_validar_afectacion_uso_comun`). Si un tramo-núcleo es forzado a juicio expropiatorio (fracasa el acuerdo), se bloqueará inmediatamente cualquier intento de crear convenios conciliatorios, previniendo estados inconsistentes.
+**6. Excepciones Operativas — implementación parcial y diseño objetivo**:
+- La base vigente contiene banderas en `nucleo_agrario` y `tramo_nucleo`, y
+  triggers que bloquean sólo parte de las operaciones incompatibles. Esto no
+  implementa todavía una salida terminal completa ni permite clasificar una
+  sola afectación. El Corte 2 deberá representar, cuando sea necesario, la
+  excepción en `afectacion`, bloquear todas las etapas ordinarias posteriores
+  y conservar únicamente notas, documentos y auditoría. La marca “No afecta
+  tierras de uso común” bloqueará sólo la ruta colectiva.
 
 ---
 
@@ -1135,7 +1201,10 @@ Según el stakeholder y el documento `Descripción proceso.md`, la distinción e
 
 *Una propiedad es una característica o comportamiento que debe ser cierto en todas las ejecuciones válidas de un sistema—esencialmente, una declaración formal sobre lo que el sistema debe hacer. Las propiedades sirven como puente entre las especificaciones legibles por humanos y las garantías de correctness verificables por máquinas.*
 
-Basándose en el análisis de prework de los 25 requerimientos, se han identificado las siguientes propiedades universales que deben cumplirse. Estas propiedades son adecuadas para property-based testing dado que el sistema gestiona lógica de negocio compleja con reglas de validación, cálculos y relaciones que deben mantenerse consistentes a través de todas las entradas válidas.
+Las propiedades de esta sección son un inventario histórico y requieren
+reescritura contra los requisitos vigentes antes de convertirse en pruebas.
+Toda referencia a `Frente`, cascadas físicas o liberación por simple
+inscripción RAN queda invalidada por el modelo actual.
 
 ### Property 1: Integridad Referencial de Autorizaciones
 
@@ -1159,16 +1228,17 @@ Basándose en el análisis de prework de los 25 requerimientos, se han identific
 - Verificar que intentar crear un Tramo con clave existente resulte en error
 - Validar que la consulta de todos los Tramos no contiene duplicados de clave
 
-### Property 3: Cardinalidad de Relación Tramo-Frente
+### Property 3: Cardinalidad de Proyecto y Tramo
 
-*Para cualquier* Tramo, el sistema debe permitir la asociación de cero o más Frentes, y cada Frente debe estar asociado exactamente a un Tramo válido.
+*Para cualquier* Proyecto, el sistema debe permitir uno o más Tramos activos,
+y cada Tramo debe estar asociado exactamente a un Proyecto válido.
 
 **Validates: Requirements 2.2, 2.4**
 
 **Estrategia de Implementación:**
-- Generar Tramos aleatorios con cantidades variables de Frentes (0 a N)
-- Para cada Frente creado, verificar que `tramoId` referencia un Tramo existente
-- Validar que eliminar un Tramo elimina sus Frentes asociados (cascada)
+- Generar Proyectos con cantidades variables de Tramos
+- Para cada Tramo, verificar que `id_proyecto` referencia un Proyecto existente
+- Validar la baja lógica y la restricción de padres con hijos activos
 
 ### Property 4: Validación Condicional de Afectaciones Individuales
 
@@ -1214,8 +1284,8 @@ Basándose en el análisis de prework de los 25 requerimientos, se han identific
 **Validates: Requirements 12.3, 12.4**
 
 **Estrategia de Implementación:**
-- Generar pares aleatorios de Frentes y Núcleos Agrarios
-- Si `ST_Intersects(frente, nucleo)` es verdadero, verificar que `ST_Intersects(nucleo, frente)` también es verdadero
+- Generar pares aleatorios de Tramos y Núcleos Agrarios
+- Si `ST_Intersects(tramo, nucleo)` es verdadero, verificar que `ST_Intersects(nucleo, tramo)` también es verdadero
 - Validar que el área de intersección es consistente sin importar el orden
 
 ### Property 8: Validación de Requisitos de Convenio según Tipo
@@ -1232,7 +1302,9 @@ Basándose en el análisis de prework de los 25 requerimientos, se han identific
 
 ### Property 9: Progresión de Estados de Convenio
 
-*Para cualquier* Convenio, la transición de estados debe seguir el flujo válido: Borrador → Firmado → Inscrito_RAN. No se permiten transiciones hacia atrás ni saltos de estados.
+*Para cualquier* Convenio, la transición registral debe seguir el flujo
+válido: Borrador → Firmado → Ingresado_RAN → Inscrito_RAN. No se permiten
+transiciones hacia atrás ni saltos de estados.
 
 **Validates: Requirements 5.5, 8.1**
 
@@ -1240,7 +1312,7 @@ Basándose en el análisis de prework de los 25 requerimientos, se han identific
 - Generar Convenios en diferentes estados
 - Intentar transicionar de Borrador a Inscrito_RAN directamente debe fallar
 - Intentar transicionar de Inscrito_RAN a Firmado (regresión) debe fallar
-- Validar que solo transiciones válidas (Borrador→Firmado, Firmado→Inscrito_RAN) sean aceptadas
+- Validar que sólo se acepten las transiciones consecutivas
 
 ### Property 10: Integridad de Auditoría
 
@@ -1279,14 +1351,18 @@ Basándose en el análisis de prework de los 25 requerimientos, se han identific
 
 ### Property 13: Validación de Excepciones Operativas
 
-*Para cualquier* Núcleo Agrario o Tramo-Núcleo, el sistema debe registrar y hacer cumplir correctamente las banderas de excepciones operativas, tales como Expropiación Directa, Comunidad Indígena y No Afecta Tierras de Uso Común, activando bloqueos de convenios según aplique.
+*Para cualquier* Núcleo Agrario, Tramo-Núcleo o Afectación, el sistema debe
+registrar y hacer cumplir Expropiación Directa, Comunidad Indígena y No Afecta
+Tierras de Uso Común en su alcance correcto.
 
 **Validates: Requirements 19.1, 19.2, 19.3, 19.4**
 
 **Estrategia de Implementación:**
-- Crear Tramo-Núcleo marcado con `es_expropiacion = true`
-- Verificar que los triggers bloquean la creación de convenios conciliatorios
-- Verificar que los reportes discriminan correctamente las banderas `comunidad_indigena` y `proyecto_no_afecta_uso_comun`
+- Crear casos terminales completos y parciales
+- Verificar que se bloqueen todas las actuaciones ordinarias posteriores
+- Verificar que notas, documentos y auditoría sigan permitidos
+- Verificar que “No afecta tierras de uso común” no bloquee la ruta individual
+- Verificar reportes mixtos sin contar terminales como liberados o pendientes
 
 ### Property 14: Trazabilidad de Oficios FIFONAFE
 
@@ -2213,6 +2289,12 @@ interface LogEntry {
 
 
 ## Testing Strategy
+
+> **Referencia histórica.** Los ejemplos de esta sección no corresponden a la
+> suite Python/React vigente y algunos todavía usan `Frente`. Para el Corte 2
+> deberán sustituirse por pruebas reales de API, servicios, PostgreSQL y
+> frontend basadas en `Proyecto → Tramo → Tramo_Núcleo → Afectación`, la
+> secuencia obligatoria, las salidas terminales y el cierre después del pago.
 
 El sistema implementa una estrategia de testing integral en múltiples niveles para garantizar correctness, confiabilidad y mantenibilidad.
 

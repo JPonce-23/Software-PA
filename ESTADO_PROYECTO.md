@@ -5,13 +5,16 @@
 > numeración de las fases operativas, los cortes principales y los subcortes de
 > Adaptaciones 2.0 significan lo mismo.
 >
-> **Fuente única vigente:** este archivo concentra el estado actual, las
-> decisiones aprobadas y el trabajo futuro. Los detalles de los subcortes A,
-> B y C ya ejecutados se conservan únicamente como registro cerrado en
+> **Fuente única de continuidad del proyecto:** este archivo concentra el
+> estado actual, las decisiones aprobadas y el trabajo futuro. La fuente
+> funcional del proceso es el flujograma de propiedad social, resumido en
+> `docs/Descripción proceso.md`; el esquema ejecutable se determina por las
+> migraciones aplicadas. Los detalles de los subcortes A, B y C ya ejecutados
+> se conservan únicamente como registro cerrado en
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
 > segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 29 de julio de 2026
+**Última actualización:** 30 de julio de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
@@ -21,9 +24,16 @@ el expediente maestro y sus subexpedientes.
 
 ## 1. Objetivo y dominio
 
-SOFTWARE-PA gestiona la liberación de derecho de vía ferroviario. Integra
-información territorial, agraria, jurídica, social, documental, financiera y
-geoespacial.
+SOFTWARE-PA gestiona el seguimiento de la liberación de derecho de vía
+ferroviario exclusivamente sobre propiedad social, para derechos colectivos e
+individuales. Integra información territorial, agraria, jurídica, social,
+documental, financiera y geoespacial.
+
+Quedan fuera del alcance funcional actual la propiedad privada, el catastro y
+el Registro Público de la Propiedad. La expropiación directa y la comunidad
+indígena tampoco son procesos gestionados por la PA: sólo se registra que una
+afectación o, cuando corresponda, el núcleo completo quedó en uno de esos
+supuestos y se detiene su seguimiento ordinario.
 
 La jerarquía territorial aprobada es:
 
@@ -110,12 +120,16 @@ método y path en `main.py` o en otro router.
 Orden recomendado para recuperar contexto:
 
 1. Este archivo.
-2. `docs/Descripción proceso.md`.
+2. El flujograma externo `flujograma propiedad social.pdf`, como fuente
+   funcional, y su resumen `docs/Descripción proceso.md`.
 3. `docs/Flujo liberacion derechos.md`.
 4. `docs/Estructura Datos.md`.
-5. `docs/requirements.md`.
-6. `docs/design.md`.
-7. Las migraciones `001`, `002`, `003` y `004` en orden.
+5. `docs/Diccionario_Datos_SSALFER.md`.
+6. `docs/requirements.md`.
+7. Las migraciones `001`, `002`, `003` y `004` en orden, como fuente del
+   esquema ejecutable.
+8. `docs/design.md`, con la advertencia de que conserva fragmentos históricos
+   y propuestas aún no implementadas.
 
 Cuando se investigue la migración 004 o las decisiones de Adaptaciones 2.0,
 consultar adicionalmente
@@ -145,6 +159,18 @@ y 4, y cualquier diferencia con este archivo se resuelve a favor de
   y una fila nuevos, con SHA-256 calculado por el servidor.
 - Una migración se aplica una sola vez y con `ON_ERROR_STOP=1`, después de un
   respaldo y sin escrituras concurrentes.
+- El flujo ordinario debe conservar esta secuencia:
+  sensibilización → caminamiento → afectación confirmada → asamblea, sólo
+  para derechos colectivos → convenio → RAN → FIFONAFE → pago → liberado.
+- Una afectación sólo está `liberada` después de completar el pago del flujo
+  aplicable. La inscripción ante el RAN es un avance registral intermedio, no
+  el cierre de liberación.
+- `expropiacion_directa` y `comunidad_indigena` son salidas terminales fuera
+  del seguimiento ordinario. No equivalen a `liberado`, `problema` ni
+  `pendiente`; después de marcarlas sólo se permiten trazabilidad, notas y
+  documentos.
+- La ausencia de tierras de uso común impide la ruta colectiva, pero no debe
+  bloquear una afectación individual válida.
 
 Regla financiera:
 
@@ -198,7 +224,9 @@ ejecución.
 No crear todavía la migración de contracción que antes se había llamado
 `005`. El Corte principal 2 puede necesitar una migración expansiva para
 distinguir datos compartidos del expediente maestro y datos propios de una
-`afectacion`.
+`afectacion`, representar salidas terminales por afectación, hacer cumplir la
+secuencia y calcular el estado de liberación sin confundirlo con la
+inscripción ante el RAN.
 
 Antes de asignar número debe definirse el diseño. La secuencia recomendada es:
 
@@ -288,6 +316,20 @@ un polígono o multipolígono válido y no vacío. Los formularios colectivo e
 individual capturan y envían esa geometría. Esta corrección no cambia la
 limitación pendiente del panel documental descrita arriba.
 
+Revalidación del repositorio realizada el 30 de julio de 2026:
+
+```text
+backend:  89 pruebas recopiladas; no se ejecutó la suite sin .env/base activa
+API:      74 rutas y 0 combinaciones de método/path duplicadas
+frontend: 0 errores y 0 advertencias de oxlint
+build:    producción exitosa usando un directorio temporal
+```
+
+El build directo sobre `frontend/dist` no pudo sobrescribir algunos assets
+propiedad del usuario `nobody`; no fue un error del código. La salida
+alternativa en `/tmp` terminó correctamente y su chunk mayor fue de 289.34
+kB. Esta revalidación no sustituye una ejecución completa contra PostgreSQL.
+
 ## 7. Estado de la base local validada
 
 El 28 de julio de 2026 la base activa local fue reiniciada de forma controlada.
@@ -307,6 +349,12 @@ Este estado sólo describe el entorno local validado. En otro equipo se debe
 consultar el esquema real; `git pull` descarga los SQL, pero no modifica
 volúmenes de PostgreSQL. Una base que sólo tiene 002 debe aplicar 003 y luego
 004, con respaldo y verificación entre ambas.
+
+En la revisión del 30 de julio no existía un archivo `.env`, por lo que no se
+volvió a consultar la base activa. Antes de diseñar o ejecutar la próxima
+migración se debe configurar el entorno local y verificar directamente
+tablas, restricciones, triggers, vistas y versiones aplicadas; no se debe
+inferir ese estado únicamente de esta nota histórica.
 
 ## 8. Plan principal vigente de cinco cortes
 
@@ -332,6 +380,13 @@ Situación actual:
   principalmente por `id_tramo_nucleo`.
 - `afectacion` ya es obligatoria en convenio y opcional en FIFONAFE, pero aún
   funciona como registro secundario de la pantalla.
+- La vista vigente `vw_tramo_nucleo_estado` clasifica expropiación como
+  `problema` y considera `liberado` cuando las afectaciones tienen convenio
+  inscrito en el RAN. Esa lógica es heredada y debe sustituirse: las salidas
+  terminales requieren estado propio y la liberación ordinaria ocurre después
+  del pago.
+- Las banderas actuales viven en `nucleo_agrario` y `tramo_nucleo`; no existe
+  todavía una salida terminal específica por `afectacion`.
 - El panel documental usa actualmente el tipo inválido `tramo_nucleo`. El
   Corte 2 debe soportar expresamente documentos compartidos del expediente
   maestro y documentos propios de una afectación.
@@ -348,11 +403,12 @@ Proyecto
                 /expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion
                 ├── antecedentes de sensibilización
                 ├── antecedentes de caminamiento y análisis
-                ├── inventario/valoración de BDT, cuando aplique
+                ├── monto, observaciones y soporte de BDT, cuando aplique
                 ├── actuaciones y minutas posteriores
                 ├── asamblea, solamente cuando corresponda
                 ├── convenio
-                ├── FIFONAFE y pagos
+                ├── RAN
+                ├── FIFONAFE y pago
                 ├── documentos
                 └── cierre
 ```
@@ -361,9 +417,9 @@ La sensibilización sigue siendo una etapa explícita previa al caminamiento.
 El caminamiento delimita superficie y geometría e identifica bienes distintos
 a la tierra. No se crea una afectación preliminar; al registrar la afectación
 confirmada, las etapas compartidas permanecen en el expediente maestro y
-quedan accesibles desde el subexpediente como antecedentes. Actualmente sólo
-existe `convenio.monto_bdt`; no hay inventario detallado de cada BDT. Antes de
-crearlo se debe confirmar el nivel de detalle requerido por usuarios.
+quedan accesibles desde el subexpediente como antecedentes. El alcance actual
+sólo conserva `convenio.monto_bdt`, observaciones y documentos de soporte; no
+incluye diseñar un inventario detallado ni un proceso de avalúo.
 
 Al diseñar el corte:
 
@@ -376,13 +432,18 @@ Al diseñar el corte:
 5. Cambiar navegación y estado para abrir afectaciones dentro de su
    `tramo_nucleo`, sin eliminar la vista maestra.
 6. Mostrar sólo las etapas aplicables al tipo colectivo o individual.
-7. Calcular avance legal, geoespacial y financiero por afectación.
+7. Hacer cumplir la secuencia obligatoria con las entidades existentes y
+   calcular avance legal, geoespacial y financiero por afectación.
 8. Migrar o vincular datos existentes sin inferir relaciones ambiguas.
 9. Añadir pruebas de aislamiento: datos de una afectación no deben aparecer
    en otra del mismo `tramo_nucleo`.
 10. Corregir el panel documental para usar
     `entidad_relacionada_tipo = 'afectacion'` e
     `entidad_relacionada_id = id_afectacion`.
+11. Representar por afectación las salidas terminales de expropiación directa
+    y comunidad indígena cuando no correspondan a todo el núcleo.
+12. Derivar `liberado` sólo después del pago y mostrar estados mixtos en el
+    expediente maestro sin ocultar afectaciones terminales.
 
 No comenzar eliminando `tramo_nucleo` ni trasladando ciegamente todas las FK a
 `afectacion`.
@@ -448,6 +509,42 @@ operativos, la migración debe ser segura para otros entornos.
 Este subcorte no incluye todavía padrón nominal, participantes de asamblea,
 firmantes de convenio ni rediseño registral; son decisiones separadas.
 
+Estado técnico observado antes de iniciar el Subcorte 2A:
+
+- La restricción actual sólo exige parcela a la afectación individual; aún no
+  prohíbe parcela en una colectiva.
+- La FK compuesta de pertenencia al mismo núcleo ya existe.
+- La validación PostgreSQL de parcela es parcial: verifica PPT, titular activo
+  y soporte o justificación registral, pero no cubre toda la regla objetivo.
+- La protección del último titular existe en el servicio, no como protección
+  completa ante escrituras directas en PostgreSQL.
+- El backend mantiene un único contrato de alta de afectación.
+- El formulario colectivo todavía expone subtipos individuales y de
+  copropiedad.
+- El formulario individual todavía captura un solo titular.
+- No están implementadas la validación mínima de dos copropietarios, la
+  restricción bidireccional, la separación de contratos ni toda su matriz de
+  pruebas.
+
+#### Subcorte 2B propuesto — Secuencia, excepciones y estado
+
+Después de reforzar colectiva/individual:
+
+1. Enlazar las etapas existentes para impedir saltos inválidos.
+2. Incorporar salidas terminales por afectación y su agregación en
+   `tramo_nucleo`.
+3. Separar progreso registral, financiero, terminal y liberación.
+4. Derivar `liberado` después del pago aplicable.
+5. Probar rutas colectiva, individual, terminal y expediente mixto.
+
+#### Subcorte 2C propuesto — Navegación y aislamiento documental
+
+1. Mantener el expediente maestro de `tramo_nucleo`.
+2. Abrir cada afectación en su propio subexpediente.
+3. Mostrar antecedentes compartidos sin duplicarlos.
+4. Aislar actuaciones, pagos y documentos propios de cada afectación.
+5. Corregir el tipo de relación inválido usado por el panel documental.
+
 ### Corte 3 — Seguridad inmediata: parcial
 
 Ya realizado:
@@ -455,14 +552,14 @@ Ya realizado:
 - Handler global sin fuga de `str(exc)`.
 - Registro interno de excepciones.
 - Escape de valores en popups de `Mapa.jsx` para mitigar XSS.
+- `docker-compose.yml` consume variables obligatorias del entorno.
+- Existe `.env.example` sin secretos reales y `.env` está ignorado por Git.
 
 Pendiente:
 
-- Quitar secretos literales de `docker-compose.yml`.
-- Consumir un `.env` local ignorado por Git.
-- Mantener `.env.example` sin secretos reales.
 - Rotar credenciales y `SECRET_KEY` que ya estuvieron en commits.
-- Documentar configuración y recuperación.
+- Crear el `.env` local de cada entorno y documentar configuración y
+  recuperación.
 
 No copiar las credenciales actuales a documentación nueva.
 
@@ -561,13 +658,16 @@ La siguiente tarea no es crear Proyecto ni repetir Adaptaciones 2.0.
 Antes de implementar el Corte principal 2:
 
 1. Leer los documentos indicados en la sección 3.
-2. Auditar modelos, FK, endpoints y pantallas que hoy usan
+2. Confirmar que requisitos y diseño respetan el flujograma de propiedad
+   social, las salidas terminales y la definición de `liberado`.
+3. Configurar el entorno y verificar el esquema real de la base activa.
+4. Auditar modelos, FK, endpoints y pantallas que hoy usan
    `id_tramo_nucleo`.
-3. Presentar una matriz entidad por entidad indicando si debe quedar en
+5. Presentar una matriz entidad por entidad indicando si debe quedar en
    `tramo_nucleo`, vincularse a `afectacion` o ser compartida.
-4. Proponer la migración expansiva, contratos API, rutas de frontend y plan de
+6. Proponer la migración expansiva, contratos API, rutas de frontend y plan de
    compatibilidad.
-5. No editar ni ejecutar una migración hasta validar esa propuesta con el
+7. No editar ni ejecutar una migración hasta validar esa propuesta con el
    usuario.
 
 El Subcorte 2A ya tiene alcance funcional aprobado en la sección 8, pero su
