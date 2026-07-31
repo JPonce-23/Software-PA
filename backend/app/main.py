@@ -18,6 +18,7 @@ from . import models, schemas
 from fastapi.security import OAuth2PasswordRequestForm
 from . import auth
 from .routers import alertas, documentos, minutas, pagos, personas
+from .services import afectaciones as afectaciones_service
 
 
 app = FastAPI(
@@ -494,6 +495,15 @@ def generar_reporte_resumen(db: Session = Depends(get_db), current_user: models.
     }
 
 # ==================== AFECTACIONES ==================== #
+def afectacion_response(db: Session, afectacion: models.Afectacion):
+    response = afectacion.__dict__.copy()
+    response["geometria_wkt"] = db.query(
+        models.Afectacion.geometria_afectacion.ST_AsText()
+    ).filter(
+        models.Afectacion.id_afectacion == afectacion.id_afectacion).scalar()
+    return response
+
+
 @app.get("/api/afectaciones", tags=["Afectaciones"], summary="Listar afectaciones", response_model=List[schemas.AfectacionResponse])
 def list_afectaciones(skip: int = 0, limit: int = 100, id_tramo_nucleo: int = Query(None), tipo_afectacion: str = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     query = db.query(
@@ -512,6 +522,40 @@ def list_afectaciones(skip: int = 0, limit: int = 100, id_tramo_nucleo: int = Qu
         results.append(resp)
     return results
 
+
+@app.post(
+    "/api/afectaciones/colectivas",
+    tags=["Afectaciones"],
+    summary="Crear afectación colectiva",
+    response_model=schemas.AfectacionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_afectacion_colectiva(
+    afectacion: schemas.AfectacionColectivaCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo'])),
+):
+    validate_wkt(db, afectacion.geometria_wkt, {"ST_Polygon", "ST_MultiPolygon"})
+    creada = afectaciones_service.crear_colectiva(db, afectacion, current_user.id_usuario)
+    return afectacion_response(db, creada)
+
+
+@app.post(
+    "/api/afectaciones/individuales",
+    tags=["Afectaciones"],
+    summary="Crear afectación individual",
+    response_model=schemas.AfectacionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_afectacion_individual(
+    afectacion: schemas.AfectacionIndividualCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo'])),
+):
+    validate_wkt(db, afectacion.geometria_wkt, {"ST_Polygon", "ST_MultiPolygon"})
+    creada = afectaciones_service.crear_individual(db, afectacion, current_user.id_usuario)
+    return afectacion_response(db, creada)
+
 @app.post("/api/afectaciones", tags=["Afectaciones"], summary="Crear afectación", response_model=schemas.AfectacionResponse, status_code=status.HTTP_201_CREATED)
 def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
@@ -526,18 +570,18 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
     if tramo_nucleo_db.id_nucleo != afectacion.id_nucleo:
         raise HTTPException(status_code=400, detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.")
     
+    # Compatibilidad temporal: el contrato genérico conserva consumidores
+    # existentes, pero aplica las mismas reglas de separación de 2A.
+    if afectacion.tipo_afectacion == 'colectivo' and afectacion.id_parcela is not None:
+        raise HTTPException(status_code=400, detail="Una afectación colectiva no usa parcela normalizada.")
+
     # Validación: Individual requiere parcela y la parcela debe pertenecer al mismo núcleo
     if afectacion.tipo_afectacion == 'individual':
         if not afectacion.id_parcela:
             raise HTTPException(status_code=400, detail="Una afectación individual requiere id_parcela")
-        parcela_db = db.query(models.Parcela).filter(
-            models.Parcela.id_parcela == afectacion.id_parcela,
-            models.Parcela.activo == True
-        ).first()
-        if not parcela_db:
-            raise HTTPException(status_code=404, detail="La Parcela especificada no existe.")
-        if parcela_db.id_nucleo != afectacion.id_nucleo:
-            raise HTTPException(status_code=400, detail="Inconsistencia: La Parcela no pertenece al NucleoAgrario especificado.")
+        afectaciones_service.validar_parcela_individual(
+            db, afectacion.id_parcela, afectacion.id_nucleo
+        )
         
     data = afectacion.model_dump()
     wkt = data.pop("geometria_wkt", None)
@@ -552,13 +596,53 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
     db.add(db_afectacion)
     db.commit()
     db.refresh(db_afectacion)
-    resp = db_afectacion.__dict__.copy()
-    resp["geometria_wkt"] = db.query(
-        models.Afectacion.geometria_afectacion.ST_AsText()
-    ).filter(
-        models.Afectacion.id_afectacion == db_afectacion.id_afectacion
-    ).scalar()
-    return resp
+    return afectacion_response(db, db_afectacion)
+
+@app.put(
+    "/api/afectaciones/colectivas/{id_afectacion}",
+    tags=["Afectaciones"],
+    summary="Actualizar afectación colectiva",
+    response_model=schemas.AfectacionResponse,
+)
+def update_afectacion_colectiva(
+    id_afectacion: int,
+    data: schemas.AfectacionColectivaUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo'])),
+):
+    afectacion = get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
+    if afectacion.tipo_afectacion != 'colectivo':
+        raise HTTPException(status_code=409, detail="La afectación no corresponde a la ruta colectiva.")
+    if data.geometria_wkt is not None:
+        validate_wkt(db, data.geometria_wkt, {"ST_Polygon", "ST_MultiPolygon"})
+    actualizada = afectaciones_service.actualizar_afectacion(
+        db, afectacion, data, current_user.id_usuario
+    )
+    return afectacion_response(db, actualizada)
+
+
+@app.put(
+    "/api/afectaciones/individuales/{id_afectacion}",
+    tags=["Afectaciones"],
+    summary="Actualizar afectación individual",
+    response_model=schemas.AfectacionResponse,
+)
+def update_afectacion_individual(
+    id_afectacion: int,
+    data: schemas.AfectacionIndividualUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo'])),
+):
+    afectacion = get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
+    if afectacion.tipo_afectacion != 'individual':
+        raise HTTPException(status_code=409, detail="La afectación no corresponde a la ruta individual.")
+    if data.geometria_wkt is not None:
+        validate_wkt(db, data.geometria_wkt, {"ST_Polygon", "ST_MultiPolygon"})
+    actualizada = afectaciones_service.actualizar_afectacion(
+        db, afectacion, data, current_user.id_usuario
+    )
+    return afectacion_response(db, actualizada)
+
 
 @app.put("/api/afectaciones/{id_afectacion}", tags=["Afectaciones"], summary="Actualizar afectación", response_model=schemas.AfectacionResponse)
 def update_afectacion_route(id_afectacion: int, data: schemas.AfectacionUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):

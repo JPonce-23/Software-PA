@@ -241,6 +241,133 @@ class AfectacionResponse(AfectacionCreate):
     activo: bool
     model_config = ConfigDict(from_attributes=True)
 
+
+# Contratos canónicos del Subcorte 2A. El contrato genérico anterior se
+# conserva temporalmente para compatibilidad, pero las nuevas capturas usan
+# rutas separadas para que una colectiva nunca reciba una parcela.
+class AfectacionColectivaCreate(AuditableCreate):
+    id_nucleo: int
+    id_tramo_nucleo: int
+    tipo_afectacion: Literal['colectivo'] = 'colectivo'
+    tipo_tenencia: str
+    subtipo_tenencia: Optional[str] = None
+    destino_superficie: Optional[str] = None
+    no_parcela_solar: Optional[str] = None
+    superficie_afectada_ha: Optional[Decimal] = Field(default=None, ge=0)
+    num_personas_afectadas: Optional[int] = Field(default=None, ge=0)
+    situacion_juridica: Optional[str] = None
+    documentacion_disponible: bool = False
+    documentacion_faltante: Optional[str] = None
+    origen_registro: Literal['captura_sistema', 'migracion_excel'] = 'captura_sistema'
+    geometria_wkt: str = Field(min_length=1)
+    model_config = ConfigDict(extra='forbid')
+
+    @field_validator('geometria_wkt')
+    @classmethod
+    def normalizar_geometria_wkt(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError('La geometría confirmada es obligatoria')
+        return value
+
+
+class AfectacionColectivaUpdate(AuditableUpdate):
+    geometria_wkt: Optional[str] = None
+    tipo_tenencia: Optional[str] = None
+    subtipo_tenencia: Optional[str] = None
+    destino_superficie: Optional[str] = None
+    no_parcela_solar: Optional[str] = None
+    superficie_afectada_ha: Optional[Decimal] = Field(default=None, ge=0)
+    num_personas_afectadas: Optional[int] = Field(default=None, ge=0)
+    situacion_juridica: Optional[str] = None
+    documentacion_disponible: Optional[bool] = None
+    documentacion_faltante: Optional[str] = None
+    model_config = ConfigDict(extra='forbid')
+
+
+class ParcelaExistenteParaAfectacion(BaseModel):
+    modo: Literal['existente']
+    id_parcela: int
+    model_config = ConfigDict(extra='forbid')
+
+
+class ParcelaNuevaParaAfectacion(BaseModel):
+    modo: Literal['nueva']
+    tipo_parcela: Literal['individual', 'copropiedad'] = 'individual'
+    no_parcela_ppt: str = Field(min_length=1, max_length=50)
+    certificado_parcelario: Optional[str] = Field(default=None, max_length=100)
+    folio_derechos: Optional[str] = Field(default=None, max_length=100)
+    constancia_vigencia_fecha: Optional[date] = None
+    documentacion_disponible: bool = False
+    documentacion_faltante: Optional[str] = None
+    titulares: List['ParcelaTitularCreate'] = Field(min_length=1)
+    model_config = ConfigDict(extra='forbid')
+
+    @field_validator(
+        'no_parcela_ppt', 'certificado_parcelario', 'folio_derechos',
+        'documentacion_faltante', mode='before'
+    )
+    @classmethod
+    def normalizar_texto(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+    @model_validator(mode='after')
+    def validar_titulares_y_soporte(self):
+        personas = [titular.id_persona for titular in self.titulares]
+        if len(personas) != len(set(personas)):
+            raise ValueError('No se puede repetir una persona titular en la misma parcela')
+        if self.tipo_parcela == 'copropiedad' and len(self.titulares) < 2:
+            raise ValueError('Una parcela en copropiedad requiere al menos dos titulares')
+        if not (
+            self.certificado_parcelario
+            or self.folio_derechos
+            or self.constancia_vigencia_fecha
+            or self.documentacion_disponible
+            or self.documentacion_faltante
+        ):
+            raise ValueError('La parcela requiere soporte o justificación registral')
+        return self
+
+
+class AfectacionIndividualCreate(AuditableCreate):
+    id_nucleo: int
+    id_tramo_nucleo: int
+    tipo_afectacion: Literal['individual'] = 'individual'
+    tipo_tenencia: str
+    subtipo_tenencia: Optional[str] = None
+    superficie_afectada_ha: Optional[Decimal] = Field(default=None, ge=0)
+    num_personas_afectadas: Optional[int] = Field(default=None, ge=0)
+    situacion_juridica: Optional[str] = None
+    documentacion_disponible: bool = False
+    documentacion_faltante: Optional[str] = None
+    origen_registro: Literal['captura_sistema', 'migracion_excel'] = 'captura_sistema'
+    geometria_wkt: str = Field(min_length=1)
+    parcela: ParcelaExistenteParaAfectacion | ParcelaNuevaParaAfectacion
+    model_config = ConfigDict(extra='forbid')
+
+    @field_validator('geometria_wkt')
+    @classmethod
+    def normalizar_geometria_wkt(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError('La geometría confirmada es obligatoria')
+        return value
+
+
+class AfectacionIndividualUpdate(AuditableUpdate):
+    geometria_wkt: Optional[str] = None
+    tipo_tenencia: Optional[str] = None
+    subtipo_tenencia: Optional[str] = None
+    superficie_afectada_ha: Optional[Decimal] = Field(default=None, ge=0)
+    num_personas_afectadas: Optional[int] = Field(default=None, ge=0)
+    situacion_juridica: Optional[str] = None
+    documentacion_disponible: Optional[bool] = None
+    documentacion_faltante: Optional[str] = None
+    model_config = ConfigDict(extra='forbid')
+
 class AsambleaCreate(AuditableCreate):
     id_nucleo: int
     id_tramo_nucleo: int

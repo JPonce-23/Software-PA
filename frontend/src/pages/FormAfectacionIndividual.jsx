@@ -40,10 +40,10 @@ export default function FormAfectacionIndividual({
   const [idParcelaSeleccionada, setIdParcelaSeleccionada] = useState('');
   const [crearParcela, setCrearParcela] = useState(false);
   const [parcela, setParcela] = useState(EMPTY_PARCELA);
+  const [copropietarios, setCopropietarios] = useState([]);
   const [afectacion, setAfectacion] = useState({
     tipo_tenencia: initialData?.tipo_tenencia || 'Parcelada',
     subtipo_tenencia: initialData?.subtipo_tenencia || '',
-    no_parcela_solar: initialData?.no_parcela_solar || '',
     superficie_afectada_ha: initialData?.superficie_afectada_ha || '',
     situacion_juridica: initialData?.situacion_juridica || '',
     geometria_wkt: initialData?.geometria_wkt || '',
@@ -85,9 +85,9 @@ export default function FormAfectacionIndividual({
     setAfectacion((current) => ({ ...current, [field]: value }));
   };
 
-  const createPersonaIfNeeded = async () => {
-    if (personaSelection?.mode === 'existing') return personaSelection.persona;
-    const draft = personaSelection?.data;
+  const createPersonaIfNeeded = async (selection) => {
+    if (selection?.mode === 'existing') return selection.persona;
+    const draft = selection?.data;
     if (!draft?.nombre?.trim()) {
       throw new Error('Captura el nombre de la persona titular.');
     }
@@ -100,26 +100,6 @@ export default function FormAfectacionIndividual({
       rfc: nullable(draft.rfc),
       telefono: nullable(draft.telefono),
       correo_electronico: nullable(draft.correo_electronico),
-    });
-    return response.data;
-  };
-
-  const createParcelaFor = async (persona) => {
-    const response = await api.post('/parcelas/con-titular', {
-      parcela: {
-        id_nucleo: idNucleo,
-        tipo_parcela: parcela.tipo_parcela,
-        no_parcela_ppt: nullable(parcela.no_parcela_ppt),
-        certificado_parcelario: nullable(parcela.certificado_parcelario),
-        folio_derechos: nullable(parcela.folio_derechos),
-        constancia_vigencia_fecha: nullable(parcela.constancia_vigencia_fecha),
-        documentacion_disponible: parcela.documentacion_disponible,
-        documentacion_faltante: nullable(parcela.documentacion_faltante),
-      },
-      titular: {
-        id_persona: persona.id_persona,
-        tipo_derecho: 'titular',
-      },
     });
     return response.data;
   };
@@ -138,27 +118,12 @@ export default function FormAfectacionIndividual({
 
     setGuardando(true);
     try {
-      let idParcela = initialData?.id_parcela;
-      if (!initialData) {
-        if (!personaSelection) throw new Error('Selecciona o registra a la persona titular.');
-        const persona = await createPersonaIfNeeded();
-        if (crearParcela || personaSelection.mode === 'new') {
-          const nuevaParcela = await createParcelaFor(persona);
-          idParcela = nuevaParcela.id_parcela;
-        } else {
-          idParcela = Number(idParcelaSeleccionada);
-        }
-        if (!idParcela) throw new Error('Selecciona una parcela o registra una nueva.');
-      }
-
       const payload = {
         id_nucleo: idNucleo,
         id_tramo_nucleo: idTramoNucleo,
-        id_parcela: idParcela,
         tipo_afectacion: 'individual',
         tipo_tenencia: afectacion.tipo_tenencia || 'Parcelada',
         subtipo_tenencia: nullable(afectacion.subtipo_tenencia),
-        no_parcela_solar: nullable(afectacion.no_parcela_solar),
         superficie_afectada_ha: afectacion.superficie_afectada_ha
           ? Number(afectacion.superficie_afectada_ha)
           : null,
@@ -169,9 +134,42 @@ export default function FormAfectacionIndividual({
         origen_registro: 'captura_sistema',
       };
       if (initialData) {
-        await api.put(`/afectaciones/${initialData.id_afectacion}`, payload);
+        await api.put(`/afectaciones/individuales/${initialData.id_afectacion}`, {
+          tipo_tenencia: payload.tipo_tenencia,
+          subtipo_tenencia: payload.subtipo_tenencia,
+          superficie_afectada_ha: payload.superficie_afectada_ha,
+          situacion_juridica: payload.situacion_juridica,
+          geometria_wkt: payload.geometria_wkt,
+          documentacion_disponible: payload.documentacion_disponible,
+          documentacion_faltante: payload.documentacion_faltante,
+        });
       } else {
-        await api.post('/afectaciones', payload);
+        if (!personaSelection) throw new Error('Selecciona o registra a la persona titular.');
+        if (crearParcela || personaSelection.mode === 'new') {
+          const selecciones = [personaSelection, ...copropietarios];
+          if (parcela.tipo_parcela === 'copropiedad' && selecciones.length < 2) {
+            throw new Error('Una copropiedad requiere al menos dos titulares.');
+          }
+          const personas = await Promise.all(selecciones.map(createPersonaIfNeeded));
+          payload.parcela = {
+            modo: 'nueva',
+            tipo_parcela: parcela.tipo_parcela,
+            no_parcela_ppt: nullable(parcela.no_parcela_ppt),
+            certificado_parcelario: nullable(parcela.certificado_parcelario),
+            folio_derechos: nullable(parcela.folio_derechos),
+            constancia_vigencia_fecha: nullable(parcela.constancia_vigencia_fecha),
+            documentacion_disponible: parcela.documentacion_disponible,
+            documentacion_faltante: nullable(parcela.documentacion_faltante),
+            titulares: personas.map((persona, index) => ({
+              id_persona: persona.id_persona,
+              tipo_derecho: index === 0 ? 'titular' : 'cotitular',
+            })),
+          };
+        } else {
+          if (!idParcelaSeleccionada) throw new Error('Selecciona una parcela o registra una nueva.');
+          payload.parcela = { modo: 'existente', id_parcela: Number(idParcelaSeleccionada) };
+        }
+        await api.post('/afectaciones/individuales', payload);
       }
       setExito(true);
       window.setTimeout(() => {
@@ -257,6 +255,36 @@ export default function FormAfectacionIndividual({
             <ParcelaFields value={parcela} onChange={updateParcela} />
           )}
 
+          {!initialData && (personaSelection?.mode === 'new' || crearParcela) && parcela.tipo_parcela === 'copropiedad' && (
+            <section className="form-section">
+              <SeccionHeader icono={<UserRound size={16} />} titulo="Copropietarios" />
+              <p className="field-hint">Registra al menos una persona adicional antes de crear la afectación.</p>
+              {copropietarios.map((selection, index) => (
+                <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'end', marginBottom: '10px' }}>
+                  <div style={{ flex: 1 }}>
+                    <PersonaSelector
+                      label={`Copropietario ${index + 2}`}
+                      value={selection}
+                      onChange={(nextValue) => setCopropietarios((current) => current.map(
+                        (item, itemIndex) => itemIndex === index ? nextValue : item
+                      ))}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => setCopropietarios((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                  >Quitar</button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => setCopropietarios((current) => [...current, null])}
+              >+ Agregar copropietario</button>
+            </section>
+          )}
+
           <section className="form-section">
             <SeccionHeader icono={<FileText size={16} />} titulo="Datos de la afectación" />
             <div style={gridDos}>
@@ -267,13 +295,6 @@ export default function FormAfectacionIndividual({
                   step="0.0001"
                   value={afectacion.superficie_afectada_ha}
                   onChange={(event) => updateAfectacion('superficie_afectada_ha', event.target.value)}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo label="No. de parcela / solar">
-                <input
-                  value={afectacion.no_parcela_solar}
-                  onChange={(event) => updateAfectacion('no_parcela_solar', event.target.value)}
                   style={inputStyle}
                 />
               </Campo>

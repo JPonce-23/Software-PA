@@ -526,6 +526,21 @@ Estado técnico observado antes de iniciar el Subcorte 2A:
   restricción bidireccional, la separación de contratos ni toda su matriz de
   pruebas.
 
+Estado de implementación en la rama `feature/backend-logica` (2026-07-31):
+
+- Se preparó la migración expansiva `005_subcorte_2a_integridad_afectaciones.sql`.
+  Su prevalidación y sintaxis se comprobaron primero dentro de una transacción
+  que terminó en `ROLLBACK`; posteriormente se aplicó correctamente. La base
+  activa está en versión `005`.
+- Se implementaron contratos y rutas separados para afectaciones colectivas e
+  individuales, incluida la creación atómica de parcela, titulares y
+  afectación individual nueva.
+- Se actualizaron los formularios: el colectivo ya no ofrece subtipos
+  individuales ni copropiedad; el individual no duplica el PPT y permite
+  capturar copropietarios.
+- Se agregaron pruebas de contratos y atomicidad. La suite completa de backend
+  pasó con `95 passed` sobre el esquema con 005 aplicada.
+
 #### Subcorte 2B propuesto — Secuencia, excepciones y estado
 
 Después de reforzar colectiva/individual:

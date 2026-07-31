@@ -17,15 +17,12 @@ const TIPOS_TENENCIA = [
   'Zona de Urbanización Ejidal',
 ];
 
-const SUBTIPOS = ['individual', 'copropiedad', 'sin asignar'];
-
 export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, initialData = null, onSuccess, onClose }) {
   const [guardando, setGuardando] = useState(false);
   const [exito, setExito]         = useState(false);
   const [error, setError]         = useState(null);
   const [form, setForm] = useState({
     tipo_tenencia:           initialData?.tipo_tenencia           || '',
-    subtipo_tenencia:        initialData?.subtipo_tenencia        || '',
     destino_superficie:      initialData?.destino_superficie      || '',
     no_parcela_solar:        initialData?.no_parcela_solar        || '',
     superficie_afectada_ha:  initialData?.superficie_afectada_ha  || '',
@@ -62,7 +59,6 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, initi
         id_tramo_nucleo:         idTramoNucleo,
         tipo_afectacion:         'colectivo',
         tipo_tenencia:           form.tipo_tenencia,
-        subtipo_tenencia:        form.subtipo_tenencia        || null,
         destino_superficie:      form.destino_superficie      || null,
         no_parcela_solar:        form.no_parcela_solar        || null,
         superficie_afectada_ha:  form.superficie_afectada_ha  ? Number(form.superficie_afectada_ha) : null,
@@ -75,9 +71,19 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, initi
       };
 
       if (initialData) {
-        await api.put(`/afectaciones/${initialData.id_afectacion}`, payload);
+        await api.put(`/afectaciones/colectivas/${initialData.id_afectacion}`, {
+          tipo_tenencia: payload.tipo_tenencia,
+          destino_superficie: payload.destino_superficie,
+          no_parcela_solar: payload.no_parcela_solar,
+          superficie_afectada_ha: payload.superficie_afectada_ha,
+          num_personas_afectadas: payload.num_personas_afectadas,
+          situacion_juridica: payload.situacion_juridica,
+          geometria_wkt: payload.geometria_wkt,
+          documentacion_disponible: payload.documentacion_disponible,
+          documentacion_faltante: payload.documentacion_faltante,
+        });
       } else {
-        await api.post('/afectaciones', payload);
+        await api.post('/afectaciones/colectivas', payload);
       }
 
       setExito(true);
@@ -115,12 +121,6 @@ export default function FormAfectacionColectiva({ idNucleo, idTramoNucleo, initi
               </select>
             </Campo>
 
-            <Campo label="Subtipo de Tenencia">
-              <select value={form.subtipo_tenencia} onChange={e => set('subtipo_tenencia', e.target.value)} style={inputStyle}>
-                <option value="">Seleccione (opcional)</option>
-                {SUBTIPOS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </Campo>
           </div>
 
           <Campo label="Destino de la Superficie">
