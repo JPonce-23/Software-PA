@@ -14,13 +14,13 @@
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
 > segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 30 de julio de 2026
+**Última actualización:** 31 de julio de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Próximo trabajo funcional:** Corte principal 2, comenzando por reforzar la
-separación entre afectaciones colectivas e individuales antes de reorganizar
-el expediente maestro y sus subexpedientes.
+**Próximo trabajo funcional:** Subcorte 2B del Corte principal 2: secuencia,
+salidas terminales y estado de liberación por afectación, sobre la base ya
+reforzada por el Subcorte 2A.
 
 ## 1. Objetivo y dominio
 
@@ -82,6 +82,7 @@ backend/app/services/                   servicios transaccionales
 backend/app/jobs/alertas_scheduler.py   tarea diaria de alertas
 backend/db/migrations/003_*.sql         Proyecto y retiro de Frente
 backend/db/migrations/004_*.sql         Adaptaciones 2.0
+backend/db/migrations/005_*.sql         Integridad de afectaciones 2A
 backend/tests/                          regresión e integración
 frontend/src/pages/ExpedienteDetail.jsx expediente actual por tramo_nucleo
 frontend/src/pages/ExpedientesList.jsx  listado actual de tramo_nucleo
@@ -96,6 +97,10 @@ GET/POST       /api/tramos
 GET/POST       /api/tramos-nucleos
 GET/POST       /api/afectaciones
 GET             /api/afectaciones/{id_afectacion}
+POST            /api/afectaciones/colectivas
+POST            /api/afectaciones/individuales
+PUT             /api/afectaciones/colectivas/{id_afectacion}
+PUT             /api/afectaciones/individuales/{id_afectacion}
 GET/POST       /api/convenios
 GET/POST       /api/asambleas
 GET/POST       /api/actividades-campo
@@ -126,9 +131,11 @@ Orden recomendado para recuperar contexto:
 4. `docs/Estructura Datos.md`.
 5. `docs/Diccionario_Datos_SSALFER.md`.
 6. `docs/requirements.md`.
-7. Las migraciones `001`, `002`, `003` y `004` en orden, como fuente del
-   esquema ejecutable.
-8. `docs/design.md`, con la advertencia de que conserva fragmentos históricos
+7. Las migraciones `001`, `002`, `003`, `004` y `005` en orden, como fuente
+   del esquema ejecutable.
+8. `docs/Diseno_Subcorte_2A.md`, como registro de la separación ya
+   implementada entre afectaciones colectivas e individuales.
+9. `docs/design.md`, con la advertencia de que conserva fragmentos históricos
    y propuestas aún no implementadas.
 
 Cuando se investigue la migración 004 o las decisiones de Adaptaciones 2.0,
@@ -219,24 +226,36 @@ integrantes ORV, minutas, acuerdos, versiones documentales, pagos y alertas.
 Registra la versión `004` en `schema_migrations` y rechaza una segunda
 ejecución.
 
+### 005 — Subcorte 2A
+
+Archivo:
+`backend/db/migrations/005_subcorte_2a_integridad_afectaciones.sql`
+
+Requiere 004. Refuerza la integridad de afectaciones colectivas e
+individuales:
+
+- `colectivo` no puede tener `id_parcela`.
+- `individual` debe tener `id_parcela`.
+- La parcela individual debe estar activa, tener PPT, soporte o justificación
+  registral y titulares activos suficientes.
+- Una parcela en `copropiedad` requiere al menos dos titulares activos.
+- PostgreSQL protege la baja o degradación de parcelas y titulares
+  referenciados por afectaciones individuales activas.
+- Registra la versión `005` en `schema_migrations` y rechaza una segunda
+  ejecución.
+
+La migración es expansiva y no corrige datos silenciosamente: si encuentra
+afectaciones o parcelas incompatibles, aborta antes de cambiar el esquema.
+
 ### Próxima migración
 
-No crear todavía la migración de contracción que antes se había llamado
-`005`. El Corte principal 2 puede necesitar una migración expansiva para
-distinguir datos compartidos del expediente maestro y datos propios de una
-`afectacion`, representar salidas terminales por afectación, hacer cumplir la
-secuencia y calcular el estado de liberación sin confundirlo con la
-inscripción ante el RAN.
-
-Antes de asignar número debe definirse el diseño. La secuencia recomendada es:
-
-```text
-005  expansión para expediente maestro y subexpedientes, si la auditoría
-     confirma que hacen falta nuevas FK, tipos documentales o estados
-006  contracción de columnas heredadas de Adaptaciones 2.0
-```
+El siguiente trabajo de base de datos corresponde al Subcorte 2B, si su diseño
+confirma que hacen falta nuevas restricciones, estados, vistas o tipos
+documentales para representar secuencia, salidas terminales y liberación.
 
 No eliminar columnas heredadas hasta desplegar y validar el Corte principal 2.
+La contracción de columnas heredadas de Adaptaciones 2.0 queda reservada para
+una migración posterior.
 
 ## 6. Trabajo realizado
 
@@ -448,11 +467,11 @@ Al diseñar el corte:
 No comenzar eliminando `tramo_nucleo` ni trasladando ciegamente todas las FK a
 `afectacion`.
 
-#### Subcorte 2A aprobado — Reforzar afectación colectiva e individual
+#### Subcorte 2A terminado — Reforzar afectación colectiva e individual
 
-Este es el primer trabajo aprobado dentro del Corte principal 2. Su propósito
-es cerrar la ambigüedad actual sin confundir derechos colectivos con una
-parcela en copropiedad:
+Este fue el primer trabajo aprobado dentro del Corte principal 2. Su propósito
+fue cerrar la ambigüedad sin confundir derechos colectivos con una parcela en
+copropiedad:
 
 ```text
 afectación colectiva
@@ -501,15 +520,15 @@ Alcance aprobado:
 10. Agregar pruebas de API y de PostgreSQL para todas las combinaciones
     válidas e inválidas.
 
-La migración debe ejecutar primero una prevalidación y abortar si encuentra
-colectivas con parcela o individuales sin parcela. No debe reclasificar ni
-corregir filas silenciosamente. Aunque la base local no contiene expedientes
-operativos, la migración debe ser segura para otros entornos.
+La migración ejecuta primero una prevalidación y aborta si encuentra
+colectivas con parcela o individuales sin parcela. No reclasifica ni corrige
+filas silenciosamente. Aunque la base local no contiene expedientes
+operativos, la migración fue diseñada para ser segura en otros entornos.
 
 Este subcorte no incluye todavía padrón nominal, participantes de asamblea,
 firmantes de convenio ni rediseño registral; son decisiones separadas.
 
-Estado técnico observado antes de iniciar el Subcorte 2A:
+Diagnóstico histórico observado antes de iniciar el Subcorte 2A:
 
 - La restricción actual sólo exige parcela a la afectación individual; aún no
   prohíbe parcela en una colectiva.
@@ -668,28 +687,28 @@ franja válida.
 
 ## 10. Instrucción para continuar
 
-La siguiente tarea no es crear Proyecto ni repetir Adaptaciones 2.0.
+La siguiente tarea no es crear Proyecto, repetir Adaptaciones 2.0 ni volver a
+diseñar el Subcorte 2A.
 
-Antes de implementar el Corte principal 2:
+Antes de implementar el Subcorte 2B:
 
 1. Leer los documentos indicados en la sección 3.
 2. Confirmar que requisitos y diseño respetan el flujograma de propiedad
    social, las salidas terminales y la definición de `liberado`.
-3. Configurar el entorno y verificar el esquema real de la base activa.
-4. Auditar modelos, FK, endpoints y pantallas que hoy usan
-   `id_tramo_nucleo`.
-5. Presentar una matriz entidad por entidad indicando si debe quedar en
-   `tramo_nucleo`, vincularse a `afectacion` o ser compartida.
+3. Configurar el entorno y verificar que la base activa tenga 004 y 005
+   aplicadas cuando corresponda.
+4. Auditar modelos, FK, endpoints, vistas y pantallas que participan en la
+   secuencia convenio → RAN → FIFONAFE → pago → liberado.
+5. Presentar una matriz de estados por afectación que separe progreso
+   registral, progreso financiero, salidas terminales y liberación.
 6. Proponer la migración expansiva, contratos API, rutas de frontend y plan de
-   compatibilidad.
-7. No editar ni ejecutar una migración hasta validar esa propuesta con el
-   usuario.
+   compatibilidad necesarios para 2B.
+7. No editar ni ejecutar una nueva migración hasta validar esa propuesta con
+   el usuario.
 
-El Subcorte 2A ya tiene alcance funcional aprobado en la sección 8, pero su
-migración y contratos concretos todavía deben presentarse para autorización
-antes de editar o ejecutar SQL. Después se implementará el resto del Corte 2
-con pruebas de integridad, regresión, autorización y aislamiento entre
-afectaciones.
+El Subcorte 2A ya quedó implementado y aplicado en la base local validada
+mediante la migración 005. El resto del Corte 2 debe continuar con pruebas de
+integridad, regresión, autorización y aislamiento entre afectaciones.
 
 El derecho de vía versionado está aprobado como componente futuro del Corte
-5. No debe mezclarse en la migración del Subcorte 2A.
+5. No debe mezclarse en el Subcorte 2B.
