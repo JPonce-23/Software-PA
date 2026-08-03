@@ -133,7 +133,7 @@ Orden recomendado para recuperar contexto:
 6. `docs/requirements.md`.
 7. Las migraciones `001`, `002`, `003`, `004` y `005` en orden, como fuente
    del esquema ejecutable.
-8. `docs/Diseno_Subcorte_2A.md`, como registro de la separación ya
+8. `docs/propuestas/2026-07-31-subcorte-2a-propuesta.md`, como registro de la separación ya
    implementada entre afectaciones colectivas e individuales.
 9. `docs/design.md`, con la advertencia de que conserva fragmentos históricos
    y propuestas aún no implementadas.
