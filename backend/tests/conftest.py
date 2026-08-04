@@ -152,6 +152,19 @@ def seed_tramo_nucleo(client, admin_headers, cleanup, seed_tramo, seed_nucleo):
     assert res.status_code == 201, f"No se pudo crear tramo-núcleo semilla: {res.text}"
     data = res.json()
     cleanup.register("/api/tramos-nucleos", data["id_tramo_nucleo"])
+    for tipo in ("sensibilizacion", "caminamiento"):
+        actividad = client.post(
+            "/api/actividades-campo",
+            json={
+                "id_tramo_nucleo": data["id_tramo_nucleo"],
+                "tipo_actividad": tipo,
+                "contexto_proceso": "cop_original",
+                "fecha_realizada": "2026-02-10" if tipo == "sensibilizacion" else "2026-02-11",
+            },
+            headers=admin_headers,
+        )
+        assert actividad.status_code == 201, actividad.text
+        cleanup.register("/api/actividades-campo", actividad.json()["id_actividad"])
     return data
 
 
@@ -213,11 +226,18 @@ def seed_afectacion_individual(client, admin_headers, cleanup, seed_nucleo, seed
 
 
 @pytest.fixture(scope="session")
-def seed_asamblea_anuencia(client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo):
+def seed_asamblea_anuencia(client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, seed_afectacion_colectiva):
     """Crea una asamblea de anuencia otorgada (requerida para convenios colectivos)."""
+    ciclos = client.get(
+        f"/api/afectaciones/{seed_afectacion_colectiva['id_afectacion']}/ciclos",
+        headers=admin_headers,
+    ).json()
+    original = next(c for c in ciclos if c["tipo_ciclo"] == "cop_original")
     payload = {
         "id_nucleo": seed_nucleo["id_nucleo"],
         "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
+        "id_afectacion": seed_afectacion_colectiva["id_afectacion"],
+        "id_ciclo_afectacion": original["id_ciclo_afectacion"],
         "contexto_proceso": "cop_original",
         "tipo_asamblea": "anuencia",
         "resultado_anuencia": "otorgada",

@@ -240,18 +240,57 @@ def test_pago_respeta_monto_tierra_mas_bdt(
     client,
     admin_headers,
     cleanup,
+    seed_nucleo,
     seed_tramo_nucleo,
-    seed_afectacion_colectiva,
-    seed_asamblea_anuencia,
 ):
+    afectacion_response = client.post(
+        "/api/afectaciones",
+        json={
+            "id_nucleo": seed_nucleo["id_nucleo"],
+            "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
+            "tipo_afectacion": "colectivo",
+            "tipo_tenencia": "Uso Común",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
+        },
+        headers=admin_headers,
+    )
+    assert afectacion_response.status_code == 201, afectacion_response.text
+    afectacion = afectacion_response.json()
+    cleanup.register("/api/afectaciones", afectacion["id_afectacion"])
+    ciclo = client.get(
+        f"/api/afectaciones/{afectacion['id_afectacion']}/ciclos",
+        headers=admin_headers,
+    ).json()[0]
+    asamblea_response = client.post(
+        "/api/asambleas",
+        json={
+            "id_nucleo": seed_nucleo["id_nucleo"],
+            "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
+            "id_afectacion": afectacion["id_afectacion"],
+            "id_ciclo_afectacion": ciclo["id_ciclo_afectacion"],
+            "tipo_asamblea": "anuencia",
+            "contexto_proceso": "cop_original",
+            "resultado_anuencia": "otorgada",
+            "estatus_asamblea": "completo",
+            "fecha_realizada": "2026-07-20",
+            "ingreso_ran_fecha": "2026-07-21",
+            "acta_inscripcion_fecha_ran": "2026-07-22",
+        },
+        headers=admin_headers,
+    )
+    assert asamblea_response.status_code == 201, asamblea_response.text
+    asamblea = asamblea_response.json()
+    cleanup.register("/api/asambleas", asamblea["id_asamblea"])
     convenio_response = client.post(
         "/api/convenios",
         json={
             "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
-            "id_afectacion": seed_afectacion_colectiva["id_afectacion"],
-            "id_asamblea_autorizacion": seed_asamblea_anuencia["id_asamblea"],
+            "id_afectacion": afectacion["id_afectacion"],
+            "id_ciclo_afectacion": ciclo["id_ciclo_afectacion"],
+            "id_asamblea_autorizacion": asamblea["id_asamblea"],
             "tipo_afectacion": "colectivo",
             "tipo_convenio": "cop_original",
+            "fecha_firma": "2026-07-23",
             "monto_100": "100.00",
             "monto_bdt": "10.00",
             "superficie_real_afectada_ha": "10.5",
@@ -261,13 +300,54 @@ def test_pago_respeta_monto_tierra_mas_bdt(
     assert convenio_response.status_code == 201, convenio_response.text
     convenio = convenio_response.json()
     cleanup.register("/api/convenios", convenio["id_convenio"])
+    ran = client.put(
+        f"/api/convenios/{convenio['id_convenio']}",
+        json={
+            "ingreso_ran_fecha": "2026-07-24",
+            "numero_solicitud_ingreso": "RAN-PAGO",
+            "convenio_inscrito_fecha_ran": "2026-07-25",
+        },
+        headers=admin_headers,
+    )
+    assert ran.status_code == 200, ran.text
+
+    oficios = {
+        "no_oficio_fifonafe_a_dgaopr": "F-1",
+        "no_oficio_dgaopr_a_repr": "D-1",
+        "no_oficio_rpta_repr_a_dgaopr": "R-1",
+        "no_oficio_rpta_dgaopr_a_fifonafe": "RF-1",
+        "fecha_oficio_fifonafe_a_dgaopr": "2026-07-25",
+        "fecha_oficio_dgaopr_a_repr": "2026-07-25",
+        "fecha_oficio_rpta_repr_a_dgaopr": "2026-07-26",
+        "fecha_oficio_rpta_dgaopr_a_fifonafe": "2026-07-26",
+    }
+    informe_response = client.post(
+        "/api/fifonafe",
+        json={
+            "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
+            "id_convenio": convenio["id_convenio"],
+            "id_afectacion": afectacion["id_afectacion"],
+            "id_ciclo_afectacion": ciclo["id_ciclo_afectacion"],
+            "tipo_afectacion": "colectivo",
+            "tipo_tramite": "informe_no_conflictos",
+            "estatus": "completo",
+            "hay_conflictos": False,
+            **oficios,
+        },
+        headers=admin_headers,
+    )
+    assert informe_response.status_code == 201, informe_response.text
+    informe = informe_response.json()
+    cleanup.register("/api/fifonafe", informe["id_tramite_fifonafe"])
 
     tramite_response = client.post(
         "/api/fifonafe",
         json={
             "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
             "id_convenio": convenio["id_convenio"],
-            "id_afectacion": seed_afectacion_colectiva["id_afectacion"],
+            "id_afectacion": afectacion["id_afectacion"],
+            "id_ciclo_afectacion": ciclo["id_ciclo_afectacion"],
+            "id_tramite_no_conflictos": informe["id_tramite_fifonafe"],
             "tipo_afectacion": "colectivo",
             "tipo_tramite": "indemnizacion",
         },
@@ -288,7 +368,7 @@ def test_pago_respeta_monto_tierra_mas_bdt(
         json={**base_payload, "monto_pagado": "110.01"},
         headers=admin_headers,
     )
-    assert excessive.status_code == 400
+    assert excessive.status_code == 409
 
     valid = client.post(
         "/api/pagos-indemnizacion",

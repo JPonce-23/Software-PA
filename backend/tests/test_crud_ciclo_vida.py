@@ -237,11 +237,18 @@ class TestCRUDConvenios:
         self, client, admin_headers, cleanup,
         seed_tramo_nucleo, seed_afectacion_individual,
     ):
+        ciclo_response = client.post(
+            f"/api/afectaciones/{seed_afectacion_individual['id_afectacion']}/ciclos",
+            json={"tipo_ciclo": "ampliacion"},
+            headers=admin_headers,
+        )
+        assert ciclo_response.status_code == 201, ciclo_response.text
         payload = {
             "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
             "id_afectacion": seed_afectacion_individual["id_afectacion"],
             "tipo_afectacion": "individual",
             "tipo_convenio": "ampliacion",
+            "id_ciclo_afectacion": ciclo_response.json()["id_ciclo_afectacion"],
             "superficie_ampliacion_ha": 0.5,
             "monto_100": 150000.00,
         }
