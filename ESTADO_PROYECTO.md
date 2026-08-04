@@ -14,13 +14,14 @@
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
 > segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 31 de julio de 2026
+**Última actualización:** 3 de agosto de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Próximo trabajo funcional:** Subcorte 2B del Corte principal 2: secuencia,
-salidas terminales y estado de liberación por afectación, sobre la base ya
-reforzada por el Subcorte 2A.
+**Próximo trabajo funcional:** Subcorte 2C del Corte principal 2: navegación
+por afectación y aislamiento documental. La migración 006 ya está aplicada en
+la base local activa; antes de iniciar 2C queda la aceptación funcional de los
+recorridos 2B con usuarios.
 
 ## 1. Objetivo y dominio
 
@@ -83,10 +84,15 @@ backend/app/jobs/alertas_scheduler.py   tarea diaria de alertas
 backend/db/migrations/003_*.sql         Proyecto y retiro de Frente
 backend/db/migrations/004_*.sql         Adaptaciones 2.0
 backend/db/migrations/005_*.sql         Integridad de afectaciones 2A
+backend/db/migrations/006_*.sql         Secuencia y estados de liberación 2B
 backend/tests/                          regresión e integración
+backend/app/routers/flujo.py            transiciones explícitas de 2B
+backend/app/services/flujo.py           dominio transaccional de 2B
+backend/app/services/access.py          autorización territorial
 frontend/src/pages/ExpedienteDetail.jsx expediente actual por tramo_nucleo
 frontend/src/pages/ExpedientesList.jsx  listado actual de tramo_nucleo
 frontend/src/components/fase2/          módulos agregados en Adaptaciones 2.0
+frontend/src/components/fase2/FlujoLiberacionPanel.jsx flujo mínimo de 2B
 ```
 
 Contratos HTTP relevantes ya existentes:
@@ -110,6 +116,13 @@ POST            /api/parcelas/con-titular
 POST            /api/orvs/con-integrantes
 GET/POST       /api/minutas
 GET/POST       /api/pagos-indemnizacion
+GET/POST       /api/afectaciones/{id_afectacion}/ciclos
+GET             /api/afectaciones/{id_afectacion}/estado
+GET             /api/tramos-nucleos/{id_tramo_nucleo}/estado
+PUT             /api/afectaciones/{id_afectacion}/salida-terminal
+POST            /api/fifonafe/{id_tramite}/completar-indemnizacion
+POST            /api/asambleas/{id_asamblea}/completar-retiro-fondos
+POST            /api/convenios/{id_convenio}/activar-modificatorio
 POST            /api/documentacion/{id_documento}/archivo
 GET             /api/documentacion/{id_documento}/versiones
 GET             /api/alertas/no-vistas
@@ -131,7 +144,7 @@ Orden recomendado para recuperar contexto:
 4. `docs/Estructura Datos.md`.
 5. `docs/Diccionario_Datos_SSALFER.md`.
 6. `docs/requirements.md`.
-7. Las migraciones `001`, `002`, `003`, `004` y `005` en orden, como fuente
+7. Las migraciones `001`, `002`, `003`, `004`, `005` y `006` en orden, como fuente
    del esquema ejecutable.
 8. `docs/propuestas/2026-07-31-subcorte-2a-propuesta.md`, como registro de la separación ya
    implementada entre afectaciones colectivas e individuales.
@@ -172,6 +185,16 @@ y 4, y cualquier diferencia con este archivo se resuelve a favor de
 - Una afectación sólo está `liberada` después de completar el pago del flujo
   aplicable. La inscripción ante el RAN es un avance registral intermedio, no
   el cierre de liberación.
+- En derechos individuales, un ciclo concluye cuando su indemnización activa
+  está en `completo`. En derechos colectivos exige además una asamblea de
+  `retiro_fondos` en `completo` vinculada al mismo ciclo. Alcanzar el límite
+  económico o registrar `tipo_pago = total` no presume conclusión.
+- `afectacion_ciclo` es la identidad estable de cada COP original o variante.
+  El ciclo original nace con la afectación; los ciclos posteriores se abren
+  explícitamente y deben ser compatibles con el tipo de derecho.
+- Un convenio modificatorio sustituye los importes financieros vigentes de
+  su convenio padre; nunca se suma al padre. La activación es transaccional y
+  no puede fijar un límite menor que los pagos acumulados del ciclo.
 - `expropiacion_directa` y `comunidad_indigena` son salidas terminales fuera
   del seguimiento ordinario. No equivalen a `liberado`, `problema` ni
   `pendiente`; después de marcarlas sólo se permiten trazabilidad, notas y
@@ -185,7 +208,9 @@ Regla financiera:
 valor de la tierra       = convenio.monto_100
 anticipo de la tierra    = convenio.monto_90, incluido en monto_100
 bienes distintos tierra = convenio.monto_bdt
-límite pagable           = monto_100 + monto_bdt
+límite base pagable      = monto_100 + monto_bdt, cuando BDT aplica
+modificatorio colectivo  = nuevo monto_100 + nuevo monto_bdt
+modificatorio individual = nuevo monto_100; monto_bdt está prohibido
 ```
 
 `monto_90` no se suma de nuevo. Obras complementarias no capturan BDT.
@@ -247,11 +272,23 @@ individuales:
 La migración es expansiva y no corrige datos silenciosamente: si encuentra
 afectaciones o parcelas incompatibles, aborta antes de cambiar el esquema.
 
-### Próxima migración
+### 006 — Subcorte 2B
 
-El siguiente trabajo de base de datos corresponde al Subcorte 2B, si su diseño
-confirma que hacen falta nuevas restricciones, estados, vistas o tipos
-documentales para representar secuencia, salidas terminales y liberación.
+Archivo:
+`backend/db/migrations/006_subcorte_2b_secuencia_estados.sql`
+
+Requiere 005. Es expansiva y transaccional: agrega la identidad
+`afectacion_ciclo`, relaciones de linaje nulas para compatibilidad histórica,
+salida terminal por afectación, vigencia financiera, restricciones y triggers
+de secuencia/concurrencia, y vistas de estado por ciclo, afectación,
+`tramo_nucleo` y dashboard. Crea únicamente una raíz estructural original por
+afectación existente; no asocia actividades, asambleas, convenios o trámites
+históricos por inferencia.
+
+La 006 fue aplicada primero sobre copias temporales representativas y después,
+el 3 de agosto de 2026, sobre `db_trenes`. El despliegue activo se realizó con
+backend y scheduler detenidos, `ON_ERROR_STOP=1`, transacción completa y
+respaldo previo validado. La base activa registra ahora 004, 005 y 006.
 
 No eliminar columnas heredadas hasta desplegar y validar el Corte principal 2.
 La contracción de columnas heredadas de Adaptaciones 2.0 queda reservada para
@@ -349,6 +386,51 @@ propiedad del usuario `nobody`; no fue un error del código. La salida
 alternativa en `/tmp` terminó correctamente y su chunk mayor fue de 289.34
 kB. Esta revalidación no sustituye una ejecución completa contra PostgreSQL.
 
+### Corte principal 2 — Subcorte 2B implementado y validado en copia aislada
+
+El 3 de agosto de 2026 se implementaron:
+
+- migración expansiva 006 con ciclos, terminalidad, linaje, vigencia
+  financiera, bloqueo concurrente y vistas derivadas;
+- estados separados operativo, registral, financiero y de liberación;
+- cierre individual por indemnización completa y colectivo por indemnización
+  más retiro de fondos completo del mismo ciclo;
+- sustitución no acumulativa de montos por modificatorios;
+- servicio y endpoints transaccionales de apertura/cierre;
+- autorización por rol y `usuario_tramo` en recursos y agregados del flujo;
+- panel mínimo para actividades, ciclos, terminalidad, FIFONAFE, retiro y
+  consulta autoritativa del saldo;
+- protección de rutas heredadas contra saltos y errores internos.
+
+Validación ejecutada sobre `db_trenes_2b_test_final5`, copia lógica de la base
+activa con 006 aplicada exclusivamente allí:
+
+```text
+backend:  104 pruebas aprobadas; 1 advertencia de deprecación de Starlette
+datos:    0 afectaciones sin ciclo original y 0 ciclos huérfanos
+vistas:   consultas de estado y dashboard ejecutadas correctamente
+frontend: 0 errores de oxlint
+build:    producción exitosa en /tmp; chunk mayor 289.34 kB
+```
+
+La base activa `db_trenes` fue migrada posteriormente a 006. La entrega aún no
+incluye commit, push ni validación de aceptación con usuarios. Las copias
+temporales se eliminaron después de conservar resultados y conteos en la
+evaluación técnica.
+
+Evidencia del despliegue activo:
+
+```text
+respaldo: backups/software-pa-db_trenes_pre_006_20260803.dump
+tamaño:   418744 bytes
+SHA-256:  85a9cece607d83330c6132870e61a55e89e311798e40ca3b95cbb4c7b5fc7757
+restore:  restauración completa comprobada; recuperó 004/005 y 6/20 afectaciones
+migración: BEGIN → COMMIT; versión 006 registrada
+integridad: 0 raíces faltantes, 0 ciclos huérfanos, 0 vigencias duplicadas
+servicios: backend y scheduler reanudados; raíz/OpenAPI HTTP 200
+seguridad: endpoint de estado devuelve 401 sin token
+```
+
 ## 7. Estado de la base local validada
 
 El 28 de julio de 2026 la base activa local fue reiniciada de forma controlada.
@@ -369,11 +451,23 @@ consultar el esquema real; `git pull` descarga los SQL, pero no modifica
 volúmenes de PostgreSQL. Una base que sólo tiene 002 debe aplicar 003 y luego
 004, con respaldo y verificación entre ambas.
 
-En la revisión del 30 de julio no existía un archivo `.env`, por lo que no se
-volvió a consultar la base activa. Antes de diseñar o ejecutar la próxima
-migración se debe configurar el entorno local y verificar directamente
-tablas, restricciones, triggers, vistas y versiones aplicadas; no se debe
-inferir ese estado únicamente de esta nota histórica.
+La base activa quedó verificada después de aplicar 006 el 3 de agosto de 2026:
+
+```text
+base/usuario:          db_trenes / alfredo
+schema_migrations:     004, 005, 006
+afectaciones:          6 activas / 20 totales
+convenios:             2 activos / 11 totales
+FIFONAFE/pagos activos: 0 / 0
+afectacion_ciclo:      6 ciclos activos / 20 totales; todos originales
+integridad 2B:         0 afectaciones sin raíz, 0 ciclos huérfanos
+vistas activas:        afectación, tramo_nucleo y dashboard consultables
+```
+
+El archivo `.env` local ya permite conectarse al servicio `db`. Estos valores
+describen sólo este entorno; en cada equipo se debe verificar el esquema real.
+En otros equipos, `git pull` descarga la migración 006, pero no la aplica al
+volumen PostgreSQL; cada colaborador debe verificar `schema_migrations`.
 
 ## 8. Plan principal vigente de cinco cortes
 
@@ -560,16 +654,20 @@ Estado de implementación en la rama `feature/backend-logica` (2026-07-31):
 - Se agregaron pruebas de contratos y atomicidad. La suite completa de backend
   pasó con `95 passed` sobre el esquema con 005 aplicada.
 
-#### Subcorte 2B propuesto — Secuencia, excepciones y estado
+#### Subcorte 2B implementado — Secuencia, excepciones y estado
 
-Después de reforzar colectiva/individual:
+La rama contiene la migración 006, backend, frontend y pruebas descritos en la
+sección 6. La implementación enlaza etapas, modela ciclos repetibles, incorpora
+salidas terminales, separa progreso registral/financiero/liberación y deriva
+el cierre con las reglas aprobadas para derechos colectivos e individuales.
 
-1. Enlazar las etapas existentes para impedir saltos inválidos.
-2. Incorporar salidas terminales por afectación y su agregación en
-   `tramo_nucleo`.
-3. Separar progreso registral, financiero, terminal y liberación.
-4. Derivar `liberado` después del pago aplicable.
-5. Probar rutas colectiva, individual, terminal y expediente mixto.
+Estado de entrega:
+
+1. Código y migración: implementados.
+2. Suite backend, lint y build: aprobados en copia aislada.
+3. Base activa: 006 aplicada y verificada con respaldo previo.
+4. Aceptación funcional con usuarios: pendiente.
+5. Commit y push: no realizados.
 
 #### Subcorte 2C propuesto — Navegación y aislamiento documental
 
@@ -675,6 +773,12 @@ franja válida.
 
 ## 9. Trabajo técnico transversal pendiente
 
+- Conservar y probar periódicamente la restauración del respaldo previo a 006
+  ubicado en `backups/software-pa-db_trenes_pre_006_20260803.dump`.
+- Conciliar manualmente relaciones históricas 2B que permanecen nulas; no
+  inferirlas por fecha, expediente o cercanía de registros.
+- Ejecutar aceptación funcional con usuarios sobre rutas colectiva,
+  individual, terminal, modificatorio y expediente mixto.
 - Validación funcional y de experiencia con usuarios finales.
 - Decidir si una base limpia necesita conservar
   `persona_fuente_legacy`; hoy es trazabilidad de migración, no una segunda
@@ -687,28 +791,22 @@ franja válida.
 
 ## 10. Instrucción para continuar
 
-La siguiente tarea no es crear Proyecto, repetir Adaptaciones 2.0 ni volver a
-diseñar el Subcorte 2A.
+La siguiente tarea no es crear Proyecto, repetir Adaptaciones 2.0, rediseñar
+2A ni reimplementar 2B.
 
-Antes de implementar el Subcorte 2B:
+Próximo paso operativo:
 
-1. Leer los documentos indicados en la sección 3.
-2. Confirmar que requisitos y diseño respetan el flujograma de propiedad
-   social, las salidas terminales y la definición de `liberado`.
-3. Configurar el entorno y verificar que la base activa tenga 004 y 005
-   aplicadas cuando corresponda.
-4. Auditar modelos, FK, endpoints, vistas y pantallas que participan en la
-   secuencia convenio → RAN → FIFONAFE → pago → liberado.
-5. Presentar una matriz de estados por afectación que separe progreso
-   registral, progreso financiero, salidas terminales y liberación.
-6. Proponer la migración expansiva, contratos API, rutas de frontend y plan de
-   compatibilidad necesarios para 2B.
-7. No editar ni ejecutar una nueva migración hasta validar esa propuesta con
-   el usuario.
+1. Ejecutar aceptación funcional de 2B con usuarios sobre rutas colectiva,
+   individual, terminal, modificatorio y expediente mixto.
+2. Conciliar datos históricos únicamente con evidencia documental.
+3. Revisar y confirmar el diff antes de commit/push.
+4. Replicar el despliegue de 006 en otros ambientes sólo después de respaldo
+   y verificación individual de 004/005.
 
-El Subcorte 2A ya quedó implementado y aplicado en la base local validada
-mediante la migración 005. El resto del Corte 2 debe continuar con pruebas de
-integridad, regresión, autorización y aislamiento entre afectaciones.
+Después de la aceptación funcional, el siguiente trabajo es diseñar el
+Subcorte 2C: navegación por subexpediente y aislamiento documental. Debe
+mantener los estados y ciclos 2B, corregir el tipo documental inválido y
+probar que dos afectaciones del mismo `tramo_nucleo` no mezclen actuaciones.
 
 El derecho de vía versionado está aprobado como componente futuro del Corte
 5. No debe mezclarse en el Subcorte 2B.
