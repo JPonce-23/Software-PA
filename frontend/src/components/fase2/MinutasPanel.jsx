@@ -10,7 +10,14 @@ import {
 import { gridDos, inputStyle } from '../formStyles';
 import { nombreCompleto } from '../../utils/personas';
 
-export default function MinutasPanel({ idTramoNucleo, canWrite }) {
+export default function MinutasPanel({
+  idTramoNucleo,
+  idAfectacion = null,
+  idCicloAfectacion = null,
+  canWrite,
+  title = 'Minutas y acuerdos',
+  emptyText = 'No hay minutas registradas.',
+}) {
   const [minutas, setMinutas] = useState([]);
   const [agreements, setAgreements] = useState({});
   const [loading, setLoading] = useState(true);
@@ -20,7 +27,12 @@ export default function MinutasPanel({ idTramoNucleo, canWrite }) {
     setLoading(true);
     try {
       const { data } = await api.get('/minutas', {
-        params: { id_tramo_nucleo: idTramoNucleo },
+        params: {
+          id_tramo_nucleo: idTramoNucleo,
+          ...(idAfectacion
+            ? { id_afectacion: idAfectacion }
+            : { solo_compartidas: true }),
+        },
       });
       setMinutas(data);
       const responses = await Promise.all(
@@ -32,7 +44,7 @@ export default function MinutasPanel({ idTramoNucleo, canWrite }) {
     } finally {
       setLoading(false);
     }
-  }, [idTramoNucleo]);
+  }, [idAfectacion, idTramoNucleo]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -50,10 +62,10 @@ export default function MinutasPanel({ idTramoNucleo, canWrite }) {
     <div className="phase-panel">
       <header className="phase-panel-header">
         <div>
-          <h3>Minutas y acuerdos</h3>
+          <h3>{title}</h3>
           <p>Compromisos trazables dentro del expediente.</p>
         </div>
-        {canWrite && (
+        {canWrite && (!idAfectacion || idCicloAfectacion) && (
           <button type="button" className="button" onClick={() => setModal({ type: 'minute' })}>
             <Plus size={16} /> Nueva minuta
           </button>
@@ -61,7 +73,7 @@ export default function MinutasPanel({ idTramoNucleo, canWrite }) {
       </header>
 
       {minutas.length === 0 ? (
-        <div className="empty-state"><ClipboardCheck size={30} /> No hay minutas registradas.</div>
+        <div className="empty-state"><ClipboardCheck size={30} /> {emptyText}</div>
       ) : (
         <div className="record-list">
           {minutas.map((minute) => (
@@ -122,6 +134,8 @@ export default function MinutasPanel({ idTramoNucleo, canWrite }) {
       {modal?.type === 'minute' && (
         <MinuteForm
           idTramoNucleo={idTramoNucleo}
+          idAfectacion={idAfectacion}
+          idCicloAfectacion={idCicloAfectacion}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); load(); }}
         />
@@ -137,7 +151,7 @@ export default function MinutasPanel({ idTramoNucleo, canWrite }) {
   );
 }
 
-function MinuteForm({ idTramoNucleo, onClose, onSaved }) {
+function MinuteForm({ idTramoNucleo, idAfectacion, idCicloAfectacion, onClose, onSaved }) {
   const [form, setForm] = useState({
     fecha_reunion: new Date().toISOString().slice(0, 10),
     asunto: '',
@@ -155,6 +169,8 @@ function MinuteForm({ idTramoNucleo, onClose, onSaved }) {
     try {
       await api.post('/minutas', {
         id_tramo_nucleo: idTramoNucleo,
+        id_afectacion: idAfectacion || null,
+        id_ciclo_afectacion: idAfectacion ? idCicloAfectacion : null,
         ...form,
         lugar: form.lugar || null,
         resumen: form.resumen || null,

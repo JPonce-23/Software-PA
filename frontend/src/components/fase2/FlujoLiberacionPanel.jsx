@@ -13,7 +13,8 @@ function errorText(error) {
 }
 
 export default function FlujoLiberacionPanel({
-  idTramoNucleo, idNucleo, afectaciones, convenios, canWrite, onRefresh,
+  idTramoNucleo, idNucleo, idAfectacion = null, afectaciones, convenios,
+  canWrite, onRefresh,
 }) {
   const [activities, setActivities] = useState([]);
   const [tramites, setTramites] = useState([]);
@@ -24,15 +25,31 @@ export default function FlujoLiberacionPanel({
   const [cycleForm, setCycleForm] = useState(null);
   const [terminalForm, setTerminalForm] = useState(null);
   const [fifonafeForm, setFifonafeForm] = useState(null);
+  const scopedAfectaciones = useMemo(
+    () => idAfectacion
+      ? afectaciones.filter((item) => item.id_afectacion === Number(idAfectacion))
+      : afectaciones,
+    [afectaciones, idAfectacion],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [activityResponse, tramiteResponse, stateResponses] = await Promise.all([
-        api.get('/actividades-campo', { params: { id_tramo_nucleo: idTramoNucleo } }),
-        api.get('/fifonafe', { params: { id_tramo_nucleo: idTramoNucleo } }),
-        Promise.all(afectaciones.map((item) => api.get(`/afectaciones/${item.id_afectacion}/estado`))),
+        api.get('/actividades-campo', {
+          params: {
+            id_tramo_nucleo: idTramoNucleo,
+            ...(idAfectacion ? { solo_compartidas: true } : {}),
+          },
+        }),
+        api.get('/fifonafe', {
+          params: {
+            id_tramo_nucleo: idTramoNucleo,
+            ...(idAfectacion ? { id_afectacion: idAfectacion } : {}),
+          },
+        }),
+        Promise.all(scopedAfectaciones.map((item) => api.get(`/afectaciones/${item.id_afectacion}/estado`))),
       ]);
       setActivities(activityResponse.data);
       setTramites(tramiteResponse.data);
@@ -42,7 +59,7 @@ export default function FlujoLiberacionPanel({
     } finally {
       setLoading(false);
     }
-  }, [afectaciones, idTramoNucleo]);
+  }, [idAfectacion, idTramoNucleo, scopedAfectaciones]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -94,7 +111,7 @@ export default function FlujoLiberacionPanel({
       </section>
 
       {states.map((state) => {
-        const affect = afectaciones.find((item) => item.id_afectacion === state.id_afectacion);
+        const affect = scopedAfectaciones.find((item) => item.id_afectacion === state.id_afectacion);
         return (
           <section key={state.id_afectacion} style={sectionStyle}>
             <div style={titleRow}>

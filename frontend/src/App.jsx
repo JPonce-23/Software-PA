@@ -11,6 +11,7 @@ const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Mapa = React.lazy(() => import('./pages/Mapa'));
 const ExpedientesList = React.lazy(() => import('./pages/ExpedientesList'));
 const ExpedienteDetail = React.lazy(() => import('./pages/ExpedienteDetail'));
+const AfectacionSubexpediente = React.lazy(() => import('./pages/AfectacionSubexpediente'));
 
 const ROL_LABELS = {
   admin: 'Administrador',
@@ -87,6 +88,7 @@ function Topbar() {
 
   const getTitulo = () => {
     if (location.pathname === '/mapa') return 'Visor de Mapas';
+    if (location.pathname.includes('/afectaciones/')) return 'Subexpediente de Afectación';
     if (location.pathname.startsWith('/expedientes/')) return 'Expediente de Ejido';
     if (location.pathname === '/expedientes') return 'Expedientes de Ejidos';
     return '¡Bienvenido!';
@@ -142,6 +144,7 @@ function AppContent() {
             <Route path="/"                             element={<Dashboard />} />
             <Route path="/mapa"                         element={<Mapa />} />
             <Route path="/expedientes"                  element={<ExpedientesList />} />
+            <Route path="/expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion" element={<AfectacionSubexpediente />} />
             <Route path="/expedientes/:id_tramo_nucleo" element={<ExpedienteDetail />} />
           </Routes>
         </React.Suspense>

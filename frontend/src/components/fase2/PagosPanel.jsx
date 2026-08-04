@@ -14,7 +14,7 @@ const money = new Intl.NumberFormat('es-MX', {
   currency: 'MXN',
 });
 
-export default function PagosPanel({ idTramoNucleo, canWrite }) {
+export default function PagosPanel({ idTramoNucleo, idAfectacion = null, canWrite }) {
   const [tramites, setTramites] = useState([]);
   const [convenios, setConvenios] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -26,8 +26,18 @@ export default function PagosPanel({ idTramoNucleo, canWrite }) {
     setLoading(true);
     try {
       const [tramitesResponse, conveniosResponse] = await Promise.all([
-        api.get('/fifonafe', { params: { id_tramo_nucleo: idTramoNucleo } }),
-        api.get('/convenios', { params: { id_tramo_nucleo: idTramoNucleo } }),
+        api.get('/fifonafe', {
+          params: {
+            id_tramo_nucleo: idTramoNucleo,
+            ...(idAfectacion ? { id_afectacion: idAfectacion } : {}),
+          },
+        }),
+        api.get('/convenios', {
+          params: {
+            id_tramo_nucleo: idTramoNucleo,
+            ...(idAfectacion ? { id_afectacion: idAfectacion } : {}),
+          },
+        }),
       ]);
       const eligible = tramitesResponse.data.filter(
         (item) => item.tipo_tramite === 'indemnizacion' && item.id_convenio,
@@ -35,9 +45,13 @@ export default function PagosPanel({ idTramoNucleo, canWrite }) {
       setTramites(eligible);
       setConvenios(conveniosResponse.data);
       const paymentResponses = await Promise.all(
-        eligible.map((item) => api.get('/pagos-indemnizacion', {
-          params: { id_tramite_fifonafe: item.id_tramite_fifonafe },
-        })),
+        idAfectacion
+          ? [api.get('/pagos-indemnizacion', {
+              params: { id_afectacion: idAfectacion },
+            })]
+          : eligible.map((item) => api.get('/pagos-indemnizacion', {
+              params: { id_tramite_fifonafe: item.id_tramite_fifonafe },
+            })),
       );
       setPayments(paymentResponses.flatMap((response) => response.data));
       const affectationIds = [...new Set(eligible.map((item) => item.id_afectacion))];
@@ -51,7 +65,7 @@ export default function PagosPanel({ idTramoNucleo, canWrite }) {
     } finally {
       setLoading(false);
     }
-  }, [idTramoNucleo]);
+  }, [idAfectacion, idTramoNucleo]);
 
   useEffect(() => { load(); }, [load]);
 

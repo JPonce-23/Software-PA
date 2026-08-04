@@ -8,7 +8,14 @@ import {
 } from '../FormUI';
 import { gridDos, inputStyle } from '../formStyles';
 
-export default function DocumentosPanel({ idTramoNucleo, canWrite }) {
+export default function DocumentosPanel({
+  idTramoNucleo,
+  entidadTipo = 'tramo_nucleo',
+  entidadId,
+  canWrite,
+  title = 'Documentación y versiones',
+  emptyText = 'No hay documentos del expediente.',
+}) {
   const [documents, setDocuments] = useState([]);
   const [versions, setVersions] = useState({});
   const [loading, setLoading] = useState(true);
@@ -16,11 +23,12 @@ export default function DocumentosPanel({ idTramoNucleo, canWrite }) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    const targetId = entidadId ?? idTramoNucleo;
     try {
       const { data } = await api.get('/documentacion', {
         params: {
-          entidad_tipo: 'tramo_nucleo',
-          entidad_id: idTramoNucleo,
+          entidad_tipo: entidadTipo,
+          entidad_id: targetId,
         },
       });
       setDocuments(data);
@@ -33,7 +41,7 @@ export default function DocumentosPanel({ idTramoNucleo, canWrite }) {
     } finally {
       setLoading(false);
     }
-  }, [idTramoNucleo]);
+  }, [entidadId, entidadTipo, idTramoNucleo]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -56,7 +64,7 @@ export default function DocumentosPanel({ idTramoNucleo, canWrite }) {
     <div className="phase-panel">
       <header className="phase-panel-header">
         <div>
-          <h3>Documentación y versiones</h3>
+          <h3>{title}</h3>
           <p>Cada carga conserva hash SHA-256, tamaño y versión.</p>
         </div>
         {canWrite && (
@@ -67,7 +75,7 @@ export default function DocumentosPanel({ idTramoNucleo, canWrite }) {
       </header>
 
       {documents.length === 0 ? (
-        <div className="empty-state"><FileClock size={30} /> No hay documentos del expediente.</div>
+        <div className="empty-state"><FileClock size={30} /> {emptyText}</div>
       ) : (
         <div className="record-list">
           {documents.map((document) => (
@@ -120,7 +128,8 @@ export default function DocumentosPanel({ idTramoNucleo, canWrite }) {
 
       {modal?.type === 'document' && (
         <DocumentForm
-          idTramoNucleo={idTramoNucleo}
+          entidadTipo={entidadTipo}
+          entidadId={entidadId ?? idTramoNucleo}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); load(); }}
         />
@@ -136,7 +145,7 @@ export default function DocumentosPanel({ idTramoNucleo, canWrite }) {
   );
 }
 
-function DocumentForm({ idTramoNucleo, onClose, onSaved }) {
+function DocumentForm({ entidadTipo, entidadId, onClose, onSaved }) {
   const [form, setForm] = useState({
     tipo_documento: '',
     categoria: 'disponible',
@@ -151,8 +160,8 @@ function DocumentForm({ idTramoNucleo, onClose, onSaved }) {
     setError(null);
     try {
       await api.post('/documentacion', {
-        entidad_relacionada_id: idTramoNucleo,
-        entidad_relacionada_tipo: 'tramo_nucleo',
+        entidad_relacionada_id: entidadId,
+        entidad_relacionada_tipo: entidadTipo,
         ...form,
       });
       onSaved();

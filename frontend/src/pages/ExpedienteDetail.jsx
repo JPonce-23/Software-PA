@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Users, FileText, ClipboardList,
   Loader2, AlertCircle, Building2, Layers, Calendar,
-  Banknote, FileClock, ShieldCheck,
+  Banknote, FileClock, FolderOpen, ShieldCheck,
 } from 'lucide-react';
 import api from '../api/axios';
 import AuthContext from '../contexts/auth-context';
@@ -196,8 +196,8 @@ export default function ExpedienteDetail() {
 
         <div role="tabpanel" style={{ padding: '30px' }}>
           {tabActiva === 'general'      && <TabGeneral tramoNucleo={tramoNucleo} nucleo={nucleo} />}
-          {tabActiva === 'colectivas'   && <TabAfectaciones tipo="colectivo" items={colectivas} convenios={convenios} user={user} onNueva={() => setModalColectiva(true)} onEditar={setModalColectiva} onCrearConvenio={setModalConvenio} />}
-          {tabActiva === 'individuales' && <TabAfectaciones tipo="individual" items={individuales} convenios={convenios} user={user} onNueva={() => setModalIndividual(true)} onEditar={setModalIndividual} onCrearConvenio={setModalConvenio} />}
+          {tabActiva === 'colectivas'   && <TabAfectaciones tipo="colectivo" items={colectivas} convenios={convenios} user={user} onNueva={() => setModalColectiva(true)} onEditar={setModalColectiva} onCrearConvenio={setModalConvenio} onAbrir={(afectacion) => navigate(`/expedientes/${id_tramo_nucleo}/afectaciones/${afectacion.id_afectacion}`)} />}
+          {tabActiva === 'individuales' && <TabAfectaciones tipo="individual" items={individuales} convenios={convenios} user={user} onNueva={() => setModalIndividual(true)} onEditar={setModalIndividual} onCrearConvenio={setModalConvenio} onAbrir={(afectacion) => navigate(`/expedientes/${id_tramo_nucleo}/afectaciones/${afectacion.id_afectacion}`)} />}
           {tabActiva === 'asambleas'    && <TabAsambleas items={asambleas} user={user} onNueva={() => setModalAsamblea(true)} onEditar={setModalAsamblea} />}
           <React.Suspense fallback={<div className="panel-loading"><Loader2 className="spin" /> Cargando módulo…</div>}>
             {tabActiva === 'flujo' && (
@@ -291,7 +291,7 @@ function TabGeneral({ tramoNucleo, nucleo }) {
 }
 
 /* ────── Pestaña: Afectaciones (Colectivas o Individuales) ────── */
-function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCrearConvenio }) {
+function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCrearConvenio, onAbrir }) {
   const esColectivo = tipo === 'colectivo';
   const puedeCapturar = user?.rol && ['admin', 'operador'].includes(user.rol);
 
@@ -330,7 +330,7 @@ function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCr
               <th style={thStyle}>Superficie (Ha)</th>
               <th style={thStyle}>Situación Jurídica</th>
               <th style={thStyle}>Convenios</th>
-              {puedeCapturar && <th style={{ ...thStyle, textAlign: 'right' }}>Acciones</th>}
+              <th style={{ ...thStyle, textAlign: 'right' }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -353,9 +353,20 @@ function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCr
                     <span style={{ color: '#94a3b8', fontSize: '13px' }}>Ninguno</span>
                   )}
                 </td>
-                {puedeCapturar && (
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => onAbrir(a)}
+                      style={{
+                        background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe',
+                        padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      }}
+                    >
+                      <FolderOpen size={14} /> Abrir
+                    </button>
+                    {puedeCapturar && (
+                      <>
                       <button
                         onClick={() => onEditar(a)}
                         style={{
@@ -374,9 +385,10 @@ function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCr
                       >
                         {hasConvenio ? 'Editar Conv.' : '+ Convenio'}
                       </button>
-                    </div>
-                  </td>
-                )}
+                      </>
+                    )}
+                  </div>
+                </td>
               </tr>
             )})}
           </tbody>
