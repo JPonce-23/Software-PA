@@ -16,7 +16,8 @@ from starlette.concurrency import run_in_threadpool
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services import documentos as service
-from ..services.common import get_active, mark_inactive, set_audit_context
+from ..services.access import require_document_access
+from ..services.common import mark_inactive, set_audit_context
 
 
 router = APIRouter()
@@ -34,13 +35,7 @@ def listar_versiones(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    get_active(
-        db,
-        models.DocumentacionSoporte,
-        id_documento,
-        "id_documento",
-        "Documento no encontrado",
-    )
+    require_document_access(db, current_user, id_documento)
     return (
         db.query(models.DocumentoVersion)
         .filter_by(id_documento=id_documento, activo=True)
@@ -59,13 +54,7 @@ def descargar_version(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    get_active(
-        db,
-        models.DocumentacionSoporte,
-        id_documento,
-        "id_documento",
-        "Documento no encontrado",
-    )
+    require_document_access(db, current_user, id_documento)
     version = (
         db.query(models.DocumentoVersion)
         .filter_by(
@@ -102,6 +91,7 @@ async def subir_archivo(
         db,
         id_documento,
     )
+    require_document_access(db, current_user, id_documento)
     return await service.save_version(
         db,
         documento,
@@ -119,13 +109,7 @@ def descargar_ultima_version(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    get_active(
-        db,
-        models.DocumentacionSoporte,
-        id_documento,
-        "id_documento",
-        "Documento no encontrado",
-    )
+    require_document_access(db, current_user, id_documento)
     version = service.latest_version(db, id_documento)
     path = service.safe_storage_path(version)
     return FileResponse(
@@ -147,13 +131,7 @@ def eliminar_documento(
         auth.RoleChecker(["admin", "operador", "geografo"])
     ),
 ):
-    documento = get_active(
-        db,
-        models.DocumentacionSoporte,
-        id_documento,
-        "id_documento",
-        "Documento no encontrado",
-    )
+    documento = require_document_access(db, current_user, id_documento)
     set_audit_context(db, current_user.id_usuario)
     versiones = (
         db.query(models.DocumentoVersion)

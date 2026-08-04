@@ -22,6 +22,8 @@ WRITE_ROLES = ["admin", "operador"]
 )
 def listar_pagos(
     id_tramite_fifonafe: int | None = Query(default=None),
+    id_afectacion: int | None = Query(default=None),
+    id_ciclo_afectacion: int | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -45,6 +47,12 @@ def listar_pagos(
         query = query.filter(
             models.PagoIndemnizacion.id_tramite_fifonafe
             == id_tramite_fifonafe
+        )
+    if id_afectacion is not None:
+        query = query.filter(models.TramiteFifonafe.id_afectacion == id_afectacion)
+    if id_ciclo_afectacion is not None:
+        query = query.filter(
+            models.TramiteFifonafe.id_ciclo_afectacion == id_ciclo_afectacion
         )
     return (
         query.order_by(

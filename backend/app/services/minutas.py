@@ -5,10 +5,37 @@ from .. import models, schemas
 from .common import get_active, mark_inactive, set_audit_context
 
 
-def _validar_actividad(
+def _validar_afectacion_ciclo(
+    db: Session,
+    id_tramo_nucleo: int,
+    id_afectacion: int | None,
+    id_ciclo_afectacion: int | None,
+) -> None:
+    if (id_afectacion is None) != (id_ciclo_afectacion is None):
+        raise HTTPException(
+            status_code=400,
+            detail="La minuta propia requiere afectación y ciclo",
+        )
+    if id_afectacion is None:
+        return
+    ciclo = db.query(models.AfectacionCiclo).filter(
+        models.AfectacionCiclo.id_tramo_nucleo == id_tramo_nucleo,
+        models.AfectacionCiclo.id_afectacion == id_afectacion,
+        models.AfectacionCiclo.id_ciclo_afectacion == id_ciclo_afectacion,
+        models.AfectacionCiclo.activo.is_(True),
+    ).first()
+    if ciclo is None:
+        raise HTTPException(
+            status_code=400,
+            detail="La afectación y el ciclo no pertenecen al expediente",
+        )
+
+
+def _validar_actividad_vs_ciclo(
     db: Session,
     id_actividad: int | None,
     id_tramo_nucleo: int,
+    id_ciclo_afectacion: int | None,
 ) -> None:
     if id_actividad is None:
         return
@@ -23,6 +50,19 @@ def _validar_actividad(
         raise HTTPException(
             status_code=400,
             detail="La actividad no pertenece al expediente de la minuta",
+        )
+    if id_ciclo_afectacion is None and actividad.id_ciclo_afectacion is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Una minuta compartida no puede apuntar a una actividad propia de ciclo",
+        )
+    if (
+        id_ciclo_afectacion is not None
+        and actividad.id_ciclo_afectacion != id_ciclo_afectacion
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="La actividad no pertenece al ciclo indicado",
         )
 
 
@@ -39,7 +79,18 @@ def create_minuta(
         "id_tramo_nucleo",
         "Expediente Tramo-Núcleo no encontrado",
     )
-    _validar_actividad(db, data.id_actividad, data.id_tramo_nucleo)
+    _validar_afectacion_ciclo(
+        db,
+        data.id_tramo_nucleo,
+        data.id_afectacion,
+        data.id_ciclo_afectacion,
+    )
+    _validar_actividad_vs_ciclo(
+        db,
+        data.id_actividad,
+        data.id_tramo_nucleo,
+        data.id_ciclo_afectacion,
+    )
     minuta = models.Minuta(**data.model_dump(exclude_unset=True))
     db.add(minuta)
     db.commit()
@@ -59,12 +110,24 @@ def update_minuta(
         raise HTTPException(status_code=400, detail="fecha_reunion es obligatoria")
     if changes.get("asunto", minuta.asunto) is None:
         raise HTTPException(status_code=400, detail="asunto es obligatorio")
-    if "id_actividad" in changes:
-        _validar_actividad(
-            db,
-            changes["id_actividad"],
-            minuta.id_tramo_nucleo,
-        )
+    id_afectacion = changes.get("id_afectacion", minuta.id_afectacion)
+    id_ciclo_afectacion = changes.get(
+        "id_ciclo_afectacion",
+        minuta.id_ciclo_afectacion,
+    )
+    id_actividad = changes.get("id_actividad", minuta.id_actividad)
+    _validar_afectacion_ciclo(
+        db,
+        minuta.id_tramo_nucleo,
+        id_afectacion,
+        id_ciclo_afectacion,
+    )
+    _validar_actividad_vs_ciclo(
+        db,
+        id_actividad,
+        minuta.id_tramo_nucleo,
+        id_ciclo_afectacion,
+    )
     for field, value in changes.items():
         setattr(minuta, field, value)
     db.commit()

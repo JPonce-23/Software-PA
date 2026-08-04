@@ -682,9 +682,11 @@ class TramoNucleoEstadoResponse(BaseModel):
 
 class DocumentacionSoporteCreate(AuditableCreate):
     entidad_relacionada_id: int
-    entidad_relacionada_tipo: str
+    entidad_relacionada_tipo: Literal[
+        'nucleo_agrario', 'tramo_nucleo', 'afectacion', 'convenio', 'orv'
+    ]
     tipo_documento: str
-    categoria: str
+    categoria: Literal['disponible', 'faltante']
     es_critico: bool = False
 
 class DocumentacionSoporteUpdate(AuditableUpdate):
@@ -695,6 +697,17 @@ class DocumentacionSoporteResponse(DocumentacionSoporteCreate):
     url_archivo: Optional[str] = None
     activo: bool
     model_config = ConfigDict(from_attributes=True)
+
+
+class AfectacionSubexpedienteResponse(BaseModel):
+    id_tramo_nucleo: int
+    id_afectacion: int
+    tramo_nucleo: TramoNucleoResponse
+    nucleo: NucleoAgrarioResponse
+    afectacion: AfectacionResponse
+    estado: AfectacionEstadoResponse
+    antecedentes_compartidos: List[ActividadCampoResponse] = Field(default_factory=list)
+    documentos_maestros: List[DocumentacionSoporteResponse] = Field(default_factory=list)
 
 # --- Para Alertas ---
 class AlertaCreate(BaseModel):
@@ -892,6 +905,8 @@ class OrvConIntegrantesCreate(BaseModel):
 class MinutaCreate(AuditableCreate):
     id_tramo_nucleo: int
     id_actividad: Optional[int] = None
+    id_afectacion: Optional[int] = None
+    id_ciclo_afectacion: Optional[int] = None
     fecha_reunion: date
     lugar: Optional[str] = Field(default=None, max_length=300)
     asunto: str = Field(min_length=1, max_length=300)
@@ -906,9 +921,17 @@ class MinutaCreate(AuditableCreate):
             raise ValueError('El asunto no puede estar vacío')
         return value
 
+    @model_validator(mode='after')
+    def validar_afectacion_ciclo(self):
+        if (self.id_afectacion is None) != (self.id_ciclo_afectacion is None):
+            raise ValueError('La minuta propia requiere afectación y ciclo')
+        return self
+
 
 class MinutaUpdate(AuditableUpdate):
     id_actividad: Optional[int] = None
+    id_afectacion: Optional[int] = None
+    id_ciclo_afectacion: Optional[int] = None
     fecha_reunion: Optional[date] = None
     lugar: Optional[str] = Field(default=None, max_length=300)
     asunto: Optional[str] = Field(default=None, min_length=1, max_length=300)
@@ -924,6 +947,12 @@ class MinutaUpdate(AuditableUpdate):
         if not value:
             raise ValueError('El asunto no puede estar vacío')
         return value
+
+    @model_validator(mode='after')
+    def validar_afectacion_ciclo(self):
+        if (self.id_afectacion is None) != (self.id_ciclo_afectacion is None):
+            raise ValueError('La minuta propia requiere afectación y ciclo')
+        return self
 
 
 class MinutaResponse(MinutaCreate):

@@ -79,6 +79,68 @@ def require_nucleo_access(
         )
 
 
+def require_document_relation_access(
+    db: Session,
+    user: models.Usuario,
+    entidad_tipo: str,
+    entidad_id: int,
+) -> None:
+    if entidad_tipo == "tramo_nucleo":
+        require_tramo_nucleo_access(db, user, entidad_id)
+        return
+    if entidad_tipo == "nucleo_agrario":
+        nucleo = db.query(models.NucleoAgrario.id_nucleo).filter(
+            models.NucleoAgrario.id_nucleo == entidad_id,
+            models.NucleoAgrario.activo.is_(True),
+        ).first()
+        if nucleo is None:
+            raise HTTPException(status_code=404, detail="Núcleo no encontrado")
+        require_nucleo_access(db, user, entidad_id)
+        return
+    if entidad_tipo == "afectacion":
+        require_afectacion_access(db, user, entidad_id)
+        return
+    if entidad_tipo == "convenio":
+        convenio = db.query(models.Convenio).filter(
+            models.Convenio.id_convenio == entidad_id,
+            models.Convenio.activo.is_(True),
+        ).first()
+        if convenio is None:
+            raise HTTPException(status_code=404, detail="Convenio no encontrado")
+        require_tramo_nucleo_access(db, user, convenio.id_tramo_nucleo)
+        return
+    if entidad_tipo == "orv":
+        orv = db.query(models.Orv).filter(
+            models.Orv.id_orv == entidad_id,
+            models.Orv.activo.is_(True),
+        ).first()
+        if orv is None:
+            raise HTTPException(status_code=404, detail="ORV no encontrado")
+        require_nucleo_access(db, user, orv.id_nucleo)
+        return
+    raise HTTPException(status_code=400, detail="Tipo de entidad documental no válido")
+
+
+def require_document_access(
+    db: Session,
+    user: models.Usuario,
+    id_documento: int,
+) -> models.DocumentacionSoporte:
+    documento = db.query(models.DocumentacionSoporte).filter(
+        models.DocumentacionSoporte.id_documento == id_documento,
+        models.DocumentacionSoporte.activo.is_(True),
+    ).first()
+    if documento is None:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    require_document_relation_access(
+        db,
+        user,
+        documento.entidad_relacionada_tipo,
+        documento.entidad_relacionada_id,
+    )
+    return documento
+
+
 def filter_by_user_tramos(
     query: Query,
     db: Session,

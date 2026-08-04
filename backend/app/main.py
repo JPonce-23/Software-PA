@@ -19,9 +19,12 @@ from fastapi.security import OAuth2PasswordRequestForm
 from . import auth
 from .routers import alertas, documentos, flujo, minutas, pagos, personas
 from .services import afectaciones as afectaciones_service
+from .services import flujo as flujo_service
 from .services.access import (
     filter_by_user_tramos,
     require_afectacion_access,
+    require_document_access,
+    require_document_relation_access,
     require_nucleo_access,
     require_tramo_access,
     require_tramo_nucleo_access,
@@ -168,6 +171,48 @@ GEOMETRY_FIELDS = {
     models.TramoNucleo: "geometria_segmento",
     models.Afectacion: "geometria_afectacion"
 }
+
+
+def require_afectacion_in_tramo_nucleo(
+    db: Session,
+    current_user: models.Usuario,
+    id_tramo_nucleo: int,
+    id_afectacion: int,
+) -> models.Afectacion:
+    afectacion = require_afectacion_access(db, current_user, id_afectacion)
+    if afectacion.id_tramo_nucleo != id_tramo_nucleo:
+        raise HTTPException(
+            status_code=404,
+            detail="Afectación no encontrada en el expediente solicitado",
+        )
+    return afectacion
+
+
+def require_ciclo_scope(
+    db: Session,
+    current_user: models.Usuario,
+    id_ciclo_afectacion: int,
+    id_tramo_nucleo: int | None = None,
+    id_afectacion: int | None = None,
+) -> models.AfectacionCiclo:
+    ciclo = db.query(models.AfectacionCiclo).filter(
+        models.AfectacionCiclo.id_ciclo_afectacion == id_ciclo_afectacion,
+        models.AfectacionCiclo.activo.is_(True),
+    ).first()
+    if ciclo is None:
+        raise HTTPException(status_code=404, detail="Ciclo no encontrado")
+    require_afectacion_access(db, current_user, ciclo.id_afectacion)
+    if id_tramo_nucleo is not None and ciclo.id_tramo_nucleo != id_tramo_nucleo:
+        raise HTTPException(
+            status_code=404,
+            detail="Ciclo no encontrado en el expediente solicitado",
+        )
+    if id_afectacion is not None and ciclo.id_afectacion != id_afectacion:
+        raise HTTPException(
+            status_code=404,
+            detail="Ciclo no encontrado en la afectación solicitada",
+        )
+    return ciclo
 
 def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
     set_audit_context(db, user_id)
@@ -734,14 +779,29 @@ def delete_afectacion(id_afectacion: int, motivo: str = Query(...), db: Session 
 
 # ==================== ASAMBLEAS ==================== #
 @app.get("/api/asambleas", tags=["Asambleas"], summary="Listar asambleas", response_model=List[schemas.AsambleaResponse])
-def list_asambleas(id_tramo_nucleo: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+def list_asambleas(
+    id_tramo_nucleo: int = Query(None),
+    id_afectacion: int = Query(None),
+    id_ciclo_afectacion: int = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo'])),
+):
     query = db.query(models.Asamblea).join(
         models.TramoNucleo,
         models.TramoNucleo.id_tramo_nucleo == models.Asamblea.id_tramo_nucleo,
     ).filter(models.Asamblea.activo == True)
     query = filter_by_user_tramos(query, db, current_user, models.TramoNucleo.id_tramo)
     if id_tramo_nucleo:
+        require_tramo_nucleo_access(db, current_user, id_tramo_nucleo)
         query = query.filter(models.Asamblea.id_tramo_nucleo == id_tramo_nucleo)
+    if id_afectacion:
+        afectacion = require_afectacion_access(db, current_user, id_afectacion)
+        if id_tramo_nucleo and afectacion.id_tramo_nucleo != id_tramo_nucleo:
+            raise HTTPException(status_code=404, detail="Afectación no encontrada en el expediente solicitado")
+        query = query.filter(models.Asamblea.id_afectacion == id_afectacion)
+    if id_ciclo_afectacion:
+        require_ciclo_scope(db, current_user, id_ciclo_afectacion, id_tramo_nucleo, id_afectacion)
+        query = query.filter(models.Asamblea.id_ciclo_afectacion == id_ciclo_afectacion)
     return query.all()
 
 @app.post("/api/asambleas", tags=["Asambleas"], summary="Crear asamblea", response_model=schemas.AsambleaResponse, status_code=status.HTTP_201_CREATED)
@@ -813,6 +873,8 @@ def delete_asamblea(id_asamblea: int, motivo: str = Query(...), db: Session = De
 @app.get("/api/convenios", tags=["Convenios"], summary="Listar convenios", response_model=List[schemas.ConvenioResponse])
 def list_convenios(
     id_tramo_nucleo: int = Query(None),
+    id_afectacion: int = Query(None),
+    id_ciclo_afectacion: int = Query(None),
     tipo_convenio: str = Query(None),
     inscrito: bool = Query(None),
     db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))
@@ -823,7 +885,16 @@ def list_convenios(
     ).filter(models.Convenio.activo == True)
     query = filter_by_user_tramos(query, db, current_user, models.TramoNucleo.id_tramo)
     if id_tramo_nucleo:
+        require_tramo_nucleo_access(db, current_user, id_tramo_nucleo)
         query = query.filter(models.Convenio.id_tramo_nucleo == id_tramo_nucleo)
+    if id_afectacion:
+        afectacion = require_afectacion_access(db, current_user, id_afectacion)
+        if id_tramo_nucleo and afectacion.id_tramo_nucleo != id_tramo_nucleo:
+            raise HTTPException(status_code=404, detail="Afectación no encontrada en el expediente solicitado")
+        query = query.filter(models.Convenio.id_afectacion == id_afectacion)
+    if id_ciclo_afectacion:
+        require_ciclo_scope(db, current_user, id_ciclo_afectacion, id_tramo_nucleo, id_afectacion)
+        query = query.filter(models.Convenio.id_ciclo_afectacion == id_ciclo_afectacion)
     if tipo_convenio:
         query = query.filter(models.Convenio.tipo_convenio == tipo_convenio)
     if inscrito is True:
@@ -968,14 +1039,27 @@ def delete_padron(id_padron: int, motivo: str = Query(...), db: Session = Depend
 
 # ==================== ACTIVIDAD CAMPO ==================== #
 @app.get("/api/actividades-campo", tags=["Actividades de Campo"], summary="Listar actividades de campo", response_model=List[schemas.ActividadCampoResponse])
-def list_actividades(id_tramo_nucleo: int = Query(None), tipo_actividad: str = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+def list_actividades(
+    id_tramo_nucleo: int = Query(None),
+    id_ciclo_afectacion: int = Query(None),
+    tipo_actividad: str = Query(None),
+    solo_compartidas: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo'])),
+):
     query = db.query(models.ActividadCampo).join(
         models.TramoNucleo,
         models.TramoNucleo.id_tramo_nucleo == models.ActividadCampo.id_tramo_nucleo,
     ).filter(models.ActividadCampo.activo == True)
     query = filter_by_user_tramos(query, db, current_user, models.TramoNucleo.id_tramo)
     if id_tramo_nucleo:
+        require_tramo_nucleo_access(db, current_user, id_tramo_nucleo)
         query = query.filter(models.ActividadCampo.id_tramo_nucleo == id_tramo_nucleo)
+    if id_ciclo_afectacion:
+        require_ciclo_scope(db, current_user, id_ciclo_afectacion, id_tramo_nucleo)
+        query = query.filter(models.ActividadCampo.id_ciclo_afectacion == id_ciclo_afectacion)
+    if solo_compartidas:
+        query = query.filter(models.ActividadCampo.id_ciclo_afectacion.is_(None))
     if tipo_actividad:
         query = query.filter(models.ActividadCampo.tipo_actividad == tipo_actividad)
     return query.all()
@@ -1015,14 +1099,32 @@ def delete_actividad(id_actividad: int, motivo: str = Query(...), db: Session = 
 
 # ==================== TRAMITE FIFONAFE ==================== #
 @app.get("/api/fifonafe", tags=["Fifonafe"], summary="Listar trámites fifonafe", response_model=List[schemas.TramiteFifonafeResponse])
-def list_fifonafe(id_tramo_nucleo: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+def list_fifonafe(
+    id_tramo_nucleo: int = Query(None),
+    id_afectacion: int = Query(None),
+    id_ciclo_afectacion: int = Query(None),
+    tipo_tramite: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo'])),
+):
     query = db.query(models.TramiteFifonafe).join(
         models.TramoNucleo,
         models.TramoNucleo.id_tramo_nucleo == models.TramiteFifonafe.id_tramo_nucleo,
     ).filter(models.TramiteFifonafe.activo == True)
     query = filter_by_user_tramos(query, db, current_user, models.TramoNucleo.id_tramo)
     if id_tramo_nucleo:
+        require_tramo_nucleo_access(db, current_user, id_tramo_nucleo)
         query = query.filter(models.TramiteFifonafe.id_tramo_nucleo == id_tramo_nucleo)
+    if id_afectacion:
+        afectacion = require_afectacion_access(db, current_user, id_afectacion)
+        if id_tramo_nucleo and afectacion.id_tramo_nucleo != id_tramo_nucleo:
+            raise HTTPException(status_code=404, detail="Afectación no encontrada en el expediente solicitado")
+        query = query.filter(models.TramiteFifonafe.id_afectacion == id_afectacion)
+    if id_ciclo_afectacion:
+        require_ciclo_scope(db, current_user, id_ciclo_afectacion, id_tramo_nucleo, id_afectacion)
+        query = query.filter(models.TramiteFifonafe.id_ciclo_afectacion == id_ciclo_afectacion)
+    if tipo_tramite:
+        query = query.filter(models.TramiteFifonafe.tipo_tramite == tipo_tramite)
     return query.all()
 
 @app.post("/api/fifonafe", tags=["Fifonafe"], summary="Crear trámite fifonafe", response_model=schemas.TramiteFifonafeResponse, status_code=status.HTTP_201_CREATED)
@@ -1075,7 +1177,12 @@ def delete_fifonafe(id_tramite: int, motivo: str = Query(...), db: Session = Dep
 @app.get("/api/documentacion", tags=["Documentación"], summary="Listar documentación de soporte", response_model=List[schemas.DocumentacionSoporteResponse])
 def list_documentacion(entidad_tipo: str = Query(None), entidad_id: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     query = db.query(models.DocumentacionSoporte).filter(models.DocumentacionSoporte.activo == True)
+    if (entidad_tipo is None) != (entidad_id is None):
+        raise HTTPException(status_code=400, detail="Indique entidad_tipo y entidad_id juntos")
+    if entidad_tipo is None and current_user.rol != "admin":
+        raise HTTPException(status_code=400, detail="Indique la entidad documental a consultar")
     if entidad_tipo:
+        require_document_relation_access(db, current_user, entidad_tipo, entidad_id)
         query = query.filter(models.DocumentacionSoporte.entidad_relacionada_tipo == entidad_tipo)
     if entidad_id:
         query = query.filter(models.DocumentacionSoporte.entidad_relacionada_id == entidad_id)
@@ -1084,6 +1191,12 @@ def list_documentacion(entidad_tipo: str = Query(None), entidad_id: int = Query(
 @app.post("/api/documentacion", tags=["Documentación"], summary="Crear documentación de soporte", response_model=schemas.DocumentacionSoporteResponse, status_code=status.HTTP_201_CREATED)
 def create_documentacion(doc: schemas.DocumentacionSoporteCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     set_audit_context(db, current_user.id_usuario)
+    require_document_relation_access(
+        db,
+        current_user,
+        doc.entidad_relacionada_tipo,
+        doc.entidad_relacionada_id,
+    )
     db_doc = models.DocumentacionSoporte(**doc.model_dump())
     db_doc.fecha_carga = datetime.now(timezone.utc)
     db.add(db_doc)
@@ -1093,8 +1206,109 @@ def create_documentacion(doc: schemas.DocumentacionSoporteCreate, db: Session = 
 
 @app.put("/api/documentacion/{id_documento}", tags=["Documentación"], summary="Actualizar documentación de soporte", response_model=schemas.DocumentacionSoporteResponse)
 def update_documentacion_route(id_documento: int, data: schemas.DocumentacionSoporteUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
-    entity = get_entity_by_id(db, models.DocumentacionSoporte, id_documento, "id_documento")
+    entity = require_document_access(db, current_user, id_documento)
     return update_entity(db, entity, data, current_user.id_usuario)
+
+# ==================== SUBEXPEDIENTE 2C ==================== #
+@app.get(
+    "/api/tramos-nucleos/{id_tramo_nucleo}/afectaciones/{id_afectacion}/subexpediente",
+    tags=["Subexpedientes"],
+    summary="Obtener resumen de subexpediente por afectación",
+    response_model=schemas.AfectacionSubexpedienteResponse,
+)
+def get_subexpediente_afectacion(
+    id_tramo_nucleo: int,
+    id_afectacion: int,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo'])),
+):
+    afectacion = require_afectacion_in_tramo_nucleo(
+        db,
+        current_user,
+        id_tramo_nucleo,
+        id_afectacion,
+    )
+    tramo_nucleo = db.query(
+        models.TramoNucleo.id_tramo_nucleo,
+        models.TramoNucleo.id_tramo,
+        models.TramoNucleo.id_nucleo,
+        models.TramoNucleo.consecutivo,
+        models.TramoNucleo.numero_tramo,
+        models.TramoNucleo.geometria_segmento.ST_AsText().label('geometria_wkt'),
+        models.TramoNucleo.longitud_m,
+        models.TramoNucleo.es_expropiacion,
+        models.TramoNucleo.causa_problema,
+        models.TramoNucleo.proyecto_no_afecta_uso_comun,
+        models.TramoNucleo.activo,
+        models.TramoNucleo.observaciones,
+    ).filter(
+        models.TramoNucleo.id_tramo_nucleo == id_tramo_nucleo,
+        models.TramoNucleo.activo == True,
+    ).first()
+    nucleo = db.query(
+        models.NucleoAgrario.id_nucleo,
+        models.NucleoAgrario.nombre_nucleo,
+        models.NucleoAgrario.tipo_nucleo,
+        models.NucleoAgrario.comunidad_indigena,
+        models.NucleoAgrario.geometria_poligono.ST_AsText().label('geometria_wkt'),
+    ).filter(
+        models.NucleoAgrario.id_nucleo == afectacion.id_nucleo,
+        models.NucleoAgrario.activo == True,
+    ).first()
+    afectacion_row = db.query(
+        models.Afectacion.id_afectacion,
+        models.Afectacion.id_nucleo,
+        models.Afectacion.id_tramo_nucleo,
+        models.Afectacion.id_parcela,
+        models.Afectacion.tipo_afectacion,
+        models.Afectacion.tipo_tenencia,
+        models.Afectacion.subtipo_tenencia,
+        models.Afectacion.destino_superficie,
+        models.Afectacion.no_parcela_solar,
+        models.Afectacion.superficie_afectada_ha,
+        models.Afectacion.geometria_afectacion.ST_AsText().label('geometria_wkt'),
+        models.Afectacion.num_personas_afectadas,
+        models.Afectacion.situacion_juridica,
+        models.Afectacion.documentacion_disponible,
+        models.Afectacion.documentacion_faltante,
+        models.Afectacion.origen_registro,
+        models.Afectacion.tipo_salida_terminal,
+        models.Afectacion.fecha_salida_terminal,
+        models.Afectacion.motivo_salida_terminal,
+        models.Afectacion.activo,
+        models.Afectacion.observaciones,
+    ).filter(
+        models.Afectacion.id_afectacion == id_afectacion,
+        models.Afectacion.activo == True,
+    ).first()
+    antecedentes = db.query(models.ActividadCampo).filter(
+        models.ActividadCampo.id_tramo_nucleo == id_tramo_nucleo,
+        models.ActividadCampo.id_ciclo_afectacion.is_(None),
+        models.ActividadCampo.activo == True,
+    ).order_by(
+        models.ActividadCampo.fecha_realizada,
+        models.ActividadCampo.fecha_programada,
+        models.ActividadCampo.id_actividad,
+    ).all()
+    documentos_maestros = db.query(models.DocumentacionSoporte).filter(
+        models.DocumentacionSoporte.entidad_relacionada_tipo == 'tramo_nucleo',
+        models.DocumentacionSoporte.entidad_relacionada_id == id_tramo_nucleo,
+        models.DocumentacionSoporte.activo == True,
+    ).order_by(models.DocumentacionSoporte.id_documento.desc()).all()
+    return {
+        "id_tramo_nucleo": id_tramo_nucleo,
+        "id_afectacion": id_afectacion,
+        "tramo_nucleo": tramo_nucleo,
+        "nucleo": nucleo,
+        "afectacion": afectacion_row,
+        "estado": flujo_service.obtener_estado_afectacion(
+            db,
+            current_user,
+            id_afectacion,
+        ),
+        "antecedentes_compartidos": antecedentes,
+        "documentos_maestros": documentos_maestros,
+    }
 
 # ==================== ALERTAS ==================== #
 @app.get("/api/alertas", tags=["Alertas"], summary="Listar alertas", response_model=List[schemas.AlertaResponse])

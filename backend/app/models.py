@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, ForeignKeyConstraint, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 from sqlalchemy.dialects.postgresql import JSONB, INET
@@ -375,9 +375,27 @@ class ParcelaTitular(Base, AuditableMixin):
 
 class Minuta(Base, AuditableMixin):
     __tablename__ = "minuta"
+    __table_args__ = (
+        CheckConstraint(
+            "(id_afectacion IS NULL AND id_ciclo_afectacion IS NULL) OR "
+            "(id_afectacion IS NOT NULL AND id_ciclo_afectacion IS NOT NULL)",
+            name="chk_2c_minuta_afectacion_ciclo_completos",
+        ),
+        ForeignKeyConstraint(
+            ["id_tramo_nucleo", "id_ciclo_afectacion", "id_afectacion"],
+            [
+                "afectacion_ciclo.id_tramo_nucleo",
+                "afectacion_ciclo.id_ciclo_afectacion",
+                "afectacion_ciclo.id_afectacion",
+            ],
+            name="fk_2c_minuta_ciclo",
+        ),
+    )
     id_minuta = Column(Integer, primary_key=True, index=True)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
     id_actividad = Column(Integer, ForeignKey("actividad_campo.id_actividad"), nullable=True)
+    id_afectacion = Column(Integer, nullable=True)
+    id_ciclo_afectacion = Column(Integer, nullable=True)
     fecha_reunion = Column(Date, nullable=False)
     lugar = Column(String(300), nullable=True)
     asunto = Column(String(300), nullable=False)

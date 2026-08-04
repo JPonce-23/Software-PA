@@ -1,10 +1,11 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
 from ..database import get_db
+from ..services.access import require_afectacion_access, require_tramo_nucleo_access
 from ..services import minutas as service
 from ..services.common import get_active
 
@@ -14,9 +15,31 @@ READ_ROLES = ["admin", "operador", "visualizador", "geografo"]
 WRITE_ROLES = ["admin", "operador", "geografo"]
 
 
+def _require_minuta_access(
+    db: Session,
+    current_user: models.Usuario,
+    id_minuta: int,
+) -> models.Minuta:
+    minuta = get_active(db, models.Minuta, id_minuta, "id_minuta")
+    require_tramo_nucleo_access(db, current_user, minuta.id_tramo_nucleo)
+    return minuta
+
+
+def _require_acuerdo_access(
+    db: Session,
+    current_user: models.Usuario,
+    id_acuerdo: int,
+) -> models.Acuerdo:
+    acuerdo = get_active(db, models.Acuerdo, id_acuerdo, "id_acuerdo")
+    _require_minuta_access(db, current_user, acuerdo.id_minuta)
+    return acuerdo
+
+
 @router.get("/minutas", response_model=List[schemas.MinutaResponse], tags=["Minutas"])
 def listar_minutas(
     id_tramo_nucleo: int | None = Query(default=None),
+    id_afectacion: int | None = Query(default=None),
+    solo_compartidas: bool = Query(default=False),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -24,7 +47,18 @@ def listar_minutas(
 ):
     query = db.query(models.Minuta).filter(models.Minuta.activo.is_(True))
     if id_tramo_nucleo is not None:
+        require_tramo_nucleo_access(db, current_user, id_tramo_nucleo)
         query = query.filter(models.Minuta.id_tramo_nucleo == id_tramo_nucleo)
+    if id_afectacion is not None:
+        afectacion = require_afectacion_access(db, current_user, id_afectacion)
+        if id_tramo_nucleo is not None and afectacion.id_tramo_nucleo != id_tramo_nucleo:
+            raise HTTPException(
+                status_code=404,
+                detail="Afectación no encontrada en el expediente solicitado",
+            )
+        query = query.filter(models.Minuta.id_afectacion == id_afectacion)
+    elif solo_compartidas:
+        query = query.filter(models.Minuta.id_afectacion.is_(None))
     return (
         query.order_by(models.Minuta.fecha_reunion.desc(), models.Minuta.id_minuta.desc())
         .offset(skip)
@@ -43,7 +77,7 @@ def obtener_minuta(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    return get_active(db, models.Minuta, id_minuta, "id_minuta")
+    return _require_minuta_access(db, current_user, id_minuta)
 
 
 @router.post(
@@ -57,6 +91,14 @@ def crear_minuta(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
+    require_tramo_nucleo_access(db, current_user, data.id_tramo_nucleo)
+    if data.id_afectacion is not None:
+        afectacion = require_afectacion_access(db, current_user, data.id_afectacion)
+        if afectacion.id_tramo_nucleo != data.id_tramo_nucleo:
+            raise HTTPException(
+                status_code=400,
+                detail="La afectación no pertenece al expediente de la minuta",
+            )
     return service.create_minuta(db, data, current_user.id_usuario)
 
 
@@ -71,7 +113,7 @@ def actualizar_minuta(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
-    minuta = get_active(db, models.Minuta, id_minuta, "id_minuta")
+    minuta = _require_minuta_access(db, current_user, id_minuta)
     return service.update_minuta(db, minuta, data, current_user.id_usuario)
 
 
@@ -82,7 +124,7 @@ def eliminar_minuta(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
-    minuta = get_active(db, models.Minuta, id_minuta, "id_minuta")
+    minuta = _require_minuta_access(db, current_user, id_minuta)
     service.delete_minuta(db, minuta, current_user.id_usuario, motivo)
     return {"status": "success", "message": "Minuta dada de baja"}
 
@@ -97,7 +139,7 @@ def listar_acuerdos(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    get_active(db, models.Minuta, id_minuta, "id_minuta")
+    _require_minuta_access(db, current_user, id_minuta)
     return (
         db.query(models.Acuerdo)
         .filter_by(id_minuta=id_minuta, activo=True)
@@ -118,7 +160,7 @@ def crear_acuerdo(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
-    minuta = get_active(db, models.Minuta, id_minuta, "id_minuta")
+    minuta = _require_minuta_access(db, current_user, id_minuta)
     return service.create_acuerdo(db, minuta, data, current_user.id_usuario)
 
 
@@ -132,7 +174,7 @@ def obtener_acuerdo(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    return get_active(db, models.Acuerdo, id_acuerdo, "id_acuerdo")
+    return _require_acuerdo_access(db, current_user, id_acuerdo)
 
 
 @router.put(
@@ -146,7 +188,7 @@ def actualizar_acuerdo(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
-    acuerdo = get_active(db, models.Acuerdo, id_acuerdo, "id_acuerdo")
+    acuerdo = _require_acuerdo_access(db, current_user, id_acuerdo)
     return service.update_acuerdo(db, acuerdo, data, current_user.id_usuario)
 
 
@@ -157,6 +199,6 @@ def eliminar_acuerdo(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
-    acuerdo = get_active(db, models.Acuerdo, id_acuerdo, "id_acuerdo")
+    acuerdo = _require_acuerdo_access(db, current_user, id_acuerdo)
     service.delete_acuerdo(db, acuerdo, current_user.id_usuario, motivo)
     return {"status": "success", "message": "Acuerdo dado de baja"}
