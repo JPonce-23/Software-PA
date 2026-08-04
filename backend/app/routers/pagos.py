@@ -7,6 +7,7 @@ from .. import auth, models, schemas
 from ..database import get_db
 from ..services import pagos as service
 from ..services.common import get_active
+from ..services.access import require_tramo_nucleo_access, filter_by_user_tramos
 
 
 router = APIRouter()
@@ -26,8 +27,19 @@ def listar_pagos(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    query = db.query(models.PagoIndemnizacion).filter(
+    query = db.query(models.PagoIndemnizacion).join(
+        models.TramiteFifonafe,
+        models.TramiteFifonafe.id_tramite_fifonafe
+        == models.PagoIndemnizacion.id_tramite_fifonafe,
+    ).join(
+        models.TramoNucleo,
+        models.TramoNucleo.id_tramo_nucleo
+        == models.TramiteFifonafe.id_tramo_nucleo,
+    ).filter(
         models.PagoIndemnizacion.activo.is_(True)
+    )
+    query = filter_by_user_tramos(
+        query, db, current_user, models.TramoNucleo.id_tramo
     )
     if id_tramite_fifonafe is not None:
         query = query.filter(
@@ -55,13 +67,17 @@ def obtener_pago(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    return get_active(
+    pago = get_active(
         db,
         models.PagoIndemnizacion,
         id_pago,
         "id_pago",
         "Pago no encontrado",
     )
+    require_tramo_nucleo_access(
+        db, current_user, pago.tramite.id_tramo_nucleo
+    )
+    return pago
 
 
 @router.post(
@@ -75,6 +91,11 @@ def crear_pago(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
+    tramite = get_active(
+        db, models.TramiteFifonafe, data.id_tramite_fifonafe,
+        "id_tramite_fifonafe", "Trámite FIFONAFE no encontrado",
+    )
+    require_tramo_nucleo_access(db, current_user, tramite.id_tramo_nucleo)
     return service.create_pago(db, data, current_user.id_usuario)
 
 
@@ -96,6 +117,7 @@ def actualizar_pago(
         "id_pago",
         "Pago no encontrado",
     )
+    require_tramo_nucleo_access(db, current_user, pago.tramite.id_tramo_nucleo)
     return service.update_pago(db, pago, data, current_user.id_usuario)
 
 
@@ -116,5 +138,6 @@ def eliminar_pago(
         "id_pago",
         "Pago no encontrado",
     )
+    require_tramo_nucleo_access(db, current_user, pago.tramite.id_tramo_nucleo)
     service.delete_pago(db, pago, current_user.id_usuario, motivo)
     return {"status": "success", "message": "Pago dado de baja"}

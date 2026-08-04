@@ -17,8 +17,15 @@ from .database import engine, Base, get_db
 from . import models, schemas
 from fastapi.security import OAuth2PasswordRequestForm
 from . import auth
-from .routers import alertas, documentos, minutas, pagos, personas
+from .routers import alertas, documentos, flujo, minutas, pagos, personas
 from .services import afectaciones as afectaciones_service
+from .services.access import (
+    filter_by_user_tramos,
+    require_afectacion_access,
+    require_nucleo_access,
+    require_tramo_access,
+    require_tramo_nucleo_access,
+)
 
 
 app = FastAPI(
@@ -43,23 +50,35 @@ def sanitize_pg_error(msg: str) -> str:
 
 @app.exception_handler(InternalError)
 def sqlalchemy_internal_error_handler(request, exc: InternalError):
-    raw_msg = str(exc.orig)
-    clean_msg = sanitize_pg_error(raw_msg)
-    return JSONResponse(status_code=400, content={"detail": clean_msg})
+    logger.error(
+        "Error interno de PostgreSQL en %s",
+        request.url.path,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "La operación no cumple las reglas del proceso."},
+    )
 
 @app.exception_handler(IntegrityError)
 def sqlalchemy_integrity_error_handler(request, exc: IntegrityError):
-    raw_msg = str(exc.orig)
-    clean_msg = sanitize_pg_error(raw_msg)
-    return JSONResponse(status_code=422, content={"detail": f"Violación de regla de negocio: {clean_msg}"})
+    logger.error(
+        "Violación de integridad en %s",
+        request.url.path,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "La operación entra en conflicto con la integridad de los datos."},
+    )
 
 @app.exception_handler(Exception)
 def global_exception_handler(request, exc: Exception):
-    logger.exception(
+    logger.error(
         "Error no controlado en %s %s",
         request.method,
         request.url.path,
-        exc_info=True,
+        exc_info=(type(exc), exc, exc.__traceback__),
     )
     return JSONResponse(
         status_code=500,
@@ -79,6 +98,7 @@ app.include_router(minutas.router, prefix="/api")
 app.include_router(pagos.router, prefix="/api")
 app.include_router(documentos.router, prefix="/api")
 app.include_router(alertas.router, prefix="/api")
+app.include_router(flujo.router, prefix="/api")
 
 
 os.makedirs("uploads", exist_ok=True)
@@ -246,6 +266,7 @@ def get_tramos(id_proyecto: int = Query(None), skip: int = 0, limit: int = 100, 
         models.Tramo.fecha_registro,
         models.Tramo.geometria_linea.ST_AsText().label('geometria_wkt')
     ).filter(models.Tramo.activo == True)
+    query = filter_by_user_tramos(query, db, current_user, models.Tramo.id_tramo)
     if id_proyecto is not None:
         query = query.filter(models.Tramo.id_proyecto == id_proyecto)
     return query.offset(skip).limit(limit).all()
@@ -303,8 +324,23 @@ def get_nucleos(id_tramo: int = Query(None), db: Session = Depends(get_db), curr
         WHERE n.activo = true
     """
     params = {}
+
+    if current_user.rol != "admin":
+        base_sql += """
+            AND EXISTS (
+                SELECT 1
+                  FROM tramo_nucleo tn
+                  JOIN usuario_tramo ut ON ut.id_tramo = tn.id_tramo
+                 WHERE tn.id_nucleo = n.id_nucleo
+                   AND tn.activo = TRUE
+                   AND ut.id_usuario = :id_usuario
+                   AND ut.activo = TRUE
+            )
+        """
+        params["id_usuario"] = current_user.id_usuario
     
     if id_tramo is not None:
+        require_tramo_access(db, current_user, id_tramo)
         base_sql += """
             AND ST_Intersects(n.geometria_poligono, (
                 SELECT ST_Union(t.geometria_linea) 
@@ -339,6 +375,7 @@ def get_tramo_detalles(id_tramo: int = Query(...), db: Session = Depends(get_db)
     from sqlalchemy import text
     from fastapi import HTTPException
     
+    require_tramo_access(db, current_user, id_tramo)
     sql = text("""
         SELECT 
             id_tramo,
@@ -412,6 +449,9 @@ def list_tramos_nucleos(
         models.TramoNucleo.activo,
         models.TramoNucleo.observaciones,
     ).filter(models.TramoNucleo.activo == True)
+    query = filter_by_user_tramos(
+        query, db, current_user, models.TramoNucleo.id_tramo
+    )
     if id_tramo:
         query = query.filter(models.TramoNucleo.id_tramo == id_tramo)
     if id_nucleo:
@@ -420,6 +460,7 @@ def list_tramos_nucleos(
 
 @app.get("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Obtener tramo-nucleo", response_model=schemas.TramoNucleoResponse)
 def get_tramo_nucleo(id_tramo_nucleo: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    require_tramo_nucleo_access(db, current_user, id_tramo_nucleo)
     row = db.query(
         models.TramoNucleo.id_tramo_nucleo,
         models.TramoNucleo.id_tramo,
@@ -443,6 +484,7 @@ def get_tramo_nucleo(id_tramo_nucleo: int, db: Session = Depends(get_db), curren
 
 @app.post("/api/tramos-nucleos", tags=["Tramos-Nucleos"], summary="Crear tramo-nucleo", response_model=schemas.TramoNucleoResponse, status_code=status.HTTP_201_CREATED)
 def create_tramo_nucleo(tramo_nucleo: schemas.TramoNucleoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+    require_tramo_access(db, current_user, tramo_nucleo.id_tramo)
     set_audit_context(db, current_user.id_usuario)
     data = tramo_nucleo.model_dump()
     wkt = data.pop("geometria_wkt", None)
@@ -465,6 +507,7 @@ def create_tramo_nucleo(tramo_nucleo: schemas.TramoNucleoCreate, db: Session = D
 @app.put("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Actualizar tramo-nucleo", response_model=schemas.TramoNucleoResponse)
 def update_tramo_nucleo(id_tramo_nucleo: int, data: schemas.TramoNucleoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.TramoNucleo, id_tramo_nucleo, "id_tramo_nucleo")
+    require_tramo_access(db, current_user, entity.id_tramo)
     updated = update_entity(db, entity, data, current_user.id_usuario)
     resp = updated.__dict__.copy()
     resp["geometria_wkt"] = db.query(
@@ -477,13 +520,27 @@ def update_tramo_nucleo(id_tramo_nucleo: int, data: schemas.TramoNucleoUpdate, d
 @app.delete("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Eliminar tramo-nucleo")
 def delete_tramo_nucleo(id_tramo_nucleo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.TramoNucleo, id_tramo_nucleo, "id_tramo_nucleo")
+    require_tramo_access(db, current_user, entity.id_tramo)
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== DASHBOARD & REPORTES ==================== #
 @app.get("/api/dashboard", tags=["Dashboard"], summary="Consultar convenios y superficie", response_model=List[schemas.DashboardMetrics])
 def get_dashboard_metrics(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    query = text("SELECT * FROM vw_dashboard_liberacion LIMIT 100;")
-    return db.execute(query).mappings().all()
+    query = text("""
+        SELECT v.*
+          FROM vw_dashboard_liberacion v
+         WHERE :es_admin OR EXISTS (
+             SELECT 1 FROM usuario_tramo ut
+              WHERE ut.id_tramo = v.id_tramo
+                AND ut.id_usuario = :id_usuario
+                AND ut.activo = TRUE
+         )
+         LIMIT 100
+    """)
+    return db.execute(query, {
+        "es_admin": current_user.rol == "admin",
+        "id_usuario": current_user.id_usuario,
+    }).mappings().all()
 
 @app.get("/api/reportes/resumen", tags=["Reportes"], summary="Generar reporte resumen")
 def generar_reporte_resumen(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
@@ -510,6 +567,13 @@ def list_afectaciones(skip: int = 0, limit: int = 100, id_tramo_nucleo: int = Qu
         models.Afectacion,
         models.Afectacion.geometria_afectacion.ST_AsText().label('geometria_wkt')
     ).filter(models.Afectacion.activo == True)
+    query = query.join(
+        models.TramoNucleo,
+        models.TramoNucleo.id_tramo_nucleo == models.Afectacion.id_tramo_nucleo,
+    )
+    query = filter_by_user_tramos(
+        query, db, current_user, models.TramoNucleo.id_tramo
+    )
     if id_tramo_nucleo:
         query = query.filter(models.Afectacion.id_tramo_nucleo == id_tramo_nucleo)
     if tipo_afectacion:
@@ -533,8 +597,9 @@ def list_afectaciones(skip: int = 0, limit: int = 100, id_tramo_nucleo: int = Qu
 def create_afectacion_colectiva(
     afectacion: schemas.AfectacionColectivaCreate,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo'])),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador'])),
 ):
+    require_tramo_nucleo_access(db, current_user, afectacion.id_tramo_nucleo)
     validate_wkt(db, afectacion.geometria_wkt, {"ST_Polygon", "ST_MultiPolygon"})
     creada = afectaciones_service.crear_colectiva(db, afectacion, current_user.id_usuario)
     return afectacion_response(db, creada)
@@ -550,15 +615,17 @@ def create_afectacion_colectiva(
 def create_afectacion_individual(
     afectacion: schemas.AfectacionIndividualCreate,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo'])),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador'])),
 ):
+    require_tramo_nucleo_access(db, current_user, afectacion.id_tramo_nucleo)
     validate_wkt(db, afectacion.geometria_wkt, {"ST_Polygon", "ST_MultiPolygon"})
     creada = afectaciones_service.crear_individual(db, afectacion, current_user.id_usuario)
     return afectacion_response(db, creada)
 
 @app.post("/api/afectaciones", tags=["Afectaciones"], summary="Crear afectación", response_model=schemas.AfectacionResponse, status_code=status.HTTP_201_CREATED)
-def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
+    require_tramo_nucleo_access(db, current_user, afectacion.id_tramo_nucleo)
     
     # Validación de integridad: TramoNucleo debe existir y pertenecer al NucleoAgrario indicado
     tramo_nucleo_db = db.query(models.TramoNucleo).filter(
@@ -608,9 +675,10 @@ def update_afectacion_colectiva(
     id_afectacion: int,
     data: schemas.AfectacionColectivaUpdate,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo'])),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador'])),
 ):
     afectacion = get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
+    require_tramo_nucleo_access(db, current_user, afectacion.id_tramo_nucleo)
     if afectacion.tipo_afectacion != 'colectivo':
         raise HTTPException(status_code=409, detail="La afectación no corresponde a la ruta colectiva.")
     if data.geometria_wkt is not None:
@@ -631,9 +699,10 @@ def update_afectacion_individual(
     id_afectacion: int,
     data: schemas.AfectacionIndividualUpdate,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo'])),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador'])),
 ):
     afectacion = get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
+    require_tramo_nucleo_access(db, current_user, afectacion.id_tramo_nucleo)
     if afectacion.tipo_afectacion != 'individual':
         raise HTTPException(status_code=409, detail="La afectación no corresponde a la ruta individual.")
     if data.geometria_wkt is not None:
@@ -645,8 +714,9 @@ def update_afectacion_individual(
 
 
 @app.put("/api/afectaciones/{id_afectacion}", tags=["Afectaciones"], summary="Actualizar afectación", response_model=schemas.AfectacionResponse)
-def update_afectacion_route(id_afectacion: int, data: schemas.AfectacionUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def update_afectacion_route(id_afectacion: int, data: schemas.AfectacionUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
     db_afectacion = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_afectacion.__dict__.copy()
     resp["geometria_wkt"] = db.query(
@@ -657,21 +727,27 @@ def update_afectacion_route(id_afectacion: int, data: schemas.AfectacionUpdate, 
     return resp
 
 @app.delete("/api/afectaciones/{id_afectacion}", tags=["Afectaciones"], summary="Eliminar afectación")
-def delete_afectacion(id_afectacion: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def delete_afectacion(id_afectacion: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.Afectacion, id_afectacion, "id_afectacion")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== ASAMBLEAS ==================== #
 @app.get("/api/asambleas", tags=["Asambleas"], summary="Listar asambleas", response_model=List[schemas.AsambleaResponse])
 def list_asambleas(id_tramo_nucleo: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    query = db.query(models.Asamblea).filter(models.Asamblea.activo == True)
+    query = db.query(models.Asamblea).join(
+        models.TramoNucleo,
+        models.TramoNucleo.id_tramo_nucleo == models.Asamblea.id_tramo_nucleo,
+    ).filter(models.Asamblea.activo == True)
+    query = filter_by_user_tramos(query, db, current_user, models.TramoNucleo.id_tramo)
     if id_tramo_nucleo:
         query = query.filter(models.Asamblea.id_tramo_nucleo == id_tramo_nucleo)
     return query.all()
 
 @app.post("/api/asambleas", tags=["Asambleas"], summary="Crear asamblea", response_model=schemas.AsambleaResponse, status_code=status.HTTP_201_CREATED)
-def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
+    require_tramo_nucleo_access(db, current_user, asamblea.id_tramo_nucleo)
     
     # Validación de integridad: TramoNucleo debe existir y pertenecer al NucleoAgrario indicado
     tramo_nucleo_db = db.query(models.TramoNucleo).filter(
@@ -687,8 +763,28 @@ def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_
         padron_db = db.query(models.PadronHistorial).filter_by(id_padron=asamblea.id_padron, activo=True).first()
         if not padron_db or padron_db.id_nucleo != asamblea.id_nucleo:
             raise HTTPException(status_code=400, detail="Inconsistencia: El Padrón no existe o no pertenece al NucleoAgrario especificado.")
-    
-    db_asamblea = models.Asamblea(**asamblea.model_dump())
+
+    datos_asamblea = asamblea.model_dump()
+    if asamblea.id_afectacion is None or asamblea.id_ciclo_afectacion is None:
+        colectivas = db.query(models.Afectacion).filter(
+            models.Afectacion.id_tramo_nucleo == asamblea.id_tramo_nucleo,
+            models.Afectacion.tipo_afectacion == 'colectivo',
+            models.Afectacion.activo == True,
+        ).all()
+        if len(colectivas) != 1 or asamblea.contexto_proceso != 'cop_original':
+            raise HTTPException(
+                status_code=409,
+                detail="Indique la afectación y el ciclo; el expediente no permite resolverlos de forma inequívoca.",
+            )
+        ciclo = db.query(models.AfectacionCiclo).filter(
+            models.AfectacionCiclo.id_afectacion == colectivas[0].id_afectacion,
+            models.AfectacionCiclo.tipo_ciclo == 'cop_original',
+            models.AfectacionCiclo.activo == True,
+        ).one()
+        datos_asamblea['id_afectacion'] = colectivas[0].id_afectacion
+        datos_asamblea['id_ciclo_afectacion'] = ciclo.id_ciclo_afectacion
+
+    db_asamblea = models.Asamblea(**datos_asamblea)
     db_asamblea.id_usuario_registro = current_user.id_usuario
     db.add(db_asamblea)
     db.commit()
@@ -696,8 +792,11 @@ def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_
     return db_asamblea
 
 @app.put("/api/asambleas/{id_asamblea}", tags=["Asambleas"], summary="Actualizar asamblea", response_model=schemas.AsambleaResponse)
-def update_asamblea_route(id_asamblea: int, data: schemas.AsambleaUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def update_asamblea_route(id_asamblea: int, data: schemas.AsambleaUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.Asamblea, id_asamblea, "id_asamblea")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
+    if entity.tipo_asamblea == 'retiro_fondos' and data.estatus_asamblea == 'completo':
+        raise HTTPException(status_code=409, detail="Use la operación explícita para completar el retiro de fondos.")
     if data.id_padron is not None:
         padron_db = db.query(models.PadronHistorial).filter_by(id_padron=data.id_padron, activo=True).first()
         if not padron_db or padron_db.id_nucleo != entity.id_nucleo:
@@ -705,8 +804,9 @@ def update_asamblea_route(id_asamblea: int, data: schemas.AsambleaUpdate, db: Se
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/asambleas/{id_asamblea}", tags=["Asambleas"], summary="Eliminar asamblea")
-def delete_asamblea(id_asamblea: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def delete_asamblea(id_asamblea: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.Asamblea, id_asamblea, "id_asamblea")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== CONVENIOS ==================== #
@@ -717,7 +817,11 @@ def list_convenios(
     inscrito: bool = Query(None),
     db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))
 ):
-    query = db.query(models.Convenio).filter(models.Convenio.activo == True)
+    query = db.query(models.Convenio).join(
+        models.TramoNucleo,
+        models.TramoNucleo.id_tramo_nucleo == models.Convenio.id_tramo_nucleo,
+    ).filter(models.Convenio.activo == True)
+    query = filter_by_user_tramos(query, db, current_user, models.TramoNucleo.id_tramo)
     if id_tramo_nucleo:
         query = query.filter(models.Convenio.id_tramo_nucleo == id_tramo_nucleo)
     if tipo_convenio:
@@ -727,8 +831,9 @@ def list_convenios(
     return query.all()
 
 @app.post("/api/convenios", tags=["Convenios"], summary="Crear convenio", response_model=schemas.ConvenioResponse, status_code=status.HTTP_201_CREATED)
-def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
+    require_tramo_nucleo_access(db, current_user, convenio.id_tramo_nucleo)
     
     # Validación de integridad: TramoNucleo debe existir
     tramo_nucleo_db = db.query(models.TramoNucleo).filter(
@@ -748,6 +853,7 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
     if afectacion_db.id_tramo_nucleo != convenio.id_tramo_nucleo:
         raise HTTPException(status_code=400, detail="Inconsistencia: La Afectación no pertenece al TramoNucleo especificado.")
         
+    padre_db = None
     if convenio.id_convenio_padre:
         padre_db = db.query(models.Convenio).filter_by(id_convenio=convenio.id_convenio_padre, activo=True).first()
         if not padre_db or padre_db.id_afectacion != convenio.id_afectacion:
@@ -759,7 +865,9 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
             raise HTTPException(status_code=400, detail="Inconsistencia: La Asamblea no existe o no pertenece al mismo TramoNucleo.")
     
     # B6 / B7: Asamblea constraint
-    if convenio.tipo_afectacion == 'colectivo' and not convenio.id_asamblea_autorizacion:
+    if (convenio.tipo_afectacion == 'colectivo'
+            and convenio.tipo_convenio != 'modificatorio'
+            and not convenio.id_asamblea_autorizacion):
         raise HTTPException(status_code=400, detail="Convenios colectivos requieren id_asamblea_autorizacion (chk_colectivo_requiere_asamblea)")
     if convenio.tipo_afectacion == 'individual' and convenio.id_asamblea_autorizacion:
         raise HTTPException(status_code=400, detail="Convenios individuales no deben tener asamblea (chk_individual_sin_asamblea)")
@@ -791,7 +899,26 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
     if convenio.tipo_afectacion == 'individual' and convenio.superficie_real_afectada_ha is not None:
         raise HTTPException(status_code=400, detail="Afectación individual debe usar superficie_total_ha, no superficie_real_afectada_ha")
 
-    db_convenio = models.Convenio(**convenio.model_dump())
+    datos_convenio = convenio.model_dump()
+    if convenio.id_ciclo_afectacion is None:
+        if convenio.tipo_convenio == 'modificatorio' and padre_db is not None:
+            datos_convenio['id_ciclo_afectacion'] = padre_db.id_ciclo_afectacion
+        elif convenio.tipo_convenio == 'cop_original':
+            ciclo = db.query(models.AfectacionCiclo).filter(
+                models.AfectacionCiclo.id_afectacion == convenio.id_afectacion,
+                models.AfectacionCiclo.tipo_ciclo == 'cop_original',
+                models.AfectacionCiclo.activo == True,
+            ).one_or_none()
+            if ciclo is None:
+                raise HTTPException(status_code=409, detail="No existe el ciclo original de la afectación.")
+            datos_convenio['id_ciclo_afectacion'] = ciclo.id_ciclo_afectacion
+        else:
+            raise HTTPException(
+                status_code=409,
+                detail="Abra y seleccione explícitamente el ciclo de la variante.",
+            )
+
+    db_convenio = models.Convenio(**datos_convenio)
     db_convenio.id_usuario_registro = current_user.id_usuario
     db.add(db_convenio)
     db.commit()
@@ -799,13 +926,15 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
     return db_convenio
 
 @app.put("/api/convenios/{id_convenio}", tags=["Convenios"], summary="Actualizar convenio", response_model=schemas.ConvenioResponse)
-def update_convenio_route(id_convenio: int, data: schemas.ConvenioUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def update_convenio_route(id_convenio: int, data: schemas.ConvenioUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.Convenio, id_convenio, "id_convenio")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/convenios/{id_convenio}", tags=["Convenios"], summary="Eliminar convenio")
-def delete_convenio(id_convenio: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def delete_convenio(id_convenio: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.Convenio, id_convenio, "id_convenio")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== PADRON ==================== #
@@ -840,7 +969,11 @@ def delete_padron(id_padron: int, motivo: str = Query(...), db: Session = Depend
 # ==================== ACTIVIDAD CAMPO ==================== #
 @app.get("/api/actividades-campo", tags=["Actividades de Campo"], summary="Listar actividades de campo", response_model=List[schemas.ActividadCampoResponse])
 def list_actividades(id_tramo_nucleo: int = Query(None), tipo_actividad: str = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    query = db.query(models.ActividadCampo).filter(models.ActividadCampo.activo == True)
+    query = db.query(models.ActividadCampo).join(
+        models.TramoNucleo,
+        models.TramoNucleo.id_tramo_nucleo == models.ActividadCampo.id_tramo_nucleo,
+    ).filter(models.ActividadCampo.activo == True)
+    query = filter_by_user_tramos(query, db, current_user, models.TramoNucleo.id_tramo)
     if id_tramo_nucleo:
         query = query.filter(models.ActividadCampo.id_tramo_nucleo == id_tramo_nucleo)
     if tipo_actividad:
@@ -848,8 +981,9 @@ def list_actividades(id_tramo_nucleo: int = Query(None), tipo_actividad: str = Q
     return query.all()
 
 @app.post("/api/actividades-campo", tags=["Actividades de Campo"], summary="Crear actividad de campo", response_model=schemas.ActividadCampoResponse, status_code=status.HTTP_201_CREATED)
-def create_actividad(act: schemas.ActividadCampoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def create_actividad(act: schemas.ActividadCampoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
+    require_tramo_nucleo_access(db, current_user, act.id_tramo_nucleo)
     
     # Validación de integridad: TramoNucleo debe existir
     tramo_nucleo_db = db.query(models.TramoNucleo).filter(
@@ -868,26 +1002,33 @@ def create_actividad(act: schemas.ActividadCampoCreate, db: Session = Depends(ge
     return db_act
 
 @app.put("/api/actividades-campo/{id_actividad}", tags=["Actividades de Campo"], summary="Actualizar actividad de campo", response_model=schemas.ActividadCampoResponse)
-def update_actividad_route(id_actividad: int, data: schemas.ActividadCampoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def update_actividad_route(id_actividad: int, data: schemas.ActividadCampoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.ActividadCampo, id_actividad, "id_actividad")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/actividades-campo/{id_actividad}", tags=["Actividades de Campo"], summary="Eliminar actividad de campo")
-def delete_actividad(id_actividad: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def delete_actividad(id_actividad: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.ActividadCampo, id_actividad, "id_actividad")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== TRAMITE FIFONAFE ==================== #
 @app.get("/api/fifonafe", tags=["Fifonafe"], summary="Listar trámites fifonafe", response_model=List[schemas.TramiteFifonafeResponse])
 def list_fifonafe(id_tramo_nucleo: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    query = db.query(models.TramiteFifonafe).filter(models.TramiteFifonafe.activo == True)
+    query = db.query(models.TramiteFifonafe).join(
+        models.TramoNucleo,
+        models.TramoNucleo.id_tramo_nucleo == models.TramiteFifonafe.id_tramo_nucleo,
+    ).filter(models.TramiteFifonafe.activo == True)
+    query = filter_by_user_tramos(query, db, current_user, models.TramoNucleo.id_tramo)
     if id_tramo_nucleo:
         query = query.filter(models.TramiteFifonafe.id_tramo_nucleo == id_tramo_nucleo)
     return query.all()
 
 @app.post("/api/fifonafe", tags=["Fifonafe"], summary="Crear trámite fifonafe", response_model=schemas.TramiteFifonafeResponse, status_code=status.HTTP_201_CREATED)
-def create_fifonafe(tramite: schemas.TramiteFifonafeCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def create_fifonafe(tramite: schemas.TramiteFifonafeCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
+    require_tramo_nucleo_access(db, current_user, tramite.id_tramo_nucleo)
     
     # Validaciones de coherencia jerárquica
     tn_db = db.query(models.TramoNucleo).filter_by(id_tramo_nucleo=tramite.id_tramo_nucleo, activo=True).first()
@@ -899,25 +1040,35 @@ def create_fifonafe(tramite: schemas.TramiteFifonafeCreate, db: Session = Depend
         if not afectacion_db or afectacion_db.id_tramo_nucleo != tramite.id_tramo_nucleo:
             raise HTTPException(status_code=400, detail="Inconsistencia: La Afectación no existe o no pertenece al TramoNucleo especificado.")
             
+    convenio_db = None
     if tramite.id_convenio:
         convenio_db = db.query(models.Convenio).filter_by(id_convenio=tramite.id_convenio, activo=True).first()
         if not convenio_db or convenio_db.id_tramo_nucleo != tramite.id_tramo_nucleo:
             raise HTTPException(status_code=400, detail="Inconsistencia: El Convenio no existe o no pertenece al TramoNucleo especificado.")
             
-    db_tram = models.TramiteFifonafe(**tramite.model_dump())
+    datos_tramite = tramite.model_dump()
+    if convenio_db is not None:
+        datos_tramite['id_afectacion'] = convenio_db.id_afectacion
+        datos_tramite['id_ciclo_afectacion'] = convenio_db.id_ciclo_afectacion
+        datos_tramite['tipo_afectacion'] = convenio_db.tipo_afectacion
+    db_tram = models.TramiteFifonafe(**datos_tramite)
     db.add(db_tram)
     db.commit()
     db.refresh(db_tram)
     return db_tram
 
 @app.put("/api/fifonafe/{id_tramite}", tags=["Fifonafe"], summary="Actualizar trámite fifonafe", response_model=schemas.TramiteFifonafeResponse)
-def update_fifonafe_route(id_tramite: int, data: schemas.TramiteFifonafeUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def update_fifonafe_route(id_tramite: int, data: schemas.TramiteFifonafeUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.TramiteFifonafe, id_tramite, "id_tramite_fifonafe")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
+    if entity.tipo_tramite == 'indemnizacion' and data.estatus == 'completo':
+        raise HTTPException(status_code=409, detail="Use la operación explícita para completar la indemnización.")
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/fifonafe/{id_tramite}", tags=["Fifonafe"], summary="Eliminar trámite fifonafe")
-def delete_fifonafe(id_tramite: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def delete_fifonafe(id_tramite: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.TramiteFifonafe, id_tramite, "id_tramite_fifonafe")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== DOCUMENTACION ==================== #
@@ -1225,6 +1376,7 @@ def remover_usuario_tramo(
 # ==================== GET BY ID (Líneas Individuales) ==================== #
 @app.get("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Obtener tramo por ID", response_model=schemas.TramoResponse)
 def get_tramo_by_id(id_tramo: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    require_tramo_access(db, current_user, id_tramo)
     row = db.query(
         models.Tramo.id_tramo,
         models.Tramo.id_proyecto,
@@ -1249,6 +1401,7 @@ def get_tramo_by_id(id_tramo: int, db: Session = Depends(get_db), current_user: 
 
 @app.get("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Obtener núcleo agrario por ID", response_model=schemas.NucleoAgrarioResponse)
 def get_nucleo_by_id(id_nucleo: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    require_nucleo_access(db, current_user, id_nucleo)
     row = db.query(
         models.NucleoAgrario.id_nucleo,
         models.NucleoAgrario.id_municipio,
@@ -1273,6 +1426,7 @@ def get_nucleo_by_id(id_nucleo: int, db: Session = Depends(get_db), current_user
 
 @app.get("/api/afectaciones/{id_afectacion}", tags=["Afectaciones"], summary="Obtener afectación por ID", response_model=schemas.AfectacionResponse)
 def get_afectacion_by_id(id_afectacion: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    require_afectacion_access(db, current_user, id_afectacion)
     row = db.query(
         models.Afectacion.id_afectacion,
         models.Afectacion.id_nucleo,
@@ -1297,6 +1451,9 @@ def get_afectacion_by_id(id_afectacion: int, db: Session = Depends(get_db), curr
         models.Afectacion.fecha_reactivacion,
         models.Afectacion.id_usuario_reactivacion,
         models.Afectacion.motivo_reactivacion,
+        models.Afectacion.tipo_salida_terminal,
+        models.Afectacion.fecha_salida_terminal,
+        models.Afectacion.motivo_salida_terminal,
         models.Afectacion.observaciones
     ).filter(models.Afectacion.id_afectacion == id_afectacion, models.Afectacion.activo == True).first()
     if not row:
@@ -1305,8 +1462,12 @@ def get_afectacion_by_id(id_afectacion: int, db: Session = Depends(get_db), curr
 
 @app.get("/api/asambleas/{id_asamblea}", tags=["Asambleas"], summary="Obtener asamblea por ID", response_model=schemas.AsambleaResponse)
 def get_asamblea_by_id(id_asamblea: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return get_entity_by_id(db, models.Asamblea, id_asamblea, "id_asamblea")
+    entity = get_entity_by_id(db, models.Asamblea, id_asamblea, "id_asamblea")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
+    return entity
 
 @app.get("/api/convenios/{id_convenio}", tags=["Convenios"], summary="Obtener convenio por ID", response_model=schemas.ConvenioResponse)
 def get_convenio_by_id(id_convenio: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return get_entity_by_id(db, models.Convenio, id_convenio, "id_convenio")
+    entity = get_entity_by_id(db, models.Convenio, id_convenio, "id_convenio")
+    require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
+    return entity

@@ -160,12 +160,28 @@ class Afectacion(Base, AuditableMixin):
     documentacion_disponible = Column(Boolean, default=False, nullable=False)
     documentacion_faltante = Column(String)
     origen_registro = Column(String(50), default='captura_sistema', nullable=False)
+    tipo_salida_terminal = Column(String(50))
+    fecha_salida_terminal = Column(DateTime(timezone=True))
+    motivo_salida_terminal = Column(Text)
+    activo = Column(Boolean, default=True, nullable=False)
+
+
+class AfectacionCiclo(Base, AuditableMixin):
+    __tablename__ = "afectacion_ciclo"
+    id_ciclo_afectacion = Column(Integer, primary_key=True, index=True)
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"), nullable=False)
+    tipo_afectacion = Column(String(20), nullable=False)
+    tipo_ciclo = Column(String(50), nullable=False)
+    consecutivo = Column(Integer, nullable=False)
+    superficie_base_ciclo_ha = Column(Numeric(12, 4))
     activo = Column(Boolean, default=True, nullable=False)
 
 class ActividadCampo(Base, AuditableMixin):
     __tablename__ = "actividad_campo"
     id_actividad = Column(Integer, primary_key=True, index=True)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    id_ciclo_afectacion = Column(Integer, ForeignKey("afectacion_ciclo.id_ciclo_afectacion"))
     tipo_actividad = Column(String(50), nullable=False)
     contexto_proceso = Column(String(50), nullable=False, default='cop_original')
     fecha_programada = Column(Date)
@@ -181,6 +197,8 @@ class Asamblea(Base, AuditableMixin):
     id_asamblea = Column(Integer, primary_key=True, index=True)
     id_nucleo = Column(Integer, nullable=False)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
+    id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"))
+    id_ciclo_afectacion = Column(Integer, ForeignKey("afectacion_ciclo.id_ciclo_afectacion"))
     tipo_asamblea = Column(String(50), nullable=False)
     contexto_proceso = Column(String(50))
     fecha_exp_1a = Column(Date)
@@ -206,6 +224,7 @@ class Convenio(Base, AuditableMixin):
     id_convenio = Column(Integer, primary_key=True, index=True)
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
     id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"), nullable=False)
+    id_ciclo_afectacion = Column(Integer, ForeignKey("afectacion_ciclo.id_ciclo_afectacion"))
     id_convenio_padre = Column(Integer, ForeignKey("convenio.id_convenio"))
     id_asamblea_autorizacion = Column(Integer, ForeignKey("asamblea.id_asamblea"))
     tipo_afectacion = Column(String(20), nullable=False)
@@ -222,6 +241,8 @@ class Convenio(Base, AuditableMixin):
     numero_solicitud_ingreso = Column(String(100))
     calificacion_registral = Column(String)
     convenio_inscrito_fecha_ran = Column(Date)
+    vigencia_financiera_desde = Column(DateTime(timezone=True))
+    vigencia_financiera_hasta = Column(DateTime(timezone=True))
     documentacion_disponible = Column(Boolean, default=False, nullable=False)
     documentacion_faltante = Column(String)
     id_usuario_registro = Column(Integer, ForeignKey("usuario.id_usuario"))
@@ -234,6 +255,8 @@ class TramiteFifonafe(Base, AuditableMixin):
     id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"), nullable=False)
     id_convenio = Column(Integer, ForeignKey("convenio.id_convenio"))
     id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"))
+    id_ciclo_afectacion = Column(Integer, ForeignKey("afectacion_ciclo.id_ciclo_afectacion"))
+    id_tramite_no_conflictos = Column(Integer, ForeignKey("tramite_fifonafe.id_tramite_fifonafe"))
     tipo_afectacion = Column(String(20), nullable=False)
     tipo_tramite = Column(String(50), nullable=False)
     estatus = Column(String(30), nullable=False, default='pendiente')

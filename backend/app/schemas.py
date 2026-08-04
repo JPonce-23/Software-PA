@@ -238,6 +238,12 @@ class AfectacionUpdate(AuditableUpdate):
 class AfectacionResponse(AfectacionCreate):
     id_afectacion: int
     geometria_wkt: Optional[str] = None
+    tipo_salida_terminal: Optional[Literal[
+        'fuera_seguimiento_expropiacion',
+        'fuera_seguimiento_comunidad_indigena',
+    ]] = None
+    fecha_salida_terminal: Optional[datetime] = None
+    motivo_salida_terminal: Optional[str] = None
     activo: bool
     model_config = ConfigDict(from_attributes=True)
 
@@ -371,6 +377,8 @@ class AfectacionIndividualUpdate(AuditableUpdate):
 class AsambleaCreate(AuditableCreate):
     id_nucleo: int
     id_tramo_nucleo: int
+    id_afectacion: Optional[int] = None
+    id_ciclo_afectacion: Optional[int] = None
     contexto_proceso: Literal['cop_original', 'obras_complementarias', 'superficie_adicional'] = 'cop_original'
     tipo_asamblea: Literal['informacion', 'anuencia', 'retiro_fondos', 'conciliacion', 'no_verificativo']
     resultado_anuencia: Literal['otorgada', 'negada', 'pendiente', 'no_aplica'] = "pendiente"
@@ -412,6 +420,7 @@ class AsambleaResponse(AsambleaCreate):
 class ConvenioCreate(AuditableCreate):
     id_tramo_nucleo: int
     id_afectacion: int
+    id_ciclo_afectacion: Optional[int] = None
     tipo_afectacion: Literal['colectivo', 'individual']
     tipo_convenio: Literal['cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias', 'ampliacion', 'ampliacion_remanente']
     fecha_firma: Optional[date] = None
@@ -448,6 +457,8 @@ class ConvenioResponse(ConvenioCreate):
     numero_solicitud_ingreso: Optional[str] = None
     calificacion_registral: Optional[str] = None
     convenio_inscrito_fecha_ran: Optional[date] = None
+    vigencia_financiera_desde: Optional[datetime] = None
+    vigencia_financiera_hasta: Optional[datetime] = None
     documentacion_disponible: Optional[bool] = None
     documentacion_faltante: Optional[str] = None
     activo: bool
@@ -506,6 +517,7 @@ class PadronHistorialResponse(PadronHistorialCreate):
 
 class ActividadCampoCreate(AuditableCreate):
     id_tramo_nucleo: int
+    id_ciclo_afectacion: Optional[int] = None
     tipo_actividad: Literal['sensibilizacion', 'caminamiento']
     contexto_proceso: Literal['cop_original', 'obras_complementarias', 'superficie_adicional'] = 'cop_original'
     fecha_programada: Optional[date] = None
@@ -525,9 +537,20 @@ class TramiteFifonafeCreate(AuditableCreate):
     id_tramo_nucleo: int
     id_convenio: Optional[int] = None
     id_afectacion: Optional[int] = None
+    id_ciclo_afectacion: Optional[int] = None
+    id_tramite_no_conflictos: Optional[int] = None
     tipo_afectacion: Literal['colectivo', 'individual']
     tipo_tramite: Literal['indemnizacion', 'informe_no_conflictos']
     estatus: str = 'pendiente'
+    hay_conflictos: Optional[bool] = None
+    no_oficio_fifonafe_a_dgaopr: Optional[str] = None
+    no_oficio_dgaopr_a_repr: Optional[str] = None
+    no_oficio_rpta_repr_a_dgaopr: Optional[str] = None
+    no_oficio_rpta_dgaopr_a_fifonafe: Optional[str] = None
+    fecha_oficio_fifonafe_a_dgaopr: Optional[date] = None
+    fecha_oficio_dgaopr_a_repr: Optional[date] = None
+    fecha_oficio_rpta_repr_a_dgaopr: Optional[date] = None
+    fecha_oficio_rpta_dgaopr_a_fifonafe: Optional[date] = None
 
 class TramiteFifonafeUpdate(AuditableUpdate):
     estatus: Optional[str] = None
@@ -554,6 +577,108 @@ class TramiteFifonafeResponse(TramiteFifonafeCreate):
     fecha_oficio_rpta_dgaopr_a_fifonafe: Optional[date] = None
     activo: bool
     model_config = ConfigDict(from_attributes=True)
+
+
+# ==================== SUBCORTE 2B ==================== #
+TipoCicloAfectacion = Literal[
+    'superficie_adicional', 'obras_complementarias',
+    'ampliacion', 'ampliacion_remanente',
+]
+
+
+class AfectacionCicloCreate(BaseModel):
+    tipo_ciclo: TipoCicloAfectacion
+    observaciones: Optional[str] = None
+    model_config = ConfigDict(extra='forbid')
+
+
+class AfectacionCicloResponse(BaseModel):
+    id_ciclo_afectacion: int
+    id_tramo_nucleo: int
+    id_afectacion: int
+    tipo_afectacion: Literal['colectivo', 'individual']
+    tipo_ciclo: Literal[
+        'cop_original', 'superficie_adicional', 'obras_complementarias',
+        'ampliacion', 'ampliacion_remanente',
+    ]
+    consecutivo: int
+    superficie_base_ciclo_ha: Optional[Decimal] = None
+    activo: bool
+    observaciones: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SalidaTerminalRequest(BaseModel):
+    tipo_salida_terminal: Literal[
+        'fuera_seguimiento_expropiacion',
+        'fuera_seguimiento_comunidad_indigena',
+    ]
+    motivo: str = Field(min_length=1)
+    confirmar: Literal[True]
+    model_config = ConfigDict(extra='forbid')
+
+    @field_validator('motivo')
+    @classmethod
+    def motivo_no_vacio(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError('El motivo es obligatorio')
+        return value
+
+
+class ConfirmarTransicionRequest(BaseModel):
+    confirmar: Literal[True]
+    observaciones: Optional[str] = None
+    model_config = ConfigDict(extra='forbid')
+
+
+class AfectacionCicloEstadoResponse(BaseModel):
+    id_ciclo_afectacion: int
+    id_afectacion: int
+    tipo_afectacion: str
+    tipo_ciclo: str
+    consecutivo: int
+    id_convenio: Optional[int] = None
+    estado_terminal: Optional[str] = None
+    estado_operativo: str
+    estado_registral: str
+    estado_financiero: str
+    no_conflictos_completo: bool
+    indemnizacion_completa: bool
+    retiro_fondos_completo: bool
+    limite_pagable: Optional[Decimal] = None
+    total_pagado: Decimal
+    saldo_disponible: Decimal
+    superficie_ciclo_ha: Decimal
+
+
+class AfectacionEstadoResponse(BaseModel):
+    id_afectacion: int
+    id_tramo_nucleo: int
+    id_nucleo: int
+    tipo_afectacion: str
+    estado_terminal: Optional[str] = None
+    total_ciclos: int
+    ciclos_concluidos: int
+    superficie_total_ciclos_ha: Decimal
+    superficie_liberada_ha: Decimal
+    estado_liberacion: str
+    estado_registral: str
+    estado_financiero: str
+    ciclos: List[AfectacionCicloEstadoResponse] = Field(default_factory=list)
+
+
+class TramoNucleoEstadoResponse(BaseModel):
+    id_tramo_nucleo: int
+    id_tramo: int
+    id_nucleo: int
+    estado_legal: str
+    estado_geoespacial: str
+    total_afectaciones: int
+    afectaciones_liberadas: int
+    afectaciones_pendientes: int
+    afectaciones_en_proceso: int
+    afectaciones_terminales: int
 
 class DocumentacionSoporteCreate(AuditableCreate):
     entidad_relacionada_id: int
