@@ -88,12 +88,45 @@ docker compose config --quiet
 ```
 
 Compose detendrá la validación si falta una variable obligatoria.
+El backend también rechazará `SECRET_KEY` que sigan siendo placeholders o sean
+demasiado cortas.
 
 Si ya existe un volumen `postgres_data`, configura inicialmente `DB_USER`,
 `DB_PASSWORD` y `DB_NAME` con los valores que usa esa base. Las variables
 `POSTGRES_*` solo crean el rol y la base durante la primera inicialización del
 volumen; cambiarlas después no actualiza PostgreSQL. Consulta el procedimiento
 de rotación segura en [docs/migraciones.md](docs/migraciones.md).
+
+### Bootstrap del primer administrador
+
+Antes de ejecutar `scripts/create_admin.py`, define valores propios del entorno
+y expórtalos en la shell que ejecutará el comando:
+
+```bash
+ADMIN_EMAIL
+ADMIN_NOMBRE
+ADMIN_APELLIDO_PATERNO
+ADMIN_APELLIDO_MATERNO
+```
+
+Estas variables no sensibles no se inyectan automáticamente al contenedor en
+ejecución; pásalas al comando de bootstrap. La contraseña se captura por prompt
+interactivo, sin eco:
+
+```bash
+docker compose exec \
+  -e ADMIN_EMAIL="$ADMIN_EMAIL" \
+  -e ADMIN_NOMBRE="$ADMIN_NOMBRE" \
+  -e ADMIN_APELLIDO_PATERNO="$ADMIN_APELLIDO_PATERNO" \
+  -e ADMIN_APELLIDO_MATERNO="$ADMIN_APELLIDO_MATERNO" \
+  backend python scripts/create_admin.py
+```
+
+La contraseña debe tener al menos 12 caracteres e incluir mayúscula,
+minúscula, número y símbolo. Para automatizaciones controladas puede pasarse
+`ADMIN_PASSWORD` como variable temporal del proceso; no la dejes persistente en
+archivos compartidos, historial de shell, logs ni capturas. El script rechaza
+placeholders y no contiene una contraseña predeterminada.
 
 ## Desarrollo
 
@@ -147,7 +180,12 @@ Resumen para una instalación nueva:
 
 ```bash
 docker compose up -d --build db backend
-docker compose exec backend python scripts/create_admin.py
+docker compose exec \
+  -e ADMIN_EMAIL="$ADMIN_EMAIL" \
+  -e ADMIN_NOMBRE="$ADMIN_NOMBRE" \
+  -e ADMIN_APELLIDO_PATERNO="$ADMIN_APELLIDO_PATERNO" \
+  -e ADMIN_APELLIDO_MATERNO="$ADMIN_APELLIDO_MATERNO" \
+  backend python scripts/create_admin.py
 docker compose exec -T db sh -lc \
   'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < backend/db/migrations/004_adaptaciones_fase2.sql
@@ -161,9 +199,9 @@ docker compose exec backend python scripts/seed_mock.py
 ```
 
 Las credenciales no se documentan en el repositorio. PgAdmin y PostgreSQL usan
-los valores definidos localmente en `.env`. Antes de ejecutar
-`scripts/create_admin.py` en un entorno compartido, revisa y sustituye las
-credenciales de desarrollo que actualmente define ese script.
+los valores definidos localmente en `.env`. `backend/db/seed.sql` ya no crea
+usuarios; requiere que exista un administrador activo para registrar la
+auditoría de los datos semilla.
 
 ## Operación diaria
 

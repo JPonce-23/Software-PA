@@ -101,6 +101,30 @@ Para adoptar el nuevo Compose sin interrumpir el acceso:
 Cambiar también el nombre del rol o de la base requiere una migración SQL
 específica y no debe hacerse únicamente editando `.env`.
 
+## Rotación de secretos por ambiente
+
+La rotación debe ejecutarse por ambiente y sin documentar valores reales:
+
+1. Crea respaldo de la base si el ambiente contiene datos que deben
+   conservarse.
+2. Rota la contraseña del rol PostgreSQL dentro de PostgreSQL con `\password`
+   o un procedimiento equivalente interactivo.
+3. Actualiza `DB_PASSWORD` en `.env` con el nuevo valor.
+4. Genera un nuevo `SECRET_KEY` fuera del repositorio, por ejemplo con
+   `openssl rand -hex 32`, y actualiza `.env`.
+5. Rota `PGADMIN_DEFAULT_PASSWORD` y revisa credenciales guardadas dentro de
+   PgAdmin si aplica.
+6. Recrea backend y scheduler para cargar el nuevo `SECRET_KEY`:
+
+   ```bash
+   docker compose up -d --force-recreate backend alertas_scheduler
+   ```
+
+7. Verifica que un token emitido antes de rotar `SECRET_KEY` ya no sea
+   aceptado y que un inicio de sesión nuevo funcione.
+8. Registra sólo evidencia operativa: fecha, ambiente, responsable,
+   servicios recreados y resultado de validaciones. No registres secretos.
+
 ## Instalación nueva
 
 1. Inicia PostgreSQL y el backend:
@@ -118,14 +142,25 @@ específica y no debe hacerse únicamente editando `.env`.
      'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
    ```
 
-3. Crea el administrador técnico requerido por la auditoría de la migración:
+3. Crea el administrador técnico requerido por la auditoría de la migración.
+   Define y exporta antes las variables no sensibles `ADMIN_EMAIL`,
+   `ADMIN_NOMBRE`, `ADMIN_APELLIDO_PATERNO` y, si aplica,
+   `ADMIN_APELLIDO_MATERNO`. Pásalas explícitamente al contenedor y captura la
+   contraseña por prompt interactivo, sin eco:
 
    ```bash
-   docker compose exec backend python scripts/create_admin.py
+   docker compose exec \
+     -e ADMIN_EMAIL="$ADMIN_EMAIL" \
+     -e ADMIN_NOMBRE="$ADMIN_NOMBRE" \
+     -e ADMIN_APELLIDO_PATERNO="$ADMIN_APELLIDO_PATERNO" \
+     -e ADMIN_APELLIDO_MATERNO="$ADMIN_APELLIDO_MATERNO" \
+     backend python scripts/create_admin.py
    ```
 
-   Antes de usar un entorno compartido, sustituye las credenciales de
-   desarrollo definidas actualmente en ese script.
+   El script no contiene credenciales predeterminadas y rechazará placeholders.
+   Para automatizaciones controladas puede pasarse `ADMIN_PASSWORD` como
+   variable temporal del proceso; no la dejes persistente en archivos
+   compartidos, historial de shell, logs ni capturas.
 
 4. Aplica `004` una sola vez:
 

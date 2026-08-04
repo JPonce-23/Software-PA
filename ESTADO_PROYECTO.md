@@ -18,10 +18,12 @@
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Próximo trabajo funcional:** validación funcional y de experiencia del
-Subcorte 2C con usuarios finales. La implementación técnica de navegación por
-afectación y aislamiento documental quedó completada y validada en este entorno
-local el 4 de agosto de 2026.
+**Próximo trabajo funcional:** completar la rotación operativa de secretos por
+ambiente y, después, iniciar el Corte 4 de autenticación formal. La
+implementación técnica de navegación por afectación y aislamiento documental
+quedó completada y validada en este entorno local el 4 de agosto de 2026; la
+validación funcional con usuarios finales fue reportada como aprobada en la
+continuidad de trabajo del 4 de agosto de 2026.
 
 ## 1. Objetivo y dominio
 
@@ -722,6 +724,45 @@ pruebas 2C crean sus fixtures y verifican aislamiento entre afectaciones del
 mismo `tramo_nucleo`. En ambientes con datos reales se debe respaldar y ejecutar
 preflight antes de aplicar 007.
 
+Estado de aceptación funcional:
+
+1. Validación funcional con usuarios finales: completada y aprobada según
+   continuidad de trabajo del 4 de agosto de 2026.
+2. Commit y push: pendiente de confirmación en el cierre de cambios.
+
+### Corte 3 — Seguridad inmediata: 3A de repositorio implementado
+
+El 4 de agosto de 2026 se implementó el hardening de repositorio del Corte 3:
+
+- `backend/app/auth.py` rechaza `SECRET_KEY` ausente, placeholder o demasiado
+  corta antes de arrancar.
+- `backend/scripts/create_admin.py` ya no contiene credenciales fijas; lee
+  configuración desde variables de entorno o prompt interactivo, valida datos
+  mínimos, usa fecha con zona y rehabilita triggers si usa la ruta especial del
+  primer usuario.
+- `backend/db/seed.sql` ya no crea un usuario administrador con credenciales
+  conocidas; exige un administrador activo previo para establecer auditoría.
+- `.env.example`, `README.md` y `docs/migraciones.md` documentan bootstrap y
+  rotación sin copiar secretos.
+- Las pruebas de autenticación pueden usar `TEST_ADMIN_EMAIL` y
+  `TEST_ADMIN_PASSWORD` por ambiente.
+
+Validación ejecutada:
+
+```text
+esquema:  schema_migrations registra 004, 005, 006 y 007
+backend:  110 pruebas aprobadas; 1 advertencia de deprecación de Starlette
+frontend: npx oxlint src sin errores
+bootstrap: ejecución no interactiva sin ADMIN_PASSWORD falla cerrado
+diff:     git diff --check sin errores
+secretos: búsqueda enfocada sin credenciales conocidas en archivos operativos tocados
+```
+
+Este resultado no equivale a rotación real de secretos en todos los ambientes.
+La rotación operativa de `SECRET_KEY`, credenciales de PostgreSQL, PgAdmin y
+cuentas administrativas debe ejecutarse por ambiente con custodia externa y
+sin registrar valores en el repositorio.
+
 ### Corte 3 — Seguridad inmediata: parcial
 
 Ya realizado:
@@ -731,12 +772,18 @@ Ya realizado:
 - Escape de valores en popups de `Mapa.jsx` para mitigar XSS.
 - `docker-compose.yml` consume variables obligatorias del entorno.
 - Existe `.env.example` sin secretos reales y `.env` está ignorado por Git.
+- Bootstrap seguro de administrador sin credenciales fijas en
+  `scripts/create_admin.py`.
+- `seed.sql` separado de credenciales operativas.
+- Validación de `SECRET_KEY` contra placeholders y longitud insuficiente.
+- Documentación de bootstrap y rotación por ambiente.
 
 Pendiente:
 
-- Rotar credenciales y `SECRET_KEY` que ya estuvieron en commits.
-- Crear el `.env` local de cada entorno y documentar configuración y
-  recuperación.
+- Ejecutar la rotación real de credenciales y `SECRET_KEY` que ya estuvieron
+  en commits, por ambiente y con custodia externa.
+- Crear o actualizar el `.env` local de cada entorno con valores rotados y
+  verificar recuperación.
 
 No copiar las credenciales actuales a documentación nueva.
 
@@ -828,8 +875,9 @@ franja válida.
   inferirlas por fecha, expediente o cercanía de registros.
 - ~~Ejecutar aceptación funcional con usuarios sobre rutas colectiva,
   individual, terminal, modificatorio y expediente mixto.~~ (Completada)
-- Ejecutar validación funcional y de experiencia con usuarios finales sobre el
-  Subcorte 2C.
+- ~~Ejecutar validación funcional y de experiencia con usuarios finales sobre
+  el Subcorte 2C.~~ (Completada y aprobada según continuidad del 4 de agosto
+  de 2026)
 - Decidir si una base limpia necesita conservar
   `persona_fuente_legacy`; hoy es trazabilidad de migración, no una segunda
   identidad maestra.
@@ -837,7 +885,9 @@ franja válida.
 - Retirar columnas legacy de ORV, parcela y documentos después del nuevo
   flujo y de verificaciones de uso.
 - Consolidar posteriormente `001_init_schema.sql` para instalaciones nuevas.
-- Rotar secretos ya expuestos en historial.
+- Rotar secretos ya expuestos en historial en cada ambiente; el hardening de
+  repositorio del Corte 3 ya está implementado, pero no sustituye la rotación
+  operativa.
 
 ## 10. Instrucción para continuar
 
@@ -846,12 +896,13 @@ La siguiente tarea no es crear Proyecto, repetir Adaptaciones 2.0, rediseñar
 
 Próximo paso operativo:
 
-1. Validar funcionalmente con usuarios finales el Subcorte 2C ya implementado:
-   expediente maestro, apertura de subexpediente, aislamiento documental,
-   minutas propias/compartidas, pagos y flujo por afectación.
+1. Ejecutar la rotación operativa de secretos por ambiente:
+   `SECRET_KEY`, credenciales de PostgreSQL, PgAdmin y cuentas
+   administrativas, sin registrar valores en Git.
 2. Replicar 007 en otros ambientes sólo después de respaldo, verificación
    individual de 004/005/006 y preflight de datos.
 3. Conciliar datos históricos únicamente con evidencia documental.
 4. Revisar y confirmar el diff antes de commit/push.
+5. Después de cerrar la rotación, iniciar el Corte 4 de autenticación formal.
 El derecho de vía versionado está aprobado como componente futuro del Corte
 5. No debe mezclarse en el Subcorte 2C.
