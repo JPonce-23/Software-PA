@@ -18,10 +18,10 @@
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Próximo trabajo funcional:** Subcorte 2C del Corte principal 2: navegación
-por afectación y aislamiento documental. La migración 006 ya está aplicada en
-la base local activa; antes de iniciar 2C queda la aceptación funcional de los
-recorridos 2B con usuarios.
+**Próximo trabajo funcional:** validación funcional y de experiencia del
+Subcorte 2C con usuarios finales. La implementación técnica de navegación por
+afectación y aislamiento documental quedó completada y validada en este entorno
+local el 4 de agosto de 2026.
 
 ## 1. Objetivo y dominio
 
@@ -85,11 +85,13 @@ backend/db/migrations/003_*.sql         Proyecto y retiro de Frente
 backend/db/migrations/004_*.sql         Adaptaciones 2.0
 backend/db/migrations/005_*.sql         Integridad de afectaciones 2A
 backend/db/migrations/006_*.sql         Secuencia y estados de liberación 2B
+backend/db/migrations/007_*.sql         Navegación y aislamiento documental 2C
 backend/tests/                          regresión e integración
 backend/app/routers/flujo.py            transiciones explícitas de 2B
 backend/app/services/flujo.py           dominio transaccional de 2B
 backend/app/services/access.py          autorización territorial
 frontend/src/pages/ExpedienteDetail.jsx expediente actual por tramo_nucleo
+frontend/src/pages/AfectacionSubexpediente.jsx subexpediente por afectacion
 frontend/src/pages/ExpedientesList.jsx  listado actual de tramo_nucleo
 frontend/src/components/fase2/          módulos agregados en Adaptaciones 2.0
 frontend/src/components/fase2/FlujoLiberacionPanel.jsx flujo mínimo de 2B
@@ -119,6 +121,7 @@ GET/POST       /api/pagos-indemnizacion
 GET/POST       /api/afectaciones/{id_afectacion}/ciclos
 GET             /api/afectaciones/{id_afectacion}/estado
 GET             /api/tramos-nucleos/{id_tramo_nucleo}/estado
+GET             /api/tramos-nucleos/{id_tramo_nucleo}/afectaciones/{id_afectacion}/subexpediente
 PUT             /api/afectaciones/{id_afectacion}/salida-terminal
 POST            /api/fifonafe/{id_tramite}/completar-indemnizacion
 POST            /api/asambleas/{id_asamblea}/completar-retiro-fondos
@@ -286,13 +289,32 @@ afectación existente; no asocia actividades, asambleas, convenios o trámites
 históricos por inferencia.
 
 La 006 fue aplicada primero sobre copias temporales representativas y después,
-el 3 de agosto de 2026, sobre `db_trenes`. El despliegue activo se realizó con
-backend y scheduler detenidos, `ON_ERROR_STOP=1`, transacción completa y
-respaldo previo validado. La base activa registra ahora 004, 005 y 006.
+el 3 de agosto de 2026, sobre la base de referencia del equipo que contenía
+datos operativos. El despliegue activo se realizó con backend y scheduler
+detenidos, `ON_ERROR_STOP=1`, transacción completa y respaldo previo validado.
 
 No eliminar columnas heredadas hasta desplegar y validar el Corte principal 2.
 La contracción de columnas heredadas de Adaptaciones 2.0 queda reservada para
 una migración posterior.
+
+### 007 — Subcorte 2C
+
+Archivo:
+`backend/db/migrations/007_subcorte_2c_navegacion_documental.sql`
+
+Requiere 006. Es expansiva y transaccional: admite
+`documentacion_soporte.entidad_relacionada_tipo = 'tramo_nucleo'`, actualiza el
+trigger de validación de referencias documentales, agrega a `minuta` las
+columnas nullable `id_afectacion` e `id_ciclo_afectacion`, y protege su
+pertenencia mediante `CHECK`, FK compuesta e índice.
+
+No reclasifica documentos históricos ni infiere minutas propias por fecha,
+actividad o asunto. Las minutas existentes permanecen compartidas en
+`tramo_nucleo` mientras no tengan relación explícita con una afectación/ciclo.
+
+La 007 fue aplicada en este entorno local el 4 de agosto de 2026 con respaldo
+previo y `ON_ERROR_STOP=1`. La base local de esta máquina registra ahora 004,
+005, 006 y 007 en `schema_migrations`.
 
 ## 6. Trabajo realizado
 
@@ -451,23 +473,26 @@ consultar el esquema real; `git pull` descarga los SQL, pero no modifica
 volúmenes de PostgreSQL. Una base que sólo tiene 002 debe aplicar 003 y luego
 004, con respaldo y verificación entre ambas.
 
-La base activa quedó verificada después de aplicar 006 el 3 de agosto de 2026:
+La base activa local de esta máquina quedó verificada después de aplicar 007 el
+4 de agosto de 2026:
 
 ```text
 base/usuario:          db_trenes / alfredo
-schema_migrations:     004, 005, 006
-afectaciones:          6 activas / 20 totales
-convenios:             2 activos / 11 totales
+schema_migrations:     004, 005, 006, 007
+afectaciones:          0 activas / 0 totales
+convenios:             0 activos / 0 totales
 FIFONAFE/pagos activos: 0 / 0
-afectacion_ciclo:      6 ciclos activos / 20 totales; todos originales
-integridad 2B:         0 afectaciones sin raíz, 0 ciclos huérfanos
+afectacion_ciclo:      0 ciclos activos / 0 totales
+integridad 2B:         sin datos operativos locales que conciliar
+integridad 2C:         columnas de minuta y tipo documental tramo_nucleo verificados
 vistas activas:        afectación, tramo_nucleo y dashboard consultables
 ```
 
 El archivo `.env` local ya permite conectarse al servicio `db`. Estos valores
 describen sólo este entorno; en cada equipo se debe verificar el esquema real.
-En otros equipos, `git pull` descarga la migración 006, pero no la aplica al
-volumen PostgreSQL; cada colaborador debe verificar `schema_migrations`.
+En otros equipos, `git pull` descarga las migraciones, pero no las aplica al
+volumen PostgreSQL; cada colaborador debe verificar `schema_migrations` y
+respaldar antes de ejecutar 006 o 007.
 
 ## 8. Plan principal vigente de cinco cortes
 
@@ -475,7 +500,7 @@ volumen PostgreSQL; cada colaborador debe verificar `schema_migrations`.
 
 Proyecto + Tramo + Tramo_Núcleo sin Frente + `usuario_tramo`.
 
-### Corte 2 — Expediente maestro y subexpedientes por afectación: siguiente
+### Corte 2 — Expediente maestro y subexpedientes por afectación: implementado técnicamente
 
 Decisión aprobada:
 
@@ -487,22 +512,18 @@ afectacion   = subexpediente operativo confirmado
 Situación actual:
 
 - `/expedientes` lista `tramo_nucleo`.
-- `/expedientes/:id_tramo_nucleo` abre el expediente maestro, pero su pantalla
-  mezcla las actuaciones propias de todas sus afectaciones.
-- Asambleas, actividades, minutas, pagos y documentos se consultan
-  principalmente por `id_tramo_nucleo`.
-- `afectacion` ya es obligatoria en convenio y opcional en FIFONAFE, pero aún
-  funciona como registro secundario de la pantalla.
-- La vista vigente `vw_tramo_nucleo_estado` clasifica expropiación como
-  `problema` y considera `liberado` cuando las afectaciones tienen convenio
-  inscrito en el RAN. Esa lógica es heredada y debe sustituirse: las salidas
-  terminales requieren estado propio y la liberación ordinaria ocurre después
-  del pago.
-- Las banderas actuales viven en `nucleo_agrario` y `tramo_nucleo`; no existe
-  todavía una salida terminal específica por `afectacion`.
-- El panel documental usa actualmente el tipo inválido `tramo_nucleo`. El
-  Corte 2 debe soportar expresamente documentos compartidos del expediente
-  maestro y documentos propios de una afectación.
+- `/expedientes/:id_tramo_nucleo` abre el expediente maestro y conserva las
+  actuaciones compartidas.
+- `/expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion` abre el
+  subexpediente operativo de la afectación seleccionada.
+- Asambleas, convenios, FIFONAFE, pagos, minutas y documentos tienen filtros
+  backend por `id_afectacion` y, cuando aplica, por `id_ciclo_afectacion`.
+- `documentacion_soporte` admite documentos maestros de `tramo_nucleo` y
+  documentos propios de `afectacion`.
+- Las salidas terminales y el estado de liberación por pago fueron resueltos en
+  2B; el subexpediente 2C consume ese estado autoritativo.
+- Está pendiente la validación funcional y de experiencia con usuarios finales
+  sobre el recorrido completo de 2C.
 
 Resultado esperado:
 
@@ -534,15 +555,15 @@ quedan accesibles desde el subexpediente como antecedentes. El alcance actual
 sólo conserva `convenio.monto_bdt`, observaciones y documentos de soporte; no
 incluye diseñar un inventario detallado ni un proceso de avalúo.
 
-Al diseñar el corte:
+Reglas que guiaron el Corte 2 y deben conservarse:
 
 1. Auditar qué entidades son propias de una afectación y cuáles son
    compartidas.
 2. Mantener ORV en el nivel del núcleo; no duplicarla por afectación.
-3. Definir una transición compatible y una migración expansiva si hace falta.
-4. Mantener un endpoint agregado del expediente maestro y agregar el detalle
-   operativo por `id_afectacion`.
-5. Cambiar navegación y estado para abrir afectaciones dentro de su
+3. Mantener transiciones compatibles y migraciones expansivas para cambios
+   posteriores.
+4. Mantener el expediente maestro y el detalle operativo por `id_afectacion`.
+5. Conservar la navegación para abrir afectaciones dentro de su
    `tramo_nucleo`, sin eliminar la vista maestra.
 6. Mostrar sólo las etapas aplicables al tipo colectivo o individual.
 7. Hacer cumplir la secuencia obligatoria con las entidades existentes y
@@ -550,9 +571,9 @@ Al diseñar el corte:
 8. Migrar o vincular datos existentes sin inferir relaciones ambiguas.
 9. Añadir pruebas de aislamiento: datos de una afectación no deben aparecer
    en otra del mismo `tramo_nucleo`.
-10. Corregir el panel documental para usar
-    `entidad_relacionada_tipo = 'afectacion'` e
-    `entidad_relacionada_id = id_afectacion`.
+10. Conservar documentos maestros como
+    `entidad_relacionada_tipo = 'tramo_nucleo'` y documentos propios como
+    `entidad_relacionada_tipo = 'afectacion'`.
 11. Representar por afectación las salidas terminales de expropiación directa
     y comunidad indígena cuando no correspondan a todo el núcleo.
 12. Derivar `liberado` sólo después del pago y mostrar estados mixtos en el
@@ -666,16 +687,40 @@ Estado de entrega:
 1. Código y migración: implementados.
 2. Suite backend, lint y build: aprobados en copia aislada.
 3. Base activa: 006 aplicada y verificada con respaldo previo.
-4. Aceptación funcional con usuarios: pendiente.
+4. Aceptación funcional con usuarios: completada y aprobada.
 5. Commit y push: realizados.
 
-#### Subcorte 2C propuesto — Navegación y aislamiento documental
+#### Subcorte 2C implementado — Navegación y aislamiento documental
+
+El 4 de agosto de 2026 se implementó técnicamente:
 
 1. Mantener el expediente maestro de `tramo_nucleo`.
-2. Abrir cada afectación en su propio subexpediente.
+2. Abrir cada afectación en su propio subexpediente mediante
+   `/expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion`.
 3. Mostrar antecedentes compartidos sin duplicarlos.
-4. Aislar actuaciones, pagos y documentos propios de cada afectación.
-5. Corregir el tipo de relación inválido usado por el panel documental.
+4. Aislar asambleas, convenios, trámites FIFONAFE, pagos, minutas y documentos
+   propios de cada afectación.
+5. Corregir el tipo de relación documental de expediente maestro admitiendo
+   `entidad_relacionada_tipo = 'tramo_nucleo'` en PostgreSQL y backend.
+6. Agregar autorización territorial para relaciones documentales dinámicas y
+   minutas.
+
+Validación técnica ejecutada:
+
+```text
+respaldo: backups/pre_migracion_007_20260804.dump
+tamaño:   288K
+SHA-256:  2573a276dea8603cc82c519e56f95a92df3a9708b389b63ed53cdf51a8f7e014
+migración: BEGIN → COMMIT; versión 007 registrada
+backend:  107 pruebas aprobadas; 1 advertencia de deprecación de Starlette
+frontend: npx oxlint src sin advertencias ni errores
+build:    producción exitosa en directorio temporal
+```
+
+La base local usada para esta validación no contiene expedientes operativos; las
+pruebas 2C crean sus fixtures y verifican aislamiento entre afectaciones del
+mismo `tramo_nucleo`. En ambientes con datos reales se debe respaldar y ejecutar
+preflight antes de aplicar 007.
 
 ### Corte 3 — Seguridad inmediata: parcial
 
@@ -775,11 +820,16 @@ franja válida.
 
 - Conservar y probar periódicamente la restauración del respaldo previo a 006
   ubicado en `backups/software-pa-db_trenes_pre_006_20260803.dump`.
+- Conservar el respaldo previo a 007 de este entorno local:
+  `backups/pre_migracion_007_20260804.dump`.
+- Replicar 007 en otros ambientes sólo después de respaldo, verificación de
+  `schema_migrations` y preflight de tipos documentales.
 - Conciliar manualmente relaciones históricas 2B que permanecen nulas; no
   inferirlas por fecha, expediente o cercanía de registros.
-- Ejecutar aceptación funcional con usuarios sobre rutas colectiva,
-  individual, terminal, modificatorio y expediente mixto.
-- Validación funcional y de experiencia con usuarios finales.
+- ~~Ejecutar aceptación funcional con usuarios sobre rutas colectiva,
+  individual, terminal, modificatorio y expediente mixto.~~ (Completada)
+- Ejecutar validación funcional y de experiencia con usuarios finales sobre el
+  Subcorte 2C.
 - Decidir si una base limpia necesita conservar
   `persona_fuente_legacy`; hoy es trazabilidad de migración, no una segunda
   identidad maestra.
@@ -796,17 +846,12 @@ La siguiente tarea no es crear Proyecto, repetir Adaptaciones 2.0, rediseñar
 
 Próximo paso operativo:
 
-1. Ejecutar aceptación funcional de 2B con usuarios sobre rutas colectiva,
-   individual, terminal, modificatorio y expediente mixto.
-2. Conciliar datos históricos únicamente con evidencia documental.
-3. Revisar y confirmar el diff antes de commit/push.
-4. Replicar el despliegue de 006 en otros ambientes sólo después de respaldo
-   y verificación individual de 004/005.
-
-Después de la aceptación funcional, el siguiente trabajo es diseñar el
-Subcorte 2C: navegación por subexpediente y aislamiento documental. Debe
-mantener los estados y ciclos 2B, corregir el tipo documental inválido y
-probar que dos afectaciones del mismo `tramo_nucleo` no mezclen actuaciones.
-
+1. Validar funcionalmente con usuarios finales el Subcorte 2C ya implementado:
+   expediente maestro, apertura de subexpediente, aislamiento documental,
+   minutas propias/compartidas, pagos y flujo por afectación.
+2. Replicar 007 en otros ambientes sólo después de respaldo, verificación
+   individual de 004/005/006 y preflight de datos.
+3. Conciliar datos históricos únicamente con evidencia documental.
+4. Revisar y confirmar el diff antes de commit/push.
 El derecho de vía versionado está aprobado como componente futuro del Corte
-5. No debe mezclarse en el Subcorte 2B.
+5. No debe mezclarse en el Subcorte 2C.
