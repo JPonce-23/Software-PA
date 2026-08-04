@@ -18,6 +18,7 @@ export default function PagosPanel({ idTramoNucleo, canWrite }) {
   const [tramites, setTramites] = useState([]);
   const [convenios, setConvenios] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [cycleStates, setCycleStates] = useState({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
 
@@ -39,6 +40,14 @@ export default function PagosPanel({ idTramoNucleo, canWrite }) {
         })),
       );
       setPayments(paymentResponses.flatMap((response) => response.data));
+      const affectationIds = [...new Set(eligible.map((item) => item.id_afectacion))];
+      const stateResponses = await Promise.all(
+        affectationIds.map((id) => api.get(`/afectaciones/${id}/estado`)),
+      );
+      setCycleStates(Object.fromEntries(
+        stateResponses.flatMap((response) => response.data.ciclos)
+          .map((cycle) => [cycle.id_ciclo_afectacion, cycle]),
+      ));
     } finally {
       setLoading(false);
     }
@@ -78,8 +87,7 @@ export default function PagosPanel({ idTramoNucleo, canWrite }) {
             const items = payments.filter(
               (payment) => payment.id_tramite_fifonafe === tramite.id_tramite_fifonafe,
             );
-            const paid = items.reduce((sum, item) => sum + Number(item.monto_pagado), 0);
-            const cap = Number(convenio?.monto_100 || 0) + Number(convenio?.monto_bdt || 0);
+            const cycleState = cycleStates[tramite.id_ciclo_afectacion];
             return (
               <article className="record-card" key={tramite.id_tramite_fifonafe}>
                 <header>
@@ -87,12 +95,13 @@ export default function PagosPanel({ idTramoNucleo, canWrite }) {
                     <strong>Trámite #{tramite.id_tramite_fifonafe}</strong>
                     <span>Convenio #{tramite.id_convenio} · {tramite.estatus}</span>
                   </div>
-                  <span className="status success">{money.format(paid)} pagado</span>
+                  <span className="status success">{money.format(cycleState?.total_pagado || 0)} pagado</span>
                 </header>
                 <div className="money-summary">
                   <span>Tierra <strong>{money.format(convenio?.monto_100 || 0)}</strong></span>
                   <span>BDT <strong>{money.format(convenio?.monto_bdt || 0)}</strong></span>
-                  <span>Disponible <strong>{money.format(Math.max(0, cap - paid))}</strong></span>
+                  <span>Límite vigente <strong>{money.format(cycleState?.limite_pagable || 0)}</strong></span>
+                  <span>Disponible <strong>{money.format(cycleState?.saldo_disponible || 0)}</strong></span>
                 </div>
                 <div className="payment-list">
                   {items.map((payment) => (

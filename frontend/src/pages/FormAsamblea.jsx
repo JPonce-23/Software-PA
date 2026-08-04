@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import api from '../api/axios';
 import {
@@ -21,10 +21,11 @@ const CONTEXTOS = [
   { value: 'superficie_adicional', label: 'Superficie Adicional' },
 ];
 
-export default function FormAsamblea({ idNucleo, idTramoNucleo, initialData = null, onSuccess, onClose }) {
+export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [], initialData = null, onSuccess, onClose }) {
   const [guardando, setGuardando] = useState(false);
   const [exito, setExito]         = useState(false);
   const [error, setError]         = useState(null);
+  const [ciclos, setCiclos]       = useState([]);
 
   const [form, setForm] = useState({
     contexto_proceso:        initialData?.contexto_proceso        || 'cop_original',
@@ -39,9 +40,18 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, initialData = nu
     documentacion_disponible: initialData?.documentacion_disponible || false,
     documentacion_faltante:  initialData?.documentacion_faltante  || '',
     observaciones:           initialData?.observaciones           || '',
+    id_afectacion:           initialData?.id_afectacion           || '',
+    id_ciclo_afectacion:     initialData?.id_ciclo_afectacion     || '',
   });
 
   const set = (campo, valor) => setForm(prev => ({ ...prev, [campo]: valor }));
+
+  useEffect(() => {
+    if (!form.id_afectacion) return;
+    api.get(`/afectaciones/${form.id_afectacion}/ciclos`)
+      .then((response) => setCiclos(response.data))
+      .catch(() => setCiclos([]));
+  }, [form.id_afectacion]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,6 +61,8 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, initialData = nu
       const payload = {
         id_nucleo:               idNucleo,
         id_tramo_nucleo:         idTramoNucleo,
+        id_afectacion:           Number(form.id_afectacion),
+        id_ciclo_afectacion:     Number(form.id_ciclo_afectacion),
         contexto_proceso:        form.contexto_proceso,
         tipo_asamblea:           form.tipo_asamblea,
         resultado_anuencia:      form.resultado_anuencia,
@@ -96,6 +108,23 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, initialData = nu
           <SeccionHeader icono={<CalendarIcon size={16} />} titulo="Datos Generales" />
 
           <div style={gridDos}>
+            <Campo label="Afectación colectiva *">
+              <select required value={form.id_afectacion} onChange={e => setForm(prev => ({ ...prev, id_afectacion: e.target.value, id_ciclo_afectacion: '' }))} style={inputStyle}>
+                <option value="">Seleccione una afectación</option>
+                {afectaciones.filter(item => item.tipo_afectacion === 'colectivo').map(item => <option key={item.id_afectacion} value={item.id_afectacion}>Afectación #{item.id_afectacion}</option>)}
+              </select>
+            </Campo>
+
+            <Campo label="Ciclo *">
+              <select required value={form.id_ciclo_afectacion} onChange={e => {
+                const ciclo = ciclos.find(item => item.id_ciclo_afectacion === Number(e.target.value));
+                setForm(prev => ({ ...prev, id_ciclo_afectacion: e.target.value, contexto_proceso: ciclo?.tipo_ciclo || prev.contexto_proceso }));
+              }} style={inputStyle}>
+                <option value="">Seleccione un ciclo</option>
+                {ciclos.map(item => <option key={item.id_ciclo_afectacion} value={item.id_ciclo_afectacion}>{item.tipo_ciclo} #{item.consecutivo}</option>)}
+              </select>
+            </Campo>
+
             <Campo label="Tipo de Asamblea *">
               <select value={form.tipo_asamblea} onChange={e => set('tipo_asamblea', e.target.value)} style={inputStyle} required>
                 {TIPOS_ASAMBLEA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}

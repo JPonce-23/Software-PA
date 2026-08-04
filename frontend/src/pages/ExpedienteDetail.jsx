@@ -16,9 +16,11 @@ const OrvPanel = React.lazy(() => import('../components/fase2/OrvPanel'));
 const MinutasPanel = React.lazy(() => import('../components/fase2/MinutasPanel'));
 const PagosPanel = React.lazy(() => import('../components/fase2/PagosPanel'));
 const DocumentosPanel = React.lazy(() => import('../components/fase2/DocumentosPanel'));
+const FlujoLiberacionPanel = React.lazy(() => import('../components/fase2/FlujoLiberacionPanel'));
 
 const TABS = [
   { key: 'general',     label: 'Información General',       icon: Building2 },
+  { key: 'flujo',       label: 'Flujo de liberación',       icon: FileText },
   { key: 'colectivas',  label: 'Afectaciones Colectivas',   icon: Layers },
   { key: 'individuales',label: 'Afectaciones Individuales', icon: Users },
   { key: 'asambleas',   label: 'Asambleas',                 icon: Calendar },
@@ -122,7 +124,7 @@ export default function ExpedienteDetail() {
 
   const colectivas   = afectaciones.filter(a => a.tipo_afectacion === 'colectivo');
   const individuales = afectaciones.filter(a => a.tipo_afectacion === 'individual');
-  const canWrite = user?.rol && ['admin', 'operador', 'geografo'].includes(user.rol);
+  const canWrite = user?.rol && ['admin', 'operador'].includes(user.rol);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -198,10 +200,24 @@ export default function ExpedienteDetail() {
           {tabActiva === 'individuales' && <TabAfectaciones tipo="individual" items={individuales} convenios={convenios} user={user} onNueva={() => setModalIndividual(true)} onEditar={setModalIndividual} onCrearConvenio={setModalConvenio} />}
           {tabActiva === 'asambleas'    && <TabAsambleas items={asambleas} user={user} onNueva={() => setModalAsamblea(true)} onEditar={setModalAsamblea} />}
           <React.Suspense fallback={<div className="panel-loading"><Loader2 className="spin" /> Cargando módulo…</div>}>
+            {tabActiva === 'flujo' && (
+              <FlujoLiberacionPanel
+                idTramoNucleo={Number(id_tramo_nucleo)}
+                idNucleo={tramoNucleo.id_nucleo}
+                afectaciones={afectaciones}
+                convenios={convenios}
+                canWrite={canWrite}
+                onRefresh={() => {
+                  refrescarAfectaciones();
+                  refrescarAsambleas();
+                  refrescarConvenios();
+                }}
+              />
+            )}
             {tabActiva === 'orv'           && <OrvPanel idNucleo={tramoNucleo.id_nucleo} canWrite={canWrite} />}
             {tabActiva === 'minutas'       && <MinutasPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite} />}
-            {tabActiva === 'pagos'         && <PagosPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite && user?.rol !== 'geografo'} />}
-            {tabActiva === 'documentos'    && <DocumentosPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite && user?.rol !== 'geografo'} />}
+            {tabActiva === 'pagos'         && <PagosPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite} />}
+            {tabActiva === 'documentos'    && <DocumentosPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite} />}
           </React.Suspense>
 
           {/* Modales de captura */}
@@ -227,6 +243,7 @@ export default function ExpedienteDetail() {
             <FormAsamblea
               idNucleo={tramoNucleo.id_nucleo}
               idTramoNucleo={Number(id_tramo_nucleo)}
+              afectaciones={afectaciones}
               initialData={typeof modalAsamblea === 'object' ? modalAsamblea : null}
               onSuccess={refrescarAsambleas}
               onClose={() => setModalAsamblea(false)}
@@ -238,6 +255,7 @@ export default function ExpedienteDetail() {
               afectacion={modalConvenio.afectacion || modalConvenio}
               initialData={modalConvenio.isEdit ? modalConvenio.convenio : null}
               asambleas={asambleas}
+              convenios={convenios}
               onSuccess={() => {
                 refrescarConvenios();
               }}
@@ -275,7 +293,7 @@ function TabGeneral({ tramoNucleo, nucleo }) {
 /* ────── Pestaña: Afectaciones (Colectivas o Individuales) ────── */
 function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCrearConvenio }) {
   const esColectivo = tipo === 'colectivo';
-  const puedeCapturar = user?.rol && ['admin', 'operador', 'geografo'].includes(user.rol);
+  const puedeCapturar = user?.rol && ['admin', 'operador'].includes(user.rol);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -370,7 +388,7 @@ function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCr
 
 /* ────── Pestaña: Asambleas ────── */
 function TabAsambleas({ items, user, onNueva, onEditar }) {
-  const puedeCapturar = user?.rol && ['admin', 'operador', 'geografo'].includes(user.rol);
+  const puedeCapturar = user?.rol && ['admin', 'operador'].includes(user.rol);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

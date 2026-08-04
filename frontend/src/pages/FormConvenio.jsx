@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FileSignature } from 'lucide-react';
 import api from '../api/axios';
 import {
@@ -17,10 +17,11 @@ const TIPOS_CONVENIO = [
   { value: 'ampliacion_remanente', label: 'Ampliación Remanente' },
 ];
 
-export default function FormConvenio({ idTramoNucleo, afectacion, asambleas, initialData = null, onSuccess, onClose }) {
+export default function FormConvenio({ idTramoNucleo, afectacion, asambleas, convenios = [], initialData = null, onSuccess, onClose }) {
   const [guardando, setGuardando] = useState(false);
   const [exito, setExito]         = useState(false);
   const [error, setError]         = useState(null);
+  const [ciclos, setCiclos]       = useState([]);
 
   const [form, setForm] = useState({
     tipo_convenio:              initialData?.tipo_convenio              || 'cop_original',
@@ -31,10 +32,35 @@ export default function FormConvenio({ idTramoNucleo, afectacion, asambleas, ini
     monto_90:                   initialData?.monto_90                   || '',
     monto_bdt:                  initialData?.monto_bdt                  || '',
     id_asamblea_autorizacion:   initialData?.id_asamblea_autorizacion   || '',
+    id_ciclo_afectacion:        initialData?.id_ciclo_afectacion        || '',
+    id_convenio_padre:          initialData?.id_convenio_padre          || '',
     observaciones:              initialData?.observaciones              || '',
   });
 
   const set = (campo, valor) => setForm(prev => ({ ...prev, [campo]: valor }));
+
+  useEffect(() => {
+    if (!afectacion?.id_afectacion) return;
+    api.get(`/afectaciones/${afectacion.id_afectacion}/ciclos`)
+      .then((response) => {
+        setCiclos(response.data);
+        if (!form.id_ciclo_afectacion) {
+          const original = response.data.find((item) => item.tipo_ciclo === 'cop_original');
+          if (original) set('id_ciclo_afectacion', String(original.id_ciclo_afectacion));
+        }
+      })
+      .catch((requestError) => setError(requestError.response?.data?.detail || 'No fue posible cargar los ciclos.'));
+  // El formulario se reinicia al cambiar de afectación.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [afectacion?.id_afectacion]);
+
+  const tiposPermitidos = useMemo(
+    () => TIPOS_CONVENIO.filter((item) => afectacion?.tipo_afectacion === 'colectivo'
+      ? ['cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias'].includes(item.value)
+      : ['cop_original', 'modificatorio', 'ampliacion', 'ampliacion_remanente'].includes(item.value)),
+    [afectacion?.tipo_afectacion],
+  );
+  const padres = convenios.filter((item) => item.id_afectacion === afectacion?.id_afectacion && item.tipo_convenio !== 'modificatorio');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,14 +76,18 @@ export default function FormConvenio({ idTramoNucleo, afectacion, asambleas, ini
       const payload = {
         id_tramo_nucleo:            idTramoNucleo,
         id_afectacion:              afectacion.id_afectacion,
+        id_ciclo_afectacion:        form.id_ciclo_afectacion ? Number(form.id_ciclo_afectacion) : null,
         tipo_afectacion:            afectacion.tipo_afectacion,
         tipo_convenio:              form.tipo_convenio,
         fecha_firma:                form.fecha_firma                || null,
-        superficie_real_afectada_ha: form.superficie_real_afectada_ha ? Number(form.superficie_real_afectada_ha) : null,
-        superficie_total_ha:        form.superficie_total_ha        ? Number(form.superficie_total_ha)        : null,
-        monto_100:                  form.monto_100                  ? Number(form.monto_100)                  : null,
-        monto_90:                   form.monto_90                   ? Number(form.monto_90)                   : null,
-        monto_bdt:                  form.monto_bdt                  ? Number(form.monto_bdt)                  : null,
+        superficie_real_afectada_ha: form.superficie_real_afectada_ha || null,
+        superficie_total_ha:        form.superficie_total_ha        || null,
+        monto_100:                  form.monto_100                  || null,
+        monto_90:                   form.monto_90                   || null,
+        monto_bdt:                  (form.tipo_convenio === 'obras_complementarias'
+          || (form.tipo_convenio === 'modificatorio' && afectacion.tipo_afectacion === 'individual'))
+          ? null : (form.monto_bdt || null),
+        id_convenio_padre:          form.id_convenio_padre ? Number(form.id_convenio_padre) : null,
         id_asamblea_autorizacion:   form.id_asamblea_autorizacion   ? Number(form.id_asamblea_autorizacion)   : null,
         observaciones:              form.observaciones              || null,
       };
@@ -101,7 +131,14 @@ export default function FormConvenio({ idTramoNucleo, afectacion, asambleas, ini
           <div style={gridDos}>
             <Campo label="Tipo de Convenio *">
               <select value={form.tipo_convenio} onChange={e => set('tipo_convenio', e.target.value)} style={inputStyle} required>
-                {TIPOS_CONVENIO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {tiposPermitidos.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </Campo>
+
+            <Campo label="Ciclo de la afectación *">
+              <select required value={form.id_ciclo_afectacion} onChange={e => set('id_ciclo_afectacion', e.target.value)} style={inputStyle}>
+                <option value="">Seleccione un ciclo</option>
+                {ciclos.map(c => <option key={c.id_ciclo_afectacion} value={c.id_ciclo_afectacion}>{c.tipo_ciclo} #{c.consecutivo}</option>)}
               </select>
             </Campo>
 
@@ -117,6 +154,18 @@ export default function FormConvenio({ idTramoNucleo, afectacion, asambleas, ini
               <input type="number" step="0.0001" min="0" value={form.superficie_total_ha} onChange={e => set('superficie_total_ha', e.target.value)} placeholder="0.0000" style={inputStyle} />
             </Campo>
           </div>
+
+          {form.tipo_convenio === 'modificatorio' && (
+            <Campo label="Convenio base que se sustituye *">
+              <select required value={form.id_convenio_padre} onChange={e => {
+                const padre = padres.find(item => item.id_convenio === Number(e.target.value));
+                setForm(prev => ({ ...prev, id_convenio_padre: e.target.value, id_ciclo_afectacion: padre ? String(padre.id_ciclo_afectacion) : prev.id_ciclo_afectacion }));
+              }} style={inputStyle}>
+                <option value="">Seleccione el convenio base</option>
+                {padres.map(item => <option key={item.id_convenio} value={item.id_convenio}>Convenio #{item.id_convenio} · {item.tipo_convenio}</option>)}
+              </select>
+            </Campo>
+          )}
 
           {/* Selector de Asamblea: solo para convenios colectivos */}
           {afectacion?.tipo_afectacion === 'colectivo' && asambleas && (
@@ -162,6 +211,15 @@ export default function FormConvenio({ idTramoNucleo, afectacion, asambleas, ini
             labelGuardar={initialData ? 'Guardar Cambios' : 'Registrar Convenio'}
             color="#059669"
           />
+          {initialData?.tipo_convenio === 'modificatorio' && !initialData?.vigencia_financiera_desde && (
+            <button type="button" className="button" onClick={() => {
+              setGuardando(true);
+              api.post(`/convenios/${initialData.id_convenio}/activar-modificatorio`, { confirmar: true })
+                .then(() => { onSuccess(); onClose(); })
+                .catch((requestError) => setError(requestError.response?.data?.detail?.message || requestError.response?.data?.detail || 'No fue posible activar el modificatorio.'))
+                .finally(() => setGuardando(false));
+            }}>Activar sustitución financiera</button>
+          )}
         </form>
       )}
     </ModalWrapper>
