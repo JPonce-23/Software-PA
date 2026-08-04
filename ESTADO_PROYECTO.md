@@ -14,7 +14,7 @@
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
 > segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 3 de agosto de 2026
+**Última actualización:** 4 de agosto de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
@@ -667,7 +667,7 @@ Estado de entrega:
 2. Suite backend, lint y build: aprobados en copia aislada.
 3. Base activa: 006 aplicada y verificada con respaldo previo.
 4. Aceptación funcional con usuarios: pendiente.
-5. Commit y push: no realizados.
+5. Commit y push: realizados.
 
 #### Subcorte 2C propuesto — Navegación y aislamiento documental
 
