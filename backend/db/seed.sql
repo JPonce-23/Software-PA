@@ -1,20 +1,23 @@
 BEGIN;
-SET LOCAL "app.current_user_id" = '1';
 
--- El usuario técnico se crea primero porque todos los registros operativos
--- disparan la auditoría forense.
-INSERT INTO usuario (
-    id_usuario, nombre, apellido_paterno, correo, contrasena_hash, rol
-)
-VALUES (
-    1,
-    'Admin',
-    'Sistema',
-    'admin@sistema.com',
-    '$2b$12$o3hWnUn7TaaDouwlExb6z.wtr3bQafHhxk9dr0L2TG4AfKP.7ymum',
-    'admin'
-)
-ON CONFLICT DO NOTHING;
+DO $$
+DECLARE
+    v_usuario_admin INTEGER;
+BEGIN
+    SELECT id_usuario
+      INTO v_usuario_admin
+      FROM usuario
+     WHERE activo IS TRUE
+       AND rol = 'admin'
+     ORDER BY id_usuario
+     LIMIT 1;
+
+    IF v_usuario_admin IS NULL THEN
+        RAISE EXCEPTION 'seed.sql requiere crear primero un usuario administrador activo con scripts/create_admin.py';
+    END IF;
+
+    PERFORM set_config('app.current_user_id', v_usuario_admin::TEXT, TRUE);
+END $$;
 
 INSERT INTO entidad_federativa (id_entidad, clave_inegi, nombre)
 VALUES (4, '04', 'Campeche')
@@ -42,7 +45,6 @@ INSERT INTO tramo_nucleo (
 VALUES (1, 1, 1, 1, '7.1')
 ON CONFLICT DO NOTHING;
 
-SELECT setval(pg_get_serial_sequence('usuario', 'id_usuario'), (SELECT MAX(id_usuario) FROM usuario));
 SELECT setval(pg_get_serial_sequence('proyecto', 'id_proyecto'), (SELECT MAX(id_proyecto) FROM proyecto));
 SELECT setval(pg_get_serial_sequence('tramo', 'id_tramo'), (SELECT MAX(id_tramo) FROM tramo));
 SELECT setval(pg_get_serial_sequence('nucleo_agrario', 'id_nucleo'), (SELECT MAX(id_nucleo) FROM nucleo_agrario));

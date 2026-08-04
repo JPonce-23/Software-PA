@@ -12,6 +12,30 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("La variable de entorno SECRET_KEY es obligatoria.")
 
+_SECRET_KEY_MIN_LENGTH = 32
+_INSECURE_SECRET_MARKERS = (
+    "change_me",
+    "changeme",
+    "default",
+    "example",
+    "secret_key",
+)
+
+
+def _is_insecure_secret_key(value: str) -> bool:
+    normalized = value.strip().lower()
+    return (
+        len(normalized) < _SECRET_KEY_MIN_LENGTH
+        or any(marker in normalized for marker in _INSECURE_SECRET_MARKERS)
+    )
+
+
+if _is_insecure_secret_key(SECRET_KEY):
+    raise RuntimeError(
+        "La variable de entorno SECRET_KEY debe ser un secreto propio del "
+        "entorno, no un placeholder, y tener al menos 32 caracteres."
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 # RNF-9: Vigencia estricta de 30 minutos
 

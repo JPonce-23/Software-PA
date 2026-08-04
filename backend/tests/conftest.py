@@ -13,6 +13,7 @@ Convenciones:
   - Toda fixture que crea datos en la BD registra su cleanup automáticamente.
 """
 
+import os
 import pytest
 import time
 from fastapi.testclient import TestClient
@@ -36,16 +37,32 @@ def client():
 # ─────────────────────── Autenticación ─────────────────────── #
 
 @pytest.fixture(scope="session")
-def admin_headers(client):
+def admin_credentials():
+    """Credenciales del administrador de pruebas.
+
+    Permite que cada ambiente de pruebas use su propio bootstrap sin codificar
+    esas credenciales en los tests.
+    """
+    return {
+        "email": os.getenv("TEST_ADMIN_EMAIL", "admin@sistema.com"),
+        "password": os.getenv("TEST_ADMIN_PASSWORD", "Admin123!"),
+    }
+
+
+@pytest.fixture(scope="session")
+def admin_headers(client, admin_credentials):
     """Headers de autorización para el usuario admin.
     Falla rápido si las credenciales de prueba no existen."""
     response = client.post(
         "/api/auth/login",
-        data={"username": "admin@sistema.com", "password": "Admin123!"},
+        data={
+            "username": admin_credentials["email"],
+            "password": admin_credentials["password"],
+        },
     )
     assert response.status_code == 200, (
         "No se pudo autenticar como admin. "
-        "Asegúrate de que el usuario admin@sistema.com existe en la BD de pruebas."
+        "Configura TEST_ADMIN_EMAIL y TEST_ADMIN_PASSWORD para esta BD de pruebas."
     )
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

@@ -72,13 +72,16 @@ class TestAsignacionUsuarioTramo:
     """Asignación y remoción de usuarios a tramos."""
 
     def test_asignar_usuario_a_tramo(
-        self, client, admin_headers, seed_tramo
+        self, client, admin_headers, admin_credentials, seed_tramo
     ):
         """Debe poder asignar un usuario a un tramo."""
         # Obtener el id del usuario admin
         login_res = client.post(
             "/api/auth/login",
-            data={"username": "admin@sistema.com", "password": "Admin123!"},
+            data={
+                "username": admin_credentials["email"],
+                "password": admin_credentials["password"],
+            },
         )
         user_id = login_res.json()["user"]["id_usuario"]
 
@@ -91,12 +94,15 @@ class TestAsignacionUsuarioTramo:
         assert res.json()["activo"] is True
 
     def test_remover_usuario_de_tramo(
-        self, client, admin_headers, seed_tramo
+        self, client, admin_headers, admin_credentials, seed_tramo
     ):
         """Debe poder remover al usuario del tramo."""
         login_res = client.post(
             "/api/auth/login",
-            data={"username": "admin@sistema.com", "password": "Admin123!"},
+            data={
+                "username": admin_credentials["email"],
+                "password": admin_credentials["password"],
+            },
         )
         user_id = login_res.json()["user"]["id_usuario"]
 
@@ -116,11 +122,14 @@ class TestAsignacionUsuarioTramo:
         assert res.status_code == 404
 
     def test_reactivar_asignacion_exige_motivo_y_registra_reactivacion(
-        self, client, admin_headers, seed_tramo
+        self, client, admin_headers, admin_credentials, seed_tramo
     ):
         login_res = client.post(
             "/api/auth/login",
-            data={"username": "admin@sistema.com", "password": "Admin123!"},
+            data={
+                "username": admin_credentials["email"],
+                "password": admin_credentials["password"],
+            },
         )
         user_id = login_res.json()["user"]["id_usuario"]
         endpoint = f"/api/tramos/{seed_tramo['id_tramo']}/asignar-usuario"
