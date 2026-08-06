@@ -6,6 +6,13 @@ x-backend-environment: &backend-environment
   DB_NAME: ${DB_NAME:-db_trenes}
   SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en el archivo .env}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  APP_ENV: ${APP_ENV:-development}
+  AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+  AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
+  AUTH_INACTIVITY_MINUTES: ${AUTH_INACTIVITY_MINUTES:-30}
+  AUTH_ABSOLUTE_MINUTES: ${AUTH_ABSOLUTE_MINUTES:-480}
+  AUTH_LOCK_MINUTES: ${AUTH_LOCK_MINUTES:-15}
+  AUTH_TRUSTED_PROXY_IPS: ${AUTH_TRUSTED_PROXY_IPS:-}
 
 x-default-logging: &default-logging
   driver: json-file

@@ -7,18 +7,21 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    
-    if (storedUser && token) {
+    let active = true;
+    const restoreSession = async () => {
       try {
-        setUser(JSON.parse(storedUser));
+        const response = await api.get('/auth/sesion');
+        if (active) setUser(response.data.user);
       } catch {
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
       }
-    }
-    setLoading(false);
+    };
+    restoreSession();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const login = async (email, password) => {
@@ -27,14 +30,11 @@ export const AuthProvider = ({ children }) => {
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await api.post('/auth/login', formData, {
+      const response = await api.post('/auth/sesiones', formData, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
-      
-      const { access_token, user: userData } = response.data;
-      
-      localStorage.setItem('token', access_token);
-      localStorage.setItem('user', JSON.stringify(userData));
+
+      const { user: userData } = response.data;
       setUser(userData);
       
       return { success: true };
@@ -46,10 +46,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      setUser(null);
+    }
   };
 
   return (

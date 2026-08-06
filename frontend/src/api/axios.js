@@ -2,6 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -9,9 +10,18 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const method = (config.method || 'get').toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      const cookies = Object.fromEntries(
+        document.cookie
+          .split(';')
+          .map((item) => item.trim().split('='))
+          .filter(([name]) => name)
+      );
+      const csrfToken = cookies['__Host-pa_csrf'] || cookies.pa_csrf_dev;
+      if (csrfToken) {
+        config.headers['X-CSRF-Token'] = decodeURIComponent(csrfToken);
+      }
     }
     return config;
   },
@@ -22,8 +32,6 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }

@@ -1,6 +1,12 @@
 # Configuración sin bind mounts ni hot reload.
 # Uso: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 services:
+  backend:
+    environment:
+      APP_ENV: production
+      AUTH_COOKIE_SECURE: "true"
+      CORS_ORIGINS: ${CORS_ORIGINS:?Define el origen HTTPS público exacto}
+
   frontend:
     build:
       target: production
