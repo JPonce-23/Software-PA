@@ -9,7 +9,7 @@ Prefijo 'zzz' para garantizar que se ejecute después de todos los demás módul
 """
 
 
-def test_limpieza_ordenada(client, admin_headers, cleanup):
+def test_limpieza_ordenada(client, admin_session, cleanup):
     """Elimina todos los recursos creados en orden inverso (LIFO).
     Reintenta dependencias temporalmente bloqueadas sin relajar las reglas de BD.
     Evita que queden datos basura en la BD tras la sesión de tests."""
@@ -21,7 +21,7 @@ def test_limpieza_ordenada(client, admin_headers, cleanup):
         for endpoint, resource_id in pendientes:
             res = client.delete(
                 f"{endpoint}/{resource_id}?motivo=Limpieza automatizada pytest",
-                headers=admin_headers,
+                headers=admin_session,
             )
             if res.status_code in (200, 404):
                 hubo_progreso = True

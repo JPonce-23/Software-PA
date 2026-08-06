@@ -19,11 +19,11 @@ TEST_PASSWORD = "PruebaAuth!2026"
 
 
 @pytest.fixture
-def auth_user(client, admin_headers):
+def auth_user(client, admin_session):
     email = f"auth-corte4-{uuid4().hex}@pa.test"
     response = client.post(
         "/api/usuarios",
-        headers=admin_headers,
+        headers=admin_session,
         json={
             "nombre": "Prueba",
             "apellido_paterno": "Autenticacion",
@@ -37,7 +37,7 @@ def auth_user(client, admin_headers):
     yield {"id_usuario": user["id_usuario"], "email": email}
     client.delete(
         f"/api/usuarios/{user['id_usuario']}?motivo=Limpieza de prueba Corte 4",
-        headers=admin_headers,
+        headers=admin_session,
     )
 
 
@@ -102,7 +102,7 @@ def test_cookie_session_csrf_logout_and_redaction(auth_user):
 def test_quinto_fallo_concurrente_bloquea_y_admin_desbloquea(
     auth_user,
     client,
-    admin_headers,
+    admin_session,
 ):
     def fail_login(_):
         with TestClient(app, raise_server_exceptions=False) as browser:
@@ -137,7 +137,7 @@ def test_quinto_fallo_concurrente_bloquea_y_admin_desbloquea(
 
     unlocked = client.post(
         f"/api/usuarios/{auth_user['id_usuario']}/desbloquear",
-        headers=admin_headers,
+        headers=admin_session,
         json={"motivo": "Recuperación controlada en prueba"},
     )
     assert unlocked.status_code == 200, unlocked.text

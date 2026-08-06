@@ -7,12 +7,12 @@ from uuid import uuid4
 
 def test_parcela_legacy_crea_titular_normalizado(
     client,
-    admin_headers,
+    admin_session,
     seed_parcela,
 ):
     response = client.get(
         f"/api/parcelas/{seed_parcela['id_parcela']}/titulares",
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert response.status_code == 200
     titulares = response.json()
@@ -22,7 +22,7 @@ def test_parcela_legacy_crea_titular_normalizado(
 
 def test_orv_legacy_crea_integrante_normalizado(
     client,
-    admin_headers,
+    admin_session,
     cleanup,
     seed_nucleo,
 ):
@@ -32,14 +32,14 @@ def test_orv_legacy_crea_integrante_normalizado(
         "fin_vigencia": "2028-12-31",
         "comisariado_presidente": "Representante de prueba",
     }
-    created = client.post("/api/orvs", json=payload, headers=admin_headers)
+    created = client.post("/api/orvs", json=payload, headers=admin_session)
     assert created.status_code == 201, created.text
     id_orv = created.json()["id_orv"]
     cleanup.register("/api/orvs", id_orv)
 
     response = client.get(
         f"/api/orvs/{id_orv}/integrantes",
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert response.status_code == 200
     integrantes = response.json()
@@ -50,14 +50,14 @@ def test_orv_legacy_crea_integrante_normalizado(
 
 def test_parcela_normalizada_es_atomica_y_filtrable_por_persona(
     client,
-    admin_headers,
+    admin_session,
     cleanup,
     seed_nucleo,
 ):
     created_person = client.post(
         "/api/personas",
         json={"nombre": "Titular normalizado"},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert created_person.status_code == 201, created_person.text
     persona = created_person.json()
@@ -76,7 +76,7 @@ def test_parcela_normalizada_es_atomica_y_filtrable_por_persona(
                 "tipo_derecho": "titular",
             },
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert created_parcel.status_code == 201, created_parcel.text
     parcela = created_parcel.json()
@@ -89,7 +89,7 @@ def test_parcela_normalizada_es_atomica_y_filtrable_por_persona(
             "id_nucleo": seed_nucleo["id_nucleo"],
             "id_persona": persona["id_persona"],
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert filtered.status_code == 200
     assert [item["id_parcela"] for item in filtered.json()] == [
@@ -99,7 +99,7 @@ def test_parcela_normalizada_es_atomica_y_filtrable_por_persona(
 
 def test_persona_normaliza_identidad_y_rechaza_curp_duplicada(
     client,
-    admin_headers,
+    admin_session,
     cleanup,
 ):
     token = uuid4().hex
@@ -110,7 +110,7 @@ def test_persona_normaliza_identidad_y_rechaza_curp_duplicada(
         "curp": curp.lower(),
         "rfc": "",
     }
-    created = client.post("/api/personas", json=payload, headers=admin_headers)
+    created = client.post("/api/personas", json=payload, headers=admin_session)
     assert created.status_code == 201, created.text
     persona = created.json()
     cleanup.register("/api/personas", persona["id_persona"])
@@ -121,14 +121,14 @@ def test_persona_normaliza_identidad_y_rechaza_curp_duplicada(
     duplicate = client.post(
         "/api/personas",
         json={"nombre": "Homónima", "curp": curp},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert duplicate.status_code == 409
 
 
 def test_minuta_y_acuerdo_validan_expediente_y_responsable(
     client,
-    admin_headers,
+    admin_session,
     cleanup,
     seed_tramo_nucleo,
 ):
@@ -139,7 +139,7 @@ def test_minuta_y_acuerdo_validan_expediente_y_responsable(
             "fecha_reunion": "2026-07-28",
             "asunto": "Seguimiento de liberación",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert minuta_response.status_code == 201, minuta_response.text
     minuta = minuta_response.json()
@@ -152,7 +152,7 @@ def test_minuta_y_acuerdo_validan_expediente_y_responsable(
             "responsable_externo": "Enlace institucional",
             "fecha_limite": "2026-08-15",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert acuerdo_response.status_code == 201, acuerdo_response.text
     acuerdo = acuerdo_response.json()
@@ -162,14 +162,14 @@ def test_minuta_y_acuerdo_validan_expediente_y_responsable(
     invalid = client.put(
         f"/api/acuerdos/{acuerdo['id_acuerdo']}",
         json={"estatus": "cumplido"},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert invalid.status_code == 400
 
 
 def test_documento_genera_version_inmutable(
     client,
-    admin_headers,
+    admin_session,
     cleanup,
     seed_nucleo,
 ):
@@ -181,7 +181,7 @@ def test_documento_genera_version_inmutable(
             "tipo_documento": "Acta",
             "categoria": "disponible",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert created.status_code == 201, created.text
     id_documento = created.json()["id_documento"]
@@ -190,7 +190,7 @@ def test_documento_genera_version_inmutable(
     uploaded = client.post(
         f"/api/documentacion/{id_documento}/archivo",
         files={"file": ("acta.pdf", b"%PDF-1.4\n%%EOF\n", "application/pdf")},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert uploaded.status_code == 201, uploaded.text
     version = uploaded.json()
@@ -200,7 +200,7 @@ def test_documento_genera_version_inmutable(
 
     versions = client.get(
         f"/api/documentacion/{id_documento}/versiones",
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert versions.status_code == 200
     assert [item["numero_version"] for item in versions.json()] == [1]
@@ -215,7 +215,7 @@ def test_documento_genera_version_inmutable(
                     "application/pdf",
                 )
             },
-            headers=admin_headers,
+            headers=admin_session,
         )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -230,7 +230,7 @@ def test_documento_genera_version_inmutable(
 
     downloaded = client.get(
         f"/api/documentacion/{id_documento}/versiones/1/archivo",
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert downloaded.status_code == 200
     assert downloaded.content == b"%PDF-1.4\n%%EOF\n"
@@ -238,7 +238,7 @@ def test_documento_genera_version_inmutable(
 
 def test_pago_respeta_monto_tierra_mas_bdt(
     client,
-    admin_headers,
+    admin_session,
     cleanup,
     seed_nucleo,
     seed_tramo_nucleo,
@@ -252,14 +252,14 @@ def test_pago_respeta_monto_tierra_mas_bdt(
             "tipo_tenencia": "Uso Común",
             "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert afectacion_response.status_code == 201, afectacion_response.text
     afectacion = afectacion_response.json()
     cleanup.register("/api/afectaciones", afectacion["id_afectacion"])
     ciclo = client.get(
         f"/api/afectaciones/{afectacion['id_afectacion']}/ciclos",
-        headers=admin_headers,
+        headers=admin_session,
     ).json()[0]
     asamblea_response = client.post(
         "/api/asambleas",
@@ -276,7 +276,7 @@ def test_pago_respeta_monto_tierra_mas_bdt(
             "ingreso_ran_fecha": "2026-07-21",
             "acta_inscripcion_fecha_ran": "2026-07-22",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert asamblea_response.status_code == 201, asamblea_response.text
     asamblea = asamblea_response.json()
@@ -295,7 +295,7 @@ def test_pago_respeta_monto_tierra_mas_bdt(
             "monto_bdt": "10.00",
             "superficie_real_afectada_ha": "10.5",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert convenio_response.status_code == 201, convenio_response.text
     convenio = convenio_response.json()
@@ -307,7 +307,7 @@ def test_pago_respeta_monto_tierra_mas_bdt(
             "numero_solicitud_ingreso": "RAN-PAGO",
             "convenio_inscrito_fecha_ran": "2026-07-25",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert ran.status_code == 200, ran.text
 
@@ -334,7 +334,7 @@ def test_pago_respeta_monto_tierra_mas_bdt(
             "hay_conflictos": False,
             **oficios,
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert informe_response.status_code == 201, informe_response.text
     informe = informe_response.json()
@@ -351,7 +351,7 @@ def test_pago_respeta_monto_tierra_mas_bdt(
             "tipo_afectacion": "colectivo",
             "tipo_tramite": "indemnizacion",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert tramite_response.status_code == 201, tramite_response.text
     tramite = tramite_response.json()
@@ -366,14 +366,14 @@ def test_pago_respeta_monto_tierra_mas_bdt(
     excessive = client.post(
         "/api/pagos-indemnizacion",
         json={**base_payload, "monto_pagado": "110.01"},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert excessive.status_code == 409
 
     valid = client.post(
         "/api/pagos-indemnizacion",
         json={**base_payload, "monto_pagado": "110.00"},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert valid.status_code == 201, valid.text
     cleanup.register("/api/pagos-indemnizacion", valid.json()["id_pago"])
@@ -382,11 +382,11 @@ def test_pago_respeta_monto_tierra_mas_bdt(
 
 def test_contador_alertas_disminuye_al_marcar_como_leida(
     client,
-    admin_headers,
+    admin_session,
     cleanup,
     seed_nucleo,
 ):
-    before = client.get("/api/alertas/no-vistas/count", headers=admin_headers)
+    before = client.get("/api/alertas/no-vistas/count", headers=admin_session)
     assert before.status_code == 200
 
     created = client.post(
@@ -398,19 +398,19 @@ def test_contador_alertas_disminuye_al_marcar_como_leida(
             "entidad_relacionada_id": seed_nucleo["id_nucleo"],
             "entidad_relacionada_tipo": "nucleo_agrario",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert created.status_code == 201, created.text
     id_alerta = created.json()["id_alerta"]
     cleanup.register("/api/alertas", id_alerta)
 
-    unread = client.get("/api/alertas/no-vistas/count", headers=admin_headers)
+    unread = client.get("/api/alertas/no-vistas/count", headers=admin_session)
     assert unread.json()["total"] == before.json()["total"] + 1
 
     marked = client.post(
         f"/api/alertas/{id_alerta}/marcar-leida",
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert marked.status_code == 200
-    after = client.get("/api/alertas/no-vistas/count", headers=admin_headers)
+    after = client.get("/api/alertas/no-vistas/count", headers=admin_session)
     assert after.json()["total"] == before.json()["total"]

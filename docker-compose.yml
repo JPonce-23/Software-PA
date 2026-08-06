@@ -75,6 +75,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       UPLOAD_ROOT: ${UPLOAD_ROOT:-/app/uploads}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-26214400}
+      TEST_ADMIN_EMAIL: ${TEST_ADMIN_EMAIL:-}
+      TEST_ADMIN_PASSWORD: ${TEST_ADMIN_PASSWORD:-}
     ports:
       - "127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"
     depends_on:

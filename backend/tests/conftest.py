@@ -54,22 +54,31 @@ def admin_credentials():
 
 
 @pytest.fixture(scope="session")
-def admin_headers(client, admin_credentials):
-    """Headers de autorización para el usuario admin.
+def admin_session(client, admin_credentials):
+    """Sesión cookie del admin de pruebas.
+
+    Autentica contra POST /api/auth/sesiones (Corte 4 cookie-based).
+    Las cookies de sesión se persisten automáticamente en el TestClient.
+    Retorna headers necesarios para escrituras (Origin + CSRF).
     Falla rápido si las credenciales de prueba no existen."""
+    from app.config import AUTH_SETTINGS
+
+    origin = AUTH_SETTINGS.allowed_origins[0]
     response = client.post(
-        "/api/auth/login",
+        "/api/auth/sesiones",
         data={
             "username": admin_credentials["email"],
             "password": admin_credentials["password"],
         },
+        headers={"Origin": origin},
     )
     assert response.status_code == 200, (
         "No se pudo autenticar como admin. "
         "Configura TEST_ADMIN_EMAIL y TEST_ADMIN_PASSWORD para esta BD de pruebas."
     )
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    csrf = client.cookies.get(AUTH_SETTINGS.csrf_cookie_name)
+    assert csrf, "No se encontró cookie CSRF después del login."
+    return {"Origin": origin, "X-CSRF-Token": csrf}
 
 
 # ─────────────────────── Pila de limpieza ─────────────────────── #
@@ -100,10 +109,10 @@ def cleanup():
 # ────────── Datos semilla (cadena de dependencias) ────────── #
 
 @pytest.fixture(scope="session")
-def seed_municipio_id(client, admin_headers):
+def seed_municipio_id(client, admin_session):
     """Obtiene un id_municipio existente del catálogo.
     No crea nada, solo lee lo que ya existe."""
-    res = client.get("/api/catalogos/municipios", headers=admin_headers)
+    res = client.get("/api/catalogos/municipios", headers=admin_session)
     assert res.status_code == 200
     municipios = res.json()
     assert len(municipios) > 0, (
@@ -113,14 +122,14 @@ def seed_municipio_id(client, admin_headers):
 
 
 @pytest.fixture(scope="session")
-def seed_proyecto(client, admin_headers, cleanup):
+def seed_proyecto(client, admin_session, cleanup):
     """Crea un proyecto de prueba para toda la sesión."""
     uid = _uid()
     payload = {
         "clave_proyecto": f"PRY-{uid}",
         "nombre_proyecto": f"Proyecto Pruebas {uid}",
     }
-    res = client.post("/api/proyectos", json=payload, headers=admin_headers)
+    res = client.post("/api/proyectos", json=payload, headers=admin_session)
     assert res.status_code == 201, f"No se pudo crear proyecto semilla: {res.text}"
     data = res.json()
     cleanup.register("/api/proyectos", data["id_proyecto"])
@@ -128,7 +137,7 @@ def seed_proyecto(client, admin_headers, cleanup):
 
 
 @pytest.fixture(scope="session")
-def seed_tramo(client, admin_headers, cleanup, seed_proyecto):
+def seed_tramo(client, admin_session, cleanup, seed_proyecto):
     """Crea un tramo de prueba para toda la sesión."""
     uid = _uid()
     payload = {
@@ -138,13 +147,13 @@ def seed_tramo(client, admin_headers, cleanup, seed_proyecto):
         "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
         "ancho_total_derecho_via_m": 40.0,
     }
-    res = client.post("/api/tramos", json=payload, headers=admin_headers)
+    res = client.post("/api/tramos", json=payload, headers=admin_session)
     assert res.status_code == 201, f"No se pudo crear tramo semilla: {res.text}"
     data = res.json()
     cleanup.register("/api/tramos", data["id_tramo"])
     return data
 @pytest.fixture(scope="session")
-def seed_nucleo(client, admin_headers, cleanup, seed_municipio_id):
+def seed_nucleo(client, admin_session, cleanup, seed_municipio_id):
     """Crea un núcleo agrario de prueba."""
     payload = {
         "id_municipio": seed_municipio_id,
@@ -153,7 +162,7 @@ def seed_nucleo(client, admin_headers, cleanup, seed_municipio_id):
         "comunidad_indigena": False,
         "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
     }
-    res = client.post("/api/nucleos", json=payload, headers=admin_headers)
+    res = client.post("/api/nucleos", json=payload, headers=admin_session)
     assert res.status_code == 201, f"No se pudo crear núcleo semilla: {res.text}"
     data = res.json()
     cleanup.register("/api/nucleos", data["id_nucleo"])
@@ -161,7 +170,7 @@ def seed_nucleo(client, admin_headers, cleanup, seed_municipio_id):
 
 
 @pytest.fixture(scope="session")
-def seed_tramo_nucleo(client, admin_headers, cleanup, seed_tramo, seed_nucleo):
+def seed_tramo_nucleo(client, admin_session, cleanup, seed_tramo, seed_nucleo):
     """Crea la relación tramo-núcleo necesaria para afectaciones."""
     payload = {
         "id_tramo": seed_tramo["id_tramo"],
@@ -169,7 +178,7 @@ def seed_tramo_nucleo(client, admin_headers, cleanup, seed_tramo, seed_nucleo):
         "consecutivo": int(_uid()),
         "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
     }
-    res = client.post("/api/tramos-nucleos", json=payload, headers=admin_headers)
+    res = client.post("/api/tramos-nucleos", json=payload, headers=admin_session)
     assert res.status_code == 201, f"No se pudo crear tramo-núcleo semilla: {res.text}"
     data = res.json()
     cleanup.register("/api/tramos-nucleos", data["id_tramo_nucleo"])
@@ -182,7 +191,7 @@ def seed_tramo_nucleo(client, admin_headers, cleanup, seed_tramo, seed_nucleo):
                 "contexto_proceso": "cop_original",
                 "fecha_realizada": "2026-02-10" if tipo == "sensibilizacion" else "2026-02-11",
             },
-            headers=admin_headers,
+            headers=admin_session,
         )
         assert actividad.status_code == 201, actividad.text
         cleanup.register("/api/actividades-campo", actividad.json()["id_actividad"])
@@ -190,7 +199,7 @@ def seed_tramo_nucleo(client, admin_headers, cleanup, seed_tramo, seed_nucleo):
 
 
 @pytest.fixture(scope="session")
-def seed_parcela(client, admin_headers, cleanup, seed_nucleo):
+def seed_parcela(client, admin_session, cleanup, seed_nucleo):
     """Crea una parcela de prueba vinculada al núcleo semilla."""
     payload = {
         "id_nucleo": seed_nucleo["id_nucleo"],
@@ -199,7 +208,7 @@ def seed_parcela(client, admin_headers, cleanup, seed_nucleo):
         "nombre_titular": f"Titular Pruebas {_uid()}",
         "documentacion_faltante": "En trámite ante el RAN",
     }
-    res = client.post("/api/parcelas", json=payload, headers=admin_headers)
+    res = client.post("/api/parcelas", json=payload, headers=admin_session)
     assert res.status_code == 201, f"No se pudo crear parcela semilla: {res.text}"
     data = res.json()
     cleanup.register("/api/parcelas", data["id_parcela"])
@@ -207,7 +216,7 @@ def seed_parcela(client, admin_headers, cleanup, seed_nucleo):
 
 
 @pytest.fixture(scope="session")
-def seed_afectacion_colectiva(client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo):
+def seed_afectacion_colectiva(client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo):
     """Crea una afectación colectiva de prueba."""
     payload = {
         "id_nucleo": seed_nucleo["id_nucleo"],
@@ -219,7 +228,7 @@ def seed_afectacion_colectiva(client, admin_headers, cleanup, seed_nucleo, seed_
         "origen_registro": "captura_sistema",
         "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
     }
-    res = client.post("/api/afectaciones", json=payload, headers=admin_headers)
+    res = client.post("/api/afectaciones", json=payload, headers=admin_session)
     assert res.status_code == 201, f"No se pudo crear afectación colectiva: {res.text}"
     data = res.json()
     cleanup.register("/api/afectaciones", data["id_afectacion"])
@@ -227,7 +236,7 @@ def seed_afectacion_colectiva(client, admin_headers, cleanup, seed_nucleo, seed_
 
 
 @pytest.fixture(scope="session")
-def seed_afectacion_individual(client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, seed_parcela):
+def seed_afectacion_individual(client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, seed_parcela):
     """Crea una afectación individual de prueba."""
     payload = {
         "id_nucleo": seed_nucleo["id_nucleo"],
@@ -239,7 +248,7 @@ def seed_afectacion_individual(client, admin_headers, cleanup, seed_nucleo, seed
         "origen_registro": "captura_sistema",
         "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
     }
-    res = client.post("/api/afectaciones", json=payload, headers=admin_headers)
+    res = client.post("/api/afectaciones", json=payload, headers=admin_session)
     assert res.status_code == 201, f"No se pudo crear afectación individual: {res.text}"
     data = res.json()
     cleanup.register("/api/afectaciones", data["id_afectacion"])
@@ -247,11 +256,11 @@ def seed_afectacion_individual(client, admin_headers, cleanup, seed_nucleo, seed
 
 
 @pytest.fixture(scope="session")
-def seed_asamblea_anuencia(client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, seed_afectacion_colectiva):
+def seed_asamblea_anuencia(client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, seed_afectacion_colectiva):
     """Crea una asamblea de anuencia otorgada (requerida para convenios colectivos)."""
     ciclos = client.get(
         f"/api/afectaciones/{seed_afectacion_colectiva['id_afectacion']}/ciclos",
-        headers=admin_headers,
+        headers=admin_session,
     ).json()
     original = next(c for c in ciclos if c["tipo_ciclo"] == "cop_original")
     payload = {
@@ -265,7 +274,7 @@ def seed_asamblea_anuencia(client, admin_headers, cleanup, seed_nucleo, seed_tra
         "estatus_asamblea": "completo",
         "fecha_realizada": "2026-02-20",
     }
-    res = client.post("/api/asambleas", json=payload, headers=admin_headers)
+    res = client.post("/api/asambleas", json=payload, headers=admin_session)
     assert res.status_code == 201, f"No se pudo crear asamblea anuencia: {res.text}"
     data = res.json()
     cleanup.register("/api/asambleas", data["id_asamblea"])

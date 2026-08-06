@@ -18,9 +18,9 @@ def _base_individual(seed_nucleo, seed_tramo_nucleo):
     }
 
 
-def _crear_persona(client, admin_headers, cleanup, nombre):
+def _crear_persona(client, admin_session, cleanup, nombre):
     response = client.post(
-        "/api/personas", json={"nombre": nombre}, headers=admin_headers
+        "/api/personas", json={"nombre": nombre}, headers=admin_session
     )
     assert response.status_code == 201, response.text
     persona = response.json()
@@ -29,7 +29,7 @@ def _crear_persona(client, admin_headers, cleanup, nombre):
 
 
 def test_contrato_colectivo_no_acepta_parcela(
-    client, admin_headers, seed_nucleo, seed_tramo_nucleo, seed_parcela,
+    client, admin_session, seed_nucleo, seed_tramo_nucleo, seed_parcela,
 ):
     response = client.post(
         "/api/afectaciones/colectivas",
@@ -40,13 +40,13 @@ def test_contrato_colectivo_no_acepta_parcela(
             "id_parcela": seed_parcela["id_parcela"],
             "geometria_wkt": GEOMETRIA,
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert response.status_code == 422
 
 
 def test_contrato_individual_no_acepta_referencia_textual_parcela(
-    client, admin_headers, seed_nucleo, seed_tramo_nucleo, seed_parcela,
+    client, admin_session, seed_nucleo, seed_tramo_nucleo, seed_parcela,
 ):
     response = client.post(
         "/api/afectaciones/individuales",
@@ -55,13 +55,13 @@ def test_contrato_individual_no_acepta_referencia_textual_parcela(
             "no_parcela_solar": "No debe duplicarse",
             "parcela": {"modo": "existente", "id_parcela": seed_parcela["id_parcela"]},
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert response.status_code == 422
 
 
 def test_copropiedad_nueva_exige_dos_titulares(
-    client, admin_headers, seed_nucleo, seed_tramo_nucleo,
+    client, admin_session, seed_nucleo, seed_tramo_nucleo,
 ):
     response = client.post(
         "/api/afectaciones/individuales",
@@ -75,14 +75,14 @@ def test_copropiedad_nueva_exige_dos_titulares(
                 "titulares": [{"id_persona": 1, "tipo_derecho": "titular"}],
             },
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert response.status_code == 422
     assert "copropiedad" in response.text.lower()
 
 
 def test_alta_individual_con_parcela_existente(
-    client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, seed_parcela,
+    client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, seed_parcela,
 ):
     response = client.post(
         "/api/afectaciones/individuales",
@@ -90,7 +90,7 @@ def test_alta_individual_con_parcela_existente(
             **_base_individual(seed_nucleo, seed_tramo_nucleo),
             "parcela": {"modo": "existente", "id_parcela": seed_parcela["id_parcela"]},
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert response.status_code == 201, response.text
     afectacion = response.json()
@@ -100,10 +100,10 @@ def test_alta_individual_con_parcela_existente(
 
 
 def test_alta_atomica_revierte_parcela_si_titular_no_existe(
-    client, admin_headers, seed_nucleo, seed_tramo_nucleo,
+    client, admin_session, seed_nucleo, seed_tramo_nucleo,
 ):
     antes = client.get(
-        f"/api/parcelas?id_nucleo={seed_nucleo['id_nucleo']}", headers=admin_headers
+        f"/api/parcelas?id_nucleo={seed_nucleo['id_nucleo']}", headers=admin_session
     )
     assert antes.status_code == 200
 
@@ -119,22 +119,22 @@ def test_alta_atomica_revierte_parcela_si_titular_no_existe(
                 "titulares": [{"id_persona": 999999, "tipo_derecho": "titular"}],
             },
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert response.status_code == 404
 
     despues = client.get(
-        f"/api/parcelas?id_nucleo={seed_nucleo['id_nucleo']}", headers=admin_headers
+        f"/api/parcelas?id_nucleo={seed_nucleo['id_nucleo']}", headers=admin_session
     )
     assert despues.status_code == 200
     assert len(despues.json()) == len(antes.json())
 
 
 def test_alta_atomica_copropiedad_con_dos_titulares(
-    client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo,
+    client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo,
 ):
-    primera = _crear_persona(client, admin_headers, cleanup, "Titular copropiedad 1")
-    segunda = _crear_persona(client, admin_headers, cleanup, "Titular copropiedad 2")
+    primera = _crear_persona(client, admin_session, cleanup, "Titular copropiedad 1")
+    segunda = _crear_persona(client, admin_session, cleanup, "Titular copropiedad 2")
 
     response = client.post(
         "/api/afectaciones/individuales",
@@ -151,7 +151,7 @@ def test_alta_atomica_copropiedad_con_dos_titulares(
                 ],
             },
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert response.status_code == 201, response.text
     afectacion = response.json()

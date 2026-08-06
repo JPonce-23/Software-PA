@@ -2,7 +2,11 @@
 
 from concurrent.futures import ThreadPoolExecutor
 import time
+from fastapi.testclient import TestClient
+from app.config import AUTH_SETTINGS
+from app.main import app
 
+ORIGIN = AUTH_SETTINGS.allowed_origins[0]
 
 OFICIOS = {
     "no_oficio_fifonafe_a_dgaopr": "FIF-001",
@@ -123,39 +127,39 @@ def _crear_fifonafe_completo(client, headers, cleanup, tramo_nucleo, afectacion,
 
 
 def test_ciclo_original_y_estado_derivado(
-    client, admin_headers, seed_afectacion_colectiva,
+    client, admin_session, seed_afectacion_colectiva,
 ):
     cycles = client.get(
         f"/api/afectaciones/{seed_afectacion_colectiva['id_afectacion']}/ciclos",
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert cycles.status_code == 200
     assert [item["tipo_ciclo"] for item in cycles.json()].count("cop_original") == 1
     state = client.get(
         f"/api/afectaciones/{seed_afectacion_colectiva['id_afectacion']}/estado",
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert state.status_code == 200
     assert state.json()["estado_liberacion"] != "liberada"
 
 
 def test_ciclo_incompatible_se_rechaza(
-    client, admin_headers, seed_afectacion_colectiva,
+    client, admin_session, seed_afectacion_colectiva,
 ):
     response = client.post(
         f"/api/afectaciones/{seed_afectacion_colectiva['id_afectacion']}/ciclos",
         json={"tipo_ciclo": "ampliacion"},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert response.status_code == 409
 
 
 def test_caminamiento_posterior_exige_sensibilizacion_del_mismo_ciclo(
-    client, admin_headers, cleanup, seed_afectacion_colectiva, seed_tramo_nucleo,
+    client, admin_session, cleanup, seed_afectacion_colectiva, seed_tramo_nucleo,
 ):
     cycle_response = client.post(
         f"/api/afectaciones/{seed_afectacion_colectiva['id_afectacion']}/ciclos",
-        json={"tipo_ciclo": "superficie_adicional"}, headers=admin_headers,
+        json={"tipo_ciclo": "superficie_adicional"}, headers=admin_session,
     )
     assert cycle_response.status_code == 201, cycle_response.text
     cycle = cycle_response.json()
@@ -166,36 +170,36 @@ def test_caminamiento_posterior_exige_sensibilizacion_del_mismo_ciclo(
         "contexto_proceso": "superficie_adicional",
         "fecha_realizada": "2026-08-03",
     }
-    blocked = client.post("/api/actividades-campo", json=walking, headers=admin_headers)
+    blocked = client.post("/api/actividades-campo", json=walking, headers=admin_session)
     assert blocked.status_code == 409
     sensitization = client.post(
         "/api/actividades-campo",
         json={**walking, "tipo_actividad": "sensibilizacion"},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert sensitization.status_code == 201, sensitization.text
     cleanup.register("/api/actividades-campo", sensitization.json()["id_actividad"])
-    allowed = client.post("/api/actividades-campo", json=walking, headers=admin_headers)
+    allowed = client.post("/api/actividades-campo", json=walking, headers=admin_session)
     assert allowed.status_code == 201, allowed.text
     cleanup.register("/api/actividades-campo", allowed.json()["id_actividad"])
 
 
 def test_individual_se_libera_por_indemnizacion_completa(
-    client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, seed_parcela,
+    client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, seed_parcela,
 ):
     afectacion, ciclo = _crear_afectacion(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo,
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo,
         "individual", seed_parcela,
     )
     convenio = _crear_convenio_individual(
-        client, admin_headers, cleanup, seed_tramo_nucleo, afectacion, ciclo,
+        client, admin_session, cleanup, seed_tramo_nucleo, afectacion, ciclo,
     )
     _crear_fifonafe_completo(
-        client, admin_headers, cleanup, seed_tramo_nucleo, afectacion, ciclo, convenio,
+        client, admin_session, cleanup, seed_tramo_nucleo, afectacion, ciclo, convenio,
     )
     state = client.get(
         f"/api/afectaciones/{afectacion['id_afectacion']}/estado",
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert state.status_code == 200
     assert state.json()["estado_financiero"] == "concluido"
@@ -203,10 +207,10 @@ def test_individual_se_libera_por_indemnizacion_completa(
 
 
 def test_salida_terminal_detiene_nuevos_ciclos(
-    client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo,
+    client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo,
 ):
     afectacion, _ = _crear_afectacion(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, "colectivo"
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, "colectivo"
     )
     terminal = client.put(
         f"/api/afectaciones/{afectacion['id_afectacion']}/salida-terminal",
@@ -215,31 +219,31 @@ def test_salida_terminal_detiene_nuevos_ciclos(
             "motivo": "Derivación confirmada por el expediente de prueba",
             "confirmar": True,
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert terminal.status_code == 200, terminal.text
     blocked = client.post(
         f"/api/afectaciones/{afectacion['id_afectacion']}/ciclos",
         json={"tipo_ciclo": "superficie_adicional"},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert blocked.status_code == 409
     state = client.get(
         f"/api/afectaciones/{afectacion['id_afectacion']}/estado",
-        headers=admin_headers,
+        headers=admin_session,
     ).json()
     assert state["estado_liberacion"] == "no_aplica_terminal"
 
 
 def test_modificatorio_individual_sustituye_sin_sumar_y_respeta_pagado(
-    client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, seed_parcela,
+    client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, seed_parcela,
 ):
     afectacion, ciclo = _crear_afectacion(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo,
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo,
         "individual", seed_parcela,
     )
     convenio = _crear_convenio_individual(
-        client, admin_headers, cleanup, seed_tramo_nucleo, afectacion, ciclo,
+        client, admin_session, cleanup, seed_tramo_nucleo, afectacion, ciclo,
     )
     informe = client.post(
         "/api/fifonafe",
@@ -254,7 +258,7 @@ def test_modificatorio_individual_sustituye_sin_sumar_y_respeta_pagado(
             "hay_conflictos": False,
             **OFICIOS,
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert informe.status_code == 201, informe.text
     cleanup.register("/api/fifonafe", informe.json()["id_tramite_fifonafe"])
@@ -269,7 +273,7 @@ def test_modificatorio_individual_sustituye_sin_sumar_y_respeta_pagado(
             "tipo_afectacion": "individual",
             "tipo_tramite": "indemnizacion",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert indemnizacion.status_code == 201, indemnizacion.text
     cleanup.register("/api/fifonafe", indemnizacion.json()["id_tramite_fifonafe"])
@@ -282,7 +286,7 @@ def test_modificatorio_individual_sustituye_sin_sumar_y_respeta_pagado(
             "tipo_pago": "parcial",
             "beneficiario_externo": "Titular de prueba",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert payment.status_code == 201, payment.text
     cleanup.register("/api/pagos-indemnizacion", payment.json()["id_pago"])
@@ -300,18 +304,18 @@ def test_modificatorio_individual_sustituye_sin_sumar_y_respeta_pagado(
             "monto_90": "70.00",
             "monto_100": "80.00",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert modifier.status_code == 201, modifier.text
     cleanup.register("/api/convenios", modifier.json()["id_convenio"])
     activated = client.post(
         f"/api/convenios/{modifier.json()['id_convenio']}/activar-modificatorio",
-        json={"confirmar": True}, headers=admin_headers,
+        json={"confirmar": True}, headers=admin_session,
     )
     assert activated.status_code == 200, activated.text
     state = client.get(
         f"/api/afectaciones/{afectacion['id_afectacion']}/estado",
-        headers=admin_headers,
+        headers=admin_session,
     ).json()
     assert state["ciclos"][0]["limite_pagable"] == "80.00"
     assert state["ciclos"][0]["total_pagado"] == "50.00"
@@ -328,7 +332,7 @@ def test_modificatorio_individual_sustituye_sin_sumar_y_respeta_pagado(
                 "banco_emisor": "Banco de prueba",
                 "referencia_bancaria": reference,
             },
-            headers=admin_headers,
+            headers=admin_session,
         )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -351,22 +355,22 @@ def test_modificatorio_individual_sustituye_sin_sumar_y_respeta_pagado(
             "monto_90": "35.00",
             "monto_100": "40.00",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert invalid.status_code == 201, invalid.text
     cleanup.register("/api/convenios", invalid.json()["id_convenio"])
     rejected = client.post(
         f"/api/convenios/{invalid.json()['id_convenio']}/activar-modificatorio",
-        json={"confirmar": True}, headers=admin_headers,
+        json={"confirmar": True}, headers=admin_session,
     )
     assert rejected.status_code == 409
 
 
 def test_colectivo_exige_indemnizacion_y_retiro_de_fondos_completos(
-    client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo,
+    client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo,
 ):
     afectacion, ciclo = _crear_afectacion(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, "colectivo"
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, "colectivo"
     )
     assembly = client.post(
         "/api/asambleas",
@@ -383,7 +387,7 @@ def test_colectivo_exige_indemnizacion_y_retiro_de_fondos_completos(
             "ingreso_ran_fecha": "2026-07-21",
             "acta_inscripcion_fecha_ran": "2026-07-22",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert assembly.status_code == 201, assembly.text
     cleanup.register("/api/asambleas", assembly.json()["id_asamblea"])
@@ -402,7 +406,7 @@ def test_colectivo_exige_indemnizacion_y_retiro_de_fondos_completos(
             "monto_bdt": "10.00",
             "superficie_real_afectada_ha": "1.2500",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert agreement.status_code == 201, agreement.text
     cleanup.register("/api/convenios", agreement.json()["id_convenio"])
@@ -412,16 +416,16 @@ def test_colectivo_exige_indemnizacion_y_retiro_de_fondos_completos(
             "ingreso_ran_fecha": "2026-07-24",
             "numero_solicitud_ingreso": "RAN-COL",
             "convenio_inscrito_fecha_ran": "2026-07-25",
-        }, headers=admin_headers,
+        }, headers=admin_session,
     )
     assert registered.status_code == 200, registered.text
     _crear_fifonafe_completo(
-        client, admin_headers, cleanup, seed_tramo_nucleo,
+        client, admin_session, cleanup, seed_tramo_nucleo,
         afectacion, ciclo, registered.json(),
     )
     pending = client.get(
         f"/api/afectaciones/{afectacion['id_afectacion']}/estado",
-        headers=admin_headers,
+        headers=admin_session,
     ).json()
     assert pending["estado_liberacion"] != "liberada"
     assert pending["ciclos"][0]["estado_financiero"] == "retiro_fondos_pendiente"
@@ -438,25 +442,25 @@ def test_colectivo_exige_indemnizacion_y_retiro_de_fondos_completos(
             "resultado_anuencia": "no_aplica",
             "estatus_asamblea": "pendiente",
             "fecha_realizada": "2026-08-03",
-        }, headers=admin_headers,
+        }, headers=admin_session,
     )
     assert withdrawal.status_code == 201, withdrawal.text
     cleanup.register("/api/asambleas", withdrawal.json()["id_asamblea"])
     completed = client.post(
         f"/api/asambleas/{withdrawal.json()['id_asamblea']}/completar-retiro-fondos",
-        json={"confirmar": True}, headers=admin_headers,
+        json={"confirmar": True}, headers=admin_session,
     )
     assert completed.status_code == 200, completed.text
     final_state = client.get(
         f"/api/afectaciones/{afectacion['id_afectacion']}/estado",
-        headers=admin_headers,
+        headers=admin_session,
     ).json()
     assert final_state["estado_liberacion"] == "liberada"
 
 
 def test_salida_terminal_heredada_detiene_ciclo_y_agrega_expediente(
     client,
-    admin_headers,
+    admin_session,
     seed_tramo_nucleo,
     seed_afectacion_colectiva,
 ):
@@ -464,34 +468,34 @@ def test_salida_terminal_heredada_detiene_ciclo_y_agrega_expediente(
     marked = client.put(
         f"/api/tramos-nucleos/{tramo_nucleo_id}",
         json={"es_expropiacion": True},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert marked.status_code == 200, marked.text
     try:
         state = client.get(
             f"/api/tramos-nucleos/{tramo_nucleo_id}/estado",
-            headers=admin_headers,
+            headers=admin_session,
         )
         assert state.status_code == 200, state.text
         assert state.json()["estado_legal"] == "fuera_seguimiento"
         blocked = client.post(
             f"/api/afectaciones/{seed_afectacion_colectiva['id_afectacion']}/ciclos",
             json={"tipo_ciclo": "superficie_adicional"},
-            headers=admin_headers,
+            headers=admin_session,
         )
         assert blocked.status_code == 409
     finally:
         restored = client.put(
             f"/api/tramos-nucleos/{tramo_nucleo_id}",
             json={"es_expropiacion": False},
-            headers=admin_headers,
+            headers=admin_session,
         )
         assert restored.status_code == 200, restored.text
 
 
 def test_flujo_respeta_pertenencia_territorial(
     client,
-    admin_headers,
+    admin_session,
     cleanup,
     seed_tramo,
     seed_afectacion_colectiva,
@@ -506,58 +510,56 @@ def test_flujo_respeta_pertenencia_territorial(
             "rol": "operador",
             "contrasena": "Prueba2B!2026",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert created.status_code == 201, created.text
     user = created.json()
     cleanup.register("/api/usuarios", user["id_usuario"])
 
-    login = client.post(
-        "/api/auth/login",
-        data={"username": correo, "password": "Prueba2B!2026"},
-    )
-    assert login.status_code == 200, login.text
-    operator_headers = {
-        "Authorization": f"Bearer {login.json()['access_token']}"
-    }
-    affected_id = seed_afectacion_colectiva["id_afectacion"]
+    with TestClient(app, raise_server_exceptions=False) as op_browser:
+        login = op_browser.post(
+            "/api/auth/sesiones",
+            data={"username": correo, "password": "Prueba2B!2026"},
+            headers={"Origin": ORIGIN},
+        )
+        assert login.status_code == 200, login.text
 
-    denied = client.get(
-        f"/api/afectaciones/{affected_id}/estado",
-        headers=operator_headers,
-    )
-    assert denied.status_code == 403
-    denied_direct = client.get(
-        f"/api/afectaciones/{affected_id}", headers=operator_headers
-    )
-    assert denied_direct.status_code == 403
-    assert client.get("/api/tramos", headers=operator_headers).json() == []
-    assert client.get("/api/tramos-nucleos", headers=operator_headers).json() == []
-    assert client.get("/api/dashboard", headers=operator_headers).json() == []
+        affected_id = seed_afectacion_colectiva["id_afectacion"]
 
-    assigned = client.post(
-        f"/api/tramos/{seed_tramo['id_tramo']}/asignar-usuario",
-        json={"id_usuario": user["id_usuario"]},
-        headers=admin_headers,
-    )
-    assert assigned.status_code == 200, assigned.text
+        denied = op_browser.get(
+            f"/api/afectaciones/{affected_id}/estado",
+        )
+        assert denied.status_code == 403
+        denied_direct = op_browser.get(
+            f"/api/afectaciones/{affected_id}"
+        )
+        assert denied_direct.status_code == 403
+        assert op_browser.get("/api/tramos").json() == []
+        assert op_browser.get("/api/tramos-nucleos").json() == []
+        assert op_browser.get("/api/dashboard").json() == []
 
-    allowed = client.get(
-        f"/api/afectaciones/{affected_id}/estado",
-        headers=operator_headers,
-    )
-    assert allowed.status_code == 200, allowed.text
-    listed = client.get("/api/afectaciones", headers=operator_headers)
-    assert listed.status_code == 200
-    assert affected_id in {item["id_afectacion"] for item in listed.json()}
-    visible_tramos = client.get("/api/tramos", headers=operator_headers)
-    assert seed_tramo["id_tramo"] in {
-        item["id_tramo"] for item in visible_tramos.json()
-    }
+        assigned = client.post(
+            f"/api/tramos/{seed_tramo['id_tramo']}/asignar-usuario",
+            json={"id_usuario": user["id_usuario"]},
+            headers=admin_session,
+        )
+        assert assigned.status_code == 200, assigned.text
 
-    removed = client.delete(
-        f"/api/tramos/{seed_tramo['id_tramo']}/remover-usuario/{user['id_usuario']}",
-        params={"motivo": "Fin de prueba territorial 2B"},
-        headers=admin_headers,
-    )
-    assert removed.status_code == 200, removed.text
+        allowed = op_browser.get(
+            f"/api/afectaciones/{affected_id}/estado",
+        )
+        assert allowed.status_code == 200, allowed.text
+        listed = op_browser.get("/api/afectaciones")
+        assert listed.status_code == 200
+        assert affected_id in {item["id_afectacion"] for item in listed.json()}
+        visible_tramos = op_browser.get("/api/tramos")
+        assert seed_tramo["id_tramo"] in {
+            item["id_tramo"] for item in visible_tramos.json()
+        }
+
+        removed = client.delete(
+            f"/api/tramos/{seed_tramo['id_tramo']}/remover-usuario/{user['id_usuario']}",
+            params={"motivo": "Fin de prueba territorial 2B"},
+            headers=admin_session,
+        )
+        assert removed.status_code == 200, removed.text

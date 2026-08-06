@@ -1,7 +1,11 @@
 """Aislamiento por subexpediente y documentación del Subcorte 2C."""
 
 import time
+from fastapi.testclient import TestClient
+from app.config import AUTH_SETTINGS
+from app.main import app
 
+ORIGIN = AUTH_SETTINGS.allowed_origins[0]
 
 OFICIOS = {
     "no_oficio_fifonafe_a_dgaopr": "FIF-2C",
@@ -150,13 +154,13 @@ def _crear_fifonafe_y_pago(client, headers, cleanup, tramo_nucleo, afectacion, c
 
 
 def test_documentos_y_subexpediente_aislan_afectaciones(
-    client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo,
+    client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo,
 ):
     afectacion_a, ciclo_a = _crear_afectacion_colectiva(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, "A"
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, "A"
     )
     afectacion_b, _ = _crear_afectacion_colectiva(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, "B"
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, "B"
     )
     documentos = []
     for entidad_tipo, entidad_id, nombre in (
@@ -173,7 +177,7 @@ def test_documentos_y_subexpediente_aislan_afectaciones(
                 "categoria": "disponible",
                 "es_critico": False,
             },
-            headers=admin_headers,
+            headers=admin_session,
         )
         assert response.status_code == 201, response.text
         documento = response.json()
@@ -186,7 +190,7 @@ def test_documentos_y_subexpediente_aislan_afectaciones(
             "entidad_tipo": "afectacion",
             "entidad_id": afectacion_a["id_afectacion"],
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert docs_a.status_code == 200, docs_a.text
     assert {item["tipo_documento"] for item in docs_a.json()} == {"Afectacion A"}
@@ -195,7 +199,7 @@ def test_documentos_y_subexpediente_aislan_afectaciones(
         "/api/tramos-nucleos/"
         f"{seed_tramo_nucleo['id_tramo_nucleo']}/afectaciones/"
         f"{afectacion_a['id_afectacion']}/subexpediente",
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert subexpediente.status_code == 200, subexpediente.text
     body = subexpediente.json()
@@ -218,7 +222,7 @@ def test_documentos_y_subexpediente_aislan_afectaciones(
             "fecha_reunion": "2026-08-04",
             "asunto": "Minuta propia A",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert propia.status_code == 201, propia.text
     cleanup.register("/api/minutas", propia.json()["id_minuta"])
@@ -229,7 +233,7 @@ def test_documentos_y_subexpediente_aislan_afectaciones(
             "fecha_reunion": "2026-08-04",
             "asunto": "Minuta compartida",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert compartida.status_code == 201, compartida.text
     cleanup.register("/api/minutas", compartida.json()["id_minuta"])
@@ -240,7 +244,7 @@ def test_documentos_y_subexpediente_aislan_afectaciones(
             "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
             "id_afectacion": afectacion_a["id_afectacion"],
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert minutas_a.status_code == 200, minutas_a.text
     assert {item["asunto"] for item in minutas_a.json()} == {"Minuta propia A"}
@@ -251,7 +255,7 @@ def test_documentos_y_subexpediente_aislan_afectaciones(
             "id_tramo_nucleo": seed_tramo_nucleo["id_tramo_nucleo"],
             "solo_compartidas": True,
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert minutas_compartidas.status_code == 200, minutas_compartidas.text
     assert "Minuta compartida" in {
@@ -260,43 +264,43 @@ def test_documentos_y_subexpediente_aislan_afectaciones(
 
 
 def test_listados_operativos_filtran_por_afectacion(
-    client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo,
+    client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo,
 ):
     afectacion_a, ciclo_a = _crear_afectacion_colectiva(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, "Filtro A"
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, "Filtro A"
     )
     afectacion_b, ciclo_b = _crear_afectacion_colectiva(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo, "Filtro B"
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo, "Filtro B"
     )
     asamblea_a = _crear_asamblea(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo,
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo,
         afectacion_a, ciclo_a,
     )
     asamblea_b = _crear_asamblea(
-        client, admin_headers, cleanup, seed_nucleo, seed_tramo_nucleo,
+        client, admin_session, cleanup, seed_nucleo, seed_tramo_nucleo,
         afectacion_b, ciclo_b,
     )
     convenio_a = _crear_convenio(
-        client, admin_headers, cleanup, seed_tramo_nucleo,
+        client, admin_session, cleanup, seed_tramo_nucleo,
         afectacion_a, ciclo_a, asamblea_a,
     )
     convenio_b = _crear_convenio(
-        client, admin_headers, cleanup, seed_tramo_nucleo,
+        client, admin_session, cleanup, seed_tramo_nucleo,
         afectacion_b, ciclo_b, asamblea_b,
     )
     tramite_a, pago_a = _crear_fifonafe_y_pago(
-        client, admin_headers, cleanup, seed_tramo_nucleo,
+        client, admin_session, cleanup, seed_tramo_nucleo,
         afectacion_a, ciclo_a, convenio_a,
     )
     tramite_b, _ = _crear_fifonafe_y_pago(
-        client, admin_headers, cleanup, seed_tramo_nucleo,
+        client, admin_session, cleanup, seed_tramo_nucleo,
         afectacion_b, ciclo_b, convenio_b,
     )
 
     asambleas = client.get(
         "/api/asambleas",
         params={"id_afectacion": afectacion_a["id_afectacion"]},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert {item["id_asamblea"] for item in asambleas.json()} == {
         asamblea_a["id_asamblea"]
@@ -304,7 +308,7 @@ def test_listados_operativos_filtran_por_afectacion(
     convenios = client.get(
         "/api/convenios",
         params={"id_afectacion": afectacion_a["id_afectacion"]},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert {item["id_convenio"] for item in convenios.json()} == {
         convenio_a["id_convenio"]
@@ -312,7 +316,7 @@ def test_listados_operativos_filtran_por_afectacion(
     tramites = client.get(
         "/api/fifonafe",
         params={"id_afectacion": afectacion_a["id_afectacion"]},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert tramite_a["id_tramite_fifonafe"] in {
         item["id_tramite_fifonafe"] for item in tramites.json()
@@ -326,13 +330,13 @@ def test_listados_operativos_filtran_por_afectacion(
     pagos = client.get(
         "/api/pagos-indemnizacion",
         params={"id_afectacion": afectacion_a["id_afectacion"]},
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert {item["id_pago"] for item in pagos.json()} == {pago_a["id_pago"]}
 
 
 def test_documentacion_respeta_pertenencia_territorial(
-    client, admin_headers, cleanup, seed_afectacion_colectiva,
+    client, admin_session, cleanup, seed_afectacion_colectiva,
 ):
     documento = client.post(
         "/api/documentacion",
@@ -343,7 +347,7 @@ def test_documentacion_respeta_pertenencia_territorial(
             "categoria": "disponible",
             "es_critico": False,
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert documento.status_code == 201, documento.text
     cleanup.register("/api/documentacion", documento.json()["id_documento"])
@@ -358,28 +362,27 @@ def test_documentacion_respeta_pertenencia_territorial(
             "rol": "operador",
             "contrasena": "Prueba2C!2026",
         },
-        headers=admin_headers,
+        headers=admin_session,
     )
     assert created.status_code == 201, created.text
     cleanup.register("/api/usuarios", created.json()["id_usuario"])
-    login = client.post(
-        "/api/auth/login",
-        data={"username": correo, "password": "Prueba2C!2026"},
-    )
-    assert login.status_code == 200, login.text
-    operator_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    with TestClient(app, raise_server_exceptions=False) as op_browser:
+        login = op_browser.post(
+            "/api/auth/sesiones",
+            data={"username": correo, "password": "Prueba2C!2026"},
+            headers={"Origin": ORIGIN},
+        )
+        assert login.status_code == 200, login.text
 
-    denied = client.get(
-        "/api/documentacion",
-        params={
-            "entidad_tipo": "afectacion",
-            "entidad_id": seed_afectacion_colectiva["id_afectacion"],
-        },
-        headers=operator_headers,
-    )
-    assert denied.status_code == 403
-    denied_versions = client.get(
-        f"/api/documentacion/{documento.json()['id_documento']}/versiones",
-        headers=operator_headers,
-    )
-    assert denied_versions.status_code == 403
+        denied = op_browser.get(
+            "/api/documentacion",
+            params={
+                "entidad_tipo": "afectacion",
+                "entidad_id": seed_afectacion_colectiva["id_afectacion"],
+            },
+        )
+        assert denied.status_code == 403
+        denied_versions = op_browser.get(
+            f"/api/documentacion/{documento.json()['id_documento']}/versiones",
+        )
+        assert denied_versions.status_code == 403
