@@ -248,6 +248,9 @@ class ParcelaResponse(ParcelaCreate):
 # ----------------- DASHBOARD ----------------- #
 class DashboardMetrics(BaseModel):
     id_tramo_nucleo: int
+    id_proyecto: Optional[int] = None
+    clave_proyecto: Optional[str] = None
+    nombre_proyecto: Optional[str] = None
     id_tramo: int
     clave_tramo: str
     id_nucleo: int
@@ -261,6 +264,10 @@ class DashboardMetrics(BaseModel):
     porcentaje_avance_legal: Decimal
     porcentaje_avance_geoespacial: Decimal
     total_convenios_formalizados_ran: int
+    total_convenios_colectivos_formalizados_ran: Optional[int] = 0
+    total_convenios_individuales_formalizados_ran: Optional[int] = 0
+    total_colectivo_ha: Optional[Decimal] = 0
+    total_individual_ha: Optional[Decimal] = 0
     model_config = ConfigDict(from_attributes=True)
 
 # ----------------- FLUJO DE LIBERACIÓN ----------------- #
