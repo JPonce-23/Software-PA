@@ -162,12 +162,28 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    variable temporal del proceso; no la dejes persistente en archivos
    compartidos, historial de shell, logs ni capturas.
 
-4. Aplica `004` una sola vez:
+4. Aplica `004`–`009` en orden, una sola vez cada una. Detén backend y
+   scheduler antes de cada migración y conserva `ON_ERROR_STOP`:
 
    ```bash
    docker compose exec -T db sh -lc \
      'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
      < backend/db/migrations/004_adaptaciones_fase2.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/005_subcorte_2a_integridad_afectaciones.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/006_subcorte_2b_secuencia_estados.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/007_subcorte_2c_navegacion_documental.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/008_corte4_autenticacion_formal.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/009_corte4_auditoria_sistema_sesion.sql
    ```
 
 5. Verifica el registro:
@@ -207,6 +223,49 @@ precondiciones. Esas migraciones no registran su versión y contienen cambios
 no idempotentes; repetirlas puede fallar. Si la base todavía tiene `frente`,
 la secuencia esperada es `002` (solo si faltan sus cambios), `003` y `004`,
 siempre con respaldo y validación entre pasos.
+
+### Migraciones 008 y 009 y operación de autenticación
+
+`008_corte4_autenticacion_formal.sql` exige 007 y aborta si una fotografía de
+bitácora contiene `contrasena_hash`. No sanea ese historial silenciosamente:
+si el preflight falla, detén el despliegue y aprueba primero un procedimiento
+de saneamiento con evidencia.
+
+Antes de desplegar el backend nuevo:
+
+1. respalda la base con permisos `0600` y verifica el archivo con
+   `pg_restore -l`;
+2. detén backend y scheduler y confirma cero transacciones activas ajenas;
+3. aplica 008 con `ON_ERROR_STOP=1`;
+4. aplica inmediatamente 009 con `ON_ERROR_STOP=1`;
+5. verifica ambas versiones, las tres tablas de autenticación y sus triggers;
+6. configura `APP_ENV=production`, `AUTH_COOKIE_SECURE=true` y
+   `CORS_ORIGINS` con el origen HTTPS público exacto;
+7. configura `AUTH_TRUSTED_PROXY_IPS` sólo con IPs exactas de proxies bajo
+   control; vacío ignora `X-Forwarded-For`;
+8. reinicia servicios y valida OpenAPI, login, CSRF, logout y logs.
+
+`009_corte4_auditoria_sistema_sesion.sql`. La 009 exige 008 y corrige la
+atribución de expiraciones automáticas: el evento forense queda sin actor y el
+trigger sólo permite modificar los campos de revocación de la misma sesión en
+la misma transacción.
+
+Valores vigentes: 30 minutos de inactividad, 8 horas absolutas, bloqueo de 15
+minutos tras cinco fallos y múltiples sesiones concurrentes. No borres filas
+de sesión ni eventos; revoca lógicamente.
+
+Si la única cuenta administradora queda bloqueada, un operador autorizado con
+acceso al backend puede ejecutar, sin registrar contraseñas:
+
+```bash
+docker compose exec backend python scripts/unlock_admin.py \
+  --email "$ADMIN_EMAIL" \
+  --reason "Motivo institucional documentado"
+```
+
+El script sólo acepta un administrador activo y registra
+`desbloqueo_recuperacion` en `evento_acceso`. No reactiva usuarios dados de
+baja ni recupera sesiones previas.
 
 Ejecuta cada archivo aprobado con este patrón:
 
