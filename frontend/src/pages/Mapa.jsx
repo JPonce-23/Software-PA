@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from '../api/axios';
 import { parse } from 'wellknown';
+import FranjaDerechoViaPanel from '../components/fase2/FranjaDerechoViaPanel';
 
 const coloresPorTramo = {
   "Tren Maya tramo 1": "#E63946",
@@ -195,6 +196,14 @@ export default function Mapa() {
               <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '10px', height: '10px', background: '#94a3b8', borderRadius: '50%'}}></span> Proceso</span>
               <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%'}}></span> Problema</span>
             </div>
+
+            <FranjaDerechoViaPanel 
+              idTramo={idTramo} 
+              onImportSuccess={() => {
+                // Ideally reload the tramo geometries, but here we can just alert or reload page for simplicity
+                window.location.reload();
+              }} 
+            />
           </div>
         )}
 
