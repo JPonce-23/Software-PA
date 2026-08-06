@@ -15,7 +15,6 @@ import io
 
 from .database import engine, Base, SessionLocal, get_db
 from . import models, schemas
-from fastapi.security import OAuth2PasswordRequestForm
 from . import auth
 from .config import AUTH_SETTINGS
 from .routers import alertas, authentication, documentos, flujo, minutas, pagos, personas
@@ -95,7 +94,7 @@ app.add_middleware(
     allow_origins=list(AUTH_SETTINGS.allowed_origins),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    allow_headers=["Content-Type", "X-CSRF-Token"],
 )
 
 
@@ -1378,33 +1377,6 @@ def update_alerta(id_alerta: int, data: schemas.AlertaUpdate, db: Session = Depe
 def delete_alerta(id_alerta: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.Alertas, id_alerta, "id_alerta")
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
-
-# ==================== AUTH ==================== #
-@app.post("/api/auth/login", tags=["Autenticación"], summary="Iniciar sesión", response_model=schemas.Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(models.Usuario).filter(models.Usuario.correo == form_data.username).first()
-    if not user or not auth.verify_password(form_data.password, user.contrasena_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if not user.activo:
-        raise HTTPException(status_code=400, detail="Usuario inactivo")
-    
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = auth.create_access_token(
-        data={"sub": user.correo, "rol": user.rol}, expires_delta=access_token_expires
-    )
-    # Return user data explicitly for the frontend AuthContext
-    user_data = {
-        "id_usuario": user.id_usuario,
-        "nombre": user.nombre,
-        "apellido_paterno": user.apellido_paterno,
-        "correo": user.correo,
-        "rol": user.rol
-    }
-    return {"access_token": access_token, "token_type": "bearer", "user": user_data}
 
 # ==================== USUARIOS ==================== #
 @app.post("/api/usuarios", tags=["Usuarios"], summary="Crear usuario", response_model=schemas.UsuarioResponse, status_code=status.HTTP_201_CREATED)

@@ -11,14 +11,6 @@ class AuditableUpdate(BaseModel):
     observaciones: Optional[str] = None
 
 # ----------------- AUTH Y USUARIOS ----------------- #
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user: Optional[dict] = None
-
-class TokenData(BaseModel):
-    correo: Optional[str] = None
-
 class UsuarioBase(BaseModel):
     nombre: str
     apellido_paterno: str

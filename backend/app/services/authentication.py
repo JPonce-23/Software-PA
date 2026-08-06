@@ -96,7 +96,6 @@ def _credentials_error() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Credenciales incorrectas",
-        headers={"WWW-Authenticate": "Bearer"},
     )
 
 
