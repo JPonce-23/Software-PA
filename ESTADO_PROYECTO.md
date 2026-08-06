@@ -14,16 +14,16 @@
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
 > segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 4 de agosto de 2026
+**Última actualización:** 5 de agosto de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Próximo trabajo funcional:** completar la rotación operativa de secretos por
-ambiente y, después, iniciar el Corte 4 de autenticación formal. La
-implementación técnica de navegación por afectación y aislamiento documental
-quedó completada y validada en este entorno local el 4 de agosto de 2026; la
-validación funcional con usuarios finales fue reportada como aprobada en la
-continuidad de trabajo del 4 de agosto de 2026.
+**Próximo trabajo funcional:** completar la contracción y aceptación operativa
+del Corte 4 de autenticación formal: validar cookies `Secure` detrás del TLS
+real, inventariar consumidores bearer, retirar JWT cuando sea compatible y
+ejecutar aceptación funcional en navegador. La rotación local de PostgreSQL,
+PgAdmin y `SECRET_KEY` fue reportada como realizada antes del trabajo del 5 de
+agosto de 2026. No registrar sus valores.
 
 ## 1. Objetivo y dominio
 
@@ -88,7 +88,11 @@ backend/db/migrations/004_*.sql         Adaptaciones 2.0
 backend/db/migrations/005_*.sql         Integridad de afectaciones 2A
 backend/db/migrations/006_*.sql         Secuencia y estados de liberación 2B
 backend/db/migrations/007_*.sql         Navegación y aislamiento documental 2C
+backend/db/migrations/008_*.sql         Autenticación formal y sesiones
+backend/db/migrations/009_*.sql         Auditoría de expiración de sesión
 backend/tests/                          regresión e integración
+backend/app/routers/authentication.py   endpoints de sesión y revocación
+backend/app/services/authentication.py  reglas transaccionales de autenticación
 backend/app/routers/flujo.py            transiciones explícitas de 2B
 backend/app/services/flujo.py           dominio transaccional de 2B
 backend/app/services/access.py          autorización territorial
@@ -132,6 +136,12 @@ POST            /api/documentacion/{id_documento}/archivo
 GET             /api/documentacion/{id_documento}/versiones
 GET             /api/alertas/no-vistas
 GET             /api/alertas/no-vistas/count
+POST            /api/auth/sesiones
+GET             /api/auth/sesion
+POST            /api/auth/logout
+POST            /api/auth/logout-todas
+POST            /api/usuarios/{id_usuario}/desbloquear
+POST            /api/usuarios/{id_usuario}/revocar-sesiones
 ```
 
 Los routers se incluyen con prefijo `/api` desde `main.py`. Antes de agregar
@@ -316,7 +326,42 @@ actividad o asunto. Las minutas existentes permanecen compartidas en
 
 La 007 fue aplicada en este entorno local el 4 de agosto de 2026 con respaldo
 previo y `ON_ERROR_STOP=1`. La base local de esta máquina registra ahora 004,
-005, 006 y 007 en `schema_migrations`.
+005, 006, 007, 008 y 009 en `schema_migrations`.
+
+### 008 — Corte 4: autenticación formal
+
+Archivo:
+`backend/db/migrations/008_corte4_autenticacion_formal.sql`
+
+Requiere 007. Es expansiva y transaccional: crea `sesion_usuario`,
+`evento_acceso` y `estado_autenticacion_usuario`; protege eventos y sesiones
+contra cambios o DELETE indebidos; correlaciona cada modificación del estado
+de bloqueo con un evento de la misma transacción; revoca sesiones cuando un
+usuario se da de baja; y redacta hashes de contraseña, sesión y CSRF en nuevas
+fotografías de bitácora.
+
+La 008 fue ensayada desde cero en bases aisladas y aplicada a `db_trenes` el 5
+de agosto de 2026, con backend y scheduler detenidos, cero transacciones
+concurrentes, `ON_ERROR_STOP=1` y respaldo validado
+`backups/software-pa-db_trenes_pre_008_20260805.dump` con permisos `0600`.
+No se infirieron sesiones ni bloqueos históricos; la cuenta existente recibió
+contador cero y ninguna sesión.
+
+### 009 — Corte 4: auditoría veraz de expiraciones
+
+Archivo:
+`backend/db/migrations/009_corte4_auditoria_sistema_sesion.sql`
+
+Requiere 008. Sustituye de forma no destructiva `fn_audit_log()` para que una
+expiración automática no se atribuya falsamente al usuario objetivo. La
+excepción sólo se admite para una actualización de revocación correlacionada
+con un evento `sesion_expirada` sin actor, de la misma sesión y transacción;
+PostgreSQL rechaza cambios colaterales en cualquier otro campo de la sesión.
+
+La 009 fue probada con la regresión completa en una base aislada y aplicada a
+`db_trenes` el 5 de agosto de 2026, con escritores detenidos, cero
+transacciones concurrentes, `ON_ERROR_STOP=1` y respaldo validado
+`backups/software-pa-db_trenes_pre_009_20260805.dump` con permisos `0600`.
 
 ## 6. Trabajo realizado
 
@@ -475,18 +520,20 @@ consultar el esquema real; `git pull` descarga los SQL, pero no modifica
 volúmenes de PostgreSQL. Una base que sólo tiene 002 debe aplicar 003 y luego
 004, con respaldo y verificación entre ambas.
 
-La base activa local de esta máquina quedó verificada después de aplicar 007 el
-4 de agosto de 2026:
+La base activa local de esta máquina quedó verificada después de aplicar 009 el
+5 de agosto de 2026:
 
 ```text
 base/usuario:          db_trenes / alfredo
-schema_migrations:     004, 005, 006, 007
+schema_migrations:     004, 005, 006, 007, 008, 009
 afectaciones:          0 activas / 0 totales
 convenios:             0 activos / 0 totales
 FIFONAFE/pagos activos: 0 / 0
 afectacion_ciclo:      0 ciclos activos / 0 totales
 integridad 2B:         sin datos operativos locales que conciliar
 integridad 2C:         columnas de minuta y tipo documental tramo_nucleo verificados
+autenticación:         1 estado / 0 sesiones / 0 eventos iniciales
+auditoría sensible:    0 filas con contrasena_hash, token_hash o csrf_hash
 vistas activas:        afectación, tramo_nucleo y dashboard consultables
 ```
 
@@ -494,7 +541,7 @@ El archivo `.env` local ya permite conectarse al servicio `db`. Estos valores
 describen sólo este entorno; en cada equipo se debe verificar el esquema real.
 En otros equipos, `git pull` descarga las migraciones, pero no las aplica al
 volumen PostgreSQL; cada colaborador debe verificar `schema_migrations` y
-respaldar antes de ejecutar 006 o 007.
+respaldar antes de ejecutar 006, 007, 008 o 009.
 
 ## 8. Plan principal vigente de cinco cortes
 
@@ -750,18 +797,18 @@ El 4 de agosto de 2026 se implementó el hardening de repositorio del Corte 3:
 Validación ejecutada:
 
 ```text
-esquema:  schema_migrations registra 004, 005, 006 y 007
-backend:  110 pruebas aprobadas; 1 advertencia de deprecación de Starlette
+esquema:  schema_migrations registra 004, 005, 006, 007, 008 y 009
+backend:  117 pruebas aprobadas; 1 advertencia de deprecación de Starlette
 frontend: npx oxlint src sin errores
 bootstrap: ejecución no interactiva sin ADMIN_PASSWORD falla cerrado
 diff:     git diff --check sin errores
 secretos: búsqueda enfocada sin credenciales conocidas en archivos operativos tocados
 ```
 
-Este resultado no equivale a rotación real de secretos en todos los ambientes.
-La rotación operativa de `SECRET_KEY`, credenciales de PostgreSQL, PgAdmin y
-cuentas administrativas debe ejecutarse por ambiente con custodia externa y
-sin registrar valores en el repositorio.
+La rotación local de `SECRET_KEY`, contraseña del rol PostgreSQL y PgAdmin fue
+reportada como realizada por el responsable antes del trabajo del 5 de agosto
+de 2026. Este hecho no demuestra la rotación en otros ambientes ni autoriza a
+registrar valores; cada ambiente mantiene custodia externa.
 
 ### Corte 3 — Seguridad inmediata: parcial
 
@@ -780,22 +827,42 @@ Ya realizado:
 
 Pendiente:
 
-- Ejecutar la rotación real de credenciales y `SECRET_KEY` que ya estuvieron
-  en commits, por ambiente y con custodia externa.
-- Crear o actualizar el `.env` local de cada entorno con valores rotados y
-  verificar recuperación.
+- Replicar y verificar la rotación en cada ambiente distinto del local, con
+  custodia externa y evidencia sin valores sensibles.
+- Verificar recuperación y revocación de credenciales anteriores por ambiente.
 
 No copiar las credenciales actuales a documentación nueva.
 
-### Corte 4 — Autenticación formal: pendiente
+### Corte 4 — Autenticación formal: incremento principal implementado
 
-- Sustituir JWT en `localStorage`.
-- Definir cookie HttpOnly o estrategia equivalente.
-- Sesiones, revocación y logout real.
-- Registro de accesos exitosos y fallidos.
-- Bloqueo por cinco intentos fallidos.
-- Expiración e inactividad.
-- Pruebas de autenticación y autorización.
+Implementado y validado técnicamente el 5 de agosto de 2026:
+
+- El frontend ya no usa `localStorage` para token ni usuario; restaura la
+  identidad desde `GET /api/auth/sesion`.
+- Cookie de sesión opaca HttpOnly; producción exige `Secure`; cookie CSRF
+  separada, header `X-CSRF-Token` y validación exacta de `Origin`.
+- Sesiones con hash SHA-256 en PostgreSQL, revocación, logout actual/total y
+  revocación administrativa sin DELETE físico.
+- Registro append-only de login exitoso/fallido, bloqueo, expiración, logout,
+  revocación y desbloqueo; identidad inexistente no guarda correo ni hash
+  enumerable.
+- La expiración automática queda como evento sin actor humano; PostgreSQL
+  impide atribuirla a la víctima y rechaza modificaciones colaterales de la
+  sesión aunque exista un evento correlacionado.
+- Cinco fallos consecutivos bloquean 15 minutos con lock de fila; existe
+  desbloqueo admin y recuperación operativa auditable del único admin.
+- Inactividad servidor de 30 minutos y límite absoluto de 8 horas.
+- Baja lógica de usuario revoca sus sesiones en la misma transacción.
+- Política mínima de 12 caracteres, mayúscula, minúscula, número y símbolo en
+  `UsuarioCreate`, alineada con bootstrap.
+- 117 pruebas backend pasan en base aislada, incluido quinto fallo concurrente,
+  CSRF, expiraciones, integridad DB y redacción. Oxlint y build frontend pasan.
+
+Pendiente antes de declarar Corte 4 terminado:
+
+- Inventariar consumidores externos y retirar el login bearer/JWT heredado.
+- Validar cookie `Secure`, host/origen y proxy confiable detrás del TLS real.
+- Ejecutar aceptación funcional E2E en navegadores soportados.
 
 ### Corte 5 — Importación y reportes: pendiente
 
@@ -896,13 +963,15 @@ La siguiente tarea no es crear Proyecto, repetir Adaptaciones 2.0, rediseñar
 
 Próximo paso operativo:
 
-1. Ejecutar la rotación operativa de secretos por ambiente:
-   `SECRET_KEY`, credenciales de PostgreSQL, PgAdmin y cuentas
-   administrativas, sin registrar valores en Git.
-2. Replicar 007 en otros ambientes sólo después de respaldo, verificación
-   individual de 004/005/006 y preflight de datos.
-3. Conciliar datos históricos únicamente con evidencia documental.
-4. Revisar y confirmar el diff antes de commit/push.
-5. Después de cerrar la rotación, iniciar el Corte 4 de autenticación formal.
+1. Validar Corte 4 detrás del TLS real: cookie `Secure`, origen público exacto
+   y, si se requiere IP cliente, proxies confiables configurados por IP exacta.
+2. Inventariar consumidores del bearer heredado; migrarlos a cookie y aprobar
+   la fecha de contracción antes de dejar de emitir/aceptar JWT.
+3. Ejecutar aceptación E2E de login, quinto fallo, desbloqueo, expiración,
+   logout y RBAC/territorio en navegadores soportados.
+4. Replicar 008 y luego 009 en otros ambientes sólo después de respaldo,
+   verificación individual de 004/005/006/007 y preflight de bitácora sensible.
+5. Revisar y confirmar el diff antes de commit/push; no declarar Corte 4
+   terminado mientras bearer siga habilitado.
 El derecho de vía versionado está aprobado como componente futuro del Corte
 5. No debe mezclarse en el Subcorte 2C.

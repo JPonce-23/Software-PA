@@ -171,7 +171,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 La migración `001_init_schema.sql` se ejecuta automáticamente **solo cuando el
 volumen de PostgreSQL está vacío**. Una instalación nueva requiere después
-crear el usuario técnico y aplicar la migración `004`.
+crear el usuario técnico y aplicar en orden las migraciones `004`–`009`.
 
 La secuencia exacta, las comprobaciones para bases existentes y los comandos de
 respaldo están documentados en [docs/migraciones.md](docs/migraciones.md).
@@ -189,6 +189,7 @@ docker compose exec \
 docker compose exec -T db sh -lc \
   'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < backend/db/migrations/004_adaptaciones_fase2.sql
+# Repite el mismo patrón, en orden, para 005, 006, 007, 008 y 009.
 docker compose up -d
 ```
 
@@ -202,6 +203,14 @@ Las credenciales no se documentan en el repositorio. PgAdmin y PostgreSQL usan
 los valores definidos localmente en `.env`. `backend/db/seed.sql` ya no crea
 usuarios; requiere que exista un administrador activo para registrar la
 auditoría de los datos semilla.
+
+La autenticación web usa una sesión opaca en cookie HttpOnly y protección
+CSRF; el frontend no guarda credenciales en `localStorage`. En producción
+define `APP_ENV=production`, `AUTH_COOKIE_SECURE=true` y un `CORS_ORIGINS`
+HTTPS exacto. El bearer JWT permanece temporalmente para compatibilidad y no
+debe considerarse el mecanismo del frontend nuevo. Consulta el despliegue de
+008/009 y la recuperación administrativa en
+[docs/migraciones.md](docs/migraciones.md#migraciones-008-y-009-y-operación-de-autenticación).
 
 ## Operación diaria
 
