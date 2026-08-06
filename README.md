@@ -205,12 +205,30 @@ usuarios; requiere que exista un administrador activo para registrar la
 auditoría de los datos semilla.
 
 La autenticación web usa una sesión opaca en cookie HttpOnly y protección
-CSRF; el frontend no guarda credenciales en `localStorage`. En producción
-define `APP_ENV=production`, `AUTH_COOKIE_SECURE=true` y un `CORS_ORIGINS`
-HTTPS exacto. El bearer JWT permanece temporalmente para compatibilidad y no
-debe considerarse el mecanismo del frontend nuevo. Consulta el despliegue de
-008/009 y la recuperación administrativa en
+CSRF; el frontend no guarda credenciales en `localStorage` y el backend ya no
+acepta bearer/JWT como mecanismo de aplicación. En producción define
+`APP_ENV=production`, `AUTH_COOKIE_SECURE=true` y un `CORS_ORIGINS` HTTPS
+exacto. Consulta el despliegue de 008/009 y la recuperación administrativa en
 [docs/migraciones.md](docs/migraciones.md#migraciones-008-y-009-y-operación-de-autenticación).
+
+### Pruebas backend autenticadas
+
+La suite de backend necesita credenciales de un administrador activo en una
+base aislada de pruebas. No uses credenciales productivas ni las guardes en el
+repositorio:
+
+```bash
+export TEST_ADMIN_EMAIL="<admin_de_pruebas>"
+export TEST_ADMIN_PASSWORD="<password_de_pruebas>"
+docker compose exec \
+  -e TEST_ADMIN_EMAIL="$TEST_ADMIN_EMAIL" \
+  -e TEST_ADMIN_PASSWORD="$TEST_ADMIN_PASSWORD" \
+  backend python -m pytest -v
+```
+
+Si la base de pruebas no tiene administrador, créalo primero con
+`scripts/create_admin.py` usando valores propios del entorno. La contraseña
+debe cumplir la política mínima y no puede ser un placeholder.
 
 ## Operación diaria
 

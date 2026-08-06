@@ -14,16 +14,16 @@
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
 > segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 5 de agosto de 2026
+**Última actualización:** 6 de agosto de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Próximo trabajo funcional:** completar la contracción y aceptación operativa
-del Corte 4 de autenticación formal: validar cookies `Secure` detrás del TLS
-real, inventariar consumidores bearer, retirar JWT cuando sea compatible y
-ejecutar aceptación funcional en navegador. La rotación local de PostgreSQL,
-PgAdmin y `SECRET_KEY` fue reportada como realizada antes del trabajo del 5 de
-agosto de 2026. No registrar sus valores.
+**Próximo trabajo funcional:** completar la aceptación operativa del Corte 4 de
+autenticación formal detrás del TLS real: validar cookies `Secure`, origen
+público exacto, proxy confiable y aceptación E2E en navegador. La contracción
+local de bearer/JWT fue aplicada y validada el 6 de agosto de 2026. La rotación
+local de PostgreSQL, PgAdmin y `SECRET_KEY` fue reportada como realizada antes
+del trabajo del 5 de agosto de 2026. No registrar sus valores.
 
 ## 1. Objetivo y dominio
 
@@ -93,6 +93,9 @@ backend/db/migrations/009_*.sql         Auditoría de expiración de sesión
 backend/tests/                          regresión e integración
 backend/app/routers/authentication.py   endpoints de sesión y revocación
 backend/app/services/authentication.py  reglas transaccionales de autenticación
+docs/evaluaciones/2026-08-06-corte-4-contraccion-bearer-auditoria-final.md
+                                        cierre local de auditoría de contracción
+docs/validacion-tls-e2e-corte-4.md      checklist operativo TLS/E2E externo
 backend/app/routers/flujo.py            transiciones explícitas de 2B
 backend/app/services/flujo.py           dominio transaccional de 2B
 backend/app/services/access.py          autorización territorial
@@ -858,9 +861,22 @@ Implementado y validado técnicamente el 5 de agosto de 2026:
 - 117 pruebas backend pasan en base aislada, incluido quinto fallo concurrente,
   CSRF, expiraciones, integridad DB y redacción. Oxlint y build frontend pasan.
 
+Contracción local aplicada y validada el 6 de agosto de 2026:
+
+- El endpoint legacy `POST /api/auth/login`, la aceptación
+  `Authorization: Bearer`, la emisión/validación JWT, los schemas `Token` y
+  `TokenData`, los tests legacy y la dependencia `python-jose` fueron retirados
+  del código local.
+- La suite de pruebas usa sesiones cookie con CSRF mediante `admin_session` y
+  credenciales inyectadas por `TEST_ADMIN_EMAIL` y `TEST_ADMIN_PASSWORD`.
+- `docker-compose.yml` permite inyectar esas variables al contenedor backend
+  sin persistir secretos, y `.env.example` documenta los nombres vacíos.
+- Validación local ejecutada: Compose saludable, `schema_migrations` con 004,
+  005, 006, 007, 008 y 009, backend sin `python-jose`, y suite backend completa
+  con `119 passed, 1 warning`.
+
 Pendiente antes de declarar Corte 4 terminado:
 
-- Inventariar consumidores externos y retirar el login bearer/JWT heredado.
 - Validar cookie `Secure`, host/origen y proxy confiable detrás del TLS real.
 - Ejecutar aceptación funcional E2E en navegadores soportados.
 
@@ -965,13 +981,13 @@ Próximo paso operativo:
 
 1. Validar Corte 4 detrás del TLS real: cookie `Secure`, origen público exacto
    y, si se requiere IP cliente, proxies confiables configurados por IP exacta.
-2. Inventariar consumidores del bearer heredado; migrarlos a cookie y aprobar
-   la fecha de contracción antes de dejar de emitir/aceptar JWT.
-3. Ejecutar aceptación E2E de login, quinto fallo, desbloqueo, expiración,
-   logout y RBAC/territorio en navegadores soportados.
-4. Replicar 008 y luego 009 en otros ambientes sólo después de respaldo,
+   *(Nota: La contracción de código de bearer/JWT a nivel local fue completada y
+   validada estructuralmente el 6 de agosto de 2026. `python-jose`, tests legacy
+   y dependencias obsoletas fueron eliminados).*
+2. Ejecutar aceptación E2E de login, quinto fallo, desbloqueo, expiración,
+   logout y RBAC/territorio en navegadores soportados, utilizando el TLS real.
+3. Replicar 008 y luego 009 en otros ambientes sólo después de respaldo,
    verificación individual de 004/005/006/007 y preflight de bitácora sensible.
-5. Revisar y confirmar el diff antes de commit/push; no declarar Corte 4
-   terminado mientras bearer siga habilitado.
+4. Revisar y confirmar el diff antes de commit/push.
 El derecho de vía versionado está aprobado como componente futuro del Corte
 5. No debe mezclarse en el Subcorte 2C.
