@@ -43,10 +43,14 @@ def admin_credentials():
     Permite que cada ambiente de pruebas use su propio bootstrap sin codificar
     esas credenciales en los tests.
     """
-    return {
-        "email": os.getenv("TEST_ADMIN_EMAIL", "admin@sistema.com"),
-        "password": os.getenv("TEST_ADMIN_PASSWORD", "Admin123!"),
-    }
+    email = os.getenv("TEST_ADMIN_EMAIL")
+    password = os.getenv("TEST_ADMIN_PASSWORD")
+    if not email or not password:
+        pytest.fail(
+            "TEST_ADMIN_EMAIL y TEST_ADMIN_PASSWORD son obligatorios para "
+            "ejecutar la suite contra una base de pruebas aislada."
+        )
+    return {"email": email, "password": password}
 
 
 @pytest.fixture(scope="session")

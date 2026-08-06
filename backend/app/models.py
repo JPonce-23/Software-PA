@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, ForeignKeyConstraint, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, ForeignKeyConstraint, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 from sqlalchemy.dialects.postgresql import JSONB, INET
@@ -98,6 +98,88 @@ class Usuario(Base, AuditableMixin):
     rol = Column(String(30), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
     fecha_alta = Column(DateTime(timezone=True), nullable=False)
+
+
+class EstadoAutenticacionUsuario(Base):
+    __tablename__ = "estado_autenticacion_usuario"
+    __table_args__ = (
+        CheckConstraint(
+            "intentos_fallidos BETWEEN 0 AND 5",
+            name="chk_008_intentos_fallidos",
+        ),
+        CheckConstraint(
+            "(intentos_fallidos = 5 AND bloqueado_hasta IS NOT NULL) OR "
+            "(intentos_fallidos < 5 AND bloqueado_hasta IS NULL)",
+            name="chk_008_bloqueo_consistente",
+        ),
+    )
+    id_usuario = Column(
+        Integer,
+        ForeignKey("usuario.id_usuario", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    intentos_fallidos = Column(SmallInteger, nullable=False, default=0)
+    bloqueado_hasta = Column(DateTime(timezone=True))
+    ultimo_acceso_en = Column(DateTime(timezone=True))
+    actualizado_en = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class SesionUsuario(Base):
+    __tablename__ = "sesion_usuario"
+    id_sesion = Column(BigInteger, primary_key=True)
+    id_usuario = Column(
+        Integer,
+        ForeignKey("usuario.id_usuario", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    token_hash = Column(String(64), nullable=False, unique=True)
+    csrf_hash = Column(String(64), nullable=False)
+    fecha_creacion = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    ultima_actividad = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expira_en = Column(DateTime(timezone=True), nullable=False)
+    revocada_en = Column(DateTime(timezone=True))
+    id_usuario_revoca = Column(
+        Integer,
+        ForeignKey("usuario.id_usuario", ondelete="RESTRICT"),
+    )
+    motivo_revocacion = Column(String(100))
+    ip_creacion = Column(INET)
+    user_agent_creacion = Column(String(512))
+
+
+class EventoAcceso(Base):
+    __tablename__ = "evento_acceso"
+    id_evento = Column(BigInteger, primary_key=True)
+    id_usuario = Column(
+        Integer,
+        ForeignKey("usuario.id_usuario", ondelete="RESTRICT"),
+    )
+    id_usuario_actor = Column(
+        Integer,
+        ForeignKey("usuario.id_usuario", ondelete="RESTRICT"),
+    )
+    id_sesion = Column(
+        BigInteger,
+        ForeignKey("sesion_usuario.id_sesion", ondelete="RESTRICT"),
+    )
+    tipo_evento = Column(String(40), nullable=False)
+    motivo_codigo = Column(String(50), nullable=False)
+    detalle = Column(String(200))
+    fecha_hora = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    ip_origen = Column(INET)
+    user_agent = Column(String(512))
+    txid_registro = Column(
+        BigInteger, nullable=False, server_default=func.txid_current()
+    )
 
 class Orv(Base, AuditableMixin):
     __tablename__ = "orv"

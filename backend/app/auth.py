@@ -3,10 +3,12 @@ from typing import Optional
 from jose import JWTError, jwt
 import bcrypt
 import os
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from . import models, database
+from .config import AUTH_SETTINGS
+from .services import authentication as authentication_service
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
@@ -39,7 +41,7 @@ if _is_insecure_secret_key(SECRET_KEY):
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 # RNF-9: Vigencia estricta de 30 minutos
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
@@ -57,7 +59,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
+def _get_bearer_user(token: str, db: Session) -> models.Usuario:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="No se pudieron validar las credenciales",
@@ -75,6 +77,44 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None or not user.activo:
         raise credentials_exception
     return user
+
+
+def get_session_context(
+    request: Request,
+    db: Session = Depends(database.get_db),
+) -> tuple[models.Usuario, models.SesionUsuario]:
+    token = request.cookies.get(AUTH_SETTINGS.session_cookie_name)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No se pudo validar la sesión",
+        )
+    return authentication_service.authenticate_session(db, request, token)
+
+
+def get_current_user(
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(database.get_db),
+):
+    session_token = request.cookies.get(AUTH_SETTINGS.session_cookie_name)
+    if token and session_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Se proporcionaron credenciales ambiguas",
+        )
+    if session_token:
+        user, _ = authentication_service.authenticate_session(
+            db, request, session_token
+        )
+        return user
+    if token:
+        return _get_bearer_user(token, db)
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="No se pudieron validar las credenciales",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 class RoleChecker:
     def __init__(self, allowed_roles: list):

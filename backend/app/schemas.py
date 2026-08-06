@@ -29,6 +29,23 @@ class UsuarioBase(BaseModel):
 class UsuarioCreate(UsuarioBase):
     contrasena: str
 
+    @field_validator("contrasena")
+    @classmethod
+    def validate_password_policy(cls, value: str) -> str:
+        checks = (
+            len(value) >= 12,
+            any(char.islower() for char in value),
+            any(char.isupper() for char in value),
+            any(char.isdigit() for char in value),
+            any(not char.isalnum() for char in value),
+        )
+        if not all(checks):
+            raise ValueError(
+                "La contraseña debe tener al menos 12 caracteres e incluir "
+                "mayúscula, minúscula, número y símbolo"
+            )
+        return value
+
 class UsuarioUpdate(BaseModel):
     nombre: Optional[str] = None
     apellido_paterno: Optional[str] = None
@@ -42,6 +59,37 @@ class UsuarioResponse(UsuarioBase):
     activo: bool
     fecha_alta: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class AuthUserResponse(BaseModel):
+    id_usuario: int
+    nombre: str
+    apellido_paterno: str
+    correo: str
+    rol: Literal['admin', 'operador', 'visualizador', 'geografo']
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuthSessionResponse(BaseModel):
+    user: AuthUserResponse
+    expira_en: datetime
+
+
+class AuthActionRequest(BaseModel):
+    motivo: str = Field(min_length=3, max_length=200)
+
+    @field_validator("motivo")
+    @classmethod
+    def validate_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 3:
+            raise ValueError("El motivo es obligatorio")
+        return normalized
+
+
+class AuthOperationResponse(BaseModel):
+    detail: str
 
 # ----------------- PROYECTO ----------------- #
 class ProyectoBase(BaseModel):

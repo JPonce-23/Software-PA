@@ -102,7 +102,11 @@ def create_admin() -> None:
         total_usuarios = db.query(models.Usuario.id_usuario).count()
         if total_usuarios == 0:
             # Primer usuario: la auditoría normal aún no tiene un actor válido.
-            db.execute(text("ALTER TABLE usuario DISABLE TRIGGER USER"))
+            # Se desactiva sólo el trigger de bitácora; los triggers de
+            # integridad y la inicialización del estado auth permanecen activos.
+            db.execute(
+                text("ALTER TABLE usuario DISABLE TRIGGER trg_audit_usuario")
+            )
             triggers_disabled = True
         else:
             actor = (
@@ -141,7 +145,9 @@ def create_admin() -> None:
     finally:
         if triggers_disabled:
             try:
-                db.execute(text("ALTER TABLE usuario ENABLE TRIGGER USER"))
+                db.execute(
+                    text("ALTER TABLE usuario ENABLE TRIGGER trg_audit_usuario")
+                )
                 db.commit()
             except Exception:
                 db.rollback()

@@ -13,12 +13,14 @@ import logging
 import pandas as pd
 import io
 
-from .database import engine, Base, get_db
+from .database import engine, Base, SessionLocal, get_db
 from . import models, schemas
 from fastapi.security import OAuth2PasswordRequestForm
 from . import auth
-from .routers import alertas, documentos, flujo, minutas, pagos, personas
+from .config import AUTH_SETTINGS
+from .routers import alertas, authentication, documentos, flujo, minutas, pagos, personas
 from .services import afectaciones as afectaciones_service
+from .services import authentication as authentication_service
 from .services import flujo as flujo_service
 from .services.access import (
     filter_by_user_tramos,
@@ -90,11 +92,49 @@ def global_exception_handler(request, exc: Exception):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
+    allow_origins=list(AUTH_SETTINGS.allowed_origins),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
+
+
+@app.middleware("http")
+async def csrf_cookie_guard(request, call_next):
+    unsafe_method = request.method in {"POST", "PUT", "PATCH", "DELETE"}
+    if not unsafe_method or not request.url.path.startswith("/api/"):
+        return await call_next(request)
+
+    origin = request.headers.get("origin")
+    if request.url.path == "/api/auth/sesiones":
+        if origin not in AUTH_SETTINGS.allowed_origins:
+            return JSONResponse(status_code=403, content={"detail": "Origen no permitido"})
+        return await call_next(request)
+
+    session_token = request.cookies.get(AUTH_SETTINGS.session_cookie_name)
+    if not session_token:
+        return await call_next(request)
+
+    csrf_cookie = request.cookies.get(AUTH_SETTINGS.csrf_cookie_name)
+    csrf_header = request.headers.get("x-csrf-token")
+    if (
+        origin not in AUTH_SETTINGS.allowed_origins
+        or not csrf_cookie
+        or not csrf_header
+        or csrf_cookie != csrf_header
+    ):
+        return JSONResponse(status_code=403, content={"detail": "Protección CSRF inválida"})
+
+    db = SessionLocal()
+    try:
+        valid = authentication_service.validate_csrf(
+            db, session_token, csrf_header
+        )
+    finally:
+        db.close()
+    if not valid:
+        return JSONResponse(status_code=403, content={"detail": "Protección CSRF inválida"})
+    return await call_next(request)
 
 app.include_router(personas.router, prefix="/api")
 app.include_router(minutas.router, prefix="/api")
@@ -102,6 +142,7 @@ app.include_router(pagos.router, prefix="/api")
 app.include_router(documentos.router, prefix="/api")
 app.include_router(alertas.router, prefix="/api")
 app.include_router(flujo.router, prefix="/api")
+app.include_router(authentication.router, prefix="/api")
 
 
 os.makedirs("uploads", exist_ok=True)
