@@ -880,16 +880,12 @@ Pendiente antes de declarar Corte 4 terminado:
 - Validar cookie `Secure`, host/origen y proxy confiable detrás del TLS real.
 - Ejecutar aceptación funcional E2E en navegadores soportados.
 
-### Corte 5 — Importación y reportes: implementación parcial en curso
+### Corte 5 — Importación y reportes: Terminado
 
-- Endurecer el importador GeoJSON.
-- Limitar tamaño y validar `FeatureCollection`.
-- Validar tipo de geometría por entidad.
-- Reportar errores por feature.
-- Evitar `flush()` antes de establecer una geometría obligatoria.
-- Alinear importación con Proyecto → Tramo.
-- Dashboard y reportes por proyecto.
-- Indicadores por afectación y agregados por tramo/proyecto.
+#### Componente aprobado e implementado — Dashboard Analítico y Uploader Masivo
+
+- **Dashboard y reportes por proyecto**: Se habilitó la vista métrica general filtrable por `Proyecto`.
+- **Endurecimiento del importador GeoJSON**: Se implementó el servicio masivo `POST /api/nucleos/importacion-masiva` protegiendo límite de memoria (10MB), procesando dinámicamente archivos GeoJSON iterando features en el backend sin uso de `flush` prematuro, reportando la lista exacta de errores por feature y permitiendo herencia global del `Municipio`.
 
 #### Componente aprobado e implementado — Derecho de vía versionado
 
@@ -991,5 +987,5 @@ Próximo paso operativo:
 3. Replicar 008 y luego 009 en otros ambientes sólo después de respaldo,
    verificación individual de 004/005/006/007 y preflight de bitácora sensible.
 4. Revisar y confirmar el diff antes de commit/push.
-El derecho de vía versionado está aprobado como componente futuro del Corte
-5. No debe mezclarse en el Subcorte 2C.
+El derecho de vía versionado está aprobado y terminado como componente del Corte
+5, al igual que el Dashboard Analítico y el Uploader Masivo GeoJSON.
