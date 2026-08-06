@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from .common import get_active, set_audit_context
 from .personas import ensure_persona_nucleo
+from . import franjas
 
 
 def _validar_contexto(
@@ -98,8 +99,10 @@ def _crear_afectacion(
     db: Session,
     data: dict,
     id_parcela: int | None,
+    tramo_nucleo: models.TramoNucleo,
 ) -> models.Afectacion:
     wkt = data.pop("geometria_wkt")
+    franjas.validar_interseccion_afectacion(db, tramo_nucleo.id_tramo, wkt)
     data.pop("parcela", None)
     data["id_parcela"] = id_parcela
     afectacion = models.Afectacion(**data)
@@ -132,8 +135,8 @@ def crear_colectiva(
     user_id: int,
 ) -> models.Afectacion:
     set_audit_context(db, user_id)
-    _validar_contexto(db, data.id_nucleo, data.id_tramo_nucleo)
-    afectacion = _crear_afectacion(db, data.model_dump(), None)
+    tramo_nucleo = _validar_contexto(db, data.id_nucleo, data.id_tramo_nucleo)
+    afectacion = _crear_afectacion(db, data.model_dump(), None, tramo_nucleo)
     _commit_or_raise(db)
     db.refresh(afectacion)
     return afectacion
@@ -193,7 +196,7 @@ def crear_individual(
     """Crea una individual y, si aplica, parcela y titulares en una transacción."""
     try:
         set_audit_context(db, user_id)
-        _validar_contexto(db, data.id_nucleo, data.id_tramo_nucleo)
+        tramo_nucleo = _validar_contexto(db, data.id_nucleo, data.id_tramo_nucleo)
         if isinstance(data.parcela, schemas.ParcelaExistenteParaAfectacion):
             parcela = validar_parcela_individual(
                 db, data.parcela.id_parcela, data.id_nucleo
@@ -206,6 +209,7 @@ def crear_individual(
             db,
             data.model_dump(),
             parcela.id_parcela,
+            tramo_nucleo,
         )
         _commit_or_raise(db)
         db.refresh(afectacion)
@@ -230,6 +234,8 @@ def actualizar_afectacion(
     for campo, valor in cambios.items():
         setattr(afectacion, campo, valor)
     if wkt is not None:
+        tramo_nucleo = _validar_contexto(db, afectacion.id_nucleo, afectacion.id_tramo_nucleo)
+        franjas.validar_interseccion_afectacion(db, tramo_nucleo.id_tramo, wkt)
         afectacion.geometria_afectacion = wkt
     _commit_or_raise(db)
     db.refresh(afectacion)

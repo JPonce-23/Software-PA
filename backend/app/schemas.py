@@ -133,6 +133,34 @@ class TramoResponse(TramoBase):
     geometria_wkt: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
+class FranjaDerechoViaCreate(AuditableCreate):
+    fuente: str
+    fecha_vigencia_inicio: date
+    ancho_izquierdo_m: Optional[Decimal] = Field(default=None, gt=0)
+    ancho_derecho_m: Optional[Decimal] = Field(default=None, gt=0)
+    geometria_wkt: str = Field(min_length=1)
+    
+    @field_validator('geometria_wkt')
+    @classmethod
+    def normalizar_geometria_wkt(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError('La geometría es obligatoria')
+        return value
+
+class FranjaDerechoViaResponse(BaseModel):
+    id_franja: int
+    id_tramo: int
+    version: int
+    ancho_izquierdo_m: Optional[Decimal] = None
+    ancho_derecho_m: Optional[Decimal] = None
+    fuente: str
+    fecha_vigencia_inicio: date
+    fecha_vigencia_fin: Optional[date] = None
+    activo: bool
+    geometria_wkt: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
 class NucleoAgrarioCreate(AuditableCreate):
     id_municipio: int
     nombre_nucleo: str

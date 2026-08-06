@@ -17,7 +17,7 @@ from .database import engine, Base, SessionLocal, get_db
 from . import models, schemas
 from . import auth
 from .config import AUTH_SETTINGS
-from .routers import alertas, authentication, documentos, flujo, minutas, pagos, personas
+from .routers import alertas, authentication, documentos, flujo, minutas, pagos, personas, franjas
 from .services import afectaciones as afectaciones_service
 from .services import authentication as authentication_service
 from .services import flujo as flujo_service
@@ -142,7 +142,7 @@ app.include_router(documentos.router, prefix="/api")
 app.include_router(alertas.router, prefix="/api")
 app.include_router(flujo.router, prefix="/api")
 app.include_router(authentication.router, prefix="/api")
-
+app.include_router(franjas.router, prefix="/api")
 
 os.makedirs("uploads", exist_ok=True)
 

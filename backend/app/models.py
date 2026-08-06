@@ -57,6 +57,31 @@ class Tramo(Base, AuditableMixin):
     activo = Column(Boolean, default=True, nullable=False)
     fecha_registro = Column(Date, nullable=False)
     proyecto = relationship("Proyecto", back_populates="tramos")
+    franjas = relationship("FranjaDerechoVia", back_populates="tramo")
+
+class FranjaDerechoVia(Base, AuditableMixin):
+    __tablename__ = "franja_derecho_via"
+    __table_args__ = (
+        CheckConstraint(
+            "(ancho_izquierdo_m IS NULL OR ancho_izquierdo_m > 0) AND (ancho_derecho_m IS NULL OR ancho_derecho_m > 0)",
+            name="chk_franja_anchos_positivos"
+        ),
+        CheckConstraint(
+            "fecha_vigencia_fin IS NULL OR fecha_vigencia_inicio <= fecha_vigencia_fin",
+            name="chk_franja_vigencia"
+        ),
+    )
+    id_franja = Column(Integer, primary_key=True, index=True)
+    id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
+    version = Column(Integer, nullable=False)
+    ancho_izquierdo_m = Column(Numeric(6, 2))
+    ancho_derecho_m = Column(Numeric(6, 2))
+    geometria_poligono = Column(Geometry(geometry_type='MULTIPOLYGON', srid=4326), nullable=False)
+    fuente = Column(String(200), nullable=False)
+    fecha_vigencia_inicio = Column(Date, nullable=False)
+    fecha_vigencia_fin = Column(Date)
+    activo = Column(Boolean, default=True, nullable=False)
+    tramo = relationship("Tramo", back_populates="franjas")
 
 class NucleoAgrario(Base, AuditableMixin):
     __tablename__ = "nucleo_agrario"
