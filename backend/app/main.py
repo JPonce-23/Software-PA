@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File, Form
 import os
 import json
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, func
 from sqlalchemy.inspection import inspect
 from sqlalchemy.exc import InternalError, IntegrityError, DatabaseError
 from typing import List, Type, Any
@@ -257,7 +257,7 @@ def require_ciclo_scope(
 def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
     set_audit_context(db, user_id)
     update_dict = update_data.model_dump(exclude_unset=True)
-    
+
     if "geometria_wkt" in update_dict:
         wkt = update_dict.pop("geometria_wkt", None)
         model_class = type(entity)
@@ -269,7 +269,7 @@ def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
         validate_wkt(db, wkt, allowed_geometry_types)
 
         geom_field = GEOMETRY_FIELDS.get(model_class)
-        
+
         if geom_field and hasattr(entity, geom_field):
             setattr(entity, geom_field, wkt)
 
@@ -396,13 +396,13 @@ def delete_tramo(id_tramo: int, motivo: str = Query(...), db: Session = Depends(
 @app.get("/api/nucleos", tags=["Núcleos Agrarios"], summary="Listar núcleos agrarios")
 def get_nucleos(id_tramo: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     from sqlalchemy import text
-    
+
     base_sql = """
-        SELECT 
-            n.id_nucleo, 
-            n.nombre_nucleo, 
-            n.tipo_nucleo, 
-            n.comunidad_indigena, 
+        SELECT
+            n.id_nucleo,
+            n.nombre_nucleo,
+            n.tipo_nucleo,
+            n.comunidad_indigena,
             ST_AsText(n.geometria_poligono) as geometria_wkt,
             (ST_Area(n.geometria_poligono::geography) / 10000.0) as area_ha
         FROM nucleo_agrario n
@@ -423,26 +423,26 @@ def get_nucleos(id_tramo: int = Query(None), db: Session = Depends(get_db), curr
             )
         """
         params["id_usuario"] = current_user.id_usuario
-    
+
     if id_tramo is not None:
         require_tramo_access(db, current_user, id_tramo)
         base_sql += """
             AND ST_Intersects(n.geometria_poligono, (
-                SELECT ST_Union(t.geometria_linea) 
-                FROM tramo t 
+                SELECT ST_Union(t.geometria_linea)
+                FROM tramo t
                 WHERE t.id_tramo = :id_tramo AND t.activo = TRUE
             ))
         """
         params["id_tramo"] = id_tramo
-        
+
     result = db.execute(text(base_sql), params).fetchall()
-    
+
     response = []
     for r in result:
-        # TODO: Para producción, el estatus debe calcularse a partir de la existencia 
+        # TODO: Para producción, el estatus debe calcularse a partir de la existencia
         # de convenios inscritos en RAN (Req. 11, vista vw_dashboard_liberacion).
         estatus = 'en_proceso'
-        
+
         response.append({
             "id_nucleo": r.id_nucleo,
             "nombre_nucleo": r.nombre_nucleo,
@@ -452,17 +452,17 @@ def get_nucleos(id_tramo: int = Query(None), db: Session = Depends(get_db), curr
             "area_ha": round(r.area_ha, 2) if r.area_ha else 0,
             "estatus_simulado": estatus
         })
-        
+
     return response
 
 @app.get("/api/tramo-detalles", tags=["Tramos"], summary="Obtener detalles y estadísticas geoespaciales de un tramo específico")
 def get_tramo_detalles(id_tramo: int = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     from sqlalchemy import text
     from fastapi import HTTPException
-    
+
     require_tramo_access(db, current_user, id_tramo)
     sql = text("""
-        SELECT 
+        SELECT
             id_tramo,
             nombre_tramo,
             ST_AsText(geometria_linea) as geometria_wkt,
@@ -471,10 +471,10 @@ def get_tramo_detalles(id_tramo: int = Query(...), db: Session = Depends(get_db)
         WHERE id_tramo = :id_tramo AND activo = TRUE
     """)
     r = db.execute(sql, {"id_tramo": id_tramo}).fetchone()
-    
+
     if not r:
         raise HTTPException(status_code=404, detail="Tramo no encontrado")
-        
+
     return {
         "id_tramo": r.id_tramo,
         "nombre_tramo": r.nombre_tramo,
@@ -512,6 +512,110 @@ def update_nucleo(id_nucleo: int, data: schemas.NucleoAgrarioUpdate, db: Session
 def delete_nucleo(id_nucleo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
+
+@app.post("/api/nucleos/importacion-masiva", tags=["Núcleos Agrarios"], summary="Importación masiva GeoJSON")
+async def importacion_masiva_nucleos(
+    file: UploadFile = File(...),
+    id_municipio_fallback: int = Form(None),
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))
+):
+    if not file.filename.endswith('.geojson'):
+        raise HTTPException(400, "El archivo debe tener extensión .geojson")
+
+    content = await file.read(10 * 1024 * 1024) # limit 10MB
+    if len(content) >= 10 * 1024 * 1024:
+        raise HTTPException(413, "Archivo excede el límite de 10MB")
+
+    try:
+        data = json.loads(content)
+    except Exception:
+        raise HTTPException(400, "Archivo JSON inválido")
+
+    if data.get("type") != "FeatureCollection" or "features" not in data:
+        raise HTTPException(400, "El archivo debe ser un FeatureCollection")
+
+    resultados = []
+    errores = []
+    exitosos = 0
+
+    set_audit_context(db, current_user.id_usuario)
+
+    with db.no_autoflush:
+        for idx, feature in enumerate(data.get("features", [])):
+            if feature.get("type") != "Feature":
+                errores.append({"index": idx, "motivo": "No es un Feature válido"})
+                continue
+
+            geom = feature.get("geometry")
+            if not geom or geom.get("type") not in ("Polygon", "MultiPolygon"):
+                errores.append({"index": idx, "motivo": "Geometría debe ser Polygon o MultiPolygon"})
+                continue
+
+            props = feature.get("properties") or {}
+
+            nombre = props.get("nombre_nucleo") or props.get("nombre")
+            tipo = (props.get("tipo_nucleo") or props.get("tipo") or "ejido").lower()
+            if tipo not in ('ejido', 'comunidad'):
+                tipo = 'ejido'
+
+            if not nombre:
+                errores.append({"index": idx, "motivo": "Falta 'nombre' en properties"})
+                continue
+
+            id_mun = props.get("id_municipio") or id_municipio_fallback
+            if not id_mun:
+                errores.append({"index": idx, "motivo": "Falta id_municipio y no se proveyó globalmente"})
+                continue
+
+            # validación ST_GeomFromGeoJSON
+            geom_json = json.dumps(geom)
+
+            try:
+                # Validar topología en BD (opcional antes de guardar)
+                valid = db.execute(
+                    text("SELECT ST_IsValid(ST_GeomFromGeoJSON(:geom))"),
+                    {"geom": geom_json}
+                ).scalar()
+
+                if not valid:
+                    errores.append({"index": idx, "motivo": "Topología de geometría inválida (ST_IsValid=false)"})
+                    continue
+
+                n_db = models.NucleoAgrario(
+                    id_municipio=int(id_mun),
+                    nombre_nucleo=nombre,
+                    tipo_nucleo=tipo,
+                    comunidad_indigena=bool(props.get("comunidad_indigena", False)),
+                    fecha_creacion=datetime.now(timezone.utc),
+                    activo=True,
+                    geometria_poligono=func.ST_Multi(func.ST_GeomFromGeoJSON(geom_json))
+                )
+                db.add(n_db)
+                exitosos += 1
+            except Exception as e:
+                errores.append({"index": idx, "motivo": f"Error insertando: {str(e)}"})
+                db.rollback()
+                break # abort if DB errors
+
+    if errores:
+        db.rollback()
+        raise HTTPException(
+            400,
+            detail={
+                "mensaje": "Se abortó la importación porque hubo errores",
+                "total_procesados": len(data["features"]),
+                "errores": errores
+            }
+        )
+
+    # Si todo bien
+    db.commit()
+    return {
+        "mensaje": f"Se importaron {exitosos} núcleos exitosamente",
+        "total": exitosos
+    }
+
 
 # ==================== TRAMOS-NUCLEOS ==================== #
 @app.get("/api/tramos-nucleos", tags=["Tramos-Nucleos"], summary="Listar tramos-nucleos", response_model=List[schemas.TramoNucleoResponse])
@@ -610,22 +714,28 @@ def delete_tramo_nucleo(id_tramo_nucleo: int, motivo: str = Query(...), db: Sess
 
 # ==================== DASHBOARD & REPORTES ==================== #
 @app.get("/api/dashboard", tags=["Dashboard"], summary="Consultar convenios y superficie", response_model=List[schemas.DashboardMetrics])
-def get_dashboard_metrics(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    query = text("""
+def get_dashboard_metrics(id_proyecto: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    sql_query = """
         SELECT v.*
           FROM vw_dashboard_liberacion v
-         WHERE :es_admin OR EXISTS (
+         WHERE (:es_admin OR EXISTS (
              SELECT 1 FROM usuario_tramo ut
               WHERE ut.id_tramo = v.id_tramo
                 AND ut.id_usuario = :id_usuario
                 AND ut.activo = TRUE
-         )
-         LIMIT 100
-    """)
-    return db.execute(query, {
+         ))
+    """
+    params = {
         "es_admin": current_user.rol == "admin",
         "id_usuario": current_user.id_usuario,
-    }).mappings().all()
+    }
+    if id_proyecto:
+        sql_query += " AND v.id_proyecto = :id_proyecto"
+        params["id_proyecto"] = id_proyecto
+
+    sql_query += " LIMIT 100"
+
+    return db.execute(text(sql_query), params).mappings().all()
 
 @app.get("/api/reportes/resumen", tags=["Reportes"], summary="Generar reporte resumen")
 def generar_reporte_resumen(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
@@ -711,7 +821,7 @@ def create_afectacion_individual(
 def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
     require_tramo_nucleo_access(db, current_user, afectacion.id_tramo_nucleo)
-    
+
     # Validación de integridad: TramoNucleo debe existir y pertenecer al NucleoAgrario indicado
     tramo_nucleo_db = db.query(models.TramoNucleo).filter(
         models.TramoNucleo.id_tramo_nucleo == afectacion.id_tramo_nucleo,
@@ -721,7 +831,7 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
     if tramo_nucleo_db.id_nucleo != afectacion.id_nucleo:
         raise HTTPException(status_code=400, detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.")
-    
+
     # Compatibilidad temporal: el contrato genérico conserva consumidores
     # existentes, pero aplica las mismas reglas de separación de 2A.
     if afectacion.tipo_afectacion == 'colectivo' and afectacion.id_parcela is not None:
@@ -734,17 +844,17 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
         afectaciones_service.validar_parcela_individual(
             db, afectacion.id_parcela, afectacion.id_nucleo
         )
-        
+
     data = afectacion.model_dump()
     wkt = data.pop("geometria_wkt", None)
-    
+
     if wkt:
         validate_wkt(db, wkt, {"ST_Polygon", "ST_MultiPolygon"})
-        
+
     db_afectacion = models.Afectacion(**data)
     if wkt:
         db_afectacion.geometria_afectacion = wkt
-        
+
     db.add(db_afectacion)
     db.commit()
     db.refresh(db_afectacion)
@@ -848,7 +958,7 @@ def list_asambleas(
 def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
     require_tramo_nucleo_access(db, current_user, asamblea.id_tramo_nucleo)
-    
+
     # Validación de integridad: TramoNucleo debe existir y pertenecer al NucleoAgrario indicado
     tramo_nucleo_db = db.query(models.TramoNucleo).filter(
         models.TramoNucleo.id_tramo_nucleo == asamblea.id_tramo_nucleo,
@@ -858,7 +968,7 @@ def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
     if tramo_nucleo_db.id_nucleo != asamblea.id_nucleo:
         raise HTTPException(status_code=400, detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.")
-        
+
     if asamblea.id_padron:
         padron_db = db.query(models.PadronHistorial).filter_by(id_padron=asamblea.id_padron, activo=True).first()
         if not padron_db or padron_db.id_nucleo != asamblea.id_nucleo:
@@ -945,7 +1055,7 @@ def list_convenios(
 def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
     require_tramo_nucleo_access(db, current_user, convenio.id_tramo_nucleo)
-    
+
     # Validación de integridad: TramoNucleo debe existir
     tramo_nucleo_db = db.query(models.TramoNucleo).filter(
         models.TramoNucleo.id_tramo_nucleo == convenio.id_tramo_nucleo,
@@ -953,7 +1063,7 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
     ).first()
     if not tramo_nucleo_db:
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
-    
+
     # Validación de integridad: La Afectación debe existir y pertenecer al mismo TramoNucleo
     afectacion_db = db.query(models.Afectacion).filter(
         models.Afectacion.id_afectacion == convenio.id_afectacion,
@@ -963,18 +1073,18 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="La Afectación especificada no existe.")
     if afectacion_db.id_tramo_nucleo != convenio.id_tramo_nucleo:
         raise HTTPException(status_code=400, detail="Inconsistencia: La Afectación no pertenece al TramoNucleo especificado.")
-        
+
     padre_db = None
     if convenio.id_convenio_padre:
         padre_db = db.query(models.Convenio).filter_by(id_convenio=convenio.id_convenio_padre, activo=True).first()
         if not padre_db or padre_db.id_afectacion != convenio.id_afectacion:
             raise HTTPException(status_code=400, detail="Inconsistencia: El Convenio Padre no existe o no pertenece a la misma Afectación.")
-            
+
     if convenio.id_asamblea_autorizacion:
         asamblea_db = db.query(models.Asamblea).filter_by(id_asamblea=convenio.id_asamblea_autorizacion, activo=True).first()
         if not asamblea_db or asamblea_db.id_tramo_nucleo != convenio.id_tramo_nucleo:
             raise HTTPException(status_code=400, detail="Inconsistencia: La Asamblea no existe o no pertenece al mismo TramoNucleo.")
-    
+
     # B6 / B7: Asamblea constraint
     if (convenio.tipo_afectacion == 'colectivo'
             and convenio.tipo_convenio != 'modificatorio'
@@ -982,11 +1092,11 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
         raise HTTPException(status_code=400, detail="Convenios colectivos requieren id_asamblea_autorizacion (chk_colectivo_requiere_asamblea)")
     if convenio.tipo_afectacion == 'individual' and convenio.id_asamblea_autorizacion:
         raise HTTPException(status_code=400, detail="Convenios individuales no deben tener asamblea (chk_individual_sin_asamblea)")
-        
+
     # B8: Modificatorio padre constraint
     if convenio.tipo_convenio == 'modificatorio' and not convenio.id_convenio_padre:
         raise HTTPException(status_code=400, detail="Los convenios modificatorios requieren un id_convenio_padre")
-        
+
     # RN-1: Compatibilidad tipo_convenio vs tipo_afectacion
     colectivo_permitidos = ['cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias']
     individual_permitidos = ['cop_original', 'modificatorio', 'ampliacion', 'ampliacion_remanente']
@@ -994,16 +1104,16 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
         raise HTTPException(status_code=400, detail=f"tipo_convenio {convenio.tipo_convenio} no permitido para afectación colectivo")
     if convenio.tipo_afectacion == 'individual' and convenio.tipo_convenio not in individual_permitidos:
         raise HTTPException(status_code=400, detail=f"tipo_convenio {convenio.tipo_convenio} no permitido para afectación individual")
-        
+
     # RN-2: Obras Complementarias sin BDT
     if convenio.tipo_convenio == 'obras_complementarias' and convenio.monto_bdt is not None:
         raise HTTPException(status_code=400, detail="Convenios de obras complementarias no deben tener monto_bdt")
-        
+
     # RN-3: Modificatorio individual restricciones
     if convenio.tipo_convenio == 'modificatorio' and convenio.tipo_afectacion == 'individual':
         if convenio.superficie_real_afectada_ha or convenio.superficie_total_ha or convenio.monto_bdt:
              raise HTTPException(status_code=400, detail="Modificatorio individual solo permite fecha_firma, monto_90 y monto_100")
-             
+
     # RN-5: Superficie field exclusivity
     if convenio.tipo_afectacion == 'colectivo' and convenio.superficie_total_ha is not None:
         raise HTTPException(status_code=400, detail="Afectación colectiva debe usar superficie_real_afectada_ha, no superficie_total_ha")
@@ -1108,7 +1218,7 @@ def list_actividades(
 def create_actividad(act: schemas.ActividadCampoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
     require_tramo_nucleo_access(db, current_user, act.id_tramo_nucleo)
-    
+
     # Validación de integridad: TramoNucleo debe existir
     tramo_nucleo_db = db.query(models.TramoNucleo).filter(
         models.TramoNucleo.id_tramo_nucleo == act.id_tramo_nucleo,
@@ -1116,7 +1226,7 @@ def create_actividad(act: schemas.ActividadCampoCreate, db: Session = Depends(ge
     ).first()
     if not tramo_nucleo_db:
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
-    
+
     db_act = models.ActividadCampo(**act.model_dump())
     db_act.fecha_registro = datetime.now(timezone.utc)
     db_act.id_usuario_registro = current_user.id_usuario
@@ -1171,23 +1281,23 @@ def list_fifonafe(
 def create_fifonafe(tramite: schemas.TramiteFifonafeCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     set_audit_context(db, current_user.id_usuario)
     require_tramo_nucleo_access(db, current_user, tramite.id_tramo_nucleo)
-    
+
     # Validaciones de coherencia jerárquica
     tn_db = db.query(models.TramoNucleo).filter_by(id_tramo_nucleo=tramite.id_tramo_nucleo, activo=True).first()
     if not tn_db:
         raise HTTPException(status_code=404, detail="El TramoNucleo no existe.")
-        
+
     if tramite.id_afectacion:
         afectacion_db = db.query(models.Afectacion).filter_by(id_afectacion=tramite.id_afectacion, activo=True).first()
         if not afectacion_db or afectacion_db.id_tramo_nucleo != tramite.id_tramo_nucleo:
             raise HTTPException(status_code=400, detail="Inconsistencia: La Afectación no existe o no pertenece al TramoNucleo especificado.")
-            
+
     convenio_db = None
     if tramite.id_convenio:
         convenio_db = db.query(models.Convenio).filter_by(id_convenio=tramite.id_convenio, activo=True).first()
         if not convenio_db or convenio_db.id_tramo_nucleo != tramite.id_tramo_nucleo:
             raise HTTPException(status_code=400, detail="Inconsistencia: El Convenio no existe o no pertenece al TramoNucleo especificado.")
-            
+
     datos_tramite = tramite.model_dump()
     if convenio_db is not None:
         datos_tramite['id_afectacion'] = convenio_db.id_afectacion
@@ -1385,7 +1495,7 @@ def create_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)
     db_user = db.query(models.Usuario).filter(models.Usuario.correo == usuario.correo).first()
     if db_user:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
-    
+
     hashed_password = auth.get_password_hash(usuario.contrasena)
     user_data = usuario.model_dump(exclude={"contrasena"})
     db_usuario = models.Usuario(**user_data, contrasena_hash=hashed_password, fecha_alta=datetime.now(timezone.utc))
@@ -1503,30 +1613,30 @@ def importar_geojson(
         # Asegurar requerimientos de negocio o defaults
         if "activo" not in datos_limpios:
             datos_limpios["activo"] = True
-            
+
         # Dependiendo del modelo, algunas columnas de fecha deben pasarse si no están
         if Modelo == models.Tramo:
             if "fecha_registro" not in datos_limpios:
                 datos_limpios["fecha_registro"] = datetime.now(timezone.utc).date()
-                
+
         if Modelo == models.NucleoAgrario:
             if "fecha_creacion" not in datos_limpios:
                 datos_limpios["fecha_creacion"] = datetime.now()
 
         # Crear instancia del ORM
         nuevo_registro = Modelo(**datos_limpios)
-        
+
         # Asignar geometría usando ST_GeomFromGeoJSON
-        # Para que SQLAlchemy acepte la función cruda en la propiedad, usamos text() en un UPDATE, 
-        # pero como es INSERT, lo mejor es hacer un flush() y luego un UPDATE, 
-        # o asignar la propiedad en la creación usando db.scalar. 
+        # Para que SQLAlchemy acepte la función cruda en la propiedad, usamos text() en un UPDATE,
+        # pero como es INSERT, lo mejor es hacer un flush() y luego un UPDATE,
+        # o asignar la propiedad en la creación usando db.scalar.
         # Lo más limpio en GeoAlchemy2 es castear el string del geom:
         # Pero GeoAlchemy soporta WKT, no GeoJSON directo en asignación a propiedad.
         # Por lo tanto, guardamos temporalmente el registro sin geometría, hacemos flush y luego update con postgis.
-        
+
         db.add(nuevo_registro)
         db.flush() # Obtenemos el ID generado
-        
+
         pk_name = inspect(Modelo).primary_key[0].name
         pk_value = getattr(nuevo_registro, pk_name)
 
@@ -1534,7 +1644,7 @@ def importar_geojson(
         geom_str = json.dumps(geometria)
         stmt = text(f"UPDATE {Modelo.__tablename__} SET {geom_column_name} = ST_SetSRID(ST_GeomFromGeoJSON(:geom), 4326) WHERE {pk_name} = :id")
         db.execute(stmt, {"geom": geom_str, "id": pk_value})
-        
+
         registros_insertados += 1
 
     db.commit()
