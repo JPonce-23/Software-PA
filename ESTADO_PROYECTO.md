@@ -880,7 +880,7 @@ Pendiente antes de declarar Corte 4 terminado:
 - Validar cookie `Secure`, host/origen y proxy confiable detrás del TLS real.
 - Ejecutar aceptación funcional E2E en navegadores soportados.
 
-### Corte 5 — Importación y reportes: pendiente
+### Corte 5 — Importación y reportes: implementación parcial en curso
 
 - Endurecer el importador GeoJSON.
 - Limitar tamaño y validar `FeatureCollection`.
@@ -891,14 +891,16 @@ Pendiente antes de declarar Corte 4 terminado:
 - Dashboard y reportes por proyecto.
 - Indicadores por afectación y agregados por tramo/proyecto.
 
-#### Componente aprobado — Derecho de vía versionado
+#### Componente aprobado e implementado — Derecho de vía versionado
 
-El Corte 5 debe sustituir gradualmente el cálculo implícito basado únicamente
-en `tramo.geometria_linea` y `tramo.ancho_total_derecho_via_m` por una franja
-oficial versionada. El nombre propuesto para la nueva entidad es
-`franja_derecho_via`.
+El Corte 5 implementó gradualmente la franja de derecho de vía oficial versionada (`franja_derecho_via`):
 
-Modelo mínimo:
+1. **Migración 010 expansiva aplicada:** Inyecta automáticamente la Versión 1 a partir del buffer heredado para mantener compatibilidad.
+2. **Modelos y validaciones espaciales:** Se actualizaron `models.py` y `schemas.py`. Se introdujo validación estricta postgis (`ST_IsValid`, `ST_Intersects`). Los campos `ancho_izquierdo_m` y `ancho_derecho_m` son opcionales según lo aprobado administrativamente, requiriendo en su lugar un `Polygon` o `MultiPolygon` consolidado, y rechazando `FeatureCollection` para prevenir carga excesiva.
+3. **Servicios y Rutas Backend:** Se agregó `importar_franja` que archiva la versión anterior e inicia la nueva en una única transacción con trazabilidad de baja lógica. `afectaciones_service.py` intercepta ahora `ST_Intersects` con la franja activa.
+4. **Frontend:** Se implementó `FranjaDerechoViaPanel.jsx` accesible desde el visor del tramo en `Mapa.jsx`, permitiendo a los geógrafos cargar archivos `.geojson` con validación previa de consolidación (evitando colecciones dispersas) y enviarlos junto con los atributos de fuente y vigencia.
+
+Modelo mínimo implementado:
 
 ```text
 franja_derecho_via
