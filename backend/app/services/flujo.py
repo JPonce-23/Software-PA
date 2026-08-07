@@ -30,6 +30,8 @@ DOMAIN_MESSAGES = {
     "2B_MODIFICATORIO_RAN_REQUERIDO": "El modificatorio colectivo debe estar inscrito en el RAN antes de activarse.",
     "2B_LIMITE_MENOR_QUE_PAGADO": "El nuevo límite no puede ser menor que lo ya pagado.",
     "2B_LIMITE_PAGO_EXCEDIDO": "El pago excede el saldo disponible del ciclo.",
+    "2B_PAGO_INSUFICIENTE": "No se puede completar la indemnización. El monto pagado es menor al límite del convenio.",
+    "2B_PAGO_INSUFICIENTE_REDUCCION": "La reducción o eliminación de este pago dejaría un ciclo completo sin fondos suficientes.",
     "2B_VERSION_FINANCIERA_INMUTABLE": "Una versión financiera vigente no se edita; registre un modificatorio.",
     "2B_REGRESION_PROHIBIDA": "No se puede revertir un hito ya concluido.",
     "2B_TERMINAL_IRREVERSIBLE": "La salida terminal no se corrige mediante edición ordinaria.",
@@ -161,6 +163,20 @@ def completar_indemnizacion(
     db.query(models.AfectacionCiclo).filter(
         models.AfectacionCiclo.id_ciclo_afectacion == tramite.id_ciclo_afectacion
     ).with_for_update().one()
+
+    total_pagado = db.execute(text("SELECT fn_2b_total_pagado_ciclo(:c)"), {"c": tramite.id_ciclo_afectacion}).scalar() or Decimal("0.00")
+    limite = db.execute(text("SELECT fn_2b_limite_ciclo(:c)"), {"c": tramite.id_ciclo_afectacion}).scalar() or Decimal("0.00")
+    if total_pagado < limite:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "2B_PAGO_INSUFICIENTE",
+                "message": DOMAIN_MESSAGES["2B_PAGO_INSUFICIENTE"],
+                "total_pagado": float(total_pagado),
+                "limite": float(limite)
+            }
+        )
+
     tramite.estatus = "completo"
     if data.observaciones is not None:
         tramite.observaciones = data.observaciones

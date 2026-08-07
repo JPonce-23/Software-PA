@@ -117,6 +117,26 @@ def _crear_fifonafe_completo(client, headers, cleanup, tramo_nucleo, afectacion,
         headers=headers,
     )
     assert updated.status_code == 200, updated.text
+
+    limite = float(convenio.get("monto_100") or 0)
+    if afectacion["tipo_afectacion"] == "colectivo" or convenio.get("tipo_convenio") != "modificatorio":
+        limite += float(convenio.get("monto_bdt") or 0)
+
+    if limite > 0:
+        payment = client.post(
+            "/api/pagos-indemnizacion",
+            json={
+                "id_tramite_fifonafe": indemnizacion["id_tramite_fifonafe"],
+                "monto_pagado": str(limite),
+                "fecha_pago": "2026-08-01",
+                "tipo_pago": "total",
+                "beneficiario_externo": "Beneficiario de prueba",
+            },
+            headers=headers,
+        )
+        assert payment.status_code == 201, payment.text
+        cleanup.register("/api/pagos-indemnizacion", payment.json()["id_pago"])
+
     completed = client.post(
         f"/api/fifonafe/{indemnizacion['id_tramite_fifonafe']}/completar-indemnizacion",
         json={"confirmar": True},
