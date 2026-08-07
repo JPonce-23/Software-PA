@@ -153,7 +153,15 @@ export default function FlujoLiberacionPanel({
                           <button type="button" className="button secondary" onClick={() => setFifonafeForm({ mode: 'indemnizacion', cycle, base, informe })}>Abrir indemnización</button>
                         )}
                         {indemnizacion && indemnizacion.estatus !== 'completo' && (
-                          <button type="button" className="button" onClick={() => setFifonafeForm({ mode: 'completar', cycle, tramite: indemnizacion })}>Completar indemnización</button>
+                          <button
+                            type="button"
+                            className="button"
+                            onClick={() => setFifonafeForm({ mode: 'completar', cycle, tramite: indemnizacion })}
+                            disabled={Number(cycle.saldo_disponible) > 0}
+                            title={Number(cycle.saldo_disponible) > 0 ? `Saldo pendiente: $${cycle.saldo_disponible}` : ''}
+                          >
+                            Completar indemnización
+                          </button>
                         )}
                         {cycle.estado_financiero === 'retiro_fondos_pendiente' && (
                           <button type="button" className="button" onClick={() => action(async () => {

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Banknote, Loader2, Plus } from 'lucide-react';
+import { AlertTriangle, Banknote, Loader2, Plus } from 'lucide-react';
 import api from '../../api/axios';
 import PersonaSelector from '../PersonaSelector';
 import {
@@ -117,6 +117,11 @@ export default function PagosPanel({ idTramoNucleo, idAfectacion = null, canWrit
                   <span>Límite vigente <strong>{money.format(cycleState?.limite_pagable || 0)}</strong></span>
                   <span>Disponible <strong>{money.format(cycleState?.saldo_disponible || 0)}</strong></span>
                 </div>
+                {Number(cycleState?.saldo_disponible || 0) > 0 && (
+                  <div style={{ backgroundColor: '#fffbeb', color: '#b45309', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertTriangle size={16} /> Falta saldo para poder completar la indemnización
+                  </div>
+                )}
                 <div className="payment-list">
                   {items.map((payment) => (
                     <div key={payment.id_pago}>
