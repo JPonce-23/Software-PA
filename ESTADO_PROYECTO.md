@@ -944,6 +944,15 @@ eliminarse en la primera migración. Servirán como compatibilidad y fuente para
 la versión inicial hasta comprobar que todos los tramos cuentan con una
 franja válida.
 
+### Cierre Financiero (Pago Suficiente): Terminado
+
+Se implementó y validó la propuesta de **Cierre Financiero estricto**.
+
+1. **Migración 011 aplicada:** Introduce preflight para proteger históricos, añade la validación `2B_PAGO_INSUFICIENTE` en `fn_2b_validar_fifonafe`, añade el trigger `trg_2b_validar_suficiencia_pago` y recalcula la vista `vw_afectacion_ciclo_estado`.
+2. **Backend:** Se intercepta el completado de indemnización en `flujo.py` verificando el límite mediante la base de datos (con protección 409). Las pruebas de integración en `test_subcorte_2b.py` cubren los casos negativos.
+3. **Frontend:** `FlujoLiberacionPanel.jsx` bloquea la transición a completo cuando `saldo_disponible > 0`. `PagosPanel.jsx` muestra una advertencia de falta de fondos cuando aplica.
+4. Las pruebas automatizadas fallan si falta `TEST_ADMIN_EMAIL` en `.env`.
+
 ## 9. Trabajo técnico transversal pendiente
 
 - Conservar y probar periódicamente la restauración del respaldo previo a 006

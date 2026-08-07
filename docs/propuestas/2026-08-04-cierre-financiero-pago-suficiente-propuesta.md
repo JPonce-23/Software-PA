@@ -17,8 +17,12 @@ respaldado por evidencia financiera real en `pago_indemnizacion`.
 
 ## 1. Trabajo vigente identificado
 
-El sistema ya implementa el flujo 2B/2C con estados derivados por afectacion,
-ciclos, RAN, FIFONAFE, pagos y subexpedientes.
+El sistema ya implementa el flujo 2B/2C con estados derivados por afectación,
+ciclos, RAN, FIFONAFE, pagos y subexpedientes. Además, el proyecto ha avanzado
+completando la implementación local del **Corte 4** (autenticación formal por
+sesiones con cookies Secure y mitigaciones CSRF) y el cierre técnico del
+**Corte 5** (Dashboard analítico, uploader masivo GeoJSON para núcleos agrarios,
+y el versionamiento de la franja del derecho de vía, aplicados hasta la migración 010).
 
 La duda funcional vigente es si una afectacion debe considerarse liberada
 cuando:
