@@ -14,16 +14,19 @@
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
 > segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 6 de agosto de 2026
+**Última actualización:** 10 de agosto de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
 **Próximo trabajo funcional:** completar la aceptación operativa del Corte 4 de
 autenticación formal detrás del TLS real: validar cookies `Secure`, origen
 público exacto, proxy confiable y aceptación E2E en navegador. La contracción
-local de bearer/JWT fue aplicada y validada el 6 de agosto de 2026. La rotación
-local de PostgreSQL, PgAdmin y `SECRET_KEY` fue reportada como realizada antes
-del trabajo del 5 de agosto de 2026. No registrar sus valores.
+local de bearer/JWT fue aplicada y validada el 6 de agosto de 2026. Los
+prerrequisitos locales de esquema y autenticación fueron reparados y validados
+el 10 de agosto de 2026; el origen HTTPS exacto se definirá cuando exista el
+staging dedicado. La rotación local de PostgreSQL, PgAdmin y `SECRET_KEY` fue
+reportada como realizada antes del trabajo del 5 de agosto de 2026. No
+registrar sus valores.
 
 ## 1. Objetivo y dominio
 
@@ -90,6 +93,8 @@ backend/db/migrations/006_*.sql         Secuencia y estados de liberación 2B
 backend/db/migrations/007_*.sql         Navegación y aislamiento documental 2C
 backend/db/migrations/008_*.sql         Autenticación formal y sesiones
 backend/db/migrations/009_*.sql         Auditoría de expiración de sesión
+backend/db/migrations/010_*.sql         Franja de derecho de vía versionada
+backend/db/migrations/011_*.sql         Cierre financiero con pago suficiente
 backend/tests/                          regresión e integración
 backend/app/routers/authentication.py   endpoints de sesión y revocación
 backend/app/services/authentication.py  reglas transaccionales de autenticación
@@ -366,6 +371,34 @@ La 009 fue probada con la regresión completa en una base aislada y aplicada a
 transacciones concurrentes, `ON_ERROR_STOP=1` y respaldo validado
 `backups/software-pa-db_trenes_pre_009_20260805.dump` con permisos `0600`.
 
+### 010 — Corte 5: franja de derecho de vía versionada
+
+Archivo:
+`backend/db/migrations/010_corte5_franja_derecho_via.sql`
+
+Es expansiva y transaccional. Crea la franja oficial versionada por tramo,
+conserva el ancho heredado como compatibilidad y registra 010 al final.
+
+### 011 — Cierre financiero con pago suficiente
+
+Archivo:
+`backend/db/migrations/011_pago_suficiente.sql`
+
+Requiere 010. Protege el cierre de indemnización sin pago suficiente, impide
+reducir pagos que sostienen un trámite completo y actualiza el cálculo de
+`vw_afectacion_ciclo_estado` sin reducir los contratos de las vistas
+superiores.
+
+El 10 de agosto de 2026 se detectó una ejecución local parcial previa: las
+funciones y el trigger existían, pero 011 no estaba registrada porque el SQL
+intentaba eliminar vistas con dependencias. La migración fue corregida con
+transacción exterior, bloqueo asesor, guardas 010/011, preflight y reemplazo
+no destructivo de la única vista afectada. Se validó primero sobre esquema
+aislado y después sobre una restauración completa del respaldo
+`backups/pre_011_auth_recovery_restorable_20260810.dump`, con permisos `0600`.
+La repetición fue rechazada por la guarda y la base activa registró 011 con
+`COMMIT` y escritores detenidos.
+
 ## 6. Trabajo realizado
 
 ### Corte principal 1 — Modelo territorial: terminado
@@ -523,28 +556,28 @@ consultar el esquema real; `git pull` descarga los SQL, pero no modifica
 volúmenes de PostgreSQL. Una base que sólo tiene 002 debe aplicar 003 y luego
 004, con respaldo y verificación entre ambas.
 
-La base activa local de esta máquina quedó verificada después de aplicar 009 el
-5 de agosto de 2026:
+La base activa local de esta máquina quedó verificada después de aplicar 011 y
+recuperar el estado de autenticación el 10 de agosto de 2026:
 
 ```text
-base/usuario:          db_trenes / alfredo
-schema_migrations:     004, 005, 006, 007, 008, 009
-afectaciones:          0 activas / 0 totales
-convenios:             0 activos / 0 totales
-FIFONAFE/pagos activos: 0 / 0
-afectacion_ciclo:      0 ciclos activos / 0 totales
-integridad 2B:         sin datos operativos locales que conciliar
-integridad 2C:         columnas de minuta y tipo documental tramo_nucleo verificados
-autenticación:         1 estado / 0 sesiones / 0 eventos iniciales
-auditoría sensible:    0 filas con contrasena_hash, token_hash o csrf_hash
-vistas activas:        afectación, tramo_nucleo y dashboard consultables
+base/rol:              db_trenes / pa_app
+schema_migrations:     004, 005, 006, 007, 008, 009, 010, 011
+datos operativos:      fixtures locales de prueba; no representan producción
+integridad FK:         cero relaciones huérfanas después de la regresión
+autenticación:         un estado por usuario; cero usuarios sin estado
+recuperación F-01A:    fila del usuario 1 restaurada desde respaldo y evento
+                       desbloqueo_recuperacion sin actor, misma transacción
+vistas activas:        ciclo, afectación, tramo_nucleo y dashboard consultables
+respaldo:              restauración completa verificada antes de aplicar 011
+backend:               119 pruebas aprobadas; 1 warning Starlette
+frontend:              build aprobado; lint con 0 errores y 1 warning preexistente
 ```
 
 El archivo `.env` local ya permite conectarse al servicio `db`. Estos valores
 describen sólo este entorno; en cada equipo se debe verificar el esquema real.
 En otros equipos, `git pull` descarga las migraciones, pero no las aplica al
 volumen PostgreSQL; cada colaborador debe verificar `schema_migrations` y
-respaldar antes de ejecutar 006, 007, 008 o 009.
+respaldar antes de ejecutar 006, 007, 008, 009, 010 u 011.
 
 ## 8. Plan principal vigente de cinco cortes
 
@@ -872,8 +905,16 @@ Contracción local aplicada y validada el 6 de agosto de 2026:
 - `docker-compose.yml` permite inyectar esas variables al contenedor backend
   sin persistir secretos, y `.env.example` documenta los nombres vacíos.
 - Validación local ejecutada: Compose saludable, `schema_migrations` con 004,
-  005, 006, 007, 008 y 009, backend sin `python-jose`, y suite backend completa
-  con `119 passed, 1 warning`.
+  005, 006, 007, 008, 009, 010 y 011, backend sin `python-jose`, un estado de
+  autenticación por usuario y suite backend completa con
+  `119 passed, 1 warning`.
+- El 10 de agosto de 2026 se recuperó de forma atómica el estado faltante del
+  administrador local desde un respaldo que conservaba contador cero, sin
+  bloqueo y su último acceso. La misma transacción registró
+  `desbloqueo_recuperacion`; no se modificaron contraseña, rol ni territorios.
+- Se creó una cuenta administradora no productiva mediante el bootstrap seguro
+  para alinear `TEST_ADMIN_EMAIL`/`TEST_ADMIN_PASSWORD`; no registrar sus
+  valores.
 
 Pendiente antes de declarar Corte 4 terminado:
 
@@ -948,7 +989,13 @@ franja válida.
 
 Se implementó y validó la propuesta de **Cierre Financiero estricto**.
 
-1. **Migración 011 aplicada:** Introduce preflight para proteger históricos, añade la validación `2B_PAGO_INSUFICIENTE` en `fn_2b_validar_fifonafe`, añade el trigger `trg_2b_validar_suficiencia_pago` y recalcula la vista `vw_afectacion_ciclo_estado`.
+1. **Migración 011 aplicada:** Introduce preflight para proteger históricos,
+   añade la validación `2B_PAGO_INSUFICIENTE` en
+   `fn_2b_validar_fifonafe`, añade el trigger
+   `trg_2b_validar_suficiencia_pago` y recalcula
+   `vw_afectacion_ciclo_estado`. Su corrección transaccional, restauración
+   aislada, aplicación activa y rechazo de repetición fueron validados el 10
+   de agosto de 2026.
 2. **Backend:** Se intercepta el completado de indemnización en `flujo.py` verificando el límite mediante la base de datos (con protección 409). Las pruebas de integración en `test_subcorte_2b.py` cubren los casos negativos.
 3. **Frontend:** `FlujoLiberacionPanel.jsx` bloquea la transición a completo cuando `saldo_disponible > 0`. `PagosPanel.jsx` muestra una advertencia de falta de fondos cuando aplica.
 4. Las pruebas automatizadas fallan si falta `TEST_ADMIN_EMAIL` en `.env`.
@@ -959,6 +1006,8 @@ Se implementó y validó la propuesta de **Cierre Financiero estricto**.
   ubicado en `backups/software-pa-db_trenes_pre_006_20260803.dump`.
 - Conservar el respaldo previo a 007 de este entorno local:
   `backups/pre_migracion_007_20260804.dump`.
+- Conservar el respaldo restaurable previo a 011 y a la recuperación F-01A:
+  `backups/pre_011_auth_recovery_restorable_20260810.dump`.
 - Replicar 007 en otros ambientes sólo después de respaldo, verificación de
   `schema_migrations` y preflight de tipos documentales.
 - Conciliar manualmente relaciones históricas 2B que permanecen nulas; no

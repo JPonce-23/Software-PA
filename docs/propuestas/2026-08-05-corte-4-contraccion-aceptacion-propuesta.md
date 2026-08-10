@@ -1,7 +1,8 @@
 # Propuesta técnica — Corte 4: contracción bearer y aceptación operativa
 
-Fecha: 2026-08-05
-Estado: propuesta nueva; pendiente de aprobación antes de implementar
+Fecha: 2026-08-05; decisiones F-01/F-03 incorporadas el 2026-08-10
+Estado: propuesta corregida y viable; prerrequisitos locales validados,
+aceptación TLS/E2E pendiente hasta disponer del staging HTTPS
 
 ## 1. Trabajo vigente identificado
 
@@ -24,6 +25,11 @@ No se reabren los Subcortes 2A–2C, no se alteran reglas de liberación, no se
 incorpora el Corte 5 y no se modifica el flujo de dominio.
 
 ## 2. Estado actual verificado
+
+Las subsecciones 2.1 y 2.2 conservan la fotografía de diseño previa a la
+contracción. La contracción bearer/JWT fue implementada y validada el 6 de
+agosto de 2026; el estado operativo posterior se registra en 2.4 y prevalece
+para la aceptación pendiente.
 
 ### 2.1 Auditoría del sistema de autenticación implementado
 
@@ -97,6 +103,20 @@ frontend, API pública). El único consumidor bearer es la suite de pruebas.
   `Domain`.
 - No hay documentación de la topología TLS del ambiente real.
 
+### 2.4 Precondiciones operativas verificadas el 10 de agosto de 2026
+
+- La base activa registra 004, 005, 006, 007, 008, 009, 010 y 011.
+- F-01A restauró para el usuario 1 la fila exacta encontrada en un respaldo:
+  contador cero, sin bloqueo y último acceso conservado. La misma transacción
+  registró `desbloqueo_recuperacion` sin actor.
+- Todos los usuarios locales tienen exactamente un estado de autenticación.
+- El Compose local es HTTP y no constituye evidencia de aceptación TLS.
+- Se aprobó un staging HTTPS dedicado sin proxy. El origen HTTPS exacto sigue
+  pendiente porque el ambiente todavía no existe; es un dato de despliegue,
+  no una decisión funcional abierta.
+- La migración 011 fue endurecida y validada sobre una restauración completa
+  antes de aplicarse a la base activa.
+
 ## 3. Reglas funcionales confirmadas
 
 1. El frontend ya no es consumidor bearer; la contracción no lo afecta.
@@ -114,6 +134,22 @@ frontend, API pública). El único consumidor bearer es la suite de pruebas.
 7. No se eliminan las migraciones 008/009 ni las tablas de sesión/eventos.
 8. `set_audit_context` se sigue exigiendo para escrituras de dominio;
    la autenticación cookie lo proporciona correctamente.
+9. Una cuenta activa debe tener exactamente un estado de autenticación; la
+   ausencia se trata como inconsistencia de datos y el login debe fallar
+   cerrado.
+10. La reparación F-01A sólo puede ejecutarse después de un respaldo y una
+    investigación que descarte un estado recuperable. Debe ser atómica,
+    auditable y no modifica la migración 008. Reutiliza el evento existente
+    `desbloqueo` con motivo `desbloqueo_recuperacion`, sin crear un tipo nuevo.
+11. La aceptación se ejecutará exclusivamente en staging HTTPS dedicado, con
+    certificado válido, cuentas no productivas y al menos dos territorios
+    controlados: uno permitido y otro denegado.
+12. El staging aprobado no usa proxy. `AUTH_TRUSTED_PROXY_IPS` debe permanecer
+    vacío; cualquier cambio de topología requiere reevaluación.
+13. La matriz mínima aprobada es Chromium y Firefox. Safari/WebKit queda fuera
+    mientras no se declare oficialmente soportado.
+14. “Contracción validada” y “Corte 4 aceptado” son estados distintos. El
+    segundo exige completar todos los gates TLS/E2E.
 
 ## 4. Hallazgos y contradicciones
 
@@ -132,6 +168,9 @@ frontend, API pública). El único consumidor bearer es la suite de pruebas.
 | C4C-11 | `get_current_user()` tiene branch para bearer que queda muerto post-contracción. | Código muerto. | Eliminar branch bearer. |
 | C4C-12 | `WWW-Authenticate: Bearer` en headers de error de `services/authentication.py` L99. | Vestigio bearer en servicio cookie. | Retirar header de autenticación bearer en errores; las respuestas no deben anunciar un mecanismo retirado. |
 | C4C-13 | El middleware CSRF salta requests sin cookie de sesión (`if not session_token: return await call_next(request)`). | Post-contracción, una request sin cookie es simplemente no autenticada; `get_current_user` la rechazará 401. No hay bypass. | Sin cambio; comportamiento correcto. |
+| C4C-14 | El único usuario activo carecía de `estado_autenticacion_usuario`. | Login imposible; reparar a cero podía borrar un bloqueo desconocido. | Resuelto: se recuperó la fila exacta de un respaldo y se registró el evento en la misma transacción. |
+| C4C-15 | La base activa no registraba 011, aunque continuidad afirmaba que estaba aplicada. | El esquema no representaba completamente el HEAD documentado. | Resuelto localmente: 011 transaccional, restauración completa, aplicación activa y guarda de repetición verificadas. |
+| C4C-16 | El staging fue aprobado, pero su origen HTTPS exacto no está definido. | TLS/E2E no puede ejecutarse todavía. | Registrar el origen cuando se aprovisione staging; no bloquea la viabilidad del diseño ni el desarrollo local. |
 
 ## 5. Diseño propuesto
 
@@ -244,6 +283,26 @@ def operator_session(client, admin_session, ...):
 
 Verificar que ningún otro módulo la importe.
 
+### 5.6 Recuperación y aceptación operativa corregidas
+
+Estados autorizados:
+
+```text
+contracción validada
+  -> preflight de esquema y usuario-estado
+  -> respaldo verificado
+  -> investigación de estado recuperable
+  -> recuperación F-01A atómica y auditable, sólo si no es recuperable
+  -> staging HTTPS configurado con origen exacto
+  -> fixtures no productivos de territorio permitido/denegado
+  -> E2E Chromium + Firefox
+  -> Corte 4 aceptado
+```
+
+Cada transición falla cerrado. Un preflight fallido, un respaldo inválido, un
+estado recuperable, la ausencia del origen exacto o la discrepancia de 011
+impiden avanzar y no se corrigen silenciosamente.
+
 ## 6. Cambios por capa
 
 ### Backend — `conftest.py`
@@ -310,20 +369,46 @@ Verificar que ningún otro módulo la importe.
 | `README.md` y `docs/migraciones.md` mencionan login bearer. | Actualizar para reflejar flujo cookie exclusivo. | Documentación precisa. | Contracción validada. | Docs anticipan código. | Revisión post-implementación. |
 | No hay checklist TLS operativo. | Crear checklist de validación TLS en `docs/`. | Cierre operativo Corte 4. | Topología real. | Sin topología no se puede completar. | Validación in situ. |
 
+### Base de datos y recuperación F-01A
+
+| Problema | Solución | Justificación | Dependencias | Riesgo | Validación |
+|----------|----------|---------------|--------------|--------|------------|
+| Usuario activo sin estado auth. | Se ejecutó preflight, respaldo e investigación; después se restauró el estado recuperable y el evento en una sola transacción. | Restablecer la invariante sin reparación silenciosa. | F-01A y respaldo restaurable. | Restaurar una fila que no correspondiera. | Mismo usuario verificado; exactamente un estado; evento correlacionado; login y bloqueo funcionan. |
+| Esquema activo sin 011. | Se endureció y aplicó 011 después de una restauración completa. | Evitar validar una combinación código/esquema divergente. | Respaldo, preflight y migración 011 corregida. | DDL parcial o reducción de vistas. | `schema_migrations`, catálogo, pruebas financieras, restauración y repetición verificadas. |
+
+### Frontend y staging
+
+No se propone cambio funcional de frontend. La aceptación usará el frontend
+existente en staging HTTPS y comprobará cookies, restauración de sesión,
+errores genéricos y aislamiento territorial en Chromium y Firefox.
+
 ## 7. Migración y compatibilidad
 
-### 7.1 Sin migración de base de datos
+### 7.1 Sin cambio de esquema para F-01A
 
-No se requiere ninguna migración SQL. Las tablas `sesion_usuario`,
-`evento_acceso` y `estado_autenticacion_usuario` no cambian. No se crean,
-modifican ni eliminan columnas, constraints ni triggers.
+F-01A no cambia tablas, columnas, constraints ni triggers y no modifica 008.
+La reparación de datos debe materializarse como operación controlada,
+idempotente, transaccional y auditable, separada de las migraciones de esquema.
+No se ejecutará hasta validar respaldo e investigación.
+
+La evidencia se registra en `evento_acceso` con `tipo_evento = 'desbloqueo'`,
+`motivo_codigo = 'desbloqueo_recuperacion'`, actor nulo conforme al mecanismo
+de recuperación existente y detalle saneado que no contenga secretos. El
+evento y el nuevo estado deben compartir la misma transacción.
+
+La contradicción de 011 es otro flujo: antes de aceptar el HEAD debe existir
+una migración 011 segura, ordenada y verificada. No se autoriza aplicar el
+archivo actual como parte de F-01A.
 
 ### 7.2 Compatibilidad con datos existentes
 
 - Las sesiones existentes (si las hay) no se alteran.
 - Los eventos de acceso existentes no se alteran.
 - Los estados de autenticación existentes no se alteran.
-- La base local tiene 0 sesiones, 0 eventos y 1 estado (admin con contador 0).
+- La base activa tiene exactamente un estado por usuario después de F-01A.
+- F-01A restauró únicamente el estado recuperable y agregó la evidencia de
+  recuperación; no creó sesiones ni cambió contraseña, rol, actividad o
+  territorio.
 
 ### 7.3 Despliegue de la contracción
 
@@ -364,24 +449,31 @@ modifican ni eliminan columnas, constraints ni triggers.
 - `services/access.py` y `usuario_tramo` no cambian.
 - Los roles `admin`, `operador`, `geografo`, `visualizador` no cambian.
 - El rol se consulta de `usuario` en cada request, no de la cookie ni del JWT.
+- Staging tendrá identidades no productivas y dos territorios controlados. La
+  identidad restringida podrá acceder al asignado y recibirá 403 o 404, según
+  el contrato vigente, para el territorio denegado.
 
 ### 8.3 Auditoría sin cambios
 
 - `set_audit_context` sigue exigiéndose para escrituras de dominio.
 - `evento_acceso` sigue siendo append-only e inmutable.
 - La redacción de secretos en bitácora sigue activa.
+- La excepción es la recuperación F-01A: debe agregar evidencia explícita del
+  evento de recuperación en la misma transacción que inserta el estado.
 
 ### 8.4 Validación TLS
 
-Para declarar Corte 4 terminado se requiere verificar en el ambiente real:
+Para declarar Corte 4 terminado se requiere verificar en el staging HTTPS
+dedicado. El staging no usa proxy y el origen exacto aún está pendiente:
 
 | Verificación | Criterio |
 |--------------|----------|
 | Cookie `Secure` | Navegador rechaza enviarla por HTTP. |
 | Cookie `__Host-` prefix | Navegador rechaza si no es HTTPS, tiene `Domain`, o `Path` ≠ `/`. |
 | `Origin` exacto | CORS y middleware CSRF rechazan origen distinto del público. |
-| `X-Forwarded-For` | Sólo aceptado de IPs proxy confiables configuradas. |
+| `X-Forwarded-For` | No confiar en cabeceras reenviadas; lista de proxies vacía. |
 | TLS termination | Certificado válido, HSTS recomendado. |
+| Navegadores | Toda la matriz pasa en Chromium y Firefox. |
 
 Si no existe ambiente TLS disponible, la verificación se documenta como
 pendiente operativo sin bloquear la contracción de código.
@@ -434,14 +526,26 @@ pendiente operativo sin bloquear la contracción de código.
 - OpenAPI: verificar que `/api/auth/login` no aparece.
 - **Criterio de avance:** validación técnica completa.
 
-### Paso 6: Checklist TLS y E2E (cuando haya ambiente)
+### Paso 5A: Precondiciones de datos y esquema
 
-- Validar cookie `Secure` detrás de TLS real.
-- Validar Origin público exacto.
-- Validar proxy confiable si aplica.
+**Estado local: completado y validado el 10 de agosto de 2026.**
+
+- Resolver la contradicción de 011 por su flujo técnico independiente.
+- Ejecutar preflight usuario-estado y validar respaldo restaurable.
+- Investigar si existe estado de autenticación recuperable.
+- Si no existe, ejecutar F-01A en una única transacción con evento auditable.
+- **Criterio de avance:** esquema alineado, un estado por usuario, evidencia de
+  recuperación y regresión auth aprobada.
+
+### Paso 6: Checklist TLS y E2E en staging
+
+- Recibir y registrar el origen HTTPS exacto sin credenciales.
+- Validar cookie `Secure` detrás de TLS real y certificado válido.
+- Validar Origin público exacto y lista de proxies vacía.
+- Crear cuentas y fixtures no productivos para territorio permitido/denegado.
 - Aceptación E2E: login, quinto fallo, desbloqueo, expiración, logout,
-  RBAC/territorio en navegadores soportados.
-- **Criterio de avance:** aceptación funcional completada.
+  RBAC/territorio en Chromium y Firefox.
+- **Criterio de avance:** ambos navegadores aprueban toda la matriz.
 
 ### Paso 7: Documentación y cierre
 
@@ -476,6 +580,13 @@ pendiente operativo sin bloquear la contracción de código.
 | RBAC por rol | 403 para rol no permitido. | Tests de dominio (conservar) |
 | Territorio (`usuario_tramo`) | Aislamiento por tramo. | Tests 2B/2C (conservar) |
 | Suite completa 2A–2C | Sin regresiones. | Archivos existentes |
+| Preflight usuario-estado | Detecta toda cuenta sin estado y no escribe. | SQL/runbook de recuperación |
+| Investigación recuperable | Documenta respaldo/eventos examinados sin exponer secretos. | Evidencia operativa |
+| Recuperación F-01A | Inserción y evento son atómicos; rollback no deja ninguno. | Integración PostgreSQL |
+| Cardinalidad posterior | Exactamente un estado por usuario; cero huérfanos. | Integración PostgreSQL |
+| Territorio permitido | Usuario no productivo accede sólo al tramo asignado. | E2E Chromium y Firefox |
+| Territorio denegado | El mismo usuario no consulta ni modifica el otro tramo. | E2E Chromium y Firefox |
+| Sin proxy confiable | `AUTH_TRUSTED_PROXY_IPS` vacío; no se confía en XFF. | Configuración y E2E |
 
 ### Tests que se eliminan
 
@@ -495,6 +606,10 @@ pendiente operativo sin bloquear la contracción de código.
 | La eliminación de `python-jose` afecta otra dependencia. | Muy baja. | Fallo de import. | `pip install` y suite. |
 | Bitácora crece por actividad de tests. | Baja. | Lentitud de tests. | Base aislada por suite. |
 | Operadores existentes con JWT vivo quedan sin sesión. | Baja (base local sin datos operativos). | 30 min de interrupción máxima. | JWT expira en 30 min; el usuario hace login cookie normalmente. |
+| El estado recuperado no correspondiera al usuario actual. | Mitigada. | Estado de seguridad incorrecto. | Se verificó el mismo `id_usuario`, rol activo y metadatos del respaldo antes de restaurar. |
+| Origen HTTPS sigue pendiente. | Confirmada hasta crear staging. | CORS/CSRF y cookies no pueden aceptarse externamente. | Tratarlo como entrada de despliegue; no usar un valor provisional como evidencia final. |
+| 011 se ejecutara de nuevo o quedara parcial. | Mitigada. | DDL divergente. | Transacción, bloqueo asesor, guardas 010/011, restauración completa y prueba de repetición. |
+| Fixtures dejan trazas permanentes. | Media. | Contaminación de auditoría de staging. | Identidades no productivas, baja lógica y etiquetado explícito de evidencia. |
 
 ## 12. Criterios de aceptación
 
@@ -511,13 +626,18 @@ pendiente operativo sin bloquear la contracción de código.
    valida 404/405).
 10. OpenAPI no documenta `/api/auth/login`.
 11. Frontend pasa oxlint y build sin cambios (no requiere modificación).
-12. Cookie `Secure` y `__Host-` prefix validados detrás de TLS real
-    (o documentado como pendiente operativo con checklist).
-13. Aceptación E2E de login, bloqueo, desbloqueo, expiración, logout y
-    RBAC/territorio en navegador (o documentado como pendiente E2E con
-    checklist).
+12. La base objetivo está alineada con el HEAD y la contradicción de 011 está
+    resuelta con evidencia de respaldo, orden y aplicación segura.
+13. El preflight usuario-estado pasa; si se ejecutó F-01A, estado y evento se
+    confirmaron atómicamente y la investigación quedó documentada.
 14. Documentación actualizada sin secretos ni credenciales.
-15. No se modifica ningún dato, regla de dominio ni flujo operativo.
+15. El origen HTTPS exacto está definido; cookie `Secure`, prefix `__Host-`,
+    certificado, CORS y rechazo de Origin distinto están validados.
+16. `AUTH_TRUSTED_PROXY_IPS` permanece vacío mientras el staging no use proxy.
+17. Login, bloqueo, desbloqueo, expiración, logout y RBAC/territorio pasan en
+    Chromium y Firefox con cuentas y fixtures no productivos.
+18. Los estados “contracción validada” y “Corte 4 aceptado” se reportan por
+    separado; no se declara el segundo con evidencia pendiente.
 
 ## 13. Actualizaciones previstas para `ESTADO_PROYECTO.md`
 
@@ -541,14 +661,31 @@ Después de implementar y validar la contracción:
 
 No modificar `ESTADO_PROYECTO.md` durante la implementación.
 
-## 14. Decisiones que requieren aprobación
+## 14. Registro de decisiones
 
-| # | Decisión | Opciones | Recomendación | Impacto |
-|---|----------|----------|---------------|---------|
-| D1 | ¿Se aprueba retirar `POST /api/auth/login` y dejar de emitir JWT? | (a) Sí, con inventario verificado. (b) No, mantener dual. | **(a) Sí.** El inventario confirma que sólo los tests lo usan; el frontend ya migró. El endpoint legacy es un riesgo activo (bypass de bloqueo, enumeración). | El endpoint se elimina. |
-| D2 | ¿Se renombra `admin_headers` a `admin_session` o se usa alias? | (a) Rename directo. (b) Alias transitorio → rename posterior. | **(a) Rename directo** en un solo paso de implementación; la suite es lo suficientemente pequeña para auditar. | Todos los tests se actualizan. |
-| D3 | ¿Qué retorna `POST /api/auth/login` post-contracción? | (a) 404 (endpoint no existe). (b) 405 (método no permitido). (c) 410 Gone con mensaje. | **(a) 404** por eliminación natural; no agregar endpoint fantasma. | Tests de contracción validan 404. |
-| D4 | ¿Se elimina `python-jose` de `requirements.txt`? | (a) Sí. (b) No, por si acaso. | **(a) Sí.** No existe otro consumidor; conservarla es superficie muerta. | Dependencia eliminada. |
-| D5 | ¿El cierre de Corte 4 requiere TLS validado o puede cerrarse la contracción de código independientemente? | (a) Cerrar Corte 4 sólo tras TLS+E2E. (b) Cerrar contracción de código, documentar TLS como pendiente operativo. | **(b)** Separar código (verificable) de operación TLS (requiere infraestructura). Corte 4 queda "contracción implementada; TLS y E2E pendientes". | No se declara Corte 4 terminado sin TLS pero no se bloquea el avance de código. |
-| D6 | ¿Conservar `SECRET_KEY` y su validación post-retiro de JWT? | (a) Conservar. (b) Eliminar. | **(a) Conservar.** Sigue usándose operativamente y podría servir para otros propósitos futuros. | Sin cambio en `.env` ni `config.py`. |
-| D7 | ¿Se necesita `TestClient` con manejo especial de cookies o es transparente? | Requiere validación técnica previa. | Probar antes de implementar: crear un test mínimo que haga login cookie y valide que requests posteriores envían la cookie automáticamente. | Determina la forma exacta del fixture. |
+Las decisiones D1-D7 de la propuesta original quedaron materializadas o
+resueltas durante la contracción validada del 6 de agosto de 2026 y no se
+reabren.
+
+| ID | Decisión incorporada | Estado | Consecuencia |
+|----|----------------------|--------|--------------|
+| F-01 | Reparación controlada F-01A. | Ejecutada y validada localmente. | Se restauró la fila exacta del respaldo y se registró el evento atómicamente, sin modificar 008. |
+| F-02 | Staging HTTPS dedicado, sin proxy, cuentas y fixtures no productivos. | Aprobada. | El origen exacto se incorpora al aprovisionar staging; no se acepta HTTP, certificado autofirmado ni producción sin autorización específica. |
+| F-03 | Chromium y Firefox como matriz mínima. | Aprobada. | Ambos deben aprobar toda la aceptación; Safari/WebKit queda fuera. |
+| T-011 | Conciliar documentación, migración y esquema activo. | Resuelta localmente. | 011 está registrada; transacción, vistas, trigger, funciones, restauración y repetición fueron verificadas. |
+
+## 15. Gates de diseño tras incorporar decisiones
+
+| Gate | Resultado | Condición pendiente |
+|------|-----------|---------------------|
+| Funcional | Aprobado | Staging, ausencia de proxy y navegadores están definidos; el origen es entrada de despliegue. |
+| Datos | Aprobado | F-01A, cardinalidad usuario-estado y auditoría FK verificadas. |
+| Seguridad | Aprobado para diseño/local | Recuperación auditable validada; cookies/Origin requieren staging real. |
+| Autorización | Aprobado para diseño | Fixtures permitido/denegado autorizados; E2E requiere staging. |
+| Arquitectura | Aprobado | No cambia dominio ni responsabilidades existentes. |
+| Migración | Aprobado | 011 aplicada con recuperación de estado parcial, rollback y guarda de repetición. |
+| Pruebas | Aprobado para evaluación | 119 backend, build y lint sin errores; E2E Chromium/Firefox pendiente. |
+
+La propuesta pasa los gates de diseño y queda lista para evaluación. Esto no
+declara Corte 4 aceptado: el cierre continúa condicionado al origen HTTPS real
+y a la matriz E2E completa en staging.

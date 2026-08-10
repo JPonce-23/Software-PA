@@ -40,7 +40,9 @@ docker compose exec -T db sh -lc \
   'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select version from schema_migrations order by version"'
 ```
 
-La versión esperada para Corte 4 es:
+El staging debe ejecutar el HEAD actual. Aunque 010 y 011 pertenecen a trabajos
+posteriores a la autenticación, también deben estar aplicadas para evitar una
+combinación código/esquema divergente:
 
 ```text
 004
@@ -49,6 +51,8 @@ La versión esperada para Corte 4 es:
 007
 008
 009
+010
+011
 ```
 
 ## 3. Pruebas de navegador
