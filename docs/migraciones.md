@@ -162,7 +162,7 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    variable temporal del proceso; no la dejes persistente en archivos
    compartidos, historial de shell, logs ni capturas.
 
-4. Aplica `004`–`009` en orden, una sola vez cada una. Detén backend y
+4. Aplica `004`–`011` en orden, una sola vez cada una. Detén backend y
    scheduler antes de cada migración y conserva `ON_ERROR_STOP`:
 
    ```bash
@@ -184,7 +184,18 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    docker compose exec -T db sh -lc \
      'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
      < backend/db/migrations/009_corte4_auditoria_sistema_sesion.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/010_corte5_franja_derecho_via.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/011_pago_suficiente.sql
    ```
+
+   La 011 exige 010, toma un bloqueo asesor, ejecuta su preflight y se
+   confirma en una sola transacción. Reemplaza únicamente
+   `vw_afectacion_ciclo_estado`; no elimina ni reduce los contratos de las
+   vistas superiores. Si existe 011 en `schema_migrations`, no la repitas.
 
 5. Verifica el registro:
 

@@ -1,5 +1,25 @@
 -- Migración 011: Cierre financiero con pago suficiente
--- Preflight: Verificar que no existan trámites completos con saldo pendiente
+
+BEGIN;
+
+SELECT pg_advisory_xact_lock(20260810, 11);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM schema_migrations WHERE version = '010'
+    ) THEN
+        RAISE EXCEPTION 'La migracion 011 requiere la migracion 010 aplicada';
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM schema_migrations WHERE version = '011'
+    ) THEN
+        RAISE EXCEPTION 'La migracion 011 ya fue aplicada';
+    END IF;
+END;
+$$;
+
+-- Preflight: Verificar que no existan trámites completos con saldo pendiente.
 DO $$
 DECLARE
     v_count INTEGER;
@@ -130,11 +150,8 @@ CREATE TRIGGER trg_2b_validar_suficiencia_pago
     BEFORE UPDATE OR DELETE ON pago_indemnizacion
     FOR EACH ROW EXECUTE FUNCTION fn_2b_validar_suficiencia_pago();
 
--- 3. Recrear vistas para incluir la condición en indemnizacion_completa
-DROP VIEW IF EXISTS vw_tramo_nucleo_estado;
-DROP VIEW IF EXISTS vw_afectacion_estado;
-DROP VIEW IF EXISTS vw_afectacion_ciclo_estado;
-
+-- 3. Reemplazar sólo la vista cuyo cálculo cambia. Las vistas superiores
+-- conservan su contrato y consumen este resultado sin ser redefinidas.
 CREATE OR REPLACE VIEW vw_afectacion_ciclo_estado AS
 WITH base AS (
     SELECT ac.*,
@@ -207,76 +224,7 @@ SELECT h.*,
            AS saldo_disponible
   FROM hechos h;
 
-CREATE OR REPLACE VIEW vw_afectacion_estado AS
-SELECT a.id_afectacion,
-       a.id_tramo_nucleo,
-       a.id_nucleo,
-       a.tipo_afectacion,
-       fn_2b_salida_terminal_efectiva(a.id_afectacion) AS estado_terminal,
-       COUNT(c.id_ciclo_afectacion) AS total_ciclos,
-       COUNT(*) FILTER (WHERE c.estado_financiero = 'concluido') AS ciclos_concluidos,
-       COALESCE(SUM(c.superficie_ciclo_ha), 0) AS superficie_total_ciclos_ha,
-       COALESCE(SUM(c.superficie_ciclo_ha)
-           FILTER (WHERE c.estado_financiero = 'concluido'), 0)
-           AS superficie_liberada_ha,
-       CASE
-           WHEN fn_2b_salida_terminal_efectiva(a.id_afectacion) IS NOT NULL
-               THEN 'no_aplica_terminal'
-           WHEN COUNT(c.id_ciclo_afectacion) > 0
-                AND BOOL_AND(c.estado_financiero = 'concluido') THEN 'liberada'
-           WHEN BOOL_OR(c.id_convenio IS NOT NULL OR c.no_conflictos_completo
-                       OR c.total_pagado > 0) THEN 'en_proceso'
-           ELSE 'pendiente'
-       END AS estado_liberacion,
-       CASE
-           WHEN BOOL_OR(c.estado_registral = 'inscrito_ran') THEN 'con_avance_registral'
-           WHEN BOOL_OR(c.estado_registral = 'ingresado_ran') THEN 'ingresado_ran'
-           ELSE 'no_iniciado'
-       END AS estado_registral,
-       CASE
-           WHEN BOOL_AND(c.estado_financiero = 'concluido') THEN 'concluido'
-           WHEN BOOL_OR(c.estado_financiero <> 'informe_no_conflictos_pendiente')
-               THEN 'en_proceso'
-           ELSE 'no_iniciado'
-       END AS estado_financiero
-  FROM afectacion a
-  LEFT JOIN vw_afectacion_ciclo_estado c ON c.id_afectacion = a.id_afectacion
- WHERE a.activo = TRUE
- GROUP BY a.id_afectacion, a.id_tramo_nucleo, a.id_nucleo, a.tipo_afectacion;
+INSERT INTO schema_migrations (version, descripcion)
+VALUES ('011', 'Cierre financiero con pago suficiente');
 
-CREATE OR REPLACE VIEW vw_tramo_nucleo_estado AS
-WITH resumen AS (
-    SELECT ae.id_tramo_nucleo,
-           COUNT(*) AS total_afectaciones,
-           COUNT(*) FILTER (WHERE ae.estado_liberacion = 'liberada') AS liberadas,
-           COUNT(*) FILTER (WHERE ae.estado_liberacion = 'pendiente') AS pendientes,
-           COUNT(*) FILTER (WHERE ae.estado_liberacion = 'en_proceso') AS en_proceso,
-           COUNT(*) FILTER (WHERE ae.estado_liberacion = 'no_aplica_terminal') AS terminales
-      FROM vw_afectacion_estado ae GROUP BY ae.id_tramo_nucleo
-)
-SELECT tn.id_tramo_nucleo, tn.id_tramo, tn.id_nucleo, tn.consecutivo,
-       tn.longitud_m, tn.causa_problema,
-       EXISTS (SELECT 1 FROM asamblea a
-                WHERE a.id_tramo_nucleo = tn.id_tramo_nucleo
-                  AND a.resultado_anuencia = 'otorgada' AND a.activo = TRUE)
-           AS tiene_anuencia,
-       EXISTS (SELECT 1 FROM convenio c
-                WHERE c.id_tramo_nucleo = tn.id_tramo_nucleo
-                  AND c.convenio_inscrito_fecha_ran IS NOT NULL AND c.activo = TRUE)
-           AS tiene_convenio_ran,
-       r.total_afectaciones,
-       r.liberadas,
-       r.pendientes,
-       r.en_proceso,
-       r.terminales,
-       CASE
-           WHEN r.total_afectaciones = 0 THEN 'no_iniciado'
-           WHEN r.total_afectaciones = (r.liberadas + r.terminales) THEN 'liberado'
-           WHEN r.liberadas > 0 THEN 'parcialmente_liberado'
-           ELSE 'en_proceso'
-       END AS estado_global
-  FROM tramo_nucleo tn
-  LEFT JOIN resumen r ON r.id_tramo_nucleo = tn.id_tramo_nucleo
- WHERE tn.activo = TRUE;
-
-INSERT INTO schema_migrations (version) VALUES ('011');
+COMMIT;
