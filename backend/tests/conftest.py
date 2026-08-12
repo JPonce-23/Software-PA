@@ -3,9 +3,9 @@ conftest.py — Configuración centralizada de fixtures para pytest.
 
 Arquitectura:
   - Se reutiliza la app FastAPI real (sin mocks de BD) para correr tests
-    de integración contra el contenedor PostgreSQL+PostGIS existente.
-  - Cada sesión de tests crea su propio conjunto de datos semilla y los
-    limpia al final en orden inverso (LIFO) para respetar foreign keys.
+    de integración contra PostgreSQL+PostGIS.
+  - La suite exige una base aislada y desechable. No intenta convertir la
+    eliminación técnica de fixtures en bajas funcionales auditadas.
 
 Convenciones:
   - Fixtures con scope="session" para datos que persisten entre tests.
@@ -16,6 +16,25 @@ Convenciones:
 import os
 import pytest
 import time
+
+
+def _assert_isolated_test_database() -> None:
+    environment = os.getenv("APP_ENV", "").strip().lower()
+    database_name = os.getenv("DB_NAME", "").strip().lower()
+    isolated_name = (
+        database_name.startswith("test_")
+        or database_name.endswith("_test")
+        or "_test_" in database_name
+    )
+    if environment != "test" or not isolated_name:
+        raise RuntimeError(
+            "La suite sólo puede ejecutarse con APP_ENV=test y una DB_NAME "
+            "aislada que incluya el marcador '_test'."
+        )
+
+
+_assert_isolated_test_database()
+
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -78,15 +97,16 @@ def admin_session(client, admin_credentials):
     )
     csrf = client.cookies.get(AUTH_SETTINGS.csrf_cookie_name)
     assert csrf, "No se encontró cookie CSRF después del login."
-    return {"Origin": origin, "X-CSRF-Token": csrf}
+    headers = {"Origin": origin, "X-CSRF-Token": csrf}
+    yield headers
+    logout = client.post("/api/auth/logout", headers=headers)
+    assert logout.status_code == 200, "No se pudo revocar la sesión de pruebas."
 
 
 # ─────────────────────── Pila de limpieza ─────────────────────── #
 
 class CleanupStack:
-    """Pila LIFO para registrar recursos creados durante los tests.
-    Al finalizar la sesión, se eliminan en orden inverso para
-    respetar las dependencias de foreign keys."""
+    """Inventario de recursos creados para diagnósticos de la sesión."""
 
     def __init__(self):
         self._items: list[tuple[str, int]] = []
@@ -150,6 +170,16 @@ def seed_tramo(client, admin_session, cleanup, seed_proyecto):
     res = client.post("/api/tramos", json=payload, headers=admin_session)
     assert res.status_code == 201, f"No se pudo crear tramo semilla: {res.text}"
     data = res.json()
+    franja = client.post(
+        f"/api/tramos/{data['id_tramo']}/franjas/importar",
+        headers=admin_session,
+        json={
+            "fuente": "Franja oficial para pruebas",
+            "fecha_vigencia_inicio": "2026-01-01",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
+        },
+    )
+    assert franja.status_code == 201, f"No se pudo crear franja semilla: {franja.text}"
     cleanup.register("/api/tramos", data["id_tramo"])
     return data
 @pytest.fixture(scope="session")

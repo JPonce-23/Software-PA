@@ -355,8 +355,12 @@ def test_modificatorio_individual_sustituye_sin_sumar_y_respeta_pagado(
             headers=admin_session,
         )
 
+    reference_suffix = time.time_ns()
     with ThreadPoolExecutor(max_workers=2) as executor:
-        concurrent = list(executor.map(concurrent_payment, ("CON-1", "CON-2")))
+        concurrent = list(executor.map(
+            concurrent_payment,
+            (f"CON-1-{reference_suffix}", f"CON-2-{reference_suffix}"),
+        ))
     assert sorted(response.status_code for response in concurrent) == [201, 409]
     for response in concurrent:
         if response.status_code == 201:

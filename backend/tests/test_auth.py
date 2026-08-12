@@ -51,6 +51,13 @@ class TestLoginSesion:
             set_cookie = res.headers.get("set-cookie", "")
             assert "HttpOnly" in set_cookie
 
+            csrf = browser.cookies.get(AUTH_SETTINGS.csrf_cookie_name)
+            logout = browser.post(
+                "/api/auth/logout",
+                headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
+            )
+            assert logout.status_code == 200
+
     def test_login_correo_inexistente(self):
         """Correo no registrado debe devolver 401."""
         with TestClient(app, raise_server_exceptions=False) as browser:

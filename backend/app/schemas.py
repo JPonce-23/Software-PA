@@ -18,6 +18,15 @@ class UsuarioBase(BaseModel):
     correo: str
     rol: Literal['admin', 'operador', 'visualizador', 'geografo']
 
+    @field_validator("correo")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        local, separator, domain = normalized.partition("@")
+        if not separator or not local or "." not in domain:
+            raise ValueError("El correo electrónico no es válido")
+        return normalized
+
 class UsuarioCreate(UsuarioBase):
     contrasena: str
 
@@ -80,6 +89,18 @@ class AuthActionRequest(BaseModel):
         return normalized
 
 
+class GeometriaUpdate(BaseModel):
+    geometria_wkt: str = Field(min_length=1)
+
+    @field_validator("geometria_wkt")
+    @classmethod
+    def normalize_geometry(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("La geometría es obligatoria")
+        return normalized
+
+
 class AuthOperationResponse(BaseModel):
     detail: str
 
@@ -109,7 +130,7 @@ class TramoBase(BaseModel):
     clave_tramo: str
     nombre_tramo: str
     descripcion: Optional[str] = None
-    ancho_total_derecho_via_m: Optional[Decimal] = 40.00
+    ancho_total_derecho_via_m: Optional[Decimal] = Decimal("40.00")
     activo: bool = True
     fecha_registro: date
 
@@ -118,7 +139,7 @@ class TramoCreate(AuditableCreate):
     clave_tramo: str
     nombre_tramo: str
     descripcion: Optional[str] = None
-    ancho_total_derecho_via_m: Optional[Decimal] = 40.00
+    ancho_total_derecho_via_m: Optional[Decimal] = Decimal("40.00")
     geometria_wkt: Optional[str] = None
 
 class TramoUpdate(AuditableUpdate):
@@ -134,11 +155,19 @@ class TramoResponse(TramoBase):
     model_config = ConfigDict(from_attributes=True)
 
 class FranjaDerechoViaCreate(AuditableCreate):
-    fuente: str
+    fuente: str = Field(min_length=1, max_length=200)
     fecha_vigencia_inicio: date
     ancho_izquierdo_m: Optional[Decimal] = Field(default=None, gt=0)
     ancho_derecho_m: Optional[Decimal] = Field(default=None, gt=0)
     geometria_wkt: str = Field(min_length=1)
+
+    @field_validator('fuente')
+    @classmethod
+    def normalizar_fuente(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError('La fuente es obligatoria')
+        return value
     
     @field_validator('geometria_wkt')
     @classmethod
@@ -177,10 +206,14 @@ class NucleoAgrarioUpdate(AuditableUpdate):
 
 class NucleoAgrarioResponse(BaseModel):
     id_nucleo: int
+    id_municipio: Optional[int] = None
     nombre_nucleo: str
     tipo_nucleo: Literal['ejido', 'comunidad']
     comunidad_indigena: bool
+    residencia: Optional[str] = None
     geometria_wkt: Optional[str] = None
+    activo: bool = True
+    observaciones: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 # ----------------- TRAMO NUCLEO ----------------- #
@@ -1242,3 +1275,38 @@ class UsuarioTramoResponse(BaseModel):
     id_tramo: int
     fecha_asignacion: datetime
     activo: bool
+
+
+class AsignacionesTramoReplace(BaseModel):
+    ids_usuario: list[int] = Field(default_factory=list)
+    motivo: str = Field(min_length=3, max_length=200)
+
+    @field_validator("ids_usuario")
+    @classmethod
+    def unique_user_ids(cls, value: list[int]) -> list[int]:
+        if any(user_id <= 0 for user_id in value):
+            raise ValueError("Los IDs de usuario deben ser positivos")
+        if len(value) != len(set(value)):
+            raise ValueError("No se permiten usuarios duplicados")
+        return value
+
+    @field_validator("motivo")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 3:
+            raise ValueError("El motivo es obligatorio")
+        return normalized
+
+
+class AsignacionAdministrativaResponse(UsuarioTramoResponse):
+    nombre_usuario: str
+    correo: str
+    rol: Literal['admin', 'operador', 'visualizador', 'geografo']
+
+
+class AdministracionResumenResponse(BaseModel):
+    detail: str
+    altas: int = 0
+    bajas: int = 0
+    reactivaciones: int = 0

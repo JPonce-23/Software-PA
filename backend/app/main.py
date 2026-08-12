@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text, func
 from sqlalchemy.inspection import inspect
 from sqlalchemy.exc import InternalError, IntegrityError, DatabaseError
-from typing import List, Type, Any
+from typing import List, Type, Any, Optional
 from datetime import datetime, timezone, timedelta
 import logging
 import pandas as pd
@@ -17,16 +17,20 @@ from .database import engine, Base, SessionLocal, get_db
 from . import models, schemas
 from . import auth
 from .config import AUTH_SETTINGS
-from .routers import alertas, authentication, documentos, flujo, minutas, pagos, personas, franjas
+from .routers import administration, alertas, authentication, documentos, flujo, minutas, pagos, personas, franjas
+from .services import administration as administration_service
 from .services import afectaciones as afectaciones_service
 from .services import authentication as authentication_service
 from .services import flujo as flujo_service
+from .services import nucleos as nucleos_service
 from .services.access import (
     filter_by_user_tramos,
+    filter_projects_by_user,
     require_afectacion_access,
     require_document_access,
     require_document_relation_access,
     require_nucleo_access,
+    require_project_access,
     require_tramo_access,
     require_tramo_nucleo_access,
 )
@@ -143,8 +147,9 @@ app.include_router(alertas.router, prefix="/api")
 app.include_router(flujo.router, prefix="/api")
 app.include_router(authentication.router, prefix="/api")
 app.include_router(franjas.router, prefix="/api")
+app.include_router(administration.router, prefix="/api")
 
-os.makedirs("uploads", exist_ok=True)
+os.makedirs(os.getenv("UPLOAD_ROOT", "uploads"), exist_ok=True)
 
 def validate_wkt(
     db: Session,
@@ -177,12 +182,14 @@ def validate_wkt(
             allowed_geometry_types
             and geometry["geometry_type"] not in allowed_geometry_types
         ):
+            detail = (
+                "La geometría de una afectación debe ser un polígono o multipolígono."
+                if allowed_geometry_types == {"ST_Polygon", "ST_MultiPolygon"}
+                else "El tipo de geometría no es válido para este recurso."
+            )
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "La geometría de una afectación debe ser un polígono "
-                    "o multipolígono."
-                ),
+                detail=detail,
             )
     except DatabaseError:
         raise HTTPException(
@@ -261,11 +268,12 @@ def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
     if "geometria_wkt" in update_dict:
         wkt = update_dict.pop("geometria_wkt", None)
         model_class = type(entity)
-        allowed_geometry_types = (
-            {"ST_Polygon", "ST_MultiPolygon"}
-            if model_class is models.Afectacion
-            else None
-        )
+        allowed_geometry_types = {
+            models.Tramo: {"ST_MultiLineString"},
+            models.NucleoAgrario: {"ST_MultiPolygon"},
+            models.TramoNucleo: {"ST_MultiLineString"},
+            models.Afectacion: {"ST_Polygon", "ST_MultiPolygon"},
+        }.get(model_class)
         validate_wkt(db, wkt, allowed_geometry_types)
 
         geom_field = GEOMETRY_FIELDS.get(model_class)
@@ -301,15 +309,18 @@ def root():
 # ==================== PROYECTOS ==================== #
 @app.get("/api/proyectos", tags=["Proyectos"], summary="Listar proyectos", response_model=List[schemas.ProyectoResponse])
 def get_proyectos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return db.query(models.Proyecto).filter(models.Proyecto.activo == True).offset(skip).limit(limit).all()
+    query = db.query(models.Proyecto).filter(models.Proyecto.activo == True)
+    query = filter_projects_by_user(query, db, current_user)
+    return query.offset(skip).limit(limit).all()
 
 @app.get("/api/proyectos/{id_proyecto}", tags=["Proyectos"], summary="Obtener proyecto por ID", response_model=schemas.ProyectoResponse)
 def get_proyecto_by_id(id_proyecto: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+    require_project_access(db, current_user, id_proyecto)
     entity = get_entity_by_id(db, models.Proyecto, id_proyecto, "id_proyecto")
     return entity
 
 @app.post("/api/proyectos", tags=["Proyectos"], summary="Crear proyecto", response_model=schemas.ProyectoResponse, status_code=status.HTTP_201_CREATED)
-def create_proyecto(proyecto: schemas.ProyectoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def create_proyecto(proyecto: schemas.ProyectoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     set_audit_context(db, current_user.id_usuario)
     db_proyecto = models.Proyecto(**proyecto.model_dump())
     db_proyecto.fecha_registro = datetime.now(timezone.utc).date()
@@ -319,12 +330,12 @@ def create_proyecto(proyecto: schemas.ProyectoCreate, db: Session = Depends(get_
     return db_proyecto
 
 @app.put("/api/proyectos/{id_proyecto}", tags=["Proyectos"], summary="Actualizar proyecto", response_model=schemas.ProyectoResponse)
-def update_proyecto(id_proyecto: int, data: schemas.ProyectoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def update_proyecto(id_proyecto: int, data: schemas.ProyectoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     entity = get_entity_by_id(db, models.Proyecto, id_proyecto, "id_proyecto")
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/proyectos/{id_proyecto}", tags=["Proyectos"], summary="Eliminar proyecto")
-def delete_proyecto(id_proyecto: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def delete_proyecto(id_proyecto: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     entity = get_entity_by_id(db, models.Proyecto, id_proyecto, "id_proyecto")
     tiene_tramos_activos = db.query(models.Tramo.id_tramo).filter(
         models.Tramo.id_proyecto == id_proyecto,
@@ -357,13 +368,13 @@ def get_tramos(id_proyecto: int = Query(None), skip: int = 0, limit: int = 100, 
     return query.offset(skip).limit(limit).all()
 
 @app.post("/api/tramos", tags=["Tramos"], summary="Crear tramo", response_model=schemas.TramoResponse, status_code=status.HTTP_201_CREATED)
-def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     # Validar que el proyecto exista
     get_entity_by_id(db, models.Proyecto, tramo.id_proyecto, "id_proyecto")
     set_audit_context(db, current_user.id_usuario)
     data = tramo.model_dump()
     wkt = data.pop("geometria_wkt", None)
-    validate_wkt(db, wkt)
+    validate_wkt(db, wkt, {"ST_MultiLineString"})
     db_tramo = models.Tramo(**data, geometria_linea=wkt)
     db_tramo.fecha_registro = datetime.now(timezone.utc).date()
     db.add(db_tramo)
@@ -376,7 +387,7 @@ def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), curr
     return resp
 
 @app.put("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Actualizar tramo", response_model=schemas.TramoResponse)
-def update_tramo(id_tramo: int, data: schemas.TramoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def update_tramo(id_tramo: int, data: schemas.TramoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     entity = get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
     db_tramo = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_tramo.__dict__.copy()
@@ -385,9 +396,28 @@ def update_tramo(id_tramo: int, data: schemas.TramoUpdate, db: Session = Depends
     ).filter(models.Tramo.id_tramo == db_tramo.id_tramo).scalar()
     return resp
 
-@app.delete("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Eliminar tramo")
-def delete_tramo(id_tramo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+
+@app.put("/api/tramos/{id_tramo}/geometria", tags=["Tramos"], summary="Actualizar geometría de tramo", response_model=schemas.TramoResponse)
+def update_tramo_geometry(id_tramo: int, data: schemas.GeometriaUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))):
+    require_tramo_access(db, current_user, id_tramo)
     entity = get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
+    db_tramo = update_entity(db, entity, data, current_user.id_usuario)
+    resp = db_tramo.__dict__.copy()
+    resp["geometria_wkt"] = db.query(
+        models.Tramo.geometria_linea.ST_AsText()
+    ).filter(models.Tramo.id_tramo == id_tramo).scalar()
+    return resp
+
+@app.delete("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Eliminar tramo")
+def delete_tramo(id_tramo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+    entity = get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
+    dependencies = (
+        db.query(models.FranjaDerechoVia.id_franja).filter_by(id_tramo=id_tramo, activo=True).first()
+        or db.query(models.TramoNucleo.id_tramo_nucleo).filter_by(id_tramo=id_tramo, activo=True).first()
+        or db.query(models.UsuarioTramo.id_usuario_tramo).filter_by(id_tramo=id_tramo, activo=True).first()
+    )
+    if dependencies:
+        raise HTTPException(status_code=409, detail="El tramo tiene relaciones activas")
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 
@@ -482,11 +512,11 @@ def get_tramo_detalles(id_tramo: int = Query(...), db: Session = Depends(get_db)
         "longitud_km": round(r.longitud_km, 2) if r.longitud_km else 0
     }
 @app.post("/api/nucleos", tags=["Núcleos Agrarios"], summary="Crear núcleo agrario", response_model=schemas.NucleoAgrarioResponse, status_code=status.HTTP_201_CREATED)
-def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     set_audit_context(db, current_user.id_usuario)
     data = nucleo.model_dump()
     wkt = data.pop("geometria_wkt", None)
-    validate_wkt(db, wkt)
+    validate_wkt(db, wkt, {"ST_MultiPolygon"})
     db_nucleo = models.NucleoAgrario(**data, geometria_poligono=wkt)
     db_nucleo.fecha_creacion = datetime.now(timezone.utc)
     db.add(db_nucleo)
@@ -499,7 +529,7 @@ def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get
     return resp
 
 @app.put("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Actualizar núcleo agrario", response_model=schemas.NucleoAgrarioResponse)
-def update_nucleo(id_nucleo: int, data: schemas.NucleoAgrarioUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def update_nucleo(id_nucleo: int, data: schemas.NucleoAgrarioUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     entity = get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
     db_nucleo = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_nucleo.__dict__.copy()
@@ -508,23 +538,39 @@ def update_nucleo(id_nucleo: int, data: schemas.NucleoAgrarioUpdate, db: Session
     ).filter(models.NucleoAgrario.id_nucleo == db_nucleo.id_nucleo).scalar()
     return resp
 
-@app.delete("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Eliminar núcleo agrario")
-def delete_nucleo(id_nucleo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+
+@app.put("/api/nucleos/{id_nucleo}/geometria", tags=["Núcleos Agrarios"], summary="Actualizar geometría de núcleo", response_model=schemas.NucleoAgrarioResponse)
+def update_nucleo_geometry(id_nucleo: int, data: schemas.GeometriaUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))):
+    require_nucleo_access(db, current_user, id_nucleo)
     entity = get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
+    db_nucleo = update_entity(db, entity, data, current_user.id_usuario)
+    resp = db_nucleo.__dict__.copy()
+    resp["geometria_wkt"] = db.query(
+        models.NucleoAgrario.geometria_poligono.ST_AsText()
+    ).filter(models.NucleoAgrario.id_nucleo == id_nucleo).scalar()
+    return resp
+
+@app.delete("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Eliminar núcleo agrario")
+def delete_nucleo(id_nucleo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+    entity = get_entity_by_id(db, models.NucleoAgrario, id_nucleo, "id_nucleo")
+    if db.query(models.TramoNucleo.id_tramo_nucleo).filter_by(id_nucleo=id_nucleo, activo=True).first():
+        raise HTTPException(status_code=409, detail="El núcleo tiene relaciones tramo-núcleo activas")
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 @app.post("/api/nucleos/importacion-masiva", tags=["Núcleos Agrarios"], summary="Importación masiva GeoJSON")
 async def importacion_masiva_nucleos(
     file: UploadFile = File(...),
     id_municipio_fallback: int = Form(None),
+    ids_tramo_contexto: Optional[List[int]] = Form(None),
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))
 ):
-    if not file.filename.endswith('.geojson'):
+    if not file.filename or not file.filename.lower().endswith('.geojson'):
         raise HTTPException(400, "El archivo debe tener extensión .geojson")
 
-    content = await file.read(10 * 1024 * 1024) # limit 10MB
-    if len(content) >= 10 * 1024 * 1024:
+    max_bytes = 10 * 1024 * 1024
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
         raise HTTPException(413, "Archivo excede el límite de 10MB")
 
     try:
@@ -532,89 +578,13 @@ async def importacion_masiva_nucleos(
     except Exception:
         raise HTTPException(400, "Archivo JSON inválido")
 
-    if data.get("type") != "FeatureCollection" or "features" not in data:
-        raise HTTPException(400, "El archivo debe ser un FeatureCollection")
-
-    resultados = []
-    errores = []
-    exitosos = 0
-
-    set_audit_context(db, current_user.id_usuario)
-
-    with db.no_autoflush:
-        for idx, feature in enumerate(data.get("features", [])):
-            if feature.get("type") != "Feature":
-                errores.append({"index": idx, "motivo": "No es un Feature válido"})
-                continue
-
-            geom = feature.get("geometry")
-            if not geom or geom.get("type") not in ("Polygon", "MultiPolygon"):
-                errores.append({"index": idx, "motivo": "Geometría debe ser Polygon o MultiPolygon"})
-                continue
-
-            props = feature.get("properties") or {}
-
-            nombre = props.get("nombre_nucleo") or props.get("nombre")
-            tipo = (props.get("tipo_nucleo") or props.get("tipo") or "ejido").lower()
-            if tipo not in ('ejido', 'comunidad'):
-                tipo = 'ejido'
-
-            if not nombre:
-                errores.append({"index": idx, "motivo": "Falta 'nombre' en properties"})
-                continue
-
-            id_mun = props.get("id_municipio") or id_municipio_fallback
-            if not id_mun:
-                errores.append({"index": idx, "motivo": "Falta id_municipio y no se proveyó globalmente"})
-                continue
-
-            # validación ST_GeomFromGeoJSON
-            geom_json = json.dumps(geom)
-
-            try:
-                # Validar topología en BD (opcional antes de guardar)
-                valid = db.execute(
-                    text("SELECT ST_IsValid(ST_GeomFromGeoJSON(:geom))"),
-                    {"geom": geom_json}
-                ).scalar()
-
-                if not valid:
-                    errores.append({"index": idx, "motivo": "Topología de geometría inválida (ST_IsValid=false)"})
-                    continue
-
-                n_db = models.NucleoAgrario(
-                    id_municipio=int(id_mun),
-                    nombre_nucleo=nombre,
-                    tipo_nucleo=tipo,
-                    comunidad_indigena=bool(props.get("comunidad_indigena", False)),
-                    fecha_creacion=datetime.now(timezone.utc),
-                    activo=True,
-                    geometria_poligono=func.ST_Multi(func.ST_GeomFromGeoJSON(geom_json))
-                )
-                db.add(n_db)
-                exitosos += 1
-            except Exception as e:
-                errores.append({"index": idx, "motivo": f"Error insertando: {str(e)}"})
-                db.rollback()
-                break # abort if DB errors
-
-    if errores:
-        db.rollback()
-        raise HTTPException(
-            400,
-            detail={
-                "mensaje": "Se abortó la importación porque hubo errores",
-                "total_procesados": len(data["features"]),
-                "errores": errores
-            }
-        )
-
-    # Si todo bien
-    db.commit()
-    return {
-        "mensaje": f"Se importaron {exitosos} núcleos exitosamente",
-        "total": exitosos
-    }
+    return nucleos_service.importar_geojson(
+        db,
+        data,
+        id_municipio_fallback,
+        ids_tramo_contexto or [],
+        current_user,
+    )
 
 
 # ==================== TRAMOS-NUCLEOS ==================== #
@@ -672,13 +642,12 @@ def get_tramo_nucleo(id_tramo_nucleo: int, db: Session = Depends(get_db), curren
     return row
 
 @app.post("/api/tramos-nucleos", tags=["Tramos-Nucleos"], summary="Crear tramo-nucleo", response_model=schemas.TramoNucleoResponse, status_code=status.HTTP_201_CREATED)
-def create_tramo_nucleo(tramo_nucleo: schemas.TramoNucleoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
-    require_tramo_access(db, current_user, tramo_nucleo.id_tramo)
+def create_tramo_nucleo(tramo_nucleo: schemas.TramoNucleoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     set_audit_context(db, current_user.id_usuario)
     data = tramo_nucleo.model_dump()
     wkt = data.pop("geometria_wkt", None)
     if wkt:
-        validate_wkt(db, wkt)
+        validate_wkt(db, wkt, {"ST_MultiLineString"})
     db_tn = models.TramoNucleo(**data)
     if wkt:
         db_tn.geometria_segmento = wkt
@@ -694,7 +663,7 @@ def create_tramo_nucleo(tramo_nucleo: schemas.TramoNucleoCreate, db: Session = D
     return resp
 
 @app.put("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Actualizar tramo-nucleo", response_model=schemas.TramoNucleoResponse)
-def update_tramo_nucleo(id_tramo_nucleo: int, data: schemas.TramoNucleoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+def update_tramo_nucleo(id_tramo_nucleo: int, data: schemas.TramoNucleoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     entity = get_entity_by_id(db, models.TramoNucleo, id_tramo_nucleo, "id_tramo_nucleo")
     require_tramo_access(db, current_user, entity.id_tramo)
     updated = update_entity(db, entity, data, current_user.id_usuario)
@@ -706,10 +675,38 @@ def update_tramo_nucleo(id_tramo_nucleo: int, data: schemas.TramoNucleoUpdate, d
     ).scalar()
     return resp
 
-@app.delete("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Eliminar tramo-nucleo")
-def delete_tramo_nucleo(id_tramo_nucleo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+
+@app.put("/api/tramos-nucleos/{id_tramo_nucleo}/geometria", tags=["Tramos-Nucleos"], summary="Actualizar geometría de relación tramo-núcleo", response_model=schemas.TramoNucleoResponse)
+def update_tramo_nucleo_geometry(id_tramo_nucleo: int, data: schemas.GeometriaUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))):
     entity = get_entity_by_id(db, models.TramoNucleo, id_tramo_nucleo, "id_tramo_nucleo")
     require_tramo_access(db, current_user, entity.id_tramo)
+    updated = update_entity(db, entity, data, current_user.id_usuario)
+    resp = updated.__dict__.copy()
+    resp["geometria_wkt"] = db.query(
+        models.TramoNucleo.geometria_segmento.ST_AsText()
+    ).filter(models.TramoNucleo.id_tramo_nucleo == id_tramo_nucleo).scalar()
+    return resp
+
+@app.delete("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Eliminar tramo-nucleo")
+def delete_tramo_nucleo(id_tramo_nucleo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
+    entity = get_entity_by_id(db, models.TramoNucleo, id_tramo_nucleo, "id_tramo_nucleo")
+    dependent_models = (
+        models.Afectacion,
+        models.AfectacionCiclo,
+        models.ActividadCampo,
+        models.Asamblea,
+        models.Convenio,
+        models.TramiteFifonafe,
+        models.Minuta,
+    )
+    if any(
+        db.query(model).filter(
+            model.id_tramo_nucleo == id_tramo_nucleo,
+            model.activo.is_(True),
+        ).first()
+        for model in dependent_models
+    ):
+        raise HTTPException(status_code=409, detail="La relación tiene expediente operativo activo")
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== DASHBOARD & REPORTES ==================== #
@@ -739,12 +736,64 @@ def get_dashboard_metrics(id_proyecto: int = Query(None), db: Session = Depends(
 
 @app.get("/api/reportes/resumen", tags=["Reportes"], summary="Generar reporte resumen")
 def generar_reporte_resumen(db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
-    return {
-        "generado_el": datetime.now(timezone.utc),
-        "total_convenios": db.query(models.Convenio).filter(models.Convenio.activo == True).count(),
-        "total_nucleos": db.query(models.NucleoAgrario).filter(models.NucleoAgrario.activo == True).count(),
-        "total_afectaciones": db.query(models.Afectacion).filter(models.Afectacion.activo == True).count()
-    }
+    conteos = db.execute(
+        text(
+            """
+            WITH tramos_permitidos AS (
+                SELECT t.id_tramo
+                  FROM tramo t
+                 WHERE t.activo = TRUE
+                   AND (
+                       :es_admin
+                       OR EXISTS (
+                           SELECT 1
+                             FROM usuario_tramo ut
+                            WHERE ut.id_tramo = t.id_tramo
+                              AND ut.id_usuario = :id_usuario
+                              AND ut.activo = TRUE
+                       )
+                   )
+            )
+            SELECT (
+                       SELECT COUNT(*)
+                         FROM convenio c
+                         JOIN tramo_nucleo tn
+                           ON tn.id_tramo_nucleo = c.id_tramo_nucleo
+                         JOIN tramos_permitidos tp ON tp.id_tramo = tn.id_tramo
+                        WHERE c.activo = TRUE AND tn.activo = TRUE
+                   ) AS total_convenios,
+                   (
+                       SELECT COUNT(DISTINCT n.id_nucleo)
+                         FROM nucleo_agrario n
+                        WHERE n.activo = TRUE
+                          AND (
+                              :es_admin
+                              OR EXISTS (
+                                  SELECT 1
+                                    FROM tramo_nucleo tn
+                                    JOIN tramos_permitidos tp
+                                      ON tp.id_tramo = tn.id_tramo
+                                   WHERE tn.id_nucleo = n.id_nucleo
+                                     AND tn.activo = TRUE
+                              )
+                          )
+                   ) AS total_nucleos,
+                   (
+                       SELECT COUNT(*)
+                         FROM afectacion a
+                         JOIN tramo_nucleo tn
+                           ON tn.id_tramo_nucleo = a.id_tramo_nucleo
+                         JOIN tramos_permitidos tp ON tp.id_tramo = tn.id_tramo
+                        WHERE a.activo = TRUE AND tn.activo = TRUE
+                   ) AS total_afectaciones
+            """
+        ),
+        {
+            "es_admin": current_user.rol == "admin",
+            "id_usuario": current_user.id_usuario,
+        },
+    ).mappings().one()
+    return {"generado_el": datetime.now(timezone.utc), **dict(conteos)}
 
 # ==================== AFECTACIONES ==================== #
 def afectacion_response(db: Session, afectacion: models.Afectacion):
@@ -1492,7 +1541,9 @@ def delete_alerta(id_alerta: int, motivo: str = Query(...), db: Session = Depend
 @app.post("/api/usuarios", tags=["Usuarios"], summary="Crear usuario", response_model=schemas.UsuarioResponse, status_code=status.HTTP_201_CREATED)
 def create_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     set_audit_context(db, current_user.id_usuario)
-    db_user = db.query(models.Usuario).filter(models.Usuario.correo == usuario.correo).first()
+    db_user = db.query(models.Usuario).filter(
+        func.lower(func.btrim(models.Usuario.correo)) == usuario.correo
+    ).first()
     if db_user:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
 
@@ -1511,12 +1562,25 @@ def get_usuarios(skip: int = 0, limit: int = 100, db: Session = Depends(get_db),
 @app.put("/api/usuarios/{id_usuario}", tags=["Usuarios"], summary="Actualizar usuario", response_model=schemas.UsuarioResponse)
 def update_usuario(id_usuario: int, data: schemas.UsuarioUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     entity = get_entity_by_id(db, models.Usuario, id_usuario, "id_usuario")
+    if entity.rol == "admin" and data.rol is not None and data.rol != "admin":
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext('software_pa_active_admin'))"))
+        if not db.query(models.Usuario.id_usuario).filter(
+            models.Usuario.activo.is_(True),
+            models.Usuario.rol == "admin",
+            models.Usuario.id_usuario != id_usuario,
+        ).first():
+            raise HTTPException(status_code=409, detail="No se puede degradar al último administrador activo")
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/usuarios/{id_usuario}", tags=["Usuarios"], summary="Eliminar usuario")
 def delete_usuario(id_usuario: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
-    entity = get_entity_by_id(db, models.Usuario, id_usuario, "id_usuario")
-    return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
+    administration_service.deactivate_user(
+        db,
+        target_user_id=id_usuario,
+        actor_user_id=current_user.id_usuario,
+        reason=motivo,
+    )
+    return {"status": "success", "message": "Usuario desactivado"}
 
 # ==================== CATÁLOGOS ==================== #
 @app.get("/api/catalogos/entidades", tags=["Catálogos"], summary="Listar entidades federativas", response_model=List[schemas.EntidadFederativaResponse])
@@ -1562,7 +1626,7 @@ def importar_geojson(
     tipo_entidad: str = Query(..., description="Opciones: tramo, nucleo_agrario, tramo_nucleo, afectacion"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))
 ):
     """
     Importa masivamente registros desde un archivo GeoJSON.
@@ -1621,7 +1685,7 @@ def importar_geojson(
 
         if Modelo == models.NucleoAgrario:
             if "fecha_creacion" not in datos_limpios:
-                datos_limpios["fecha_creacion"] = datetime.now()
+                datos_limpios["fecha_creacion"] = datetime.now(timezone.utc)
 
         # Crear instancia del ORM
         nuevo_registro = Modelo(**datos_limpios)

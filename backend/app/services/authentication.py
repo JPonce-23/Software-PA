@@ -6,7 +6,7 @@ from ipaddress import ip_address
 
 import bcrypt
 from fastapi import HTTPException, Request, status
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -113,9 +113,10 @@ def create_session(
     password: str,
 ) -> tuple[models.Usuario, models.SesionUsuario, str, str]:
     now = _utcnow()
+    normalized_username = username.strip().lower()
     user = (
         db.query(models.Usuario)
-        .filter(models.Usuario.correo == username)
+        .filter(func.lower(func.btrim(models.Usuario.correo)) == normalized_username)
         .with_for_update()
         .first()
     )

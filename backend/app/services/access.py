@@ -26,6 +26,29 @@ def require_tramo_access(
         )
 
 
+def require_project_access(
+    db: Session,
+    user: models.Usuario,
+    id_proyecto: int,
+) -> None:
+    if user.rol == "admin":
+        return
+    permitido = db.query(models.Tramo.id_tramo).join(
+        models.UsuarioTramo,
+        models.UsuarioTramo.id_tramo == models.Tramo.id_tramo,
+    ).filter(
+        models.Tramo.id_proyecto == id_proyecto,
+        models.Tramo.activo.is_(True),
+        models.UsuarioTramo.id_usuario == user.id_usuario,
+        models.UsuarioTramo.activo.is_(True),
+    ).first()
+    if permitido is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene acceso al proyecto solicitado",
+        )
+
+
 def require_tramo_nucleo_access(
     db: Session,
     user: models.Usuario,
@@ -154,3 +177,21 @@ def filter_by_user_tramos(
         models.UsuarioTramo.activo.is_(True),
     )
     return query.filter(id_tramo_column.in_(tramos))
+
+
+def filter_projects_by_user(
+    query: Query,
+    db: Session,
+    user: models.Usuario,
+) -> Query:
+    if user.rol == "admin":
+        return query
+    projects = db.query(models.Tramo.id_proyecto).join(
+        models.UsuarioTramo,
+        models.UsuarioTramo.id_tramo == models.Tramo.id_tramo,
+    ).filter(
+        models.Tramo.activo.is_(True),
+        models.UsuarioTramo.id_usuario == user.id_usuario,
+        models.UsuarioTramo.activo.is_(True),
+    ).distinct()
+    return query.filter(models.Proyecto.id_proyecto.in_(projects))

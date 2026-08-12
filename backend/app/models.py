@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, ForeignKeyConstraint, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
@@ -46,13 +48,19 @@ class Tramo(Base, AuditableMixin):
     __tablename__ = "tramo"
     __table_args__ = (
         UniqueConstraint("id_proyecto", "clave_tramo", name="uq_tramo_proyecto_clave"),
+        CheckConstraint(
+            "geometria_linea IS NULL OR (NOT ST_IsEmpty(geometria_linea) "
+            "AND ST_IsValid(geometria_linea) AND ST_SRID(geometria_linea) = 4326 "
+            "AND GeometryType(geometria_linea) = 'MULTILINESTRING')",
+            name="chk_015_tramo_geometria_valida",
+        ),
     )
     id_tramo = Column(Integer, primary_key=True, index=True)
     id_proyecto = Column(Integer, ForeignKey("proyecto.id_proyecto"), nullable=False)
     clave_tramo = Column(String(20), nullable=False)
     nombre_tramo = Column(String(200), nullable=False)
     descripcion = Column(String)
-    ancho_total_derecho_via_m = Column(Numeric(6, 2), default=40.00)
+    ancho_total_derecho_via_m = Column(Numeric(6, 2), default=Decimal("40.00"))
     geometria_linea = Column(Geometry(geometry_type='MULTILINESTRING', srid=4326))
     activo = Column(Boolean, default=True, nullable=False)
     fecha_registro = Column(Date, nullable=False)
@@ -62,6 +70,8 @@ class Tramo(Base, AuditableMixin):
 class FranjaDerechoVia(Base, AuditableMixin):
     __tablename__ = "franja_derecho_via"
     __table_args__ = (
+        UniqueConstraint("id_tramo", "version", name="uq_franja_tramo_version"),
+        CheckConstraint("version > 0", name="chk_franja_version_positiva"),
         CheckConstraint(
             "(ancho_izquierdo_m IS NULL OR ancho_izquierdo_m > 0) AND (ancho_derecho_m IS NULL OR ancho_derecho_m > 0)",
             name="chk_franja_anchos_positivos"
@@ -69,6 +79,13 @@ class FranjaDerechoVia(Base, AuditableMixin):
         CheckConstraint(
             "fecha_vigencia_fin IS NULL OR fecha_vigencia_inicio <= fecha_vigencia_fin",
             name="chk_franja_vigencia"
+        ),
+        CheckConstraint("btrim(fuente) <> ''", name="chk_franja_fuente_no_vacia"),
+        CheckConstraint(
+            "NOT ST_IsEmpty(geometria_poligono) AND ST_IsValid(geometria_poligono) "
+            "AND ST_SRID(geometria_poligono) = 4326 "
+            "AND GeometryType(geometria_poligono) = 'MULTIPOLYGON'",
+            name="chk_franja_geometria_valida",
         ),
     )
     id_franja = Column(Integer, primary_key=True, index=True)
@@ -85,7 +102,16 @@ class FranjaDerechoVia(Base, AuditableMixin):
 
 class NucleoAgrario(Base, AuditableMixin):
     __tablename__ = "nucleo_agrario"
-    __table_args__ = (CheckConstraint("tipo_nucleo IN ('ejido', 'comunidad')", name='chk_tipo_nucleo'),)
+    __table_args__ = (
+        CheckConstraint("tipo_nucleo IN ('ejido', 'comunidad')", name='chk_tipo_nucleo'),
+        CheckConstraint(
+            "geometria_poligono IS NULL OR ("
+            "NOT ST_IsEmpty(geometria_poligono) AND ST_IsValid(geometria_poligono) "
+            "AND ST_SRID(geometria_poligono) = 4326 "
+            "AND GeometryType(geometria_poligono) = 'MULTIPOLYGON')",
+            name="chk_nucleo_geometria_valida",
+        ),
+    )
     id_nucleo = Column(Integer, primary_key=True, index=True)
     id_municipio = Column(Integer, ForeignKey("municipio.id_municipio"), nullable=False)
     nombre_nucleo = Column(String(300), nullable=False)
@@ -99,6 +125,14 @@ class NucleoAgrario(Base, AuditableMixin):
 
 class TramoNucleo(Base, AuditableMixin):
     __tablename__ = "tramo_nucleo"
+    __table_args__ = (
+        CheckConstraint(
+            "geometria_segmento IS NULL OR (NOT ST_IsEmpty(geometria_segmento) "
+            "AND ST_IsValid(geometria_segmento) AND ST_SRID(geometria_segmento) = 4326 "
+            "AND GeometryType(geometria_segmento) = 'MULTILINESTRING')",
+            name="chk_015_tramo_nucleo_geometria_valida",
+        ),
+    )
     id_tramo_nucleo = Column(Integer, primary_key=True, index=True)
     id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
 
