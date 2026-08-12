@@ -12,6 +12,7 @@ services:
       - --reload
     volumes:
       - ./backend:/app
+      - ./backend/uploads:/app/uploads
 
   alertas_scheduler:
     volumes:

@@ -79,6 +79,8 @@ services:
       TEST_ADMIN_PASSWORD: ${TEST_ADMIN_PASSWORD:-}
     ports:
       - "127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -124,3 +126,4 @@ services:
 volumes:
   postgres_data:
   pgadmin_data:
+  uploads_data:
