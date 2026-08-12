@@ -14,19 +14,20 @@
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
 > segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 10 de agosto de 2026
+**Última actualización:** 12 de agosto de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Próximo trabajo funcional:** completar la aceptación operativa del Corte 4 de
-autenticación formal detrás del TLS real: validar cookies `Secure`, origen
-público exacto, proxy confiable y aceptación E2E en navegador. La contracción
-local de bearer/JWT fue aplicada y validada el 6 de agosto de 2026. Los
-prerrequisitos locales de esquema y autenticación fueron reparados y validados
-el 10 de agosto de 2026; el origen HTTPS exacto se definirá cuando exista el
-staging dedicado. La rotación local de PostgreSQL, PgAdmin y `SECRET_KEY` fue
-reportada como realizada antes del trabajo del 5 de agosto de 2026. No
-registrar sus valores.
+**Trabajo funcional actual:** la Administración territorial y de accesos quedó
+implementada y validada. El ambiente aislado `software_pa_uat` está preparado
+con 015, fixture reproducible y cuatro roles; backend y scheduler locales están
+conectados actualmente a UAT para iniciar el recorrido real desde el frontend.
+La base original `db_trenes` también quedó alineada con 015 después de respaldo
+verificado y baja lógica de sus dos franjas de prueba incompatibles, con actor,
+fecha, fin de vigencia y motivo. El siguiente trabajo es la aceptación manual
+del flujo completo por rol. El Corte 4 permanece con contracción local
+validada y aceptación operativa TLS/E2E diferida; ese gate no bloquea este
+incremento local, pero sí bloquea liberar autenticación a operación.
 
 ## 1. Objetivo y dominio
 
@@ -95,9 +96,15 @@ backend/db/migrations/008_*.sql         Autenticación formal y sesiones
 backend/db/migrations/009_*.sql         Auditoría de expiración de sesión
 backend/db/migrations/010_*.sql         Franja de derecho de vía versionada
 backend/db/migrations/011_*.sql         Cierre financiero con pago suficiente
+backend/db/migrations/012_*.sql         Regularización correctiva del Corte 5
+backend/db/migrations/013_*.sql         Auditoría de integridad temporal de franjas
+backend/db/migrations/014_*.sql         Auditoría de geometrías de núcleos
+backend/db/migrations/015_*.sql         Integridad de administración territorial
 backend/tests/                          regresión e integración
 backend/app/routers/authentication.py   endpoints de sesión y revocación
 backend/app/services/authentication.py  reglas transaccionales de autenticación
+backend/app/routers/administration.py   contratos administrativos reservados
+backend/app/services/administration.py  asignaciones y bajas compuestas
 docs/evaluaciones/2026-08-06-corte-4-contraccion-bearer-auditoria-final.md
                                         cierre local de auditoría de contracción
 docs/validacion-tls-e2e-corte-4.md      checklist operativo TLS/E2E externo
@@ -107,8 +114,11 @@ backend/app/services/access.py          autorización territorial
 frontend/src/pages/ExpedienteDetail.jsx expediente actual por tramo_nucleo
 frontend/src/pages/AfectacionSubexpediente.jsx subexpediente por afectacion
 frontend/src/pages/ExpedientesList.jsx  listado actual de tramo_nucleo
+frontend/src/pages/AdministracionTerritorial.jsx configuración territorial
+frontend/src/pages/AdministracionUsuarios.jsx usuarios y accesos
 frontend/src/components/fase2/          módulos agregados en Adaptaciones 2.0
 frontend/src/components/fase2/FlujoLiberacionPanel.jsx flujo mínimo de 2B
+backend/scripts/seed_uat.py              fixture reproducible para UAT aislado
 ```
 
 Contratos HTTP relevantes ya existentes:
@@ -399,6 +409,93 @@ aislado y después sobre una restauración completa del respaldo
 La repetición fue rechazada por la guarda y la base activa registró 011 con
 `COMMIT` y escritores detenidos.
 
+### 012 — Regularización correctiva del Corte 5
+
+Archivo:
+`backend/db/migrations/012_regularizacion_corte5.sql`
+
+Requiere 010 y 011. Agrega guardas, bloqueo asesor, preflight, restricciones
+de versión y geometría, FK de actores, auditoría, baja lógica y protección
+contra `DELETE` físico para `franja_derecho_via`. Completa la versión inicial
+sólo cuando el tramo activo no tiene historial y sus datos heredados permiten
+una derivación inequívoca. Sustituye en PostgreSQL la validación espacial por
+la franja activa y hace inmutables los datos sustantivos de cada versión.
+
+Se ensayó sobre una copia lógica de la base activa, donde creó siete franjas y
+rechazó la repetición. Después se aplicó a la base activa el 11 de agosto de
+2026 con backend y scheduler detenidos, cero escritores, `ON_ERROR_STOP=1` y
+respaldo validado
+`backups/pre_012_corte5_regularizacion_20260811.dump`, de 544183 bytes,
+permisos `0600` y SHA-256
+`2eb2a454e006b64144038481c6e1ed4f8e7dcc2e53dd32315b569faf4355c93a`.
+
+### 013 — Auditoría de integridad temporal de franjas
+
+Archivo:
+`backend/db/migrations/013_auditoria_integridad_franja.sql`
+
+Requiere 012. La auditoría independiente comprobó que PostgreSQL todavía
+aceptaba una fuente vacía y una versión cuya vigencia iniciaba antes que la
+versión anterior. La migración agrega el `CHECK` de fuente no vacía y reemplaza
+el trigger de versión para validar también el orden cronológico bajo el mismo
+bloqueo asesor por tramo. Es expansiva, transaccional y aborta ante datos
+preexistentes incompatibles; no reescribe versiones ni elimina estructuras.
+
+Se ensayó en la restauración aislada
+`audit_c5_013_20260811_2038`, rechazó la repetición y superó la suite completa
+de 125 pruebas. Después se aplicó a la base activa el 11 de agosto de 2026 con
+backend y scheduler detenidos, cero escritores y `ON_ERROR_STOP=1`. El respaldo
+previo `backups/pre_013_corte5_auditoria_20260811.dump` tiene 1161975 bytes,
+permisos `0600`, catálogo legible por `pg_restore -l` y SHA-256
+`df505e946e0ed0834c7ddc93acb822290f34a66d4a26a29d00b1e1877fcd1582`.
+
+### 014 — Auditoría de integridad geométrica de núcleos
+
+Archivo:
+`backend/db/migrations/014_auditoria_integridad_nucleo.sql`
+
+Requiere 013. La auditoría confirmó que el importador validaba topología en el
+servicio, pero la tabla permitía una geometría no vacía e inválida mediante una
+escritura directa. La migración agrega un `CHECK` compatible con geometrías
+históricas nulas y exige que toda geometría presente sea `MULTIPOLYGON` WGS84,
+no vacía y válida. El preflight de la base activa encontró cero incompatibles.
+
+Se ensayó y repitió la suite de 125 pruebas en la restauración aislada antes de
+aplicarla a la base activa, donde después volvió a pasar la suite completa.
+Backend y scheduler estuvieron detenidos y se confirmaron cero escritores.
+El respaldo `backups/pre_014_corte5_nucleos_20260811.dump` tiene 1166829 bytes,
+permisos `0600`, catálogo legible y SHA-256
+`ad8d3855a1ac9b47c740f8d4b19f7a28398f163df5dd578daa9d396ab1889014`.
+
+### 015 — Integridad de administración territorial
+
+Archivo:
+`backend/db/migrations/015_administracion_territorial.sql`
+
+Requiere 014. Es expansiva y transaccional: agrega unicidad normalizada del
+correo, restricciones geométricas y triggers para impedir hijos activos con
+padres inactivos, asociaciones espaciales incoherentes, bajas de padres con
+dependencias activas y la baja o degradación del último administrador activo.
+Las transiciones sensibles usan bloqueos de fila o asesores para contemplar
+concurrencia. No elimina ni reescribe estructuras existentes.
+
+Se validó el 12 de agosto de 2026 en bases desechables. El primer ensayo sobre
+una copia de la base activa abortó completo y sin cambios al encontrar dos
+franjas activas vinculadas a tramos inactivos. Después de preparar otra copia
+aislada, la migración y la suite de 131 pruebas pasaron.
+
+La base `db_trenes` se alineó posteriormente el 12 de agosto de 2026: se generó
+el respaldo `backups/db_trenes_pre_015_20260812.dump`, de 1231401 bytes,
+permisos `0600`, catálogo legible por `pg_restore -l` y SHA-256
+`17f7f260fb163bc5b84147cb97ac50a185eeb736af6cdb119d02a64af9bb9b21`.
+Con escritores detenidos y `ON_ERROR_STOP=1`, se dieron de baja lógica las
+franjas de prueba `id_franja` 19 y 41, con actor, fecha, fin de vigencia y
+motivo, y luego se aplicó 015 con `COMMIT`. La validación posterior confirmó
+`schema_migrations=015`, cero franjas activas bajo tramos inactivos, 11 triggers
+015, el índice de correo normalizado, los 2 `CHECK` geométricos y rechazo
+PostgreSQL de una franja activa con tramo inactivo mediante
+`ADM_PADRE_INACTIVO`.
+
 ## 6. Trabajo realizado
 
 ### Corte principal 1 — Modelo territorial: terminado
@@ -556,28 +653,59 @@ consultar el esquema real; `git pull` descarga los SQL, pero no modifica
 volúmenes de PostgreSQL. Una base que sólo tiene 002 debe aplicar 003 y luego
 004, con respaldo y verificación entre ambas.
 
-La base activa local de esta máquina quedó verificada después de aplicar 011 y
-recuperar el estado de autenticación el 10 de agosto de 2026:
+La base activa local de esta máquina se volvió a inspeccionar y alinear el 12
+de agosto de 2026:
 
 ```text
 base/rol:              db_trenes / pa_app
-schema_migrations:     004, 005, 006, 007, 008, 009, 010, 011
+schema_migrations:     004, 005, 006, 007, 008, 009, 010, 011, 012, 013, 014, 015
 datos operativos:      fixtures locales de prueba; no representan producción
 integridad FK:         cero relaciones huérfanas después de la regresión
 autenticación:         un estado por usuario; cero usuarios sin estado
 recuperación F-01A:    fila del usuario 1 restaurada desde respaldo y evento
                        desbloqueo_recuperacion sin actor, misma transacción
 vistas activas:        ciclo, afectación, tramo_nucleo y dashboard consultables
-respaldo:              restauración completa verificada antes de aplicar 011
-backend:               119 pruebas aprobadas; 1 warning Starlette
-frontend:              build aprobado; lint con 0 errores y 1 warning preexistente
+franjas:               cero franjas activas ligadas a tramos inactivos; las
+                       franjas de prueba 19 y 41 quedaron con baja lógica
+respaldo:              respaldos previos a 013, 014 y 015 validados con
+                       pg_restore -l
+backend:               131 pruebas aprobadas sobre base desechable con 015;
+                       1 warning deprecado de Starlette
+frontend:              build y lint aprobados; 2 recorridos Playwright de
+                       administración aprobados en escritorio y móvil
 ```
 
 El archivo `.env` local ya permite conectarse al servicio `db`. Estos valores
 describen sólo este entorno; en cada equipo se debe verificar el esquema real.
 En otros equipos, `git pull` descarga las migraciones, pero no las aplica al
 volumen PostgreSQL; cada colaborador debe verificar `schema_migrations` y
-respaldar antes de ejecutar 006, 007, 008, 009, 010 u 011.
+respaldar antes de ejecutar 006, 007, 008, 009, 010, 011, 012, 013, 014 o 015.
+
+Ambiente UAT preparado el 12 de agosto de 2026:
+
+```text
+base:                   software_pa_uat
+schema_migrations:      004–015
+escenario:              1 proyecto, 2 tramos, 2 franjas activas,
+                        2 núcleos, 2 tramo_nucleo y 1 parcela
+usuarios:               admin, geografo, operador y visualizador
+territorio:             UAT-A asignado; UAT-B reservado para acceso denegado
+servicios conectados:   backend y alertas_scheduler con APP_ENV=test
+frontend:               http://localhost:5173
+credenciales locales:   backups/uat_credentials.env, ignorado por Git, modo 0600
+validación:              login de 4 roles; no-admin 403 en administración;
+                        geografo sólo ve UAT-A y recibe 403 directo sobre UAT-B;
+                        Playwright escritorio/móvil 2 aprobadas
+```
+
+El archivo de credenciales contiene únicamente usuarios sintéticos. No debe
+confirmarse, copiarse a producción ni reutilizarse fuera de este UAT. Si Compose
+recrea los servicios con el `.env` normal, reconectar UAT explícitamente con:
+
+```bash
+DB_NAME=software_pa_uat APP_ENV=test docker compose up -d --no-deps \
+  --force-recreate backend alertas_scheduler
+```
 
 ## 8. Plan principal vigente de cinco cortes
 
@@ -918,10 +1046,44 @@ Contracción local aplicada y validada el 6 de agosto de 2026:
 
 Pendiente antes de declarar Corte 4 terminado:
 
-- Validar cookie `Secure`, host/origen y proxy confiable detrás del TLS real.
+- Validar cookie `Secure`, host/origen HTTPS exacto y proxy confiable detrás del
+  TLS real del ambiente de aceptación.
 - Ejecutar aceptación funcional E2E en navegadores soportados.
 
+Estos pendientes son un gate de aceptación/preliberación. No deben reportarse
+como bloqueo de entorno para continuar el desarrollo local de otros incrementos,
+salvo que la tarea solicitada sea cerrar Corte 4, validar operación real o
+liberar autenticación en un ambiente de uso.
+
 ### Corte 5 — Importación y reportes: Terminado
+
+Regularización correctiva aprobada e implementada el 11 de agosto de 2026:
+
+- Se priorizó corregir el Corte 5 antes de agregar una capacidad nueva.
+- La importación de núcleos es global para `admin`. El `geografo` puede elegir
+  uno, varios o todos sus tramos asignados activamente; el backend vuelve a
+  verificar cada asignación e intersección y aborta el lote completo ante un
+  tramo no autorizado.
+- La importación no crea ni infiere relaciones `tramo_nucleo`.
+- El resumen de reportes respeta el alcance territorial.
+- Las franjas fallan cerrado cuando no existe versión activa, serializan el
+  versionado concurrente y conservan historial inmutable y auditado.
+- PostgreSQL protege versión, geometría, unicidad activa, ciclo de vida,
+  orden cronológico, fuente no vacía, auditoría, baja lógica, ausencia de
+  `DELETE` y la intersección de afectaciones con la franja activa.
+- La auditoría independiente corrigió el `500` de una raíz JSON no-objeto,
+  exige territorio también para actualizar o dar de baja un núcleo y revoca
+  las sesiones creadas por las regresiones concurrentes.
+- Las pruebas de login y Corte 5 hacen logout explícito; quedaron cero sesiones
+  `testclient` activas después de la suite completa.
+- PostgreSQL rechaza ahora geometrías de núcleo presentes que estén vacías,
+  sean topológicamente inválidas o no sean `MULTIPOLYGON` WGS84.
+- La interfaz ofrece selección múltiple y “Todos mis tramos” al geógrafo,
+  modo global al administrador, historial de franjas y rechazo de
+  `FeatureCollection` para una franja.
+- Validación: migraciones 012/013/014 aisladas y activas, repetición rechazada,
+  `125 passed` en restauración aislada y también sobre la base activa;
+  frontend con lint limpio y build de producción exitoso.
 
 #### Componente aprobado e implementado — Dashboard Analítico y Uploader Masivo
 
@@ -932,7 +1094,10 @@ Pendiente antes de declarar Corte 4 terminado:
 
 El Corte 5 implementó gradualmente la franja de derecho de vía oficial versionada (`franja_derecho_via`):
 
-1. **Migración 010 expansiva aplicada:** Inyecta automáticamente la Versión 1 a partir del buffer heredado para mantener compatibilidad.
+1. **Migraciones 010 y 012 aplicadas:** 010 creó la estructura versionada. La
+   verificación posterior detectó que la base activa no tenía las versiones
+   iniciales documentadas; 012 completó siete versiones de forma auditable y
+   reforzó la integridad sin retirar el ancho heredado.
 2. **Modelos y validaciones espaciales:** Se actualizaron `models.py` y `schemas.py`. Se introdujo validación estricta postgis (`ST_IsValid`, `ST_Intersects`). Los campos `ancho_izquierdo_m` y `ancho_derecho_m` son opcionales según lo aprobado administrativamente, requiriendo en su lugar un `Polygon` o `MultiPolygon` consolidado, y rechazando `FeatureCollection` para prevenir carga excesiva.
 3. **Servicios y Rutas Backend:** Se agregó `importar_franja` que archiva la versión anterior e inicia la nueva en una única transacción con trazabilidad de baja lógica. `afectaciones_service.py` intercepta ahora `ST_Intersects` con la franja activa.
 4. **Frontend:** Se implementó `FranjaDerechoViaPanel.jsx` accesible desde el visor del tramo en `Mapa.jsx`, permitiendo a los geógrafos cargar archivos `.geojson` con validación previa de consolidación (evitando colecciones dispersas) y enviarlos junto con los atributos de fuente y vigencia.
@@ -1000,6 +1165,183 @@ Se implementó y validó la propuesta de **Cierre Financiero estricto**.
 3. **Frontend:** `FlujoLiberacionPanel.jsx` bloquea la transición a completo cuando `saldo_disponible > 0`. `PagosPanel.jsx` muestra una advertencia de falta de fondos cuando aplica.
 4. Las pruebas automatizadas fallan si falta `TEST_ADMIN_EMAIL` en `.env`.
 
+### Siguiente incremento aprobado — Administración territorial y de accesos
+
+**Estado:** implementación completa y validada; UAT local activa en 015 y
+aceptación funcional manual por los cuatro roles pendiente.
+
+#### Motivo
+
+Antes de este incremento el backend exponía contratos para proyectos, tramos,
+`tramo_nucleo`, usuarios y asignaciones `usuario_tramo`, pero el frontend sólo
+ofrecía dashboard, mapa y expedientes. Las nuevas vistas administrativas cierran
+esa brecha para la operación normal; el fixture queda reservado para preparar
+un ambiente UAT aislado.
+
+El incremento debe cubrir la Fase 1 descrita en el proceso funcional, antes de
+la operación cotidiana de los expedientes:
+
+```text
+Proyecto
+└── Tramo
+    ├── Franja de derecho de vía versionada
+    └── Tramo_Núcleo                 expediente maestro territorial
+        └── Afectación               subexpediente confirmado posterior
+```
+
+Crear un proyecto no crea por sí mismo un expediente. El expediente maestro
+nace únicamente cuando se registra de manera explícita un `tramo_nucleo`. La
+importación o selección de un núcleo no debe crear, inferir ni duplicar esa
+relación automáticamente.
+
+#### Pantallas y recorridos requeridos
+
+1. **Administración → Proyectos**
+   - Listar, buscar y consultar proyectos activos.
+   - Crear y editar un proyecto.
+   - Darlo de baja lógicamente, con motivo y respetando dependencias activas.
+   - Abrir el detalle del proyecto para administrar sus tramos.
+2. **Proyecto → Tramos**
+   - Listar y filtrar los tramos del proyecto.
+   - Crear y editar un tramo con sus datos y geometría.
+   - Darlo de baja lógicamente con motivo.
+   - Abrir la administración territorial del tramo.
+3. **Tramo → Derecho de vía y núcleos**
+   - Consultar y versionar la franja de derecho de vía mediante el mecanismo ya
+     implementado, sin duplicar su lógica.
+   - Seleccionar un núcleo existente o importarlo con las reglas vigentes del
+     Corte 5.
+   - Revisar geometría, intersección y contexto territorial antes de asociarlo.
+   - Crear explícitamente `tramo_nucleo`, con consecutivo, longitud, geometría,
+     observaciones y condiciones especiales aplicables.
+   - Después de guardar la relación, ofrecer acceso al expediente maestro en
+     `/expedientes/:id_tramo_nucleo`.
+4. **Administración → Usuarios**
+   - Listar, crear y editar usuarios sin exponer credenciales ni hashes.
+   - Asignar rol, activar o dar de baja lógicamente.
+   - Utilizar los mecanismos existentes de desbloqueo y revocación de sesiones.
+5. **Usuario → Tramos asignados** o **Tramo → Equipo**
+   - Consultar asignaciones activas.
+   - Asignar uno o varios tramos mediante `usuario_tramo`.
+   - Retirar o reactivar una asignación con el motivo obligatorio y la auditoría
+     existente.
+
+Las vistas quedaron integradas en el layout y React Router existentes como
+`/administracion/territorio` y `/administracion/usuarios`, sin duplicar una
+misma operación en interfaces separadas.
+
+#### Reglas obligatorias del incremento
+
+- Reutilizar la jerarquía aprobada `Proyecto → Tramo → Tramo_Núcleo`; no crear
+  una entidad paralela ni reintroducir `Frente`.
+- No crear una afectación durante la configuración territorial. La afectación
+  se registra después, cuando derecho, superficie, geometría y sujetos están
+  confirmados.
+- No inferir `tramo_nucleo` por intersección, nombre, cercanía o importación.
+- Mantener autorización por rol y pertenencia territorial también en backend;
+  ocultar controles en React no sustituye la autorización.
+- Mantener bajas lógicas con motivo; no ejecutar `DELETE` físico.
+- Configurar el contexto de auditoría antes de cada escritura y conservar la
+  trazabilidad de reactivaciones, bajas y asignaciones.
+- Validar geometrías y pertenencia en PostgreSQL y backend, no sólo en el mapa o
+  en Pydantic.
+- No exponer secretos, hashes, excepciones internas ni datos de otros
+  territorios.
+- Mostrar estados de carga, vacío, error, acceso denegado, éxito y conflicto;
+  un error del API no debe presentarse como una lista vacía válida.
+- Conservar operaciones compuestas dentro de una sola transacción cuando una
+  acción de usuario escriba varias entidades; contemplar repetición y
+  concurrencia.
+
+#### Autorización aprobada e implementada
+
+La decisión funcional DF-01 aprobó que sólo `admin` administre proyectos,
+tramos, relaciones `tramo_nucleo`, usuarios y asignaciones. El `geografo`
+conserva edición de geometrías, franjas e importaciones en cualquiera de sus
+tramos asignados; no queda atado a un único tramo. `operador` y `visualizador`
+mantienen el acceso operativo o de lectura que corresponda únicamente sobre su
+territorio asignado. La API aplica esta matriz aunque el cliente invoque una
+ruta directamente.
+
+#### Implementación validada
+
+- `/administracion/territorio` permite buscar, listar activos o inactivos,
+  crear, editar, dar de baja y reactivar proyectos, tramos, núcleos y
+  `tramo_nucleo`; la asociación es siempre explícita y ofrece navegación al
+  expediente maestro.
+- `/administracion/usuarios` permite buscar, crear, editar, desbloquear,
+  revocar sesiones, dar de baja y reactivar usuarios. Las asignaciones por
+  tramo se reemplazan atómicamente desde la administración territorial.
+- El router y servicio administrativos aíslan las operaciones de composición,
+  validan padres y usuarios activos y configuran auditoría. Las bajas siguen
+  siendo lógicas y requieren motivo.
+- La migración 015 protege en PostgreSQL la integridad crítica y el último
+  administrador. La autenticación compara correos normalizados sin distinguir
+  mayúsculas y minúsculas.
+- `backend/scripts/seed_uat.py` prepara idempotentemente cuatro roles, un
+  proyecto, dos tramos con un escenario permitido y otro denegado, franjas,
+  núcleos, `tramo_nucleo` y parcela; sólo admite bases marcadas como test/UAT y
+  exige contraseñas suministradas por variables de entorno.
+- Docker Compose persiste `/app/uploads` en un volumen nombrado y el override
+  de desarrollo conserva el montaje local existente.
+
+#### Preparación UAT complementaria
+
+El fixture no sustituye las pantallas anteriores. Debe servir para crear de
+forma reproducible un ambiente UAT aislado con un proyecto, al menos dos tramos,
+franjas activas, municipios, núcleos, relaciones `tramo_nucleo`, una parcela y
+usuarios de cada rol con territorios permitidos y denegados. La base UAT no debe
+ser utilizada por la suite automatizada ni compartir datos con desarrollo.
+
+Antes de validar el flujo documental con usuarios, `/app/uploads` debe contar
+con almacenamiento persistente fuera de la capa escribible del contenedor. La
+aceptación debe incluir escenarios de administrador, operador, geógrafo y
+visualizador; acceso permitido y denegado; alta territorial completa; rutas
+colectiva e individual; documentos; errores; reintentos y concurrencia.
+
+El aprovisionamiento técnico ya está completo en `software_pa_uat`: fixture
+ejecutado dos veces para comprobar idempotencia, 015 aplicada, almacenamiento
+persistente configurado y los cuatro inicios de sesión validados. Falta la
+aceptación manual del proceso; el fixture no constituye por sí mismo esa
+aceptación.
+
+#### Orden incremental
+
+1. ~~Confirmar la matriz de autorización y evaluar los contratos existentes.~~
+2. ~~Agregar pruebas de reglas y autorización a los endpoints base.~~
+3. ~~Implementar navegación administrativa y proyectos.~~
+4. ~~Implementar tramos y reutilizar la administración de franjas.~~
+5. ~~Implementar selección/importación de núcleos y alta explícita de
+   `tramo_nucleo`.~~
+6. ~~Implementar usuarios y asignaciones territoriales.~~
+7. ~~Crear el fixture UAT aislado y el almacenamiento documental persistente.~~
+8. Se aprobaron regresión backend, PostgreSQL aislado, rutas, lint, build y E2E
+   administrativo en escritorio y móvil. Falta ejecutar en UAT el recorrido
+   funcional completo con admin, operador, geógrafo y visualizador.
+
+#### Criterios mínimos de aceptación
+
+- Un usuario autorizado puede preparar desde el frontend la jerarquía completa
+  hasta obtener un expediente maestro navegable, sin usar SQL ni llamadas
+  manuales a la API.
+- La creación de `tramo_nucleo` exige una confirmación explícita y nunca ocurre
+  como efecto lateral de importar un núcleo.
+- Cada rol ve y ejecuta únicamente las acciones aprobadas y los datos de sus
+  territorios; los intentos directos contra la API también son rechazados.
+- Bajas, reactivaciones y asignaciones quedan auditadas y no eliminan físicamente
+  registros operativos.
+- Los errores de validación, autorización, concurrencia y red se distinguen de
+  estados vacíos legítimos.
+- El fixture permite repetir el escenario UAT en una base aislada y los archivos
+  cargados sobreviven a la recreación del contenedor backend.
+- Las pruebas de regresión, frontend y E2E pasan sin desactivar restricciones ni
+  reutilizar la base UAT como base automatizada.
+
+Los criterios técnicos y del recorrido administrativo automatizado están
+cumplidos. La aceptación integral del proceso por los cuatro roles permanece
+pendiente en `software_pa_uat`; no debe declararse aceptación operativa antes
+de completar y registrar ese recorrido manual.
+
 ## 9. Trabajo técnico transversal pendiente
 
 - Conservar y probar periódicamente la restauración del respaldo previo a 006
@@ -1008,6 +1350,14 @@ Se implementó y validó la propuesta de **Cierre Financiero estricto**.
   `backups/pre_migracion_007_20260804.dump`.
 - Conservar el respaldo restaurable previo a 011 y a la recuperación F-01A:
   `backups/pre_011_auth_recovery_restorable_20260810.dump`.
+- Conservar el respaldo previo a 012:
+  `backups/pre_012_corte5_regularizacion_20260811.dump`.
+- Conservar el respaldo previo a 013:
+  `backups/pre_013_corte5_auditoria_20260811.dump`.
+- Conservar el respaldo previo a 014:
+  `backups/pre_014_corte5_nucleos_20260811.dump`.
+- Conservar el respaldo previo a 015:
+  `backups/db_trenes_pre_015_20260812.dump`.
 - Replicar 007 en otros ambientes sólo después de respaldo, verificación de
   `schema_migrations` y preflight de tipos documentales.
 - Conciliar manualmente relaciones históricas 2B que permanecen nulas; no
@@ -1030,20 +1380,39 @@ Se implementó y validó la propuesta de **Cierre Financiero estricto**.
 
 ## 10. Instrucción para continuar
 
-La siguiente tarea no es crear Proyecto, repetir Adaptaciones 2.0, rediseñar
-2A ni reimplementar 2B.
+La siguiente tarea no es reimplementar la administración, crear otra entidad
+Proyecto, cambiar la jerarquía territorial, repetir Adaptaciones 2.0, rediseñar
+2A ni reimplementar 2B. Debe ejecutar y registrar la aceptación funcional del
+incremento ya implementado sobre la UAT activa en 015.
 
 Próximo paso operativo:
 
-1. Validar Corte 4 detrás del TLS real: cookie `Secure`, origen público exacto
-   y, si se requiere IP cliente, proxies confiables configurados por IP exacta.
+1. Modelar desde el frontend el flujo real con admin, operador, geógrafo y
+   visualizador, incluyendo territorio permitido/denegado, rutas colectiva e
+   individual, documentos, reintentos y concurrencia.
+2. Registrar defectos técnicos reproducibles sin alterar los datos para ocultar
+   fallos. El escenario se repone idempotentemente con `python -m scripts.seed_uat`.
+3. No tratar la falta del ambiente HTTPS de aceptación como bloqueo general del
+   desarrollo local; registrarla únicamente como gate pendiente para cierre de
+   Corte 4 o liberación operativa.
+4. Antes de declarar Corte 4 terminado, validar detrás del TLS real del ambiente
+   de aceptación: cookie
+   `Secure`, origen HTTPS exacto y, si se requiere IP cliente, proxies
+   confiables configurados por IP exacta. El ambiente puede ser interno de
+   oficina/VPN; no requiere exposición pública a Internet, pero sí nombre
+   estable, certificado confiable para Chromium/Firefox y ausencia de
+   advertencias TLS.
    *(Nota: La contracción de código de bearer/JWT a nivel local fue completada y
    validada estructuralmente el 6 de agosto de 2026. `python-jose`, tests legacy
    y dependencias obsoletas fueron eliminados).*
-2. Ejecutar aceptación E2E de login, quinto fallo, desbloqueo, expiración,
-   logout y RBAC/territorio en navegadores soportados, utilizando el TLS real.
-3. Replicar 008 y luego 009 en otros ambientes sólo después de respaldo,
+5. Ejecutar aceptación E2E de login, quinto fallo, desbloqueo, expiración,
+   logout y RBAC/territorio en navegadores soportados, utilizando el TLS real
+   del ambiente de aceptación.
+6. Replicar 008 y luego 009 en otros ambientes sólo después de respaldo,
    verificación individual de 004/005/006/007 y preflight de bitácora sensible.
-4. Revisar y confirmar el diff antes de commit/push.
+7. Revisar y confirmar el diff antes de commit/push.
 El derecho de vía versionado está aprobado y terminado como componente del Corte
-5, al igual que el Dashboard Analítico y el Uploader Masivo GeoJSON.
+5, al igual que el Dashboard Analítico y el Uploader Masivo GeoJSON. La
+regularización correctiva de estos componentes quedó implementada y validada
+el 11 de agosto de 2026 mediante las migraciones 012, 013 y 014 y la regresión
+de 125 pruebas tanto en restauración aislada como sobre la base activa.

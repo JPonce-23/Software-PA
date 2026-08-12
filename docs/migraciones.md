@@ -162,7 +162,7 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    variable temporal del proceso; no la dejes persistente en archivos
    compartidos, historial de shell, logs ni capturas.
 
-4. Aplica `004`–`011` en orden, una sola vez cada una. Detén backend y
+4. Aplica `004`–`015` en orden, una sola vez cada una. Detén backend y
    scheduler antes de cada migración y conserva `ON_ERROR_STOP`:
 
    ```bash
@@ -190,12 +190,47 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    docker compose exec -T db sh -lc \
      'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
      < backend/db/migrations/011_pago_suficiente.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/012_regularizacion_corte5.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/013_auditoria_integridad_franja.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/014_auditoria_integridad_nucleo.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/015_administracion_territorial.sql
    ```
 
    La 011 exige 010, toma un bloqueo asesor, ejecuta su preflight y se
    confirma en una sola transacción. Reemplaza únicamente
    `vw_afectacion_ciclo_estado`; no elimina ni reduce los contratos de las
    vistas superiores. Si existe 011 en `schema_migrations`, no la repitas.
+
+   La 012 exige 010 y 011, corrige la integridad y auditoría de las franjas,
+   completa únicamente las versiones iniciales inequívocas y sustituye el
+   búfer espacial heredado en la validación de afectaciones. Su preflight
+   aborta ante historiales parciales, versiones duplicadas o geometrías no
+   válidas. Si existe 012 en `schema_migrations`, no la repitas.
+
+   La 013 exige 012, aborta si existen fuentes vacías o versiones fuera de
+   orden cronológico y refuerza ambas reglas en PostgreSQL sin reescribir el
+   historial. Si existe 013 en `schema_migrations`, no la repitas.
+
+   La 014 exige 013 y agrega la validación PostgreSQL de geometrías de núcleo
+   presentes sin volver obligatorias las geometrías históricas nulas. Aborta si
+   encuentra una geometría vacía, inválida, con SRID distinto de 4326 o que no
+   sea `MULTIPOLYGON`. Si existe 014 en `schema_migrations`, no la repitas.
+
+   La 015 exige 014 y protege correo normalizado, geometrías, jerarquía activa,
+   asociaciones espaciales, dependencias de bajas lógicas y la existencia de
+   al menos un administrador activo. Su preflight aborta, entre otros casos, si
+   encuentra una franja activa con tramo inactivo. No corrijas esos datos por
+   inferencia: concílialos con el responsable funcional, crea un respaldo nuevo
+   y vuelve a ejecutar la auditoría. Si existe 015 en `schema_migrations`, no la
+   repitas.
 
 5. Verifica el registro:
 
@@ -212,11 +247,29 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    docker compose ps
    ```
 
-7. Opcionalmente carga datos de prueba:
+7. Opcionalmente carga datos de prueba general:
 
    ```bash
    docker compose exec backend python scripts/seed_mock.py
    ```
+
+   Para preparar UAT usa una base aislada cuyo nombre contenga `uat` o `test`.
+   El fixture rechaza otros ambientes y exige una contraseña distinta para cada
+   rol mediante `UAT_ADMIN_PASSWORD`, `UAT_OPERADOR_PASSWORD`,
+   `UAT_GEOGRAFO_PASSWORD` y `UAT_VISUALIZADOR_PASSWORD`:
+
+   ```bash
+   docker compose exec \
+     -e APP_ENV=test \
+     -e UAT_ADMIN_PASSWORD="$UAT_ADMIN_PASSWORD" \
+     -e UAT_OPERADOR_PASSWORD="$UAT_OPERADOR_PASSWORD" \
+     -e UAT_GEOGRAFO_PASSWORD="$UAT_GEOGRAFO_PASSWORD" \
+     -e UAT_VISUALIZADOR_PASSWORD="$UAT_VISUALIZADOR_PASSWORD" \
+     backend python -m scripts.seed_uat
+   ```
+
+   No uses la base UAT para la suite automatizada ni confirmes esas credenciales
+   en archivos del repositorio.
 
 ## Base heredada
 
@@ -251,7 +304,8 @@ Antes de desplegar el backend nuevo:
 4. aplica inmediatamente 009 con `ON_ERROR_STOP=1`;
 5. verifica ambas versiones, las tres tablas de autenticación y sus triggers;
 6. configura `APP_ENV=production`, `AUTH_COOKIE_SECURE=true` y
-   `CORS_ORIGINS` con el origen HTTPS público exacto;
+   `CORS_ORIGINS` con el origen HTTPS exacto del ambiente de aceptación
+   interno o público;
 7. configura `AUTH_TRUSTED_PROXY_IPS` sólo con IPs exactas de proxies bajo
    control; vacío ignora `X-Forwarded-For`;
 8. reinicia servicios y valida OpenAPI, login, CSRF, logout y logs.

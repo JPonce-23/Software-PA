@@ -2,7 +2,8 @@
 
 Fecha: 2026-08-05; decisiones F-01/F-03 incorporadas el 2026-08-10
 Estado: propuesta corregida y viable; prerrequisitos locales validados,
-aceptación TLS/E2E pendiente hasta disponer del staging HTTPS
+aceptación TLS/E2E diferida como gate de preliberación hasta disponer del
+ambiente HTTPS de aceptación
 
 ## 1. Trabajo vigente identificado
 
@@ -111,9 +112,13 @@ frontend, API pública). El único consumidor bearer es la suite de pruebas.
   registró `desbloqueo_recuperacion` sin actor.
 - Todos los usuarios locales tienen exactamente un estado de autenticación.
 - El Compose local es HTTP y no constituye evidencia de aceptación TLS.
-- Se aprobó un staging HTTPS dedicado sin proxy. El origen HTTPS exacto sigue
-  pendiente porque el ambiente todavía no existe; es un dato de despliegue,
-  no una decisión funcional abierta.
+- Se aprobó un ambiente HTTPS de aceptación dedicado sin proxy. Puede ser
+  interno de oficina/VPN si el nombre resuelve para los usuarios previstos y el
+  certificado es confiable en Chromium y Firefox, sin advertencias TLS. El
+  origen HTTPS exacto sigue pendiente porque el ambiente todavía no existe; es
+  un dato de despliegue, no una decisión funcional abierta. Esta ausencia no
+  bloquea continuar el desarrollo local de otros incrementos; sólo impide
+  declarar Corte 4 terminado o liberar autenticación a operación.
 - La migración 011 fue endurecida y validada sobre una restauración completa
   antes de aplicarse a la base activa.
 
@@ -141,10 +146,12 @@ frontend, API pública). El único consumidor bearer es la suite de pruebas.
     investigación que descarte un estado recuperable. Debe ser atómica,
     auditable y no modifica la migración 008. Reutiliza el evento existente
     `desbloqueo` con motivo `desbloqueo_recuperacion`, sin crear un tipo nuevo.
-11. La aceptación se ejecutará exclusivamente en staging HTTPS dedicado, con
-    certificado válido, cuentas no productivas y al menos dos territorios
-    controlados: uno permitido y otro denegado.
-12. El staging aprobado no usa proxy. `AUTH_TRUSTED_PROXY_IPS` debe permanecer
+11. La aceptación se ejecutará exclusivamente en un ambiente HTTPS dedicado, con
+    certificado confiable para los navegadores soportados, cuentas no
+    productivas y al menos dos territorios controlados: uno permitido y otro
+    denegado. No requiere exposición pública a Internet si la operación aprobada
+    es interna de oficina/VPN.
+12. El ambiente aprobado no usa proxy. `AUTH_TRUSTED_PROXY_IPS` debe permanecer
     vacío; cualquier cambio de topología requiere reevaluación.
 13. La matriz mínima aprobada es Chromium y Firefox. Safari/WebKit queda fuera
     mientras no se declare oficialmente soportado.
@@ -293,7 +300,7 @@ contracción validada
   -> respaldo verificado
   -> investigación de estado recuperable
   -> recuperación F-01A atómica y auditable, sólo si no es recuperable
-  -> staging HTTPS configurado con origen exacto
+  -> ambiente HTTPS de aceptación configurado con origen exacto
   -> fixtures no productivos de territorio permitido/denegado
   -> E2E Chromium + Firefox
   -> Corte 4 aceptado
@@ -376,10 +383,10 @@ impiden avanzar y no se corrigen silenciosamente.
 | Usuario activo sin estado auth. | Se ejecutó preflight, respaldo e investigación; después se restauró el estado recuperable y el evento en una sola transacción. | Restablecer la invariante sin reparación silenciosa. | F-01A y respaldo restaurable. | Restaurar una fila que no correspondiera. | Mismo usuario verificado; exactamente un estado; evento correlacionado; login y bloqueo funcionan. |
 | Esquema activo sin 011. | Se endureció y aplicó 011 después de una restauración completa. | Evitar validar una combinación código/esquema divergente. | Respaldo, preflight y migración 011 corregida. | DDL parcial o reducción de vistas. | `schema_migrations`, catálogo, pruebas financieras, restauración y repetición verificadas. |
 
-### Frontend y staging
+### Frontend y ambiente de aceptación
 
 No se propone cambio funcional de frontend. La aceptación usará el frontend
-existente en staging HTTPS y comprobará cookies, restauración de sesión,
+existente en el ambiente HTTPS de aceptación y comprobará cookies, restauración de sesión,
 errores genéricos y aislamiento territorial en Chromium y Firefox.
 
 ## 7. Migración y compatibilidad
@@ -463,14 +470,15 @@ archivo actual como parte de F-01A.
 
 ### 8.4 Validación TLS
 
-Para declarar Corte 4 terminado se requiere verificar en el staging HTTPS
-dedicado. El staging no usa proxy y el origen exacto aún está pendiente:
+Para declarar Corte 4 terminado se requiere verificar en el ambiente HTTPS de
+aceptación dedicado. El ambiente aprobado no usa proxy y el origen exacto aún
+está pendiente:
 
 | Verificación | Criterio |
 |--------------|----------|
 | Cookie `Secure` | Navegador rechaza enviarla por HTTP. |
 | Cookie `__Host-` prefix | Navegador rechaza si no es HTTPS, tiene `Domain`, o `Path` ≠ `/`. |
-| `Origin` exacto | CORS y middleware CSRF rechazan origen distinto del público. |
+| `Origin` exacto | CORS y middleware CSRF rechazan origen distinto del ambiente de aceptación. |
 | `X-Forwarded-For` | No confiar en cabeceras reenviadas; lista de proxies vacía. |
 | TLS termination | Certificado válido, HSTS recomendado. |
 | Navegadores | Toda la matriz pasa en Chromium y Firefox. |
@@ -537,11 +545,11 @@ pendiente operativo sin bloquear la contracción de código.
 - **Criterio de avance:** esquema alineado, un estado por usuario, evidencia de
   recuperación y regresión auth aprobada.
 
-### Paso 6: Checklist TLS y E2E en staging
+### Paso 6: Checklist TLS y E2E en ambiente de aceptación
 
 - Recibir y registrar el origen HTTPS exacto sin credenciales.
 - Validar cookie `Secure` detrás de TLS real y certificado válido.
-- Validar Origin público exacto y lista de proxies vacía.
+- Validar Origin exacto del ambiente de aceptación y lista de proxies vacía.
 - Crear cuentas y fixtures no productivos para territorio permitido/denegado.
 - Aceptación E2E: login, quinto fallo, desbloqueo, expiración, logout,
   RBAC/territorio en Chromium y Firefox.

@@ -208,7 +208,7 @@ La autenticación web usa una sesión opaca en cookie HttpOnly y protección
 CSRF; el frontend no guarda credenciales en `localStorage` y el backend ya no
 acepta bearer/JWT como mecanismo de aplicación. En producción define
 `APP_ENV=production`, `AUTH_COOKIE_SECURE=true` y un `CORS_ORIGINS` HTTPS
-exacto. Consulta el despliegue de 008/009 y la recuperación administrativa en
+exacto del ambiente. Consulta el despliegue de 008/009 y la recuperación administrativa en
 [docs/migraciones.md](docs/migraciones.md#migraciones-008-y-009-y-operación-de-autenticación).
 
 ### Pruebas backend autenticadas

@@ -1,17 +1,28 @@
 # Validación TLS/E2E - Corte 4
 
-Este checklist se ejecuta sólo en un ambiente con HTTPS real. No reemplaza la
-suite automatizada local ni debe usarse para declarar validado un entorno HTTP.
+Este checklist se ejecuta sólo en un ambiente con HTTPS real y certificado
+confiable para los navegadores soportados. El ambiente puede ser público o
+interno de oficina/VPN, siempre que use un origen HTTPS exacto, nombre estable y
+no muestre advertencias TLS. No reemplaza la suite automatizada local ni debe
+usarse para declarar validado un entorno HTTP. Mientras ese ambiente no exista,
+este checklist queda diferido como gate de aceptación/preliberación y no bloquea
+el desarrollo local de otros incrementos.
 
 ## 1. Requisitos externos
 
 | Requisito | Fuente | Obligatorio |
 | --- | --- | --- |
-| Origen público HTTPS exacto | Operación/infraestructura | Sí |
-| Certificado TLS válido para el origen | Operación/infraestructura | Sí |
+| Origen HTTPS exacto del ambiente de aceptación | Operación/infraestructura | Sí |
+| DNS interno, `hosts` administrado o nombre equivalente que resuelva al servidor para los usuarios previstos | Operación/infraestructura | Sí |
+| Certificado TLS válido y confiable para el origen | Operación/infraestructura | Sí |
 | Navegador soportado | Equipo de aceptación | Sí |
 | Usuario admin activo de prueba | Base aislada o ambiente de aceptación | Sí |
 | Topología de proxy y balanceador | Operación/infraestructura | Sí, si se confía en `X-Forwarded-For` |
+
+Un certificado emitido por CA corporativa o CA privada de staging es aceptable
+si esa CA está instalada como confiable en los equipos de prueba. Un certificado
+autofirmado de hoja, una excepción manual del navegador o HTTP local no cierran
+Corte 4.
 
 No registrar contraseñas, cookies, hashes, tokens ni capturas que expongan
 secretos.
@@ -22,7 +33,7 @@ secretos.
 | --- | --- |
 | `APP_ENV` | `production` en ambiente expuesto. |
 | `AUTH_COOKIE_SECURE` | `true`. |
-| `CORS_ORIGINS` | Origen HTTPS exacto, sin wildcard. |
+| `CORS_ORIGINS` | Origen HTTPS exacto del ambiente de aceptación, sin wildcard. |
 | `AUTH_TRUSTED_PROXY_IPS` | Sólo IPs exactas de proxies confiables, cuando aplique. |
 | `TEST_ADMIN_EMAIL` | Admin activo de prueba, no productivo. |
 | `TEST_ADMIN_PASSWORD` | Contraseña del admin de prueba, no persistida en repositorio. |
