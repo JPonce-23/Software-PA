@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../api/axios';
 import { Upload, X, Check } from 'lucide-react';
 import { stringify } from 'wellknown';
@@ -12,10 +12,24 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
   const [anchoDer, setAnchoDer] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [franjas, setFranjas] = useState([]);
+
+  const loadFranjas = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/tramos/${idTramo}/franjas`);
+      setFranjas(data);
+    } catch {
+      setFranjas([]);
+    }
+  }, [idTramo]);
+
+  useEffect(() => {
+    loadFranjas();
+  }, [loadFranjas]);
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
-    if (selected && selected.name.endsWith('.geojson')) {
+    if (selected && selected.name.toLowerCase().endsWith('.geojson')) {
       setFile(selected);
       setError(null);
     } else {
@@ -25,7 +39,7 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
   };
 
   const handleImport = async () => {
-    if (!file || !fuente || !fechaVigencia) {
+    if (!file || !fuente.trim() || !fechaVigencia) {
       setError('Fuente, Fecha y Archivo son obligatorios.');
       return;
     }
@@ -35,24 +49,24 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
     
     try {
       const reader = new FileReader();
+      reader.onerror = () => {
+        setError('Error al leer el archivo.');
+        setLoading(false);
+      };
       reader.onload = async (e) => {
         try {
           const content = JSON.parse(e.target.result);
-          // Simplified validation before sending
-          if (content.type === 'FeatureCollection' && content.features.length !== 1) {
-             setError('El archivo debe estar consolidado en un único Feature (Polygon o MultiPolygon). No se admiten colecciones dispersas.');
-             setLoading(false);
-             return;
+          if (content.type === 'FeatureCollection') {
+            setError('FeatureCollection no está permitido para una franja.');
+            return;
           }
-          
-          let wkt = '';
-          // We will mock parsing GeoJSON to WKT for simplicity, relying on backend for strict checks
-          // A robust app uses a library like 'wellknown' stringify, but here we expect the user to send valid GeoJSON 
-          // that our backend API will actually parse.
-          // Wait, backend expects `geometria_wkt: str` in the payload!
-          // We need to convert GeoJSON to WKT. Let's use `wellknown`.
-          let feature = content.type === 'FeatureCollection' ? content.features[0] : content;
-          wkt = stringify(feature.geometry);
+
+          const geometry = content.type === 'Feature' ? content.geometry : content;
+          if (!geometry || !['Polygon', 'MultiPolygon'].includes(geometry.type)) {
+            setError('La franja debe ser Polygon o MultiPolygon.');
+            return;
+          }
+          const wkt = stringify(geometry);
           
           if (!wkt) {
             setError('No se pudo extraer la geometría WKT.');
@@ -61,11 +75,11 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
           }
 
           const payload = {
-            fuente,
+            fuente: fuente.trim(),
             fecha_vigencia_inicio: fechaVigencia,
             geometria_wkt: wkt,
-            ancho_izquierdo_m: anchoIzq ? parseFloat(anchoIzq) : null,
-            ancho_derecho_m: anchoDer ? parseFloat(anchoDer) : null,
+            ancho_izquierdo_m: anchoIzq || null,
+            ancho_derecho_m: anchoDer || null,
           };
           
           await api.post(`/tramos/${idTramo}/franjas/importar`, payload);
@@ -75,15 +89,23 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
           setFechaVigencia('');
           setAnchoIzq('');
           setAnchoDer('');
+          await loadFranjas();
           if (onImportSuccess) onImportSuccess();
         } catch (err) {
-          setError(err.response?.data?.detail || 'Error procesando el archivo.');
+          const detail = err.response?.data?.detail;
+          if (typeof detail === 'string') {
+            setError(detail);
+          } else if (Array.isArray(detail)) {
+            setError(detail.map((item) => item.msg).filter(Boolean).join('\n') || 'Datos de franja inválidos.');
+          } else {
+            setError('Error procesando el archivo.');
+          }
         } finally {
           setLoading(false);
         }
       };
       reader.readAsText(file);
-    } catch (err) {
+    } catch {
       setError('Error al leer el archivo.');
       setLoading(false);
     }
@@ -95,7 +117,7 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
         onClick={() => setIsOpen(true)}
         style={{
           width: '100%', padding: '10px', background: '#0284c7', color: 'white', 
-          border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', 
+          border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex',
           alignItems: 'center', justifyContent: 'center', gap: '8px',
           marginTop: '15px'
         }}
@@ -111,7 +133,7 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
           <div style={{
-            background: 'white', padding: '25px', borderRadius: '12px', width: '400px',
+            background: 'white', padding: '25px', borderRadius: '8px', width: 'min(400px, calc(100vw - 32px))',
             boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontFamily: 'Inter, sans-serif'
           }}>
             <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '15px'}}>
@@ -119,16 +141,12 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
               <button onClick={() => setIsOpen(false)} style={{background: 'transparent', border: 'none', cursor: 'pointer'}}><X size={20}/></button>
             </div>
             
-            <p style={{fontSize: '12px', color: '#64748b', marginBottom: '15px'}}>
-              Cargue el polígono oficial consolidado (WGS84). Una vez aprobado, sustituirá a la versión actual.
-            </p>
-
             {error && <div style={{background: '#fef2f2', color: '#b91c1c', padding: '10px', borderRadius: '6px', fontSize: '12px', marginBottom: '15px'}}>{error}</div>}
 
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <div>
                 <label style={{fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '5px'}}>Fuente Documental *</label>
-                <input type="text" value={fuente} onChange={e => setFuente(e.target.value)} style={{width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px'}} placeholder="Ej. Oficio SCT-2026-102" />
+                <input type="text" maxLength={200} value={fuente} onChange={e => setFuente(e.target.value)} style={{width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px'}} placeholder="Ej. Oficio SCT-2026-102" />
               </div>
               <div>
                 <label style={{fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '5px'}}>Fecha Vigencia *</label>
@@ -163,6 +181,16 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
               {loading ? 'Procesando...' : 'Confirmar Importación'}
             </button>
           </div>
+        </div>
+      )}
+      {franjas.length > 0 && (
+        <div style={{ marginTop: '10px', fontSize: '12px', color: '#475569' }}>
+          {franjas.slice(0, 3).map((franja) => (
+            <div key={franja.id_franja} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '4px 0' }}>
+              <span>Versión {franja.version}</span>
+              <span>{franja.activo ? 'Activa' : 'Histórica'}</span>
+            </div>
+          ))}
         </div>
       )}
     </>

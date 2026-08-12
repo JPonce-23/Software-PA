@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Layers, Maximize, CheckCircle } from 'lucide-react';
 import { MapContainer, TileLayer, GeoJSON, LayersControl, useMap } from 'react-leaflet';
 import { useSearchParams } from 'react-router-dom';
@@ -7,6 +7,8 @@ import L from 'leaflet';
 import api from '../api/axios';
 import { parse } from 'wellknown';
 import FranjaDerechoViaPanel from '../components/fase2/FranjaDerechoViaPanel';
+import NucleosImportPanel from '../components/fase2/NucleosImportPanel';
+import AuthContext from '../contexts/auth-context';
 
 const coloresPorTramo = {
   "Tren Maya tramo 1": "#E63946",
@@ -45,12 +47,14 @@ function MapFitter({ geojsonData }) {
 }
 
 export default function Mapa() {
+  const { user } = useContext(AuthContext);
   const [searchParams] = useSearchParams();
   const idTramo = Number(searchParams.get('id_tramo')) || null;
   
   const [tramosGeoJSON, setTramosGeoJSON] = useState(null);
   const [nucleosGeoJSON, setNucleosGeoJSON] = useState(null);
   const [tramoDetalle, setTramoDetalle] = useState(null);
+  const [nucleosRevision, setNucleosRevision] = useState(0);
   const centerPosition = [19.25, -90.25];
 
   useEffect(() => {
@@ -111,7 +115,7 @@ export default function Mapa() {
 
       setNucleosGeoJSON({ type: "FeatureCollection", features });
     }).catch(console.error);
-  }, [idTramo]);
+  }, [idTramo, nucleosRevision]);
 
   const onEachNucleo = (feature, layer) => {
     if (feature.properties && feature.properties.name) {
@@ -147,6 +151,12 @@ export default function Mapa() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '20px' }}>
       <div style={{ flex: '1', position: 'relative', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', minHeight: '600px' }}>
+        {!idTramo && ['admin', 'geografo'].includes(user?.rol) && (
+          <NucleosImportPanel
+            role={user.rol}
+            onImportSuccess={() => setNucleosRevision((revision) => revision + 1)}
+          />
+        )}
         
         {/* PANEL TÉCNICO GLASSMORPHISM */}
         {idTramo && tramoDetalle && (
@@ -197,13 +207,9 @@ export default function Mapa() {
               <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%'}}></span> Problema</span>
             </div>
 
-            <FranjaDerechoViaPanel 
-              idTramo={idTramo} 
-              onImportSuccess={() => {
-                // Ideally reload the tramo geometries, but here we can just alert or reload page for simplicity
-                window.location.reload();
-              }} 
-            />
+            {['admin', 'geografo'].includes(user?.rol) && (
+              <FranjaDerechoViaPanel idTramo={idTramo} />
+            )}
           </div>
         )}
 
