@@ -12,6 +12,8 @@ const Mapa = React.lazy(() => import('./pages/Mapa'));
 const ExpedientesList = React.lazy(() => import('./pages/ExpedientesList'));
 const ExpedienteDetail = React.lazy(() => import('./pages/ExpedienteDetail'));
 const AfectacionSubexpediente = React.lazy(() => import('./pages/AfectacionSubexpediente'));
+const AdministracionTerritorial = React.lazy(() => import('./pages/AdministracionTerritorial'));
+const AdministracionUsuarios = React.lazy(() => import('./pages/AdministracionUsuarios'));
 
 const ROL_LABELS = {
   admin: 'Administrador',
@@ -21,7 +23,7 @@ const ROL_LABELS = {
 };
 
 function Sidebar() {
-  const { logout } = React.useContext(AuthContext);
+  const { logout, user } = React.useContext(AuthContext);
   const location = useLocation();
   const [proyectos, setProyectos] = React.useState([]);
 
@@ -74,6 +76,12 @@ function Sidebar() {
           <Link className={`menu-item ${location.pathname === '/mapa' ? 'active' : ''}`} to="/mapa">Mapa Geoespacial</Link>
         </div>
 
+        {user?.rol === 'admin' && <div className="menu-group admin-menu-group">
+          <h4>Administración</h4>
+          <Link className={`menu-item ${isActive('/administracion/territorio') ? 'active' : ''}`} to="/administracion/territorio">Territorio</Link>
+          <Link className={`menu-item ${isActive('/administracion/usuarios') ? 'active' : ''}`} to="/administracion/usuarios">Usuarios y accesos</Link>
+        </div>}
+
         <Link className="menu-item logout" to="/login" onClick={logout}>Cerrar sesión</Link>
       </nav>
     </aside>
@@ -91,6 +99,8 @@ function Topbar() {
     if (location.pathname.includes('/afectaciones/')) return 'Subexpediente de Afectación';
     if (location.pathname.startsWith('/expedientes/')) return 'Expediente de Ejido';
     if (location.pathname === '/expedientes') return 'Expedientes de Ejidos';
+    if (location.pathname === '/administracion/territorio') return 'Administración territorial';
+    if (location.pathname === '/administracion/usuarios') return 'Administración de usuarios';
     return '¡Bienvenido!';
   };
 
@@ -133,6 +143,10 @@ function AppContent() {
     return <Navigate to="/" replace />;
   }
 
+  const adminElement = (element) => user?.rol === 'admin'
+    ? element
+    : <Navigate to="/" replace />;
+
   return (
     <div className="app-container">
       <Sidebar />
@@ -146,6 +160,8 @@ function AppContent() {
             <Route path="/expedientes"                  element={<ExpedientesList />} />
             <Route path="/expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion" element={<AfectacionSubexpediente />} />
             <Route path="/expedientes/:id_tramo_nucleo" element={<ExpedienteDetail />} />
+            <Route path="/administracion/territorio" element={adminElement(<AdministracionTerritorial />)} />
+            <Route path="/administracion/usuarios" element={adminElement(<AdministracionUsuarios />)} />
           </Routes>
         </React.Suspense>
       </main>
