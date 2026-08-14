@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import AuthContext from './auth-context';
 
+const getApiErrorMessage = (error) => {
+  const detail = error.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) return detail.map((item) => item.msg || item.message || 'Dato inválido').join('. ');
+  return 'Error de conexión con el servidor';
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +48,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       return { 
         success: false, 
-        message: error.response?.data?.detail || 'Error de conexión con el servidor'
+        message: getApiErrorMessage(error)
       };
     }
   };
