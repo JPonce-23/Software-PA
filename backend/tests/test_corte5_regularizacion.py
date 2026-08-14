@@ -113,6 +113,72 @@ def test_franja_versionada_sustituye_sin_sobrescribir(
     assert [item["version"] for item in history.json()[:2]] == [2, 1]
     assert history.json()[0]["activo"] is True
     assert history.json()[1]["activo"] is False
+    assert history.json()[0]["geometria_wkt"].startswith("MULTIPOLYGON")
+
+
+def test_franja_debe_intersectar_linea_del_tramo(
+    client,
+    admin_session,
+    seed_tramo,
+):
+    response = client.post(
+        f"/api/tramos/{seed_tramo['id_tramo']}/franjas/importar",
+        headers=admin_session,
+        json={
+            "fuente": "Franja fuera del trazo",
+            "fecha_vigencia_inicio": "2027-01-01",
+            "geometria_wkt": "MULTIPOLYGON(((10 10, 11 10, 11 11, 10 11, 10 10)))",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "La franja de derecho de vía no intersecta con la línea del tramo."
+
+
+def test_franjas_activas_exponen_geometria(
+    client,
+    admin_session,
+    seed_tramo,
+):
+    response = client.get("/api/franjas/activas", headers=admin_session)
+    assert response.status_code == 200, response.text
+    franja = next(
+        item for item in response.json()
+        if item["id_tramo"] == seed_tramo["id_tramo"]
+    )
+    assert franja["activo"] is True
+    assert franja["geometria_wkt"].startswith("MULTIPOLYGON")
+
+
+def test_nucleos_por_tramo_usan_superficie_de_franja_no_linea(
+    client,
+    admin_session,
+    cleanup,
+    seed_tramo,
+    seed_municipio_id,
+):
+    nombre = f"Núcleo franja sin eje {uuid4().hex}"
+    created = client.post(
+        "/api/nucleos",
+        headers=admin_session,
+        json={
+            "id_municipio": seed_municipio_id,
+            "nombre_nucleo": nombre,
+            "tipo_nucleo": "ejido",
+            "comunidad_indigena": False,
+            "geometria_wkt": "MULTIPOLYGON(((0.75 0.05, 0.90 0.05, 0.90 0.20, 0.75 0.20, 0.75 0.05)))",
+        },
+    )
+    assert created.status_code == 201, created.text
+    id_nucleo = created.json()["id_nucleo"]
+    cleanup.register("/api/nucleos", id_nucleo)
+
+    response = client.get(
+        f"/api/nucleos?id_tramo={seed_tramo['id_tramo']}",
+        headers=admin_session,
+    )
+    assert response.status_code == 200, response.text
+    item = next(row for row in response.json() if row["id_nucleo"] == id_nucleo)
+    assert item["area_afectada_ha"] > 0
 
 
 def test_postgresql_protege_versiones_y_delete(seed_tramo):

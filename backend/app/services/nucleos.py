@@ -314,10 +314,18 @@ def importar_geojson(
                                CASE
                                    WHEN :validar_contexto THEN EXISTS (
                                        SELECT 1
-                                         FROM tramo t
-                                        WHERE t.id_tramo = ANY(:ids_tramo)
+                                         FROM franja_derecho_via f
+                                         JOIN tramo t ON t.id_tramo = f.id_tramo
+                                        WHERE f.id_tramo = ANY(:ids_tramo)
+                                          AND f.activo = TRUE
                                           AND t.activo = TRUE
-                                          AND ST_Intersects(geom, t.geometria_linea)
+                                          AND ST_Intersects(geom, f.geometria_poligono)
+                                          AND ST_Area(
+                                              ST_CollectionExtract(
+                                                  ST_Intersection(geom, f.geometria_poligono),
+                                                  3
+                                              )::geography
+                                          ) > 0
                                    )
                                    ELSE TRUE
                                END AS intersecta
@@ -339,7 +347,7 @@ def importar_geojson(
             continue
         if not validacion.intersecta:
             errores.append(
-                {"index": index, "motivo": "La geometría no intersecta los tramos seleccionados."}
+                {"index": index, "motivo": "La geometría no tiene superficie de intersección con la franja activa de los tramos seleccionados."}
             )
             continue
 

@@ -162,7 +162,7 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    variable temporal del proceso; no la dejes persistente en archivos
    compartidos, historial de shell, logs ni capturas.
 
-4. Aplica `004`–`018` en orden, una sola vez cada una. Detén backend y
+4. Aplica `004`–`019` en orden, una sola vez cada una. Detén backend y
    scheduler antes de cada migración y conserva `ON_ERROR_STOP`:
 
    ```bash
@@ -211,6 +211,9 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    docker compose exec -T db sh -lc \
      'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
      < backend/db/migrations/018_nucleo_nombre_unico_importacion.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/019_franja_autoridad_territorial.sql
    ```
 
    La 011 exige 010, toma un bloqueo asesor, ejecuta su preflight y se
@@ -246,6 +249,11 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    activos. La 018 exige 017 y evita núcleos activos duplicados por municipio,
    tipo y nombre normalizado. Su preflight aborta si ya existen duplicados: no
    los elimines ni fusiones por inferencia; concílialos antes de reintentar.
+
+   La 019 exige 018, agrega el índice espacial de franjas y convierte la
+   franja activa en autoridad territorial. La franja debe intersectar la línea
+   del tramo y cada relación tramo-núcleo activa debe tener superficie positiva
+   dentro de ella.
 
 5. Verifica el registro:
 

@@ -474,13 +474,28 @@ def get_nucleos(
             ef.id_entidad,
             ef.nombre AS entidad_nombre,
             ST_AsText(n.geometria_poligono) as geometria_wkt,
-            (ST_Area(n.geometria_poligono::geography) / 10000.0) as area_ha
+            (ST_Area(n.geometria_poligono::geography) / 10000.0) as area_ha,
+            CASE
+                WHEN :id_tramo_espacial IS NULL THEN NULL
+                ELSE (
+                    SELECT ST_Area(
+                        ST_CollectionExtract(
+                            ST_Intersection(n.geometria_poligono, f.geometria_poligono),
+                            3
+                        )::geography
+                    ) / 10000.0
+                      FROM franja_derecho_via f
+                     WHERE f.id_tramo = :id_tramo_espacial
+                       AND f.activo = TRUE
+                     LIMIT 1
+                )
+            END AS area_afectada_ha
         FROM nucleo_agrario n
         JOIN municipio m ON m.id_municipio = n.id_municipio AND m.activo = TRUE
         JOIN entidad_federativa ef ON ef.id_entidad = m.id_entidad AND ef.activo = TRUE
         WHERE n.activo = true
     """
-    params = {}
+    params = {"id_tramo_espacial": id_tramo}
 
     if current_user.rol != "admin":
         base_sql += """
@@ -499,11 +514,21 @@ def get_nucleos(
     if id_tramo is not None:
         require_tramo_access(db, current_user, id_tramo)
         base_sql += """
-            AND ST_Intersects(n.geometria_poligono, (
-                SELECT ST_Union(t.geometria_linea)
-                FROM tramo t
-                WHERE t.id_tramo = :id_tramo AND t.activo = TRUE
-            ))
+            AND EXISTS (
+                SELECT 1
+                  FROM franja_derecho_via f
+                  JOIN tramo t ON t.id_tramo = f.id_tramo
+                 WHERE f.id_tramo = :id_tramo
+                   AND f.activo = TRUE
+                   AND t.activo = TRUE
+                   AND ST_Intersects(n.geometria_poligono, f.geometria_poligono)
+                   AND ST_Area(
+                       ST_CollectionExtract(
+                           ST_Intersection(n.geometria_poligono, f.geometria_poligono),
+                           3
+                       )::geography
+                   ) > 0
+            )
         """
         params["id_tramo"] = id_tramo
 
@@ -549,6 +574,7 @@ def get_nucleos(
             "entidad_nombre": r.entidad_nombre,
             "geometria_wkt": r.geometria_wkt,
             "area_ha": round(r.area_ha, 2) if r.area_ha else 0,
+            "area_afectada_ha": round(r.area_afectada_ha, 4) if r.area_afectada_ha else 0,
             "estatus_simulado": estatus
         })
 

@@ -271,6 +271,49 @@ def test_nucleos_territorio_acepta_alias_name_y_tipo_predeterminado(
     cleanup.register("/api/nucleos", confirmed.json()["ids_creados"][0])
 
 
+def test_nucleos_contexto_usa_franja_aunque_no_cruce_linea(
+    client,
+    admin_session,
+    cleanup,
+    seed_tramo,
+    seed_municipio_id,
+):
+    nombre = f"Nucleo borde franja {uuid4().hex[:8]}"
+    geometry = {
+        "type": "Polygon",
+        "coordinates": [[
+            [0.75, 0.05],
+            [0.90, 0.05],
+            [0.90, 0.20],
+            [0.75, 0.20],
+            [0.75, 0.05],
+        ]],
+    }
+    preview = client.post(
+        "/api/importaciones-territoriales/nucleos/previsualizar",
+        headers=admin_session,
+        data={
+            "id_municipio_fallback": str(seed_municipio_id),
+            "tipo_nucleo_fallback": "ejido",
+            "ids_tramo_contexto": str(seed_tramo["id_tramo"]),
+        },
+        files=_collection(_feature({"nombre_nucleo": nombre}, geometry)),
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["validos"] == 1
+
+    confirmed = client.post(
+        "/api/importaciones-territoriales/nucleos/confirmar",
+        headers=admin_session,
+        json={
+            "archivo_sha256": preview.json()["archivo_sha256"],
+            "items": preview.json()["items"],
+        },
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    cleanup.register("/api/nucleos", confirmed.json()["ids_creados"][0])
+
+
 def test_nucleos_territorio_resuelve_tamaulipas_por_entidad_y_municipio(
     client,
     admin_session,

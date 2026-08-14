@@ -52,9 +52,11 @@ export default function Mapa() {
   const idTramo = Number(searchParams.get('id_tramo')) || null;
   
   const [tramosGeoJSON, setTramosGeoJSON] = useState(null);
+  const [franjasGeoJSON, setFranjasGeoJSON] = useState(null);
   const [nucleosGeoJSON, setNucleosGeoJSON] = useState(null);
   const [tramoDetalle, setTramoDetalle] = useState(null);
   const [nucleosRevision, setNucleosRevision] = useState(0);
+  const [franjasRevision, setFranjasRevision] = useState(0);
   const centerPosition = [19.25, -90.25];
 
   useEffect(() => {
@@ -87,7 +89,25 @@ export default function Mapa() {
       }).catch(console.error);
     }
 
-    // 2. Cargar Núcleos Agrarios (filtrados por tramo)
+    // 2. Cargar la versión activa del derecho de vía.
+    const urlFranjas = idTramo ? `/tramos/${idTramo}/franjas` : '/franjas/activas';
+    api.get(urlFranjas).then(res => {
+      const features = res.data.filter((franja) => franja.activo && franja.geometria_wkt).map((franja) => ({
+        type: 'Feature',
+        properties: {
+          id_tramo: franja.id_tramo,
+          fuente: franja.fuente,
+          color: '#ca8a04',
+          fillColor: '#facc15',
+          fillOpacity: 0.35,
+          weight: 1.5,
+        },
+        geometry: parse(franja.geometria_wkt),
+      }));
+      setFranjasGeoJSON({ type: 'FeatureCollection', features });
+    }).catch(() => setFranjasGeoJSON({ type: 'FeatureCollection', features: [] }));
+
+    // 3. Cargar núcleos agrarios afectados por la franja activa.
     const urlNucleos = idTramo ? `/nucleos?id_tramo=${idTramo}` : '/nucleos';
     api.get(urlNucleos).then(res => {
       const features = res.data.map(n => {
@@ -105,6 +125,7 @@ export default function Mapa() {
             tipo: n.tipo_nucleo,
             estatus: n.estatus_simulado,
             area_ha: n.area_ha,
+            area_afectada_ha: n.area_afectada_ha,
             color: "#ffffff", // Borde blanco
             fillColor: fillColor, 
             fillOpacity: 0.7 
@@ -115,7 +136,7 @@ export default function Mapa() {
 
       setNucleosGeoJSON({ type: "FeatureCollection", features });
     }).catch(console.error);
-  }, [idTramo, nucleosRevision]);
+  }, [idTramo, nucleosRevision, franjasRevision]);
 
   const onEachNucleo = (feature, layer) => {
     if (feature.properties && feature.properties.name) {
@@ -131,7 +152,8 @@ export default function Mapa() {
           <p style="margin:0; font-size: 12px; color: #64748b; text-transform: capitalize;">${escapeHtml(feature.properties.tipo)}</p>
           <hr style="margin: 8px 0; border: 0; border-top: 1px solid #e2e8f0;" />
           <p style="margin:4px 0;"><strong>Estatus:</strong> ${estatusText}</p>
-          <p style="margin:4px 0;"><strong>Superficie Afectada:</strong> ${escapeHtml(feature.properties.area_ha)} hectáreas</p>
+          <p style="margin:4px 0;"><strong>Superficie del núcleo:</strong> ${escapeHtml(feature.properties.area_ha)} hectáreas</p>
+          <p style="margin:4px 0;"><strong>Superficie en derecho de vía:</strong> ${escapeHtml(feature.properties.area_afectada_ha)} hectáreas</p>
         </div>
       `);
     }
@@ -145,7 +167,7 @@ export default function Mapa() {
   });
 
   const totalNucleos = nucleosGeoJSON ? nucleosGeoJSON.features.length : 0;
-  const areaTotal = nucleosGeoJSON ? nucleosGeoJSON.features.reduce((acc, f) => acc + (f.properties.area_ha || 0), 0) : 0;
+  const areaTotal = nucleosGeoJSON ? nucleosGeoJSON.features.reduce((acc, f) => acc + (f.properties.area_afectada_ha || 0), 0) : 0;
   const liberados = nucleosGeoJSON ? nucleosGeoJSON.features.filter(f => f.properties.estatus === 'liberado').length : 0;
 
   return (
@@ -208,14 +230,25 @@ export default function Mapa() {
             </div>
 
             {['admin', 'geografo'].includes(user?.rol) && (
-              <FranjaDerechoViaPanel idTramo={idTramo} />
+              <FranjaDerechoViaPanel
+                idTramo={idTramo}
+                onImportSuccess={() => setFranjasRevision((revision) => revision + 1)}
+              />
             )}
           </div>
         )}
 
         <MapContainer center={centerPosition} zoom={8} style={{ height: '100%', width: '100%' }}>
           {/* Zoom Inteligente hacia los poligonos */}
-          {nucleosGeoJSON && <MapFitter geojsonData={nucleosGeoJSON} />}
+          <MapFitter
+            geojsonData={
+              nucleosGeoJSON?.features.length
+                ? nucleosGeoJSON
+                : franjasGeoJSON?.features.length
+                  ? franjasGeoJSON
+                  : tramosGeoJSON
+            }
+          />
 
           <LayersControl position="topright">
             {/* 1. Capa Satelital (Ideal para ver terrenos reales) */}
@@ -269,8 +302,18 @@ export default function Mapa() {
               </LayersControl.Overlay>
             )}
 
+            {franjasGeoJSON?.features.length > 0 && (
+              <LayersControl.Overlay checked name="Derecho de vía">
+                <GeoJSON
+                  key={idTramo ? `${idTramo}-franja-${franjasRevision}` : `all-franjas-${franjasRevision}`}
+                  data={franjasGeoJSON}
+                  style={styleFeature}
+                />
+              </LayersControl.Overlay>
+            )}
+
             {tramosGeoJSON && (
-              <LayersControl.Overlay checked name="Trazo Ferroviario">
+              <LayersControl.Overlay checked name="Eje ferroviario">
                 <GeoJSON 
                   key={idTramo ? `${idTramo}-tramo` : "all-tramos"}
                   data={tramosGeoJSON} 

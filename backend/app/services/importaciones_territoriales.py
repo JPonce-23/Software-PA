@@ -770,11 +770,18 @@ def _validar_geometria(
                        CASE
                            WHEN :validar_contexto THEN EXISTS (
                                SELECT 1
-                                 FROM tramo t
-                                WHERE t.id_tramo = ANY(:ids_tramo)
+                                 FROM franja_derecho_via f
+                                 JOIN tramo t ON t.id_tramo = f.id_tramo
+                                WHERE f.id_tramo = ANY(:ids_tramo)
+                                  AND f.activo = TRUE
                                   AND t.activo = TRUE
-                                  AND t.geometria_linea IS NOT NULL
-                                  AND ST_Intersects(geom, t.geometria_linea)
+                                  AND ST_Intersects(geom, f.geometria_poligono)
+                                  AND ST_Area(
+                                      ST_CollectionExtract(
+                                          ST_Intersection(geom, f.geometria_poligono),
+                                          3
+                                      )::geography
+                                  ) > 0
                            )
                            ELSE TRUE
                        END AS intersecta_contexto
@@ -793,7 +800,10 @@ def _validar_geometria(
     if not result["valida"] or not result["no_vacia"] or result["tipo"] not in postgis_allowed:
         raise HTTPException(status_code=400, detail=f"La geometria de {label} es invalida o esta vacia.")
     if not result["intersecta_contexto"]:
-        raise HTTPException(status_code=400, detail="La geometria no intersecta los tramos seleccionados.")
+        raise HTTPException(
+            status_code=400,
+            detail="La geometria no tiene superficie de interseccion con la franja activa de los tramos seleccionados.",
+        )
     return geometry_json
 
 

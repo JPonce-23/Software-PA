@@ -64,13 +64,20 @@ def importar_franja(
         with db.begin_nested():
             result = db.execute(
                 text("""
+                    WITH entrada AS (
+                        SELECT ST_GeomFromText(:wkt, 4326) AS geom
+                    )
                     SELECT
-                        ST_IsValid(geom) AS is_valid,
-                        NOT ST_IsEmpty(geom) AS is_not_empty,
-                        ST_GeometryType(geom) AS geom_type
-                    FROM (SELECT ST_GeomFromText(:wkt, 4326) AS geom) AS t
+                        ST_IsValid(entrada.geom) AS is_valid,
+                        NOT ST_IsEmpty(entrada.geom) AS is_not_empty,
+                        ST_GeometryType(entrada.geom) AS geom_type,
+                        ST_Intersects(entrada.geom, tramo.geometria_linea) AS intersecta_tramo
+                    FROM entrada
+                    JOIN tramo ON tramo.id_tramo = :id_tramo
+                    WHERE tramo.activo = TRUE
+                      AND tramo.geometria_linea IS NOT NULL
                 """),
-                {"wkt": data.geometria_wkt},
+                {"wkt": data.geometria_wkt, "id_tramo": id_tramo},
             ).fetchone()
     except DBAPIError as exc:
         raise HTTPException(status_code=400, detail="Geometría inválida.") from exc
@@ -81,6 +88,11 @@ def importar_franja(
         raise HTTPException(status_code=400, detail="Topología inválida: la geometría se auto-intersecta o está mal formada.")
     if result[2] not in ('ST_Polygon', 'ST_MultiPolygon'):
         raise HTTPException(status_code=400, detail="El archivo GeoJSON debe contener un polígono o multipolígono único.")
+    if not result[3]:
+        raise HTTPException(
+            status_code=400,
+            detail="La franja de derecho de vía no intersecta con la línea del tramo.",
+        )
 
     set_audit_context(db, user_id)
     franja_actual = get_franja_activa(db, id_tramo)
