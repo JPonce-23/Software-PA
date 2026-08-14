@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import models, schemas, auth
 from ..database import get_db
 from ..services import franjas as franjas_service
-from ..services.access import filter_by_user_tramos, require_tramo_access
+from ..services.access import (
+    filter_by_user_tramos,
+    require_project_access,
+    require_tramo_access,
+)
 
 router = APIRouter(tags=["Franjas de Derecho de Vía"])
 
@@ -43,11 +47,15 @@ def list_franjas(
     response_model=List[schemas.FranjaDerechoViaResponse],
 )
 def list_franjas_activas(
+    id_proyecto: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(
         auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo'])
     ),
 ):
+    if id_proyecto is not None:
+        require_project_access(db, current_user, id_proyecto)
+
     query = db.query(
         models.FranjaDerechoVia.id_franja,
         models.FranjaDerechoVia.id_tramo,
@@ -66,6 +74,8 @@ def list_franjas_activas(
         models.FranjaDerechoVia.activo.is_(True),
         models.Tramo.activo.is_(True),
     )
+    if id_proyecto is not None:
+        query = query.filter(models.Tramo.id_proyecto == id_proyecto)
     query = filter_by_user_tramos(
         query,
         db,

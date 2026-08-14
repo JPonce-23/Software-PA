@@ -1,7 +1,7 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { Layers, Maximize, CheckCircle } from 'lucide-react';
+import React, { useContext, useState, useEffect, useMemo, useRef } from 'react';
+import { Layers, Maximize, CheckCircle, MapPin, ChevronUp, ChevronDown, ExternalLink, X } from 'lucide-react';
 import { MapContainer, TileLayer, GeoJSON, LayersControl, useMap } from 'react-leaflet';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from '../api/axios';
@@ -10,15 +10,20 @@ import FranjaDerechoViaPanel from '../components/fase2/FranjaDerechoViaPanel';
 import NucleosImportPanel from '../components/fase2/NucleosImportPanel';
 import AuthContext from '../contexts/auth-context';
 
-const coloresPorTramo = {
-  "Tren Maya tramo 1": "#E63946",
-  "Tren Maya tramo 2": "#F4A261",
-  "Tren Maya tramo 3": "#E9C46A",
-  "Tren Maya tramo 4": "#2A9D8F",
-  "Tren Maya tramo 5": "#219EBC",
-  "Tren Maya tramo 6": "#023047",
-  "Tren Maya tramo 7": "#9B2247" // Guinda Institucional (reemplaza al morado)
-};
+// Paleta de colores diferenciados por proyecto
+const PROJECT_PALETTE = [
+  '#E63946', '#2A9D8F', '#219EBC', '#023047', '#9B2247',
+  '#F4A261', '#6A4C93', '#1982C4', '#8AC926', '#FF595E',
+];
+
+function getProjectColor(idProyecto, projectIds) {
+  const idx = projectIds.indexOf(idProyecto);
+  return PROJECT_PALETTE[(idx >= 0 ? idx : 0) % PROJECT_PALETTE.length];
+}
+
+// Centro geográfico de México y zoom para vista general
+const MEXICO_CENTER = [23.6345, -102.5528];
+const MEXICO_ZOOM = 5;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
@@ -30,113 +35,215 @@ function escapeHtml(value) {
   }[character]));
 }
 
-// Componente para auto-ajustar el zoom al polígono del tramo
-function MapFitter({ geojsonData }) {
+// Componente para auto-ajustar el zoom al polígono
+function MapFitter({ geojsonData, selectedTramoId }) {
   const map = useMap();
+  const didFitTramo = useRef(null);
+
   useEffect(() => {
     if (geojsonData && geojsonData.features.length > 0) {
       try {
-        const layer = L.geoJSON(geojsonData);
+        let featuresToFit = geojsonData.features;
+        // Si hay un tramo seleccionado y acabamos de cambiar a él, enfocar
+        if (selectedTramoId && didFitTramo.current !== selectedTramoId) {
+          const tramoFeature = featuresToFit.find(f => f.properties?.id_tramo === selectedTramoId);
+          if (tramoFeature) {
+            featuresToFit = [tramoFeature];
+            didFitTramo.current = selectedTramoId;
+          }
+        } else if (!selectedTramoId) {
+          didFitTramo.current = null;
+        }
+
+        const layer = L.geoJSON({ type: "FeatureCollection", features: featuresToFit });
         map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 11 });
       } catch (e) {
         console.error("Error ajustando límites", e);
       }
     }
-  }, [geojsonData, map]);
+  }, [geojsonData, selectedTramoId, map]);
   return null;
+}
+
+function buildNucleosGeoJSON(data, selectedTramoId = null) {
+  const features = data.map(n => {
+    if (!n.geometria_wkt) return null;
+
+    // Semáforo agrario
+    let fillColor = "#94a3b8"; // Gris - En proceso
+    if (n.estatus_simulado === 'liberado') fillColor = "#22c55e"; // Verde
+    if (n.estatus_simulado === 'problema') fillColor = "#ef4444"; // Rojo
+
+    return {
+      type: "Feature",
+      properties: {
+        id_tramo: n.id_tramo || selectedTramoId,
+        name: n.nombre_nucleo,
+        tipo: n.tipo_nucleo,
+        estatus: n.estatus_simulado,
+        area_ha: n.area_ha,
+        area_afectada_ha: n.area_afectada_ha,
+        color: "#ffffff", // Borde blanco
+        fillColor: fillColor,
+        fillOpacity: 0.7
+      },
+      geometry: parse(n.geometria_wkt)
+    };
+  }).filter(Boolean);
+  return { type: "FeatureCollection", features };
 }
 
 export default function Mapa() {
   const { user } = useContext(AuthContext);
-  const [searchParams] = useSearchParams();
-  const idTramo = Number(searchParams.get('id_tramo')) || null;
-  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Fuente única de verdad: URL Query Params
+  const idProyectoParam = searchParams.get('id_proyecto');
+  const selectedProjectId = idProyectoParam === 'all' ? 'all' : (Number(idProyectoParam) || null);
+
+  const idTramoParam = searchParams.get('seleccionar_tramo');
+  const selectedTramoId = Number(idTramoParam) || null;
+
+  // Lista de proyectos
+  const [proyectos, setProyectos] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+
+  // Capas GeoJSON
   const [tramosGeoJSON, setTramosGeoJSON] = useState(null);
   const [franjasGeoJSON, setFranjasGeoJSON] = useState(null);
   const [nucleosGeoJSON, setNucleosGeoJSON] = useState(null);
+
+  // Panel de detalles del tramo
   const [tramoDetalle, setTramoDetalle] = useState(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  // Revisión para forzar recarga tras importación
   const [nucleosRevision, setNucleosRevision] = useState(0);
   const [franjasRevision, setFranjasRevision] = useState(0);
-  const centerPosition = [19.25, -90.25];
 
+  // Estado de carga y error
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // IDs de proyectos disponibles para paleta de colores
+  const projectIds = useMemo(() => proyectos.map(p => p.id_proyecto), [proyectos]);
+
+  // 1. Cargar lista de proyectos al montar
   useEffect(() => {
-    // 1. Cargar el Tramo principal (o todos si no hay param)
-    if (idTramo) {
-      api.get(`/tramo-detalles?id_tramo=${idTramo}`).then(res => {
-        setTramoDetalle(res.data);
-        if (res.data.geometria_wkt) {
-          setTramosGeoJSON({
-            type: "FeatureCollection",
-            features: [{
-              type: "Feature",
-              properties: { name: res.data.nombre_tramo, color: coloresPorTramo[res.data.nombre_tramo] || "#ff0000", weight: 6 },
-              geometry: parse(res.data.geometria_wkt)
-            }]
-          });
-        }
-      }).catch(console.error);
-    } else {
-      api.get('/tramos').then(res => {
-        const features = res.data.map(t => {
-          if (!t.geometria_wkt) return null;
-          return {
-            type: "Feature",
-            properties: { name: t.nombre_tramo, color: coloresPorTramo[t.nombre_tramo] || "#333333", weight: 5 },
-            geometry: parse(t.geometria_wkt)
-          };
-        }).filter(Boolean);
-        setTramosGeoJSON({ type: "FeatureCollection", features });
-      }).catch(console.error);
+    api.get('/proyectos')
+      .then(res => setProyectos(res.data))
+      .catch(() => {
+        setProyectos([]);
+        setError('No fue posible cargar los proyectos disponibles.');
+      })
+      .finally(() => setProjectsLoading(false));
+  }, []);
+
+  // 2. Cargar datos geoespaciales según el proyecto seleccionado con AbortController
+  useEffect(() => {
+    // Limpiar geometrías y detalle inmediatamente al cambiar de proyecto (Fase 6)
+    setTramosGeoJSON(null);
+    setFranjasGeoJSON(null);
+    setNucleosGeoJSON(null);
+    setTramoDetalle(null);
+    setError(null);
+
+    if (selectedProjectId === null) {
+      setLoading(false);
+      return;
     }
 
-    // 2. Cargar la versión activa del derecho de vía.
-    const urlFranjas = idTramo ? `/tramos/${idTramo}/franjas` : '/franjas/activas';
-    api.get(urlFranjas).then(res => {
-      const features = res.data.filter((franja) => franja.activo && franja.geometria_wkt).map((franja) => ({
-        type: 'Feature',
-        properties: {
-          id_tramo: franja.id_tramo,
-          fuente: franja.fuente,
-          color: '#ca8a04',
-          fillColor: '#facc15',
-          fillOpacity: 0.35,
-          weight: 1.5,
-        },
-        geometry: parse(franja.geometria_wkt),
-      }));
-      setFranjasGeoJSON({ type: 'FeatureCollection', features });
-    }).catch(() => setFranjasGeoJSON({ type: 'FeatureCollection', features: [] }));
+    const abortController = new AbortController();
+    setLoading(true);
 
-    // 3. Cargar núcleos agrarios afectados por la franja activa.
-    const urlNucleos = idTramo ? `/nucleos?id_tramo=${idTramo}` : '/nucleos';
-    api.get(urlNucleos).then(res => {
-      const features = res.data.map(n => {
-        if (!n.geometria_wkt) return null;
-        
-        // Semáforo agrario
-        let fillColor = "#94a3b8"; // Gris - En proceso
-        if (n.estatus_simulado === 'liberado') fillColor = "#22c55e"; // Verde
-        if (n.estatus_simulado === 'problema') fillColor = "#ef4444"; // Rojo
+    const isAll = selectedProjectId === 'all';
+    const tramosUrl = isAll ? '/tramos' : `/tramos?id_proyecto=${selectedProjectId}`;
+    const franjasUrl = isAll ? '/franjas/activas' : `/franjas/activas?id_proyecto=${selectedProjectId}`;
+    const nucleosUrl = selectedTramoId
+      ? `/nucleos?id_tramo=${selectedTramoId}`
+      : isAll ? '/nucleos' : `/nucleos?id_proyecto=${selectedProjectId}`;
 
+    Promise.all([
+      api.get(tramosUrl, { signal: abortController.signal }),
+      api.get(franjasUrl, { signal: abortController.signal }),
+      api.get(nucleosUrl, { signal: abortController.signal }),
+    ]).then(([resTramos, resFranjas, resNucleos]) => {
+      if (selectedTramoId && !resTramos.data.some((tramo) => tramo.id_tramo === selectedTramoId)) {
+        setSearchParams((currentParams) => {
+          const nextParams = new URLSearchParams(currentParams);
+          nextParams.delete('seleccionar_tramo');
+          return nextParams;
+        }, { replace: true });
+        return;
+      }
+
+      // Tramos con color por proyecto
+      const tramoFeatures = resTramos.data.map(t => {
+        if (!t.geometria_wkt) return null;
         return {
           type: "Feature",
-          properties: { 
-            name: n.nombre_nucleo, 
-            tipo: n.tipo_nucleo,
-            estatus: n.estatus_simulado,
-            area_ha: n.area_ha,
-            area_afectada_ha: n.area_afectada_ha,
-            color: "#ffffff", // Borde blanco
-            fillColor: fillColor, 
-            fillOpacity: 0.7 
+          properties: {
+            name: t.nombre_tramo,
+            id_tramo: t.id_tramo,
+            id_proyecto: t.id_proyecto,
+            color: getProjectColor(t.id_proyecto, projectIds),
+            weight: 5,
           },
-          geometry: parse(n.geometria_wkt)
+          geometry: parse(t.geometria_wkt)
         };
       }).filter(Boolean);
+      setTramosGeoJSON({ type: "FeatureCollection", features: tramoFeatures });
 
-      setNucleosGeoJSON({ type: "FeatureCollection", features });
-    }).catch(console.error);
-  }, [idTramo, nucleosRevision, franjasRevision]);
+      // Franjas
+      const franjaFeatures = resFranjas.data
+        .filter(f => f.activo && f.geometria_wkt)
+        .map(franja => ({
+          type: 'Feature',
+          properties: {
+            id_tramo: franja.id_tramo,
+            fuente: franja.fuente,
+            color: '#ca8a04',
+            fillColor: '#facc15',
+            fillOpacity: 0.35,
+            weight: 1.5,
+          },
+          geometry: parse(franja.geometria_wkt),
+        }));
+      setFranjasGeoJSON({ type: 'FeatureCollection', features: franjaFeatures });
+
+      // Núcleos
+      setNucleosGeoJSON(buildNucleosGeoJSON(resNucleos.data, selectedTramoId));
+    }).catch(err => {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
+      console.error('Error al cargar capas:', err);
+      setError('Error al cargar datos geoespaciales.');
+    }).finally(() => {
+      if (!abortController.signal.aborted) {
+        setLoading(false);
+      }
+    });
+
+    return () => abortController.abort(); // Cancelar petición si el componente se desmonta o cambia el proyecto (Fase 7)
+  }, [selectedProjectId, selectedTramoId, nucleosRevision, franjasRevision, projectIds, setSearchParams]);
+
+  // 3. Cargar detalle de tramo seleccionado
+  useEffect(() => {
+    if (!selectedTramoId) {
+      setTramoDetalle(null);
+      return;
+    }
+    const abortController = new AbortController();
+    api.get(`/tramo-detalles?id_tramo=${selectedTramoId}`, { signal: abortController.signal })
+      .then(res => {
+        setTramoDetalle(res.data);
+        setIsPanelOpen(false); // Fase 9: Panel inicialmente contraído
+      })
+      .catch(err => {
+        if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') console.error(err);
+      });
+    return () => abortController.abort();
+  }, [selectedTramoId]);
 
   const onEachNucleo = (feature, layer) => {
     if (feature.properties && feature.properties.name) {
@@ -159,96 +266,355 @@ export default function Mapa() {
     }
   };
 
-  const styleFeature = (feature) => ({
-    color: feature.properties.color,
-    weight: feature.properties.weight || 1.5,
-    fillColor: feature.properties.fillColor || feature.properties.color,
-    fillOpacity: feature.properties.fillOpacity || 0.2
-  });
+  const handleSelectTramo = (id_tramo) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (id_tramo) {
+      nextParams.set('seleccionar_tramo', id_tramo);
+    } else {
+      nextParams.delete('seleccionar_tramo');
+    }
+    setSearchParams(nextParams);
+  };
 
-  const totalNucleos = nucleosGeoJSON ? nucleosGeoJSON.features.length : 0;
-  const areaTotal = nucleosGeoJSON ? nucleosGeoJSON.features.reduce((acc, f) => acc + (f.properties.area_afectada_ha || 0), 0) : 0;
-  const liberados = nucleosGeoJSON ? nucleosGeoJSON.features.filter(f => f.properties.estatus === 'liberado').length : 0;
+  const onEachTramo = (feature, layer) => {
+    if (feature.properties) {
+      const idTramo = feature.properties.id_tramo;
+      const proyecto = proyectos.find(p => p.id_proyecto === feature.properties.id_proyecto);
+      const proyectoLabel = proyecto ? proyecto.nombre_proyecto : '';
+
+      if (feature.properties.name) {
+        layer.bindTooltip(
+          `<strong>${escapeHtml(feature.properties.name)}</strong>${proyectoLabel ? `<br/><span style="font-size:11px;color:#64748b">${escapeHtml(proyectoLabel)}</span>` : ''}`,
+          { sticky: true }
+        );
+      }
+
+      layer.on({
+        click: () => {
+          handleSelectTramo(idTramo);
+        }
+      });
+    }
+  };
+
+  const styleFeature = (feature) => {
+    return {
+      color: feature.properties.color,
+      weight: feature.properties.weight || 1.5,
+      opacity: 1.0, // Ya no atenuamos porque filtramos las no seleccionadas
+      fillColor: feature.properties.fillColor || feature.properties.color,
+      fillOpacity: feature.properties.fillOpacity || 0.2
+    };
+  };
+
+  // Fase 2: Selección Exclusiva. Filtramos para mostrar SÓLO lo del tramo seleccionado
+  const tramosVisibles = useMemo(() => {
+    if (!tramosGeoJSON) return null;
+    if (!selectedTramoId) return tramosGeoJSON;
+    return { ...tramosGeoJSON, features: tramosGeoJSON.features.filter(f => f.properties.id_tramo === selectedTramoId) };
+  }, [tramosGeoJSON, selectedTramoId]);
+
+  const franjasVisibles = useMemo(() => {
+    if (!franjasGeoJSON) return null;
+    if (!selectedTramoId) return franjasGeoJSON;
+    return { ...franjasGeoJSON, features: franjasGeoJSON.features.filter(f => f.properties.id_tramo === selectedTramoId) };
+  }, [franjasGeoJSON, selectedTramoId]);
+
+  const nucleosVisibles = useMemo(() => {
+    if (!nucleosGeoJSON) return null;
+    if (!selectedTramoId) return nucleosGeoJSON;
+    return { ...nucleosGeoJSON, features: nucleosGeoJSON.features.filter(f => f.properties.id_tramo === selectedTramoId) };
+  }, [nucleosGeoJSON, selectedTramoId]);
+
+  const totalNucleos = nucleosVisibles ? nucleosVisibles.features.length : 0;
+  const areaTotal = nucleosVisibles
+    ? nucleosVisibles.features.reduce(
+      (acc, feature) => acc + (Number(
+        selectedTramoId ? feature.properties.area_afectada_ha : feature.properties.area_ha,
+      ) || 0),
+      0,
+    )
+    : 0;
+  const liberados = nucleosVisibles ? nucleosVisibles.features.filter(f => f.properties.estatus === 'liberado').length : 0;
+
+  // Determinar datos para fitBounds
+  const boundsData = nucleosVisibles?.features.length
+    ? nucleosVisibles
+    : franjasVisibles?.features.length
+      ? franjasVisibles
+      : tramosVisibles?.features.length
+        ? tramosVisibles
+        : null;
+
+  // Proyecto actualmente seleccionado (para título del panel)
+  const proyectoSeleccionado = typeof selectedProjectId === 'number'
+    ? proyectos.find(p => p.id_proyecto === selectedProjectId)
+    : null;
+
+  const handleProjectChange = (e) => {
+    const val = e.target.value;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('seleccionar_tramo');
+    if (val === '') nextParams.delete('id_proyecto');
+    else nextParams.set('id_proyecto', val);
+    setSearchParams(nextParams);
+  };
+
+  // Leyenda de proyectos para modo "Todos"
+  const projectLegend = useMemo(() => {
+    if (selectedProjectId !== 'all' || !tramosGeoJSON) return [];
+    const idsEnMapa = [...new Set(tramosGeoJSON.features.map(f => f.properties.id_proyecto))];
+    return idsEnMapa
+      .map(pid => {
+        const p = proyectos.find(pr => pr.id_proyecto === pid);
+        return p ? { id: pid, name: p.nombre_proyecto, color: getProjectColor(pid, projectIds) } : null;
+      }).filter(Boolean);
+  }, [selectedProjectId, tramosGeoJSON, proyectos, projectIds]);
+
+  const noProjectsAssigned = proyectos.length === 0;
+  const hasData = tramosGeoJSON?.features.length > 0
+    || franjasGeoJSON?.features.length > 0
+    || nucleosGeoJSON?.features.length > 0;
+
+  // Keys para forzar re-render de GeoJSON cuando cambian los datos
+  const layerKey = `proj-${selectedProjectId}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '20px' }}>
       <div style={{ flex: '1', position: 'relative', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', minHeight: '600px' }}>
-        {!idTramo && ['admin', 'geografo'].includes(user?.rol) && (
+
+        {/* ────── SELECTOR DE PROYECTO ────── */}
+        <div className="mapa-project-selector">
+          <MapPin size={16} style={{ color: '#64748b', flexShrink: 0 }} />
+          <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>
+            Proyecto:
+          </label>
+          <select
+            value={selectedProjectId === null ? '' : selectedProjectId}
+            onChange={handleProjectChange}
+            className="mapa-project-select"
+          >
+            <option value="">Seleccionar proyecto…</option>
+            <option value="all">Todos los proyectos</option>
+            {proyectos.map(p => (
+              <option key={p.id_proyecto} value={p.id_proyecto}>
+                {p.nombre_proyecto}
+              </option>
+            ))}
+          </select>
+          {(loading || projectsLoading) && <div className="mapa-spinner" />}
+        </div>
+
+        {/* ────── MENSAJE SIN SELECCIÓN ────── */}
+        {selectedProjectId === null && !loading && !projectsLoading && !error && (
+          <div className="mapa-overlay-message">
+            {noProjectsAssigned ? (
+              <>
+                <p style={{ margin: 0, fontSize: '15px', color: '#64748b' }}>
+                  No tienes proyectos asignados.
+                </p>
+                <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                  Contacta al administrador para obtener acceso.
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: 0, fontSize: '15px', color: '#64748b' }}>
+                  Selecciona un proyecto para visualizar sus datos geoespaciales.
+                </p>
+                <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                  Usa el selector en la esquina superior izquierda.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ────── MENSAJE SIN GEOMETRÍAS ────── */}
+        {selectedProjectId !== null && !loading && !error && !hasData && (
+          <div className="mapa-overlay-message">
+            <p style={{ margin: 0, fontSize: '15px', color: '#64748b' }}>
+              Este proyecto no tiene geometrías registradas.
+            </p>
+          </div>
+        )}
+
+        {/* ────── ERROR ────── */}
+        {error && (
+          <div style={{
+            position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 1000,
+            background: '#fef2f2', border: '1px solid #fecaca',
+            padding: '10px 20px', borderRadius: '10px',
+            fontSize: '13px', color: '#dc2626',
+            fontFamily: 'Inter, sans-serif',
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* ────── IMPORTACIÓN DE NÚCLEOS ────── */}
+        {['admin', 'geografo'].includes(user?.rol) && (
           <NucleosImportPanel
             role={user.rol}
             onImportSuccess={() => setNucleosRevision((revision) => revision + 1)}
           />
         )}
-        
-        {/* PANEL TÉCNICO GLASSMORPHISM */}
-        {idTramo && tramoDetalle && (
-          <div style={{
-            position: 'absolute', top: '20px', left: '60px', zIndex: 1000,
+
+        {/* ────── PANEL TÉCNICO GLASSMORPHISM (modo tramo) ────── */}
+        {selectedTramoId && tramoDetalle && (
+          <div className="mapa-tramo-panel" style={{
+            position: 'absolute', top: '130px', left: '60px', zIndex: 1000, // Fase 8: Evitar superposición moviéndolo debajo de Selector y Importar
             background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(12px)',
-            padding: '20px', borderRadius: '16px', width: '320px',
+            borderRadius: '16px', width: '320px',
             boxShadow: '0 8px 32px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.8)',
-            fontFamily: 'Inter, sans-serif'
+            fontFamily: 'Inter, sans-serif',
+            overflow: 'hidden',
+            maxHeight: 'calc(100% - 150px)',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
-            <h2 style={{ margin: '0 0 5px 0', fontSize: '20px', color: '#0f172a' }}>{tramoDetalle.nombre_tramo}</h2>
-            <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b' }}>Análisis Geoespacial en Vivo</p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: '#e0f2fe', padding: '8px', borderRadius: '8px', color: '#0ea5e9' }}><Maximize size={18} /></div>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Longitud del Trazo</div>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>{tramoDetalle.longitud_km} km</div>
-                </div>
+            <header
+              onClick={() => setIsPanelOpen(!isPanelOpen)}
+              style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '15px 20px', cursor: 'pointer', background: 'rgba(255, 255, 255, 0.5)',
+                borderBottom: isPanelOpen ? '1px solid rgba(0,0,0,0.05)' : 'none',
+                flexShrink: 0
+              }}
+            >
+              <div>
+                <h2 style={{ margin: '0 0 2px 0', fontSize: '16px', color: '#0f172a' }}>{tramoDetalle.nombre_tramo}</h2>
+                <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{isPanelOpen ? 'Análisis Geoespacial' : 'Ver información del tramo'}</p>
               </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: '#fef3c7', padding: '8px', borderRadius: '8px', color: '#d97706' }}><Layers size={18} /></div>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Superficie Afectada</div>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>{areaTotal.toLocaleString(undefined, {maximumFractionDigits:2})} ha</div>
-                </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex' }}
+                  title={isPanelOpen ? "Ocultar panel" : "Mostrar panel"}
+                >
+                  {isPanelOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleSelectTramo(null); }}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex' }}
+                  title="Cerrar panel y deseleccionar tramo"
+                >
+                  <X size={20} />
+                </button>
               </div>
+            </header>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: '#dcfce7', padding: '8px', borderRadius: '8px', color: '#16a34a' }}><CheckCircle size={18} /></div>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Estatus de Liberación</div>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>{liberados} de {totalNucleos} núcleos</div>
-                  {totalNucleos > 0 && (
-                    <div style={{ width: '100%', background: '#e2e8f0', height: '6px', borderRadius: '3px', marginTop: '5px' }}>
-                      <div style={{ width: `${(liberados/totalNucleos)*100}%`, background: '#22c55e', height: '100%', borderRadius: '3px' }}></div>
+            {isPanelOpen && (
+              <div style={{ padding: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: '#e0f2fe', padding: '8px', borderRadius: '8px', color: '#0ea5e9' }}><Maximize size={18} /></div>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>Longitud del Trazo</div>
+                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>{tramoDetalle.longitud_km} km</div>
                     </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: '#fef3c7', padding: '8px', borderRadius: '8px', color: '#d97706' }}><Layers size={18} /></div>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>Superficie Afectada</div>
+                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>{areaTotal.toLocaleString(undefined, {maximumFractionDigits:2})} ha</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: '#dcfce7', padding: '8px', borderRadius: '8px', color: '#16a34a' }}><CheckCircle size={18} /></div>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>Estatus de Liberación</div>
+                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>{liberados} de {totalNucleos} núcleos</div>
+                      {totalNucleos > 0 && (
+                        <div style={{ width: '100%', background: '#e2e8f0', height: '6px', borderRadius: '3px', marginTop: '5px' }}>
+                          <div style={{ width: `${(liberados/totalNucleos)*100}%`, background: '#22c55e', height: '100%', borderRadius: '3px' }}></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b' }}>
+                  <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '10px', height: '10px', background: '#22c55e', borderRadius: '50%'}}></span> Liberado</span>
+                  <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '10px', height: '10px', background: '#94a3b8', borderRadius: '50%'}}></span> Proceso</span>
+                  <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%'}}></span> Problema</span>
+                </div>
+
+                <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button
+                    onClick={() => navigate(`/expedientes?id_tramo=${selectedTramoId}`)}
+                    style={{ width: '100%', padding: '10px', background: '#006341', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  >
+                    <ExternalLink size={16} />
+                    Ver expedientes
+                  </button>
+
+                  {['admin', 'geografo'].includes(user?.rol) && (
+                    <FranjaDerechoViaPanel
+                      idTramo={selectedTramoId}
+                      onImportSuccess={() => setFranjasRevision((revision) => revision + 1)}
+                    />
                   )}
                 </div>
               </div>
-            </div>
-
-            <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b' }}>
-              <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '10px', height: '10px', background: '#22c55e', borderRadius: '50%'}}></span> Liberado</span>
-              <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '10px', height: '10px', background: '#94a3b8', borderRadius: '50%'}}></span> Proceso</span>
-              <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%'}}></span> Problema</span>
-            </div>
-
-            {['admin', 'geografo'].includes(user?.rol) && (
-              <FranjaDerechoViaPanel
-                idTramo={idTramo}
-                onImportSuccess={() => setFranjasRevision((revision) => revision + 1)}
-              />
             )}
           </div>
         )}
 
-        <MapContainer center={centerPosition} zoom={8} style={{ height: '100%', width: '100%' }}>
-          {/* Zoom Inteligente hacia los poligonos */}
-          <MapFitter
-            geojsonData={
-              nucleosGeoJSON?.features.length
-                ? nucleosGeoJSON
-                : franjasGeoJSON?.features.length
-                  ? franjasGeoJSON
-                  : tramosGeoJSON
-            }
-          />
+        {/* ────── PANEL RESUMEN (modo proyecto) ────── */}
+        {selectedProjectId !== null && !loading && totalNucleos > 0 && (
+          <div className="mapa-summary-panel">
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#0f172a' }}>
+              {proyectoSeleccionado ? proyectoSeleccionado.nombre_proyecto : 'Todos los proyectos'}
+            </h3>
+            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#475569' }}>
+              <div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b' }}>{totalNucleos}</div>
+                <div>Núcleos</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b' }}>{areaTotal.toLocaleString(undefined, {maximumFractionDigits:2})}</div>
+                <div>{selectedTramoId ? 'ha afectadas' : 'ha de núcleos'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>{liberados}</div>
+                <div>Liberados</div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b' }}>
+              <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%'}}></span> Liberado</span>
+              <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '8px', height: '8px', background: '#94a3b8', borderRadius: '50%'}}></span> Proceso</span>
+              <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%'}}></span> Problema</span>
+            </div>
+
+            {/* Leyenda de proyectos (modo todos) */}
+            {projectLegend.length > 1 && (
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px', fontWeight: 600 }}>Proyectos</div>
+                {projectLegend.map(pl => (
+                  <div key={pl.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#334155', marginBottom: '3px' }}>
+                    <span style={{ width: '14px', height: '3px', background: pl.color, borderRadius: '2px', flexShrink: 0 }}></span>
+                    {pl.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <MapContainer
+          center={MEXICO_CENTER}
+          zoom={MEXICO_ZOOM}
+          style={{ height: '100%', width: '100%' }}
+        >
+          {/* Zoom Inteligente hacia los polígonos */}
+          {boundsData && selectedProjectId !== null && (
+            <MapFitter geojsonData={boundsData} selectedTramoId={selectedTramoId} />
+          )}
 
           <LayersControl position="topright">
             {/* 1. Capa Satelital (Ideal para ver terrenos reales) */}
@@ -258,7 +624,7 @@ export default function Mapa() {
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               />
             </LayersControl.BaseLayer>
-            
+
             {/* 2. Capa Clara / Escala de Grises (Ideal para resaltar los polígonos) */}
             <LayersControl.BaseLayer checked name="Minimalista Claro (CartoDB)">
               <TileLayer
@@ -291,33 +657,34 @@ export default function Mapa() {
               />
             </LayersControl.BaseLayer>
 
-            {nucleosGeoJSON && (
+            {nucleosVisibles?.features.length > 0 && (
               <LayersControl.Overlay checked name="Núcleos Agrarios">
-                <GeoJSON 
-                  key={idTramo ? `${idTramo}-nucleos` : "all-nucleos"}
-                  data={nucleosGeoJSON} 
-                  style={styleFeature} 
-                  onEachFeature={onEachNucleo} 
+                <GeoJSON
+                  key={`${layerKey}-nucleos-${nucleosRevision}-sel-${selectedTramoId}`}
+                  data={nucleosVisibles}
+                  style={styleFeature}
+                  onEachFeature={onEachNucleo}
                 />
               </LayersControl.Overlay>
             )}
 
-            {franjasGeoJSON?.features.length > 0 && (
+            {franjasVisibles?.features.length > 0 && (
               <LayersControl.Overlay checked name="Derecho de vía">
                 <GeoJSON
-                  key={idTramo ? `${idTramo}-franja-${franjasRevision}` : `all-franjas-${franjasRevision}`}
-                  data={franjasGeoJSON}
+                  key={`${layerKey}-franja-${franjasRevision}-sel-${selectedTramoId}`}
+                  data={franjasVisibles}
                   style={styleFeature}
                 />
               </LayersControl.Overlay>
             )}
 
-            {tramosGeoJSON && (
+            {tramosVisibles?.features.length > 0 && (
               <LayersControl.Overlay checked name="Eje ferroviario">
-                <GeoJSON 
-                  key={idTramo ? `${idTramo}-tramo` : "all-tramos"}
-                  data={tramosGeoJSON} 
-                  style={styleFeature} 
+                <GeoJSON
+                  key={`${layerKey}-tramo-sel-${selectedTramoId}`}
+                  data={tramosVisibles}
+                  style={styleFeature}
+                  onEachFeature={onEachTramo}
                 />
               </LayersControl.Overlay>
             )}

@@ -150,6 +150,17 @@ class TestTramoDetalles:
         assert "nombre_tramo" in body
         assert "longitud_km" in body
 
+    def test_franjas_activas_filtra_por_proyecto(
+        self, client, admin_session, seed_proyecto, seed_tramo
+    ):
+        response = client.get(
+            f"/api/franjas/activas?id_proyecto={seed_proyecto['id_proyecto']}",
+            headers=admin_session,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()
+        assert {item["id_tramo"] for item in response.json()} == {seed_tramo["id_tramo"]}
+
     def test_tramo_detalles_inexistente(self, client, admin_session):
         res = client.get(
             "/api/tramo-detalles?id_tramo=999999",

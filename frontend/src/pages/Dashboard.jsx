@@ -14,7 +14,7 @@ function ProjectCard({ tramo, proyecto, nucleosTramo }) {
   return (
     <article
       className="project-card"
-      onClick={() => navigate(`/mapa?id_tramo=${tramo.id_tramo}`)}
+      onClick={() => navigate(`/mapa?id_proyecto=${tramo.id_proyecto}&seleccionar_tramo=${tramo.id_tramo}`)}
       style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
     >
       <div className="project-card-badge">
@@ -62,6 +62,7 @@ function ProjectCard({ tramo, proyecto, nucleosTramo }) {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [tramosData, setTramosData] = useState([]);
   const [proyectosData, setProyectosData] = useState([]);
   const [metricsData, setMetricsData] = useState([]);
@@ -131,15 +132,25 @@ export default function Dashboard() {
     <div>
       <div className="dashboard-header">
         <h2 style={{color: '#1e293b', margin: 0}}>{titulo}</h2>
-        <label className="project-filter">
-          <span>Proyecto</span>
-          <select value={proyectoFiltro || ''} onChange={handleProjectChange}>
-            <option value="">Todos</option>
-            {proyectosData.map(p => (
-              <option key={p.id_proyecto} value={p.id_proyecto}>{p.nombre_proyecto}</option>
-            ))}
-          </select>
-        </label>
+        <div className="dashboard-map-actions">
+          <label className="project-filter">
+            <span>Proyecto</span>
+            <select value={proyectoFiltro || ''} onChange={handleProjectChange}>
+              <option value="">Todos</option>
+              {proyectosData.map(p => (
+                <option key={p.id_proyecto} value={p.id_proyecto}>{p.nombre_proyecto}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="dashboard-map-button"
+            onClick={() => navigate(proyectoFiltro ? `/mapa?id_proyecto=${proyectoFiltro}` : `/mapa?id_proyecto=all`)}
+          >
+            <Map size={16} />
+            Ver Mapa
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
