@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, FolderOpen, MapPin, ChevronRight, Loader2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Search, FolderOpen, MapPin, ChevronRight, Loader2, X } from 'lucide-react';
 import api from '../api/axios';
 
 export default function ExpedientesList() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const idTramoFiltro = searchParams.get('id_tramo') ? Number(searchParams.get('id_tramo')) : null;
+
   const [tramosNucleos, setTramosNucleos] = useState([]);
   const [nucleosMap, setNucleosMap] = useState({});
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,8 @@ export default function ExpedientesList() {
   }, []);
 
   const filtrados = tramosNucleos.filter(tn => {
+    if (idTramoFiltro && tn.id_tramo !== idTramoFiltro) return false;
+
     const nombre = nucleosMap[tn.id_nucleo] || '';
     const tramo = String(tn.numero_tramo || '');
     const consec = String(tn.consecutivo || '');
@@ -70,17 +75,33 @@ export default function ExpedientesList() {
     );
   }
 
+  const handleLimpiarFiltroTramo = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('id_tramo');
+    setSearchParams(nextParams);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
       {/* Barra superior */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '16px 24px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#006341', fontWeight: '600', fontSize: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#006341', fontWeight: '600', fontSize: '16px', flexWrap: 'wrap' }}>
           <FolderOpen size={20} />
           Expedientes de Ejidos y Comunidades
           <span style={{ background: '#e0f0eb', color: '#006341', borderRadius: '20px', padding: '2px 10px', fontSize: '13px' }}>
             {filtrados.length} expedientes
           </span>
+          {idTramoFiltro && (
+            <button
+              type="button"
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#d97706', borderRadius: '20px', padding: '2px 10px', fontSize: '13px', border: '1px solid #fde68a', cursor: 'pointer' }}
+              onClick={handleLimpiarFiltroTramo}
+              title="Quitar filtro de Tramo"
+            >
+              Tramo {idTramoFiltro} <X size={14} style={{ cursor: 'pointer' }} />
+            </button>
+          )}
         </div>
 
         <div style={{ position: 'relative', width: '320px' }}>
