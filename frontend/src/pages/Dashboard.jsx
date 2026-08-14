@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Files, Layers, Map } from 'lucide-react';
+import { Files, FolderKanban, Layers, Map } from 'lucide-react';
 
 function ProjectCard({ tramo, proyecto, nucleosTramo }) {
   const navigate = useNavigate();
@@ -15,10 +15,12 @@ function ProjectCard({ tramo, proyecto, nucleosTramo }) {
     <article
       className="project-card"
       onClick={() => navigate(`/mapa?id_tramo=${tramo.id_tramo}`)}
-      style={{ cursor: 'pointer', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-5px)' } }}
+      style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
     >
-      <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>
-        {proyecto?.nombre_proyecto || 'Proyecto sin asignar'}
+      <div className="project-card-badge">
+        <FolderKanban size={14} />
+        <span>{proyecto?.clave_proyecto || 'S/P'}</span>
+        <strong>{proyecto?.nombre_proyecto || 'Proyecto sin asignar'}</strong>
       </div>
       <h2>{tramo.nombre_tramo}</h2>
 
@@ -127,18 +129,17 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div className="dashboard-header">
         <h2 style={{color: '#1e293b', margin: 0}}>{titulo}</h2>
-        <select
-          value={proyectoFiltro || ''}
-          onChange={handleProjectChange}
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-        >
-          <option value="">Todos los Proyectos</option>
-          {proyectosData.map(p => (
-            <option key={p.id_proyecto} value={p.id_proyecto}>{p.nombre_proyecto}</option>
-          ))}
-        </select>
+        <label className="project-filter">
+          <span>Proyecto</span>
+          <select value={proyectoFiltro || ''} onChange={handleProjectChange}>
+            <option value="">Todos</option>
+            {proyectosData.map(p => (
+              <option key={p.id_proyecto} value={p.id_proyecto}>{p.nombre_proyecto}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>

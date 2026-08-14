@@ -26,6 +26,8 @@ function Sidebar() {
   const { logout, user } = React.useContext(AuthContext);
   const location = useLocation();
   const [proyectos, setProyectos] = React.useState([]);
+  const canManageTerritory = ['admin', 'geografo'].includes(user?.rol);
+  const canManageUsers = user?.rol === 'admin';
 
   React.useEffect(() => {
     if (location.pathname === '/login') return undefined;
@@ -76,10 +78,10 @@ function Sidebar() {
           <Link className={`menu-item ${location.pathname === '/mapa' ? 'active' : ''}`} to="/mapa">Mapa Geoespacial</Link>
         </div>
 
-        {user?.rol === 'admin' && <div className="menu-group admin-menu-group">
+        {canManageTerritory && <div className="menu-group admin-menu-group">
           <h4>Administración</h4>
           <Link className={`menu-item ${isActive('/administracion/territorio') ? 'active' : ''}`} to="/administracion/territorio">Territorio</Link>
-          <Link className={`menu-item ${isActive('/administracion/usuarios') ? 'active' : ''}`} to="/administracion/usuarios">Usuarios y accesos</Link>
+          {canManageUsers && <Link className={`menu-item ${isActive('/administracion/usuarios') ? 'active' : ''}`} to="/administracion/usuarios">Usuarios y accesos</Link>}
         </div>}
 
         <Link className="menu-item logout" to="/login" onClick={logout}>Cerrar sesión</Link>
@@ -143,7 +145,7 @@ function AppContent() {
     return <Navigate to="/" replace />;
   }
 
-  const adminElement = (element) => user?.rol === 'admin'
+  const roleElement = (element, roles) => roles.includes(user?.rol)
     ? element
     : <Navigate to="/" replace />;
 
@@ -160,8 +162,8 @@ function AppContent() {
             <Route path="/expedientes"                  element={<ExpedientesList />} />
             <Route path="/expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion" element={<AfectacionSubexpediente />} />
             <Route path="/expedientes/:id_tramo_nucleo" element={<ExpedienteDetail />} />
-            <Route path="/administracion/territorio" element={adminElement(<AdministracionTerritorial />)} />
-            <Route path="/administracion/usuarios" element={adminElement(<AdministracionUsuarios />)} />
+            <Route path="/administracion/territorio" element={roleElement(<AdministracionTerritorial />, ['admin', 'geografo'])} />
+            <Route path="/administracion/usuarios" element={roleElement(<AdministracionUsuarios />, ['admin'])} />
           </Routes>
         </React.Suspense>
       </main>

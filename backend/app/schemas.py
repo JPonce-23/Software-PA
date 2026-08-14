@@ -190,6 +190,15 @@ class FranjaDerechoViaResponse(BaseModel):
     geometria_wkt: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
+
+class ProyectoResumen(BaseModel):
+    id_proyecto: int
+    clave_proyecto: str
+    nombre_proyecto: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class NucleoAgrarioCreate(AuditableCreate):
     id_municipio: int
     nombre_nucleo: str
@@ -207,6 +216,10 @@ class NucleoAgrarioUpdate(AuditableUpdate):
 class NucleoAgrarioResponse(BaseModel):
     id_nucleo: int
     id_municipio: Optional[int] = None
+    id_entidad: Optional[int] = None
+    municipio_nombre: Optional[str] = None
+    entidad_nombre: Optional[str] = None
+    proyectos_territoriales: List[ProyectoResumen] = Field(default_factory=list)
     nombre_nucleo: str
     tipo_nucleo: Literal['ejido', 'comunidad']
     comunidad_indigena: bool
@@ -215,6 +228,7 @@ class NucleoAgrarioResponse(BaseModel):
     activo: bool = True
     observaciones: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
 
 # ----------------- TRAMO NUCLEO ----------------- #
 class TramoNucleoCreate(AuditableCreate):
@@ -240,6 +254,15 @@ class TramoNucleoResponse(BaseModel):
     id_tramo_nucleo: int
     id_tramo: int
     id_nucleo: int
+    id_proyecto: Optional[int] = None
+    clave_proyecto: Optional[str] = None
+    nombre_proyecto: Optional[str] = None
+    nombre_tramo: Optional[str] = None
+    nombre_nucleo: Optional[str] = None
+    id_municipio: Optional[int] = None
+    municipio_nombre: Optional[str] = None
+    id_entidad: Optional[int] = None
+    entidad_nombre: Optional[str] = None
     consecutivo: int
     numero_tramo: Optional[str] = None
     geometria_wkt: Optional[str] = None
@@ -275,8 +298,41 @@ class ParcelaUpdate(AuditableUpdate):
 
 class ParcelaResponse(ParcelaCreate):
     id_parcela: int
+    geometria_wkt: Optional[str] = None
     activo: bool
     model_config = ConfigDict(from_attributes=True)
+
+
+class ImportacionTerritorialPreviewItem(BaseModel):
+    index: int
+    estado: Literal["valido", "error", "advertencia"]
+    accion: Literal["crear", "versionar"] = "crear"
+    resumen: str
+    datos: dict[str, Any] = Field(default_factory=dict)
+    errores: List[str] = Field(default_factory=list)
+    advertencias: List[str] = Field(default_factory=list)
+
+
+class ImportacionTerritorialPreviewResponse(BaseModel):
+    tipo: Literal["tramos", "nucleos", "derecho_via", "parcelas", "cruces_operativos"]
+    archivo_sha256: str
+    total: int
+    validos: int
+    errores: int
+    advertencias: int
+    items: List[ImportacionTerritorialPreviewItem]
+
+
+class ImportacionTerritorialConfirmRequest(BaseModel):
+    archivo_sha256: str
+    items: List[ImportacionTerritorialPreviewItem]
+
+
+class ImportacionTerritorialConfirmResponse(BaseModel):
+    tipo: Literal["tramos", "nucleos", "derecho_via", "parcelas", "cruces_operativos"]
+    total: int
+    ids_creados: List[int] = Field(default_factory=list)
+    mensaje: str
 
 # ----------------- DASHBOARD ----------------- #
 class DashboardMetrics(BaseModel):

@@ -17,7 +17,7 @@ from .database import engine, Base, SessionLocal, get_db
 from . import models, schemas
 from . import auth
 from .config import AUTH_SETTINGS
-from .routers import administration, alertas, authentication, documentos, flujo, minutas, pagos, personas, franjas
+from .routers import administration, alertas, authentication, documentos, flujo, importaciones_territoriales, minutas, pagos, personas, franjas
 from .services import administration as administration_service
 from .services import afectaciones as afectaciones_service
 from .services import authentication as authentication_service
@@ -148,6 +148,7 @@ app.include_router(flujo.router, prefix="/api")
 app.include_router(authentication.router, prefix="/api")
 app.include_router(franjas.router, prefix="/api")
 app.include_router(administration.router, prefix="/api")
+app.include_router(importaciones_territoriales.router, prefix="/api")
 
 os.makedirs(os.getenv("UPLOAD_ROOT", "uploads"), exist_ok=True)
 
@@ -320,14 +321,18 @@ def get_proyecto_by_id(id_proyecto: int, db: Session = Depends(get_db), current_
     return entity
 
 @app.post("/api/proyectos", tags=["Proyectos"], summary="Crear proyecto", response_model=schemas.ProyectoResponse, status_code=status.HTTP_201_CREATED)
-def create_proyecto(proyecto: schemas.ProyectoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
-    set_audit_context(db, current_user.id_usuario)
-    db_proyecto = models.Proyecto(**proyecto.model_dump())
-    db_proyecto.fecha_registro = datetime.now(timezone.utc).date()
-    db.add(db_proyecto)
-    db.commit()
-    db.refresh(db_proyecto)
-    return db_proyecto
+def create_proyecto(proyecto: schemas.ProyectoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))):
+    try:
+        set_audit_context(db, current_user.id_usuario)
+        db_proyecto = models.Proyecto(**proyecto.model_dump())
+        db_proyecto.fecha_registro = datetime.now(timezone.utc).date()
+        db.add(db_proyecto)
+        db.commit()
+        db.refresh(db_proyecto)
+        return db_proyecto
+    except Exception:
+        db.rollback()
+        raise
 
 @app.put("/api/proyectos/{id_proyecto}", tags=["Proyectos"], summary="Actualizar proyecto", response_model=schemas.ProyectoResponse)
 def update_proyecto(id_proyecto: int, data: schemas.ProyectoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
@@ -368,23 +373,47 @@ def get_tramos(id_proyecto: int = Query(None), skip: int = 0, limit: int = 100, 
     return query.offset(skip).limit(limit).all()
 
 @app.post("/api/tramos", tags=["Tramos"], summary="Crear tramo", response_model=schemas.TramoResponse, status_code=status.HTTP_201_CREATED)
-def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
-    # Validar que el proyecto exista
-    get_entity_by_id(db, models.Proyecto, tramo.id_proyecto, "id_proyecto")
-    set_audit_context(db, current_user.id_usuario)
-    data = tramo.model_dump()
-    wkt = data.pop("geometria_wkt", None)
-    validate_wkt(db, wkt, {"ST_MultiLineString"})
-    db_tramo = models.Tramo(**data, geometria_linea=wkt)
-    db_tramo.fecha_registro = datetime.now(timezone.utc).date()
-    db.add(db_tramo)
-    db.commit()
-    db.refresh(db_tramo)
-    resp = db_tramo.__dict__.copy()
-    resp["geometria_wkt"] = db.query(
-        models.Tramo.geometria_linea.ST_AsText()
-    ).filter(models.Tramo.id_tramo == db_tramo.id_tramo).scalar()
-    return resp
+def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))):
+    try:
+        get_entity_by_id(db, models.Proyecto, tramo.id_proyecto, "id_proyecto")
+        set_audit_context(db, current_user.id_usuario)
+        data = tramo.model_dump()
+        wkt = data.pop("geometria_wkt", None)
+        validate_wkt(db, wkt, {"ST_MultiLineString"})
+        db_tramo = models.Tramo(**data, geometria_linea=wkt)
+        db_tramo.fecha_registro = datetime.now(timezone.utc).date()
+        db.add(db_tramo)
+        db.flush()
+
+        if current_user.rol == "geografo":
+            existing = db.query(models.UsuarioTramo).filter(
+                models.UsuarioTramo.id_usuario == current_user.id_usuario,
+                models.UsuarioTramo.id_tramo == db_tramo.id_tramo,
+            ).with_for_update().first()
+            if existing is None:
+                db.add(models.UsuarioTramo(
+                    id_usuario=current_user.id_usuario,
+                    id_tramo=db_tramo.id_tramo,
+                    fecha_asignacion=datetime.now(timezone.utc),
+                    activo=True,
+                ))
+            elif not existing.activo:
+                existing.activo = True
+                existing.fecha_asignacion = datetime.now(timezone.utc)
+                existing.fecha_reactivacion = datetime.now(timezone.utc)
+                existing.id_usuario_reactivacion = current_user.id_usuario
+                existing.motivo_reactivacion = "Asignación automática por creación de tramo"
+
+        db.commit()
+        db.refresh(db_tramo)
+        resp = db_tramo.__dict__.copy()
+        resp["geometria_wkt"] = db.query(
+            models.Tramo.geometria_linea.ST_AsText()
+        ).filter(models.Tramo.id_tramo == db_tramo.id_tramo).scalar()
+        return resp
+    except Exception:
+        db.rollback()
+        raise
 
 @app.put("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Actualizar tramo", response_model=schemas.TramoResponse)
 def update_tramo(id_tramo: int, data: schemas.TramoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
@@ -424,7 +453,14 @@ def delete_tramo(id_tramo: int, motivo: str = Query(...), db: Session = Depends(
 
 # ==================== NUCLEOS AGRARIOS ==================== #
 @app.get("/api/nucleos", tags=["Núcleos Agrarios"], summary="Listar núcleos agrarios")
-def get_nucleos(id_tramo: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
+def get_nucleos(
+    id_tramo: int = Query(None),
+    id_proyecto: int = Query(None),
+    id_entidad: int = Query(None),
+    id_municipio: int = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))
+):
     from sqlalchemy import text
 
     base_sql = """
@@ -433,9 +469,15 @@ def get_nucleos(id_tramo: int = Query(None), db: Session = Depends(get_db), curr
             n.nombre_nucleo,
             n.tipo_nucleo,
             n.comunidad_indigena,
+            n.id_municipio,
+            m.nombre AS municipio_nombre,
+            ef.id_entidad,
+            ef.nombre AS entidad_nombre,
             ST_AsText(n.geometria_poligono) as geometria_wkt,
             (ST_Area(n.geometria_poligono::geography) / 10000.0) as area_ha
         FROM nucleo_agrario n
+        JOIN municipio m ON m.id_municipio = n.id_municipio AND m.activo = TRUE
+        JOIN entidad_federativa ef ON ef.id_entidad = m.id_entidad AND ef.activo = TRUE
         WHERE n.activo = true
     """
     params = {}
@@ -465,6 +507,29 @@ def get_nucleos(id_tramo: int = Query(None), db: Session = Depends(get_db), curr
         """
         params["id_tramo"] = id_tramo
 
+    if id_proyecto is not None:
+        require_project_access(db, current_user, id_proyecto)
+        base_sql += """
+            AND EXISTS (
+                SELECT 1
+                  FROM tramo_nucleo tn
+                  JOIN tramo t ON t.id_tramo = tn.id_tramo
+                 WHERE tn.id_nucleo = n.id_nucleo
+                   AND tn.activo = TRUE
+                   AND t.activo = TRUE
+                   AND t.id_proyecto = :id_proyecto
+            )
+        """
+        params["id_proyecto"] = id_proyecto
+
+    if id_entidad is not None:
+        base_sql += " AND ef.id_entidad = :id_entidad"
+        params["id_entidad"] = id_entidad
+
+    if id_municipio is not None:
+        base_sql += " AND n.id_municipio = :id_municipio"
+        params["id_municipio"] = id_municipio
+
     result = db.execute(text(base_sql), params).fetchall()
 
     response = []
@@ -478,6 +543,10 @@ def get_nucleos(id_tramo: int = Query(None), db: Session = Depends(get_db), curr
             "nombre_nucleo": r.nombre_nucleo,
             "tipo_nucleo": r.tipo_nucleo,
             "comunidad_indigena": r.comunidad_indigena,
+            "id_municipio": r.id_municipio,
+            "municipio_nombre": r.municipio_nombre,
+            "id_entidad": r.id_entidad,
+            "entidad_nombre": r.entidad_nombre,
             "geometria_wkt": r.geometria_wkt,
             "area_ha": round(r.area_ha, 2) if r.area_ha else 0,
             "estatus_simulado": estatus
@@ -512,21 +581,26 @@ def get_tramo_detalles(id_tramo: int = Query(...), db: Session = Depends(get_db)
         "longitud_km": round(r.longitud_km, 2) if r.longitud_km else 0
     }
 @app.post("/api/nucleos", tags=["Núcleos Agrarios"], summary="Crear núcleo agrario", response_model=schemas.NucleoAgrarioResponse, status_code=status.HTTP_201_CREATED)
-def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
-    set_audit_context(db, current_user.id_usuario)
-    data = nucleo.model_dump()
-    wkt = data.pop("geometria_wkt", None)
-    validate_wkt(db, wkt, {"ST_MultiPolygon"})
-    db_nucleo = models.NucleoAgrario(**data, geometria_poligono=wkt)
-    db_nucleo.fecha_creacion = datetime.now(timezone.utc)
-    db.add(db_nucleo)
-    db.commit()
-    db.refresh(db_nucleo)
-    resp = db_nucleo.__dict__.copy()
-    resp["geometria_wkt"] = db.query(
-        models.NucleoAgrario.geometria_poligono.ST_AsText()
-    ).filter(models.NucleoAgrario.id_nucleo == db_nucleo.id_nucleo).scalar()
-    return resp
+def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))):
+    try:
+        get_entity_by_id(db, models.Municipio, nucleo.id_municipio, "id_municipio")
+        set_audit_context(db, current_user.id_usuario)
+        data = nucleo.model_dump()
+        wkt = data.pop("geometria_wkt", None)
+        validate_wkt(db, wkt, {"ST_MultiPolygon"})
+        db_nucleo = models.NucleoAgrario(**data, geometria_poligono=wkt)
+        db_nucleo.fecha_creacion = datetime.now(timezone.utc)
+        db.add(db_nucleo)
+        db.commit()
+        db.refresh(db_nucleo)
+        resp = db_nucleo.__dict__.copy()
+        resp["geometria_wkt"] = db.query(
+            models.NucleoAgrario.geometria_poligono.ST_AsText()
+        ).filter(models.NucleoAgrario.id_nucleo == db_nucleo.id_nucleo).scalar()
+        return resp
+    except Exception:
+        db.rollback()
+        raise
 
 @app.put("/api/nucleos/{id_nucleo}", tags=["Núcleos Agrarios"], summary="Actualizar núcleo agrario", response_model=schemas.NucleoAgrarioResponse)
 def update_nucleo(id_nucleo: int, data: schemas.NucleoAgrarioUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
@@ -561,12 +635,14 @@ def delete_nucleo(id_nucleo: int, motivo: str = Query(...), db: Session = Depend
 async def importacion_masiva_nucleos(
     file: UploadFile = File(...),
     id_municipio_fallback: int = Form(None),
+    id_entidad_fallback: int = Form(None),
     ids_tramo_contexto: Optional[List[int]] = Form(None),
+    tipo_nucleo_fallback: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))
 ):
-    if not file.filename or not file.filename.lower().endswith('.geojson'):
-        raise HTTPException(400, "El archivo debe tener extensión .geojson")
+    if not file.filename or not file.filename.lower().endswith(('.geojson', '.json')):
+        raise HTTPException(400, "El archivo debe tener extensión .geojson o .json")
 
     max_bytes = 10 * 1024 * 1024
     content = await file.read(max_bytes + 1)
@@ -584,6 +660,8 @@ async def importacion_masiva_nucleos(
         id_municipio_fallback,
         ids_tramo_contexto or [],
         current_user,
+        tipo_nucleo_fallback,
+        id_entidad_fallback,
     )
 
 
@@ -598,6 +676,15 @@ def list_tramos_nucleos(
         models.TramoNucleo.id_tramo_nucleo,
         models.TramoNucleo.id_tramo,
         models.TramoNucleo.id_nucleo,
+        models.Proyecto.id_proyecto,
+        models.Proyecto.clave_proyecto,
+        models.Proyecto.nombre_proyecto,
+        models.Tramo.nombre_tramo,
+        models.NucleoAgrario.nombre_nucleo,
+        models.Municipio.id_municipio,
+        models.Municipio.nombre.label("municipio_nombre"),
+        models.EntidadFederativa.id_entidad,
+        models.EntidadFederativa.nombre.label("entidad_nombre"),
         models.TramoNucleo.consecutivo,
         models.TramoNucleo.numero_tramo,
         models.TramoNucleo.geometria_segmento.ST_AsText().label('geometria_wkt'),
@@ -607,6 +694,21 @@ def list_tramos_nucleos(
         models.TramoNucleo.proyecto_no_afecta_uso_comun,
         models.TramoNucleo.activo,
         models.TramoNucleo.observaciones,
+    ).join(
+        models.Tramo,
+        models.Tramo.id_tramo == models.TramoNucleo.id_tramo,
+    ).join(
+        models.Proyecto,
+        models.Proyecto.id_proyecto == models.Tramo.id_proyecto,
+    ).join(
+        models.NucleoAgrario,
+        models.NucleoAgrario.id_nucleo == models.TramoNucleo.id_nucleo,
+    ).join(
+        models.Municipio,
+        models.Municipio.id_municipio == models.NucleoAgrario.id_municipio,
+    ).join(
+        models.EntidadFederativa,
+        models.EntidadFederativa.id_entidad == models.Municipio.id_entidad,
     ).filter(models.TramoNucleo.activo == True)
     query = filter_by_user_tramos(
         query, db, current_user, models.TramoNucleo.id_tramo
@@ -624,6 +726,15 @@ def get_tramo_nucleo(id_tramo_nucleo: int, db: Session = Depends(get_db), curren
         models.TramoNucleo.id_tramo_nucleo,
         models.TramoNucleo.id_tramo,
         models.TramoNucleo.id_nucleo,
+        models.Proyecto.id_proyecto,
+        models.Proyecto.clave_proyecto,
+        models.Proyecto.nombre_proyecto,
+        models.Tramo.nombre_tramo,
+        models.NucleoAgrario.nombre_nucleo,
+        models.Municipio.id_municipio,
+        models.Municipio.nombre.label("municipio_nombre"),
+        models.EntidadFederativa.id_entidad,
+        models.EntidadFederativa.nombre.label("entidad_nombre"),
         models.TramoNucleo.consecutivo,
         models.TramoNucleo.numero_tramo,
         models.TramoNucleo.geometria_segmento.ST_AsText().label('geometria_wkt'),
@@ -633,6 +744,21 @@ def get_tramo_nucleo(id_tramo_nucleo: int, db: Session = Depends(get_db), curren
         models.TramoNucleo.proyecto_no_afecta_uso_comun,
         models.TramoNucleo.activo,
         models.TramoNucleo.observaciones,
+    ).join(
+        models.Tramo,
+        models.Tramo.id_tramo == models.TramoNucleo.id_tramo,
+    ).join(
+        models.Proyecto,
+        models.Proyecto.id_proyecto == models.Tramo.id_proyecto,
+    ).join(
+        models.NucleoAgrario,
+        models.NucleoAgrario.id_nucleo == models.TramoNucleo.id_nucleo,
+    ).join(
+        models.Municipio,
+        models.Municipio.id_municipio == models.NucleoAgrario.id_municipio,
+    ).join(
+        models.EntidadFederativa,
+        models.EntidadFederativa.id_entidad == models.Municipio.id_entidad,
     ).filter(
         models.TramoNucleo.id_tramo_nucleo == id_tramo_nucleo,
         models.TramoNucleo.activo == True

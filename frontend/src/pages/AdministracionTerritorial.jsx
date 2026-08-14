@@ -5,8 +5,10 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import AuthContext from '../contexts/auth-context';
+import ImportacionTerritorialPanel from '../components/ImportacionTerritorialPanel';
 
-const tabs = [
+const allTabs = [
   ['proyectos', 'Proyectos', FolderKanban],
   ['tramos', 'Tramos', Map],
   ['nucleos', 'Núcleos', Map],
@@ -20,7 +22,7 @@ const emptyForms = {
     ancho_total_derecho_via_m: '40.00', geometria_wkt: '',
   },
   nucleos: {
-    id_municipio: '', nombre_nucleo: '', tipo_nucleo: 'ejido',
+    id_entidad: '', id_municipio: '', nombre_nucleo: '', tipo_nucleo: 'ejido',
     comunidad_indigena: false, residencia: '', geometria_wkt: '',
   },
   relaciones: {
@@ -33,6 +35,24 @@ const apiError = (error) => error.response?.data?.detail || 'No fue posible comp
 
 function Field({ label, children }) {
   return <label className="admin-field"><span>{label}</span>{children}</label>;
+}
+
+function GeometryField({ label, expected, example, value, onChange }) {
+  const invalid = value && !value.trim().toUpperCase().startsWith(expected);
+  return (
+    <label className="admin-field admin-field-wide">
+      <span>{label}</span>
+      <textarea
+        className={invalid ? 'admin-input-invalid' : ''}
+        value={value ?? ''}
+        placeholder={example}
+        spellCheck="false"
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <small>Formato WKT esperado: {expected}. Ejemplo: {example}</small>
+      {invalid && <em>La geometría debe iniciar con {expected}; PostgreSQL validará tipo, SRID, topología y vacío.</em>}
+    </label>
+  );
 }
 
 function ActionButton({ title, onClick, danger = false, children }) {
@@ -133,8 +153,14 @@ function AssignmentDialog({ tramo, users, onCancel, onSaved, setPageError }) {
 
 export default function AdministracionTerritorial() {
   const navigate = useNavigate();
+  const { user } = React.useContext(AuthContext);
+  const isAdmin = user?.rol === 'admin';
+  const tabs = React.useMemo(
+    () => allTabs.filter(([key]) => isAdmin || ['proyectos', 'tramos', 'nucleos'].includes(key)),
+    [isAdmin],
+  );
   const [activeTab, setActiveTab] = React.useState('proyectos');
-  const [data, setData] = React.useState({ proyectos: [], tramos: [], nucleos: [], relaciones: [], usuarios: [], municipios: [] });
+  const [data, setData] = React.useState({ proyectos: [], tramos: [], nucleos: [], relaciones: [], usuarios: [], municipios: [], entidades: [] });
   const [form, setForm] = React.useState(emptyForms.proyectos);
   const [editingId, setEditingId] = React.useState(null);
   const [showForm, setShowForm] = React.useState(false);
@@ -145,27 +171,42 @@ export default function AdministracionTerritorial() {
   const [assignmentTramo, setAssignmentTramo] = React.useState(null);
   const [showInactive, setShowInactive] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  const [nucleoFilters, setNucleoFilters] = React.useState({ id_proyecto: '', id_entidad: '', id_municipio: '' });
 
   const load = React.useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [proyectos, tramos, nucleos, relaciones, usuarios, municipios] = await Promise.all([
+      const nucleosParams = new URLSearchParams({ incluir_inactivos: 'true' });
+      Object.entries(nucleoFilters).forEach(([key, value]) => {
+        if (value) nucleosParams.set(key, value);
+      });
+      const requests = [
         api.get('/administracion/proyectos?incluir_inactivos=true'),
         api.get('/administracion/tramos?incluir_inactivos=true'),
-        api.get('/administracion/nucleos?incluir_inactivos=true'),
-        api.get('/administracion/tramos-nucleos?incluir_inactivos=true'),
-        api.get('/administracion/usuarios?incluir_inactivos=true'),
+        api.get(`/administracion/nucleos?${nucleosParams.toString()}`),
         api.get('/catalogos/municipios'),
-      ]);
+        api.get('/catalogos/entidades'),
+      ];
+      if (isAdmin) {
+        requests.push(
+          api.get('/administracion/tramos-nucleos?incluir_inactivos=true'),
+          api.get('/administracion/usuarios?incluir_inactivos=true'),
+        );
+      }
+      const [proyectos, tramos, nucleos, municipios, entidades, relaciones, usuarios] = await Promise.all(requests);
       setData({
         proyectos: proyectos.data, tramos: tramos.data, nucleos: nucleos.data,
-        relaciones: relaciones.data, usuarios: usuarios.data, municipios: municipios.data,
+        relaciones: relaciones?.data ?? [], usuarios: usuarios?.data ?? [], municipios: municipios.data,
+        entidades: entidades.data,
       });
     } catch (requestError) { setError(apiError(requestError)); } finally { setLoading(false); }
-  }, []);
+  }, [isAdmin, nucleoFilters]);
 
   React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    if (!tabs.some(([key]) => key === activeTab)) setActiveTab('proyectos');
+  }, [activeTab, tabs]);
   React.useEffect(() => {
     setForm({ ...emptyForms[activeTab] });
     setEditingId(null);
@@ -178,6 +219,10 @@ export default function AdministracionTerritorial() {
   const openEdit = (item) => {
     const next = { ...emptyForms[activeTab], ...item };
     if (next.geometria_wkt == null) next.geometria_wkt = '';
+    if (activeTab === 'nucleos' && next.id_municipio) {
+      const municipio = data.municipios.find((m) => m.id_municipio === next.id_municipio);
+      next.id_entidad = municipio?.id_entidad ?? next.id_entidad ?? '';
+    }
     setForm(next); setEditingId(item[`id_${activeTab === 'relaciones' ? 'tramo_nucleo' : activeTab.slice(0, -1)}`]); setShowForm(true);
   };
 
@@ -198,6 +243,7 @@ export default function AdministracionTerritorial() {
               : ['id_tramo', 'id_nucleo', 'consecutivo'];
         immutable.forEach((key) => delete payload[key]);
       }
+      if (activeTab === 'nucleos') delete payload.id_entidad;
       await api[editingId ? 'put' : 'post'](path, payload);
       setShowForm(false); await load();
     } catch (requestError) { setError(apiError(requestError)); } finally { setSaving(false); }
@@ -212,6 +258,20 @@ export default function AdministracionTerritorial() {
       else await api.post(`/administracion/${singular}/${item[idKey]}/reactivar`, { motivo: reason });
       setReasonAction(null); await load();
     } catch (requestError) { setError(apiError(requestError)); setReasonAction(null); }
+  };
+
+  const formMunicipios = data.municipios.filter((municipio) => (
+    !form.id_entidad || municipio.id_entidad === Number(form.id_entidad)
+  ));
+  const filterMunicipios = data.municipios.filter((municipio) => (
+    !nucleoFilters.id_entidad || municipio.id_entidad === Number(nucleoFilters.id_entidad)
+  ));
+  const updateNucleoFilter = (key, value) => {
+    setNucleoFilters((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === 'id_entidad' ? { id_municipio: '' } : {}),
+    }));
   };
 
   const renderForm = () => (
@@ -229,15 +289,16 @@ export default function AdministracionTerritorial() {
           <Field label="Nombre"><input required value={form.nombre_tramo ?? ''} onChange={(e) => updateField('nombre_tramo', e.target.value)} /></Field>
           <Field label="Ancho total (m)"><input type="number" min="0.01" step="0.01" value={form.ancho_total_derecho_via_m ?? ''} onChange={(e) => updateField('ancho_total_derecho_via_m', e.target.value)} /></Field>
           <Field label="Descripción"><input value={form.descripcion ?? ''} onChange={(e) => updateField('descripcion', e.target.value)} /></Field>
-          <Field label="Geometría MULTILINESTRING"><textarea value={form.geometria_wkt ?? ''} onChange={(e) => updateField('geometria_wkt', e.target.value)} /></Field>
+          <GeometryField label="Geometría del eje" expected="MULTILINESTRING" example="MULTILINESTRING((-99.10 19.40, -99.08 19.42))" value={form.geometria_wkt} onChange={(value) => updateField('geometria_wkt', value)} />
         </>}
         {activeTab === 'nucleos' && <>
-          <Field label="Municipio"><select required disabled={Boolean(editingId)} value={form.id_municipio ?? ''} onChange={(e) => updateField('id_municipio', Number(e.target.value))}><option value="">Selecciona</option>{data.municipios.map((m) => <option key={m.id_municipio} value={m.id_municipio}>{m.nombre}</option>)}</select></Field>
+          <Field label="Entidad federativa"><select required disabled={Boolean(editingId)} value={form.id_entidad ?? ''} onChange={(e) => { updateField('id_entidad', e.target.value); updateField('id_municipio', ''); }}><option value="">Selecciona</option>{data.entidades.map((entidad) => <option key={entidad.id_entidad} value={entidad.id_entidad}>{entidad.nombre}</option>)}</select></Field>
+          <Field label="Municipio"><select required disabled={Boolean(editingId) || !form.id_entidad} value={form.id_municipio ?? ''} onChange={(e) => updateField('id_municipio', Number(e.target.value))}><option value="">{form.id_entidad ? 'Selecciona' : 'Selecciona primero entidad'}</option>{formMunicipios.map((m) => <option key={m.id_municipio} value={m.id_municipio}>{m.nombre}</option>)}</select></Field>
           <Field label="Nombre"><input required value={form.nombre_nucleo ?? ''} onChange={(e) => updateField('nombre_nucleo', e.target.value)} /></Field>
           <Field label="Tipo"><select disabled={Boolean(editingId)} value={form.tipo_nucleo ?? 'ejido'} onChange={(e) => updateField('tipo_nucleo', e.target.value)}><option value="ejido">Ejido</option><option value="comunidad">Comunidad</option></select></Field>
           <Field label="Residencia"><input value={form.residencia ?? ''} onChange={(e) => updateField('residencia', e.target.value)} /></Field>
           <label className="admin-toggle"><input type="checkbox" checked={Boolean(form.comunidad_indigena)} onChange={(e) => updateField('comunidad_indigena', e.target.checked)} /><span>Comunidad indígena</span></label>
-          <Field label="Geometría MULTIPOLYGON"><textarea value={form.geometria_wkt ?? ''} onChange={(e) => updateField('geometria_wkt', e.target.value)} /></Field>
+          <GeometryField label="Geometría del núcleo" expected="MULTIPOLYGON" example="MULTIPOLYGON(((-99.10 19.40, -99.08 19.40, -99.08 19.42, -99.10 19.40)))" value={form.geometria_wkt} onChange={(value) => updateField('geometria_wkt', value)} />
         </>}
         {activeTab === 'relaciones' && <>
           <Field label="Tramo"><select required disabled={Boolean(editingId)} value={form.id_tramo ?? ''} onChange={(e) => updateField('id_tramo', Number(e.target.value))}><option value="">Selecciona</option>{data.tramos.filter((t) => t.activo).map((t) => <option key={t.id_tramo} value={t.id_tramo}>{t.clave_tramo} · {t.nombre_tramo}</option>)}</select></Field>
@@ -245,7 +306,7 @@ export default function AdministracionTerritorial() {
           <Field label="Consecutivo"><input required type="number" min="1" disabled={Boolean(editingId)} value={form.consecutivo ?? ''} onChange={(e) => updateField('consecutivo', Number(e.target.value))} /></Field>
           <Field label="Número de tramo"><input value={form.numero_tramo ?? ''} onChange={(e) => updateField('numero_tramo', e.target.value)} /></Field>
           <label className="admin-toggle"><input type="checkbox" checked={Boolean(form.es_expropiacion)} onChange={(e) => updateField('es_expropiacion', e.target.checked)} /><span>Es expropiación</span></label>
-          <Field label="Geometría MULTILINESTRING"><textarea value={form.geometria_wkt ?? ''} onChange={(e) => updateField('geometria_wkt', e.target.value)} /></Field>
+          <GeometryField label="Geometría del segmento" expected="MULTILINESTRING" example="MULTILINESTRING((-99.10 19.40, -99.08 19.42))" value={form.geometria_wkt} onChange={(value) => updateField('geometria_wkt', value)} />
         </>}
       </div>
       <div className="admin-form-actions"><button className="admin-button" disabled={saving} type="submit"><Save size={16} />{saving ? 'Guardando...' : 'Guardar'}</button></div>
@@ -260,14 +321,52 @@ export default function AdministracionTerritorial() {
   const projectName = (id) => data.proyectos.find((item) => item.id_proyecto === id)?.clave_proyecto || '—';
   const tramoName = (id) => data.tramos.find((item) => item.id_tramo === id)?.clave_tramo || '—';
   const nucleoName = (id) => data.nucleos.find((item) => item.id_nucleo === id)?.nombre_nucleo || '—';
+  const nucleoProjectLabel = (item) => {
+    const projects = item.proyectos_territoriales || [];
+    if (projects.length === 0) return 'Sin relación';
+    if (projects.length === 1) return projects[0].clave_proyecto;
+    return `${projects[0].clave_proyecto} +${projects.length - 1}`;
+  };
 
   return (
     <section className="admin-page">
       <div className="admin-toolbar">
         <div className="admin-tabs" role="tablist">{tabs.map(([key, label, Icon]) => <button key={key} type="button" role="tab" aria-selected={activeTab === key} className={activeTab === key ? 'active' : ''} onClick={() => setActiveTab(key)}><Icon size={16} />{label}</button>)}</div>
-        <div className="admin-toolbar-actions"><label className="admin-history-toggle"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />Incluir inactivos</label><button className="admin-button" type="button" onClick={openCreate}><Plus size={16} />Nuevo</button></div>
+        <div className="admin-toolbar-actions">
+          {isAdmin && <label className="admin-history-toggle"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />Incluir inactivos</label>}
+          <ImportacionTerritorialPanel role={user?.rol} data={data} activeTab={activeTab} onImported={load} />
+          <button className="admin-button" type="button" onClick={openCreate}><Plus size={16} />Nuevo</button>
+        </div>
       </div>
       <label className="admin-search"><Search size={16} /><input type="search" placeholder="Buscar en esta vista" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+      {activeTab === 'nucleos' && (
+        <div className="admin-filter-row" aria-label="Filtros de núcleos agrarios">
+          <Field label="Proyecto">
+            <select value={nucleoFilters.id_proyecto} onChange={(event) => updateNucleoFilter('id_proyecto', event.target.value)}>
+              <option value="">Todos</option>
+              {data.proyectos.filter((p) => p.activo).map((p) => (
+                <option key={p.id_proyecto} value={p.id_proyecto}>{p.clave_proyecto} · {p.nombre_proyecto}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Entidad federativa">
+            <select value={nucleoFilters.id_entidad} onChange={(event) => updateNucleoFilter('id_entidad', event.target.value)}>
+              <option value="">Todas</option>
+              {data.entidades.map((entidad) => (
+                <option key={entidad.id_entidad} value={entidad.id_entidad}>{entidad.nombre}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Municipio">
+            <select value={nucleoFilters.id_municipio} disabled={!nucleoFilters.id_entidad} onChange={(event) => updateNucleoFilter('id_municipio', event.target.value)}>
+              <option value="">{nucleoFilters.id_entidad ? 'Todos' : 'Selecciona entidad'}</option>
+              {filterMunicipios.map((municipio) => (
+                <option key={municipio.id_municipio} value={municipio.id_municipio}>{municipio.nombre}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      )}
       {error && <div className="admin-error" role="alert">{error}</div>}
       {showForm && renderForm()}
       <div className="admin-table-wrap">
@@ -276,24 +375,29 @@ export default function AdministracionTerritorial() {
             <thead><tr>
               {activeTab === 'proyectos' && <><th>Clave</th><th>Proyecto</th></>}
               {activeTab === 'tramos' && <><th>Clave</th><th>Tramo</th><th>Proyecto</th><th>Ancho</th></>}
-              {activeTab === 'nucleos' && <><th>Núcleo</th><th>Tipo</th><th>Residencia</th></>}
+              {activeTab === 'nucleos' && <><th>Núcleo</th><th>Proyecto</th><th>Entidad</th><th>Municipio</th><th>Tipo</th></>}
               {activeTab === 'relaciones' && <><th>Tramo</th><th>Núcleo</th><th>Consecutivo</th><th>Número</th></>}
               <th>Estado</th><th className="admin-actions-cell">Acciones</th>
             </tr></thead>
             <tbody>{items.map((item) => {
-              const id = item.id_proyecto || item.id_tramo_nucleo || item.id_tramo || item.id_nucleo;
-              return <tr key={id} className={!item.activo ? 'inactive' : ''}>
+              const idKey = activeTab === 'proyectos' ? 'id_proyecto' :
+                            activeTab === 'tramos' ? 'id_tramo' :
+                            activeTab === 'nucleos' ? 'id_nucleo' :
+                            'id_tramo_nucleo';
+
+              const id = item[idKey];
+              return <tr key={`${activeTab}-${id}`} className={!item.activo ? 'inactive' : ''}>
                 {activeTab === 'proyectos' && <><td data-label="Clave"><strong>{item.clave_proyecto}</strong></td><td data-label="Proyecto">{item.nombre_proyecto}</td></>}
                 {activeTab === 'tramos' && <><td data-label="Clave"><strong>{item.clave_tramo}</strong></td><td data-label="Tramo">{item.nombre_tramo}</td><td data-label="Proyecto">{projectName(item.id_proyecto)}</td><td data-label="Ancho">{item.ancho_total_derecho_via_m ?? '—'} m</td></>}
-                {activeTab === 'nucleos' && <><td data-label="Núcleo"><strong>{item.nombre_nucleo}</strong></td><td data-label="Tipo">{item.tipo_nucleo}</td><td data-label="Residencia">{item.residencia || '—'}</td></>}
+                {activeTab === 'nucleos' && <><td data-label="Núcleo"><strong>{item.nombre_nucleo}</strong></td><td data-label="Proyecto">{nucleoProjectLabel(item)}</td><td data-label="Entidad">{item.entidad_nombre || '—'}</td><td data-label="Municipio">{item.municipio_nombre || '—'}</td><td data-label="Tipo">{item.tipo_nucleo}</td></>}
                 {activeTab === 'relaciones' && <><td data-label="Tramo"><strong>{tramoName(item.id_tramo)}</strong></td><td data-label="Núcleo">{nucleoName(item.id_nucleo)}</td><td data-label="Consecutivo">{item.consecutivo}</td><td data-label="Número">{item.numero_tramo || '—'}</td></>}
                 <td data-label="Estado"><span className={`admin-status ${item.activo ? 'active' : 'inactive'}`}>{item.activo ? 'Activo' : 'Inactivo'}</span></td>
                 <td data-label="Acciones" className="admin-actions-cell">
-                  {item.activo && <ActionButton title="Editar" onClick={() => openEdit(item)}><Edit3 size={16} /></ActionButton>}
+                  {isAdmin && item.activo && <ActionButton title="Editar" onClick={() => openEdit(item)}><Edit3 size={16} /></ActionButton>}
                   {activeTab === 'tramos' && item.activo && <ActionButton title="Abrir mapa y derecho de vía" onClick={() => navigate(`/mapa?id_tramo=${item.id_tramo}`)}><Layers size={16} /></ActionButton>}
-                  {activeTab === 'tramos' && item.activo && <ActionButton title="Asignar usuarios" onClick={() => setAssignmentTramo(item)}><UserRoundCog size={16} /></ActionButton>}
+                  {isAdmin && activeTab === 'tramos' && item.activo && <ActionButton title="Asignar usuarios" onClick={() => setAssignmentTramo(item)}><UserRoundCog size={16} /></ActionButton>}
                   {activeTab === 'relaciones' && item.activo && <ActionButton title="Abrir expediente" onClick={() => navigate(`/expedientes/${item.id_tramo_nucleo}`)}><FolderKanban size={16} /></ActionButton>}
-                  <ActionButton title={item.activo ? 'Dar de baja' : 'Reactivar'} danger={item.activo} onClick={() => setReasonAction({ item, type: activeTab })}>{item.activo ? <Trash2 size={16} /> : <ArchiveRestore size={16} />}</ActionButton>
+                  {isAdmin && <ActionButton title={item.activo ? 'Dar de baja' : 'Reactivar'} danger={item.activo} onClick={() => setReasonAction({ item, type: activeTab })}>{item.activo ? <Trash2 size={16} /> : <ArchiveRestore size={16} />}</ActionButton>}
                 </td>
               </tr>;
             })}</tbody>

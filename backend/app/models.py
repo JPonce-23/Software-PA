@@ -270,6 +270,16 @@ class PadronHistorial(Base, AuditableMixin):
 
 class Parcela(Base, AuditableMixin):
     __tablename__ = "parcela"
+    __table_args__ = (
+        CheckConstraint("tipo_parcela IN ('individual', 'copropiedad')", name='parcela_tipo_parcela_check'),
+        CheckConstraint(
+            "geometria_poligono IS NULL OR ("
+            "NOT ST_IsEmpty(geometria_poligono) AND ST_IsValid(geometria_poligono) "
+            "AND ST_SRID(geometria_poligono) = 4326 "
+            "AND GeometryType(geometria_poligono) = 'MULTIPOLYGON')",
+            name="chk_017_parcela_geometria_valida",
+        ),
+    )
     id_parcela = Column(Integer, primary_key=True, index=True)
     id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
     tipo_parcela = Column(String(30))
@@ -278,6 +288,7 @@ class Parcela(Base, AuditableMixin):
     folio_derechos = Column(String(100))
     constancia_vigencia_fecha = Column(Date)
     nombre_titular = Column(String(300))
+    geometria_poligono = Column(Geometry(geometry_type='MULTIPOLYGON', srid=4326))
     documentacion_disponible = Column(Boolean, default=False, nullable=False)
     documentacion_faltante = Column(String)
     activo = Column(Boolean, default=True, nullable=False)

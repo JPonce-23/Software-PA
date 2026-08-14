@@ -280,6 +280,7 @@ function AsambleasSection({ asambleas, canWrite, onNueva }) {
         {canWrite && <button type="button" className="button" onClick={onNueva}>Nueva asamblea</button>}
       </header>
       <SimpleList
+        idKey="id_asamblea"
         items={asambleas}
         empty="No hay asambleas de esta afectación."
         render={(item) => (
@@ -304,6 +305,7 @@ function ConveniosSection({ convenios, canWrite, onNuevo, onEditar }) {
         {canWrite && <button type="button" className="button" onClick={onNuevo}>Nuevo convenio</button>}
       </header>
       <SimpleList
+        idKey="id_convenio"
         items={convenios}
         empty="No hay convenios de esta afectación."
         render={(item) => (
@@ -332,6 +334,7 @@ function AntecedentesSection({ antecedentes, documentos }) {
         </div>
       </header>
       <SimpleList
+        idKey="id_actividad"
         items={antecedentes}
         empty="No hay antecedentes compartidos registrados."
         render={(item) => (
@@ -343,6 +346,7 @@ function AntecedentesSection({ antecedentes, documentos }) {
       />
       <h4 style={{ margin: '20px 0 10px', color: '#334155' }}>Documentos maestros</h4>
       <SimpleList
+        idKey="id_documento"
         items={documentos}
         empty="No hay documentos maestros registrados."
         render={(item) => (
@@ -356,12 +360,12 @@ function AntecedentesSection({ antecedentes, documentos }) {
   );
 }
 
-function SimpleList({ items, empty, render }) {
+function SimpleList({ items, idKey, empty, render }) {
   if (!items.length) return <div className="empty-state">{empty}</div>;
   return (
     <div className="record-list">
       {items.map((item) => (
-        <article className="record-card" key={item.id_asamblea || item.id_convenio || item.id_actividad || item.id_documento}>
+        <article className="record-card" key={item[idKey]}>
           {render(item)}
         </article>
       ))}

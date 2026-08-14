@@ -40,10 +40,14 @@ export default function ExpedientesList() {
     const nombre = nucleosMap[tn.id_nucleo] || '';
     const tramo = String(tn.numero_tramo || '');
     const consec = String(tn.consecutivo || '');
+    const proyecto = `${tn.clave_proyecto || ''} ${tn.nombre_proyecto || ''}`;
+    const municipio = `${tn.municipio_nombre || ''} ${tn.entidad_nombre || ''}`;
     const termino = busqueda.toLowerCase();
     return (
       nombre.toLowerCase().includes(termino) ||
       tramo.toLowerCase().includes(termino) ||
+      proyecto.toLowerCase().includes(termino) ||
+      municipio.toLowerCase().includes(termino) ||
       consec.toLowerCase().includes(termino) ||
       String(tn.id_tramo_nucleo).includes(termino)
     );
@@ -107,6 +111,8 @@ export default function ExpedientesList() {
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                 <th style={thStyle}>ID</th>
                 <th style={thStyle}>Núcleo Agrario</th>
+                <th style={thStyle}>Proyecto</th>
+                <th style={thStyle}>Municipio</th>
                 <th style={thStyle}>No. Tramo</th>
                 <th style={thStyle}>Consecutivo</th>
                 <th style={thStyle}>Longitud</th>
@@ -119,7 +125,7 @@ export default function ExpedientesList() {
                 <ExpedienteRow
                   key={tn.id_tramo_nucleo}
                   tn={tn}
-                  nombre={nucleosMap[tn.id_nucleo] || `Núcleo #${tn.id_nucleo}`}
+                  nombre={tn.nombre_nucleo || nucleosMap[tn.id_nucleo] || `Núcleo #${tn.id_nucleo}`}
                   index={i}
                   onClick={() => navigate(`/expedientes/${tn.id_tramo_nucleo}`)}
                 />
@@ -158,6 +164,14 @@ function ExpedienteRow({ tn, nombre, index, onClick }) {
           </div>
           <span style={{ fontWeight: '500', color: '#1e293b' }}>{nombre}</span>
         </div>
+      </td>
+      <td style={tdStyle}>
+        <span style={{ display: 'block', fontWeight: '600', color: '#1f513b' }}>{tn.clave_proyecto || '—'}</span>
+        <small style={{ color: '#64748b' }}>{tn.nombre_proyecto || 'Proyecto no disponible'}</small>
+      </td>
+      <td style={tdStyle}>
+        <span style={{ display: 'block', fontWeight: '500' }}>{tn.municipio_nombre || '—'}</span>
+        <small style={{ color: '#64748b' }}>{tn.entidad_nombre || 'Entidad no disponible'}</small>
       </td>
       <td style={tdStyle}>{tn.numero_tramo || '—'}</td>
       <td style={tdStyle}>{tn.consecutivo || '—'}</td>

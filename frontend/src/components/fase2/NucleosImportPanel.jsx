@@ -9,8 +9,11 @@ export default function NucleosImportPanel({ role, onImportSuccess }) {
   const [file, setFile] = useState(null);
   const [tramos, setTramos] = useState([]);
   const [municipios, setMunicipios] = useState([]);
+  const [entidades, setEntidades] = useState([]);
   const [selectedTramos, setSelectedTramos] = useState([]);
+  const [entidadFallback, setEntidadFallback] = useState('');
   const [municipioFallback, setMunicipioFallback] = useState('');
+  const [tipoFallback, setTipoFallback] = useState('ejido');
   const [globalMode, setGlobalMode] = useState(role === 'admin');
   const [contextLoading, setContextLoading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,10 +24,11 @@ export default function NucleosImportPanel({ role, onImportSuccess }) {
     if (!isOpen) return;
     setContextLoading(true);
     setError(null);
-    Promise.all([api.get('/tramos'), api.get('/catalogos/municipios')])
-      .then(([tramosResponse, municipiosResponse]) => {
+    Promise.all([api.get('/tramos'), api.get('/catalogos/municipios'), api.get('/catalogos/entidades')])
+      .then(([tramosResponse, municipiosResponse, entidadesResponse]) => {
         setTramos(tramosResponse.data);
         setMunicipios(municipiosResponse.data);
+        setEntidades(entidadesResponse.data);
       })
       .catch(() => setError('No fue posible cargar el contexto de importación.'))
       .finally(() => setContextLoading(false));
@@ -53,7 +57,9 @@ export default function NucleosImportPanel({ role, onImportSuccess }) {
 
     const form = new FormData();
     form.append('file', file);
+    if (entidadFallback) form.append('id_entidad_fallback', entidadFallback);
     if (municipioFallback) form.append('id_municipio_fallback', municipioFallback);
+    if (tipoFallback) form.append('tipo_nucleo_fallback', tipoFallback);
     if (!globalMode) {
       selectedTramos.forEach((idTramo) => form.append('ids_tramo_contexto', idTramo));
     }
@@ -133,10 +139,22 @@ export default function NucleosImportPanel({ role, onImportSuccess }) {
             )}
 
             <label className="import-field">
+              Entidad predeterminada
+              <select value={entidadFallback} onChange={(event) => setEntidadFallback(event.target.value)}>
+                <option value="">Usar la entidad de cada feature</option>
+                {entidades.map((entidad) => (
+                  <option key={entidad.id_entidad} value={entidad.id_entidad}>
+                    {entidad.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="import-field">
               Municipio predeterminado
               <select value={municipioFallback} onChange={(event) => setMunicipioFallback(event.target.value)}>
                 <option value="">Usar el municipio de cada feature</option>
-                {municipios.map((municipio) => (
+                {municipios.filter((municipio) => !entidadFallback || municipio.id_entidad === Number(entidadFallback)).map((municipio) => (
                   <option key={municipio.id_municipio} value={municipio.id_municipio}>
                     {municipio.nombre}
                   </option>
@@ -145,8 +163,17 @@ export default function NucleosImportPanel({ role, onImportSuccess }) {
             </label>
 
             <label className="import-field">
+              Tipo predeterminado
+              <select value={tipoFallback} onChange={(event) => setTipoFallback(event.target.value)}>
+                <option value="ejido">Ejido</option>
+                <option value="comunidad">Comunidad</option>
+                <option value="">Usar el tipo de cada feature</option>
+              </select>
+            </label>
+
+            <label className="import-field">
               Archivo GeoJSON
-              <input type="file" accept=".geojson,application/geo+json" onChange={(event) => setFile(event.target.files[0] || null)} />
+              <input type="file" accept=".geojson,.json,application/geo+json,application/json" onChange={(event) => setFile(event.target.files[0] || null)} />
             </label>
 
             {error && <div className="import-error">{error}</div>}

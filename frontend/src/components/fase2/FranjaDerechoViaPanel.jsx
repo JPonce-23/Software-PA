@@ -29,12 +29,12 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
-    if (selected && selected.name.toLowerCase().endsWith('.geojson')) {
+    if (selected && /\.(geojson|json)$/i.test(selected.name)) {
       setFile(selected);
       setError(null);
     } else {
       setFile(null);
-      setError('Por favor, selecciona un archivo .geojson válido.');
+      setError('Por favor, selecciona un archivo .geojson o .json con contenido GeoJSON.');
     }
   };
 
@@ -163,8 +163,8 @@ export default function FranjaDerechoViaPanel({ idTramo, onImportSuccess }) {
                 </div>
               </div>
               <div>
-                <label style={{fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '5px'}}>Archivo .geojson *</label>
-                <input type="file" accept=".geojson" onChange={handleFileChange} style={{fontSize: '12px'}} />
+                <label style={{fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '5px'}}>Archivo GeoJSON *</label>
+                <input type="file" accept=".geojson,.json,application/geo+json,application/json" onChange={handleFileChange} style={{fontSize: '12px'}} />
               </div>
             </div>
 

@@ -5,6 +5,7 @@ import time
 from fastapi.testclient import TestClient
 
 from app.config import AUTH_SETTINGS
+from app import main as main_module
 from app.main import app
 
 
@@ -63,22 +64,166 @@ def _create_empty_tramo(client, admin_session, cleanup, seed_proyecto):
     return tramo
 
 
-def test_consultas_administrativas_exigen_admin(client, admin_session, cleanup):
+def test_consultas_administrativas_separan_configuracion_y_admin(client, admin_session, cleanup):
     geographer, password = _create_user(client, admin_session, cleanup, "geografo")
     geographer_client, headers = _login(geographer["correo"].upper(), password)
 
     assert client.get("/api/administracion/proyectos", headers=admin_session).status_code == 200
-    assert geographer_client.get("/api/administracion/proyectos", headers=headers).status_code == 403
-    assert geographer_client.post(
+    assert geographer_client.get("/api/administracion/proyectos", headers=headers).status_code == 200
+    assert geographer_client.get("/api/administracion/usuarios", headers=headers).status_code == 403
+    created = geographer_client.post(
         "/api/proyectos",
         headers=headers,
-        json={"clave_proyecto": f"NO-{_uid()}", "nombre_proyecto": "No permitido"},
-    ).status_code == 403
+        json={"clave_proyecto": f"GEO-{_uid()}", "nombre_proyecto": "Proyecto geógrafo"},
+    )
+    assert created.status_code == 201, created.text
+    cleanup.register("/api/proyectos", created.json()["id_proyecto"])
     assert geographer_client.post(
         "/api/geometria/importar-geojson?tipo_entidad=tramo",
         headers=headers,
         files={"file": ("tramo.geojson", b"{}", "application/geo+json")},
     ).status_code == 403
+
+
+def test_geografo_puede_crear_tramo_y_queda_asignado(
+    client, admin_session, cleanup, seed_proyecto
+):
+    geographer, password = _create_user(client, admin_session, cleanup, "geografo")
+    geographer_client, headers = _login(geographer["correo"], password)
+    response = geographer_client.post(
+        "/api/tramos",
+        headers=headers,
+        json={
+            "id_proyecto": seed_proyecto["id_proyecto"],
+            "clave_tramo": f"GTR-{_uid()}",
+            "nombre_tramo": "Tramo creado por geógrafo",
+            "ancho_total_derecho_via_m": "40.00",
+            "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
+        },
+    )
+    assert response.status_code == 201, response.text
+    tramo = response.json()
+    cleanup.register("/api/tramos", tramo["id_tramo"])
+
+    assignments = client.get(
+        f"/api/administracion/tramos/{tramo['id_tramo']}/asignaciones",
+        headers=admin_session,
+    )
+    assert assignments.status_code == 200, assignments.text
+    assert [item["id_usuario"] for item in assignments.json()] == [geographer["id_usuario"]]
+
+
+def test_geografo_no_puede_falsificar_usuario_en_asignacion_automatica(
+    client, admin_session, cleanup, seed_proyecto
+):
+    geographer, password = _create_user(client, admin_session, cleanup, "geografo")
+    admin_identity = client.get("/api/auth/sesion", headers=admin_session).json()["user"]
+    geographer_client, headers = _login(geographer["correo"], password)
+    response = geographer_client.post(
+        "/api/tramos",
+        headers=headers,
+        json={
+            "id_proyecto": seed_proyecto["id_proyecto"],
+            "clave_tramo": f"FAL-{_uid()}",
+            "nombre_tramo": "Tramo sin usuario falsificado",
+            "ancho_total_derecho_via_m": "40.00",
+            "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
+            "id_usuario": admin_identity["id_usuario"],
+        },
+    )
+    assert response.status_code == 201, response.text
+    tramo = response.json()
+    cleanup.register("/api/tramos", tramo["id_tramo"])
+
+    assignments = client.get(
+        f"/api/administracion/tramos/{tramo['id_tramo']}/asignaciones",
+        headers=admin_session,
+    )
+    assigned_ids = [item["id_usuario"] for item in assignments.json()]
+    assert assigned_ids == [geographer["id_usuario"]]
+    assert admin_identity["id_usuario"] not in assigned_ids
+
+
+def test_geografo_puede_crear_nucleo(client, admin_session, cleanup, seed_municipio_id):
+    geographer, password = _create_user(client, admin_session, cleanup, "geografo")
+    geographer_client, headers = _login(geographer["correo"], password)
+    response = geographer_client.post(
+        "/api/nucleos",
+        headers=headers,
+        json={
+            "id_municipio": seed_municipio_id,
+            "nombre_nucleo": f"Núcleo geógrafo {_uid()}",
+            "tipo_nucleo": "ejido",
+            "comunidad_indigena": False,
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
+        },
+    )
+    assert response.status_code == 201, response.text
+    cleanup.register("/api/nucleos", response.json()["id_nucleo"])
+
+
+def test_operador_no_puede_crear_configuracion_territorial(
+    client, admin_session, cleanup, seed_proyecto, seed_municipio_id
+):
+    operator, password = _create_user(client, admin_session, cleanup, "operador")
+    operator_client, headers = _login(operator["correo"], password)
+    assert operator_client.post(
+        "/api/proyectos",
+        headers=headers,
+        json={"clave_proyecto": f"OPR-{_uid()}", "nombre_proyecto": "Rechazado"},
+    ).status_code == 403
+    assert operator_client.post(
+        "/api/tramos",
+        headers=headers,
+        json={
+            "id_proyecto": seed_proyecto["id_proyecto"],
+            "clave_tramo": f"OPR-{_uid()}",
+            "nombre_tramo": "Rechazado",
+        },
+    ).status_code == 403
+    assert operator_client.post(
+        "/api/nucleos",
+        headers=headers,
+        json={
+            "id_municipio": seed_municipio_id,
+            "nombre_nucleo": "Rechazado",
+            "tipo_nucleo": "ejido",
+        },
+    ).status_code == 403
+
+
+def test_creacion_tramo_revierte_si_falla_asignacion_geografo(
+    client, admin_session, cleanup, seed_proyecto, monkeypatch
+):
+    geographer, password = _create_user(client, admin_session, cleanup, "geografo")
+    geographer_client, headers = _login(geographer["correo"], password)
+    clave = f"RBK-{_uid()}"
+
+    class BrokenUsuarioTramo:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("fallo controlado de asignación")
+
+    monkeypatch.setattr(main_module.models, "UsuarioTramo", BrokenUsuarioTramo)
+    response = geographer_client.post(
+        "/api/tramos",
+        headers=headers,
+        json={
+            "id_proyecto": seed_proyecto["id_proyecto"],
+            "clave_tramo": clave,
+            "nombre_tramo": "Tramo con rollback",
+            "ancho_total_derecho_via_m": "40.00",
+            "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
+        },
+    )
+    assert response.status_code == 500
+    monkeypatch.undo()
+
+    tramos = client.get(
+        f"/api/tramos?id_proyecto={seed_proyecto['id_proyecto']}",
+        headers=admin_session,
+    )
+    assert tramos.status_code == 200, tramos.text
+    assert all(item["clave_tramo"] != clave for item in tramos.json())
 
 
 def test_geografo_conserva_geometria_solo_en_tramo_asignado(

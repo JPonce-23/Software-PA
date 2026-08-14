@@ -12,17 +12,17 @@ from ..services import administration as service
 
 router = APIRouter(prefix="/administracion", tags=["Administración territorial"])
 admin_only = auth.RoleChecker(["admin"])
+territory_setup = auth.RoleChecker(["admin", "geografo"])
 
 
 @router.get("/proyectos", response_model=List[schemas.ProyectoResponse])
 def list_projects(
     incluir_inactivos: bool = False,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(admin_only),
+    current_user: models.Usuario = Depends(territory_setup),
 ):
-    del current_user
     query = db.query(models.Proyecto)
-    if not incluir_inactivos:
+    if current_user.rol != "admin" or not incluir_inactivos:
         query = query.filter(models.Proyecto.activo.is_(True))
     return query.order_by(models.Proyecto.clave_proyecto).all()
 
@@ -32,9 +32,8 @@ def list_sections(
     id_proyecto: int | None = None,
     incluir_inactivos: bool = False,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(admin_only),
+    current_user: models.Usuario = Depends(territory_setup),
 ):
-    del current_user
     query = db.query(
         models.Tramo.id_tramo,
         models.Tramo.id_proyecto,
@@ -48,21 +47,34 @@ def list_sections(
     )
     if id_proyecto is not None:
         query = query.filter(models.Tramo.id_proyecto == id_proyecto)
-    if not incluir_inactivos:
+    if current_user.rol != "admin":
+        query = query.join(
+            models.UsuarioTramo,
+            models.UsuarioTramo.id_tramo == models.Tramo.id_tramo,
+        ).filter(
+            models.UsuarioTramo.id_usuario == current_user.id_usuario,
+            models.UsuarioTramo.activo.is_(True),
+        )
+    if current_user.rol != "admin" or not incluir_inactivos:
         query = query.filter(models.Tramo.activo.is_(True))
     return query.order_by(models.Tramo.clave_tramo).all()
 
 
 @router.get("/nucleos", response_model=List[schemas.NucleoAgrarioResponse])
 def list_land_units(
+    id_proyecto: int | None = None,
+    id_entidad: int | None = None,
+    id_municipio: int | None = None,
     incluir_inactivos: bool = False,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(admin_only),
+    current_user: models.Usuario = Depends(territory_setup),
 ):
-    del current_user
     query = db.query(
         models.NucleoAgrario.id_nucleo,
         models.NucleoAgrario.id_municipio,
+        models.Municipio.id_entidad,
+        models.Municipio.nombre.label("municipio_nombre"),
+        models.EntidadFederativa.nombre.label("entidad_nombre"),
         models.NucleoAgrario.nombre_nucleo,
         models.NucleoAgrario.tipo_nucleo,
         models.NucleoAgrario.comunidad_indigena,
@@ -70,10 +82,67 @@ def list_land_units(
         models.NucleoAgrario.geometria_poligono.ST_AsText().label("geometria_wkt"),
         models.NucleoAgrario.activo,
         models.NucleoAgrario.observaciones,
+    ).join(
+        models.Municipio,
+        models.Municipio.id_municipio == models.NucleoAgrario.id_municipio,
+    ).join(
+        models.EntidadFederativa,
+        models.EntidadFederativa.id_entidad == models.Municipio.id_entidad,
     )
-    if not incluir_inactivos:
+    if id_proyecto is not None:
+        query = query.filter(
+            db.query(models.TramoNucleo.id_tramo_nucleo).join(
+                models.Tramo,
+                models.Tramo.id_tramo == models.TramoNucleo.id_tramo,
+            ).filter(
+                models.TramoNucleo.id_nucleo == models.NucleoAgrario.id_nucleo,
+                models.TramoNucleo.activo.is_(True),
+                models.Tramo.id_proyecto == id_proyecto,
+                models.Tramo.activo.is_(True),
+            ).exists()
+        )
+    if id_entidad is not None:
+        query = query.filter(models.Municipio.id_entidad == id_entidad)
+    if id_municipio is not None:
+        query = query.filter(models.NucleoAgrario.id_municipio == id_municipio)
+    if current_user.rol != "admin" or not incluir_inactivos:
         query = query.filter(models.NucleoAgrario.activo.is_(True))
-    return query.order_by(models.NucleoAgrario.nombre_nucleo).all()
+    rows = query.order_by(models.NucleoAgrario.nombre_nucleo).all()
+    projects_by_nucleo: dict[int, list[schemas.ProyectoResumen]] = {}
+    if rows:
+        nucleus_ids = [row.id_nucleo for row in rows]
+        project_rows = db.query(
+            models.TramoNucleo.id_nucleo,
+            models.Proyecto.id_proyecto,
+            models.Proyecto.clave_proyecto,
+            models.Proyecto.nombre_proyecto,
+        ).join(
+            models.Tramo,
+            models.Tramo.id_tramo == models.TramoNucleo.id_tramo,
+        ).join(
+            models.Proyecto,
+            models.Proyecto.id_proyecto == models.Tramo.id_proyecto,
+        ).filter(
+            models.TramoNucleo.id_nucleo.in_(nucleus_ids),
+            models.TramoNucleo.activo.is_(True),
+            models.Tramo.activo.is_(True),
+            models.Proyecto.activo.is_(True),
+        ).distinct().order_by(models.Proyecto.clave_proyecto).all()
+        for project in project_rows:
+            projects_by_nucleo.setdefault(project.id_nucleo, []).append(
+                schemas.ProyectoResumen(
+                    id_proyecto=project.id_proyecto,
+                    clave_proyecto=project.clave_proyecto,
+                    nombre_proyecto=project.nombre_proyecto,
+                )
+            )
+    return [
+        {
+            **row._asdict(),
+            "proyectos_territoriales": projects_by_nucleo.get(row.id_nucleo, []),
+        }
+        for row in rows
+    ]
 
 
 @router.get("/tramos-nucleos", response_model=List[schemas.TramoNucleoResponse])
