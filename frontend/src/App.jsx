@@ -14,6 +14,7 @@ const ExpedienteDetail = React.lazy(() => import('./pages/ExpedienteDetail'));
 const AfectacionSubexpediente = React.lazy(() => import('./pages/AfectacionSubexpediente'));
 const AdministracionTerritorial = React.lazy(() => import('./pages/AdministracionTerritorial'));
 const AdministracionUsuarios = React.lazy(() => import('./pages/AdministracionUsuarios'));
+const ImportacionesGeoespaciales = React.lazy(() => import('./pages/ImportacionesGeoespaciales'));
 
 const ROL_LABELS = {
   admin: 'Administrador',
@@ -81,6 +82,7 @@ function Sidebar() {
         {canManageTerritory && <div className="menu-group admin-menu-group">
           <h4>Administración</h4>
           <Link className={`menu-item ${isActive('/administracion/territorio') ? 'active' : ''}`} to="/administracion/territorio">Territorio</Link>
+          <Link className={`menu-item ${isActive('/administracion/importaciones-geoespaciales') ? 'active' : ''}`} to="/administracion/importaciones-geoespaciales">Importaciones GIS</Link>
           {canManageUsers && <Link className={`menu-item ${isActive('/administracion/usuarios') ? 'active' : ''}`} to="/administracion/usuarios">Usuarios y accesos</Link>}
         </div>}
 
@@ -103,6 +105,7 @@ function Topbar() {
     if (location.pathname === '/expedientes') return 'Expedientes de Ejidos';
     if (location.pathname === '/administracion/territorio') return 'Administración territorial';
     if (location.pathname === '/administracion/usuarios') return 'Administración de usuarios';
+    if (location.pathname === '/administracion/importaciones-geoespaciales') return 'Importaciones geoespaciales';
     return '¡Bienvenido!';
   };
 
@@ -164,6 +167,7 @@ function AppContent() {
             <Route path="/expedientes/:id_tramo_nucleo" element={<ExpedienteDetail />} />
             <Route path="/administracion/territorio" element={roleElement(<AdministracionTerritorial />, ['admin', 'geografo'])} />
             <Route path="/administracion/usuarios" element={roleElement(<AdministracionUsuarios />, ['admin'])} />
+            <Route path="/administracion/importaciones-geoespaciales" element={roleElement(<ImportacionesGeoespaciales />, ['admin', 'geografo'])} />
           </Routes>
         </React.Suspense>
       </main>

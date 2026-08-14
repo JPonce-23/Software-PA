@@ -13,6 +13,12 @@ x-backend-environment: &backend-environment
   AUTH_ABSOLUTE_MINUTES: ${AUTH_ABSOLUTE_MINUTES:-480}
   AUTH_LOCK_MINUTES: ${AUTH_LOCK_MINUTES:-15}
   AUTH_TRUSTED_PROXY_IPS: ${AUTH_TRUSTED_PROXY_IPS:-}
+  IMPORT_MAX_FILE_SIZE_MB: ${IMPORT_MAX_FILE_SIZE_MB:-100}
+  IMPORT_STAGING_BATCH_SIZE: ${IMPORT_STAGING_BATCH_SIZE:-250}
+  IMPORT_CONFIRM_BATCH_SIZE: ${IMPORT_CONFIRM_BATCH_SIZE:-100}
+  IMPORT_GDAL_TIMEOUT_SECONDS: ${IMPORT_GDAL_TIMEOUT_SECONDS:-300}
+  IMPORT_STAGING_RETENTION_DAYS: ${IMPORT_STAGING_RETENTION_DAYS:-30}
+  IMPORT_MAKE_VALID_MAX_AREA_DELTA: ${IMPORT_MAKE_VALID_MAX_AREA_DELTA:-}
 
 x-default-logging: &default-logging
   driver: json-file
@@ -103,6 +109,9 @@ services:
     environment:
       <<: *backend-environment
       ALERTAS_INTERVAL_SECONDS: ${ALERTAS_INTERVAL_SECONDS:-86400}
+      UPLOAD_ROOT: ${UPLOAD_ROOT:-/app/uploads}
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy

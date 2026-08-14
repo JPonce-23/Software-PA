@@ -162,7 +162,7 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    variable temporal del proceso; no la dejes persistente en archivos
    compartidos, historial de shell, logs ni capturas.
 
-4. Aplica `004`–`019` en orden, una sola vez cada una. Detén backend y
+4. Aplica `004`–`022` en orden, una sola vez cada una. Detén backend y
    scheduler antes de cada migración y conserva `ON_ERROR_STOP`:
 
    ```bash
@@ -214,6 +214,15 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    docker compose exec -T db sh -lc \
      'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
      < backend/db/migrations/019_franja_autoridad_territorial.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/020_importador_geoespacial_seguro.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/021_alcance_identidad_externa.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/022_identidad_externa_territorio_resuelto.sql
    ```
 
    La 011 exige 010, toma un bloqueo asesor, ejecuta su preflight y se
@@ -254,6 +263,18 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    franja activa en autoridad territorial. La franja debe intersectar la línea
    del tramo y cada relación tramo-núcleo activa debe tener superficie positiva
    dentro de ella.
+
+   La 020 exige 019 y crea el staging auditable, perfiles de mapeo, alias
+   territoriales y procedencia externa de núcleos. La 021 exige 020 y hace
+   explícito si una clave externa de núcleo es global o territorial; evita
+   tratar como duplicadas claves que una fuente reutiliza en municipios
+   distintos. Ambas migraciones son expansivas y abortan si no encuentran su
+   versión precedente.
+
+   La 022 exige 021 y reemplaza únicamente el índice territorial de 021. Usa el
+   municipio interno previamente resuelto como contexto estable, incluso cuando
+   la fuente no proporciona claves propias de entidad o municipio. Su preflight
+   aborta ante identidades territoriales activas duplicadas.
 
 5. Verifica el registro:
 

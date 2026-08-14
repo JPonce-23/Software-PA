@@ -1,10 +1,10 @@
 import React from 'react';
 import { CheckCircle2, FileSearch, Upload, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 
 const tipos = [
   { value: 'tramos', label: 'Tramos' },
-  { value: 'nucleos', label: 'Núcleos agrarios' },
   { value: 'derecho_via', label: 'Derecho de vía' },
   { value: 'parcelas', label: 'Parcelas' },
   { value: 'cruces_operativos', label: 'Cruces operativos' },
@@ -18,6 +18,7 @@ const apiError = (error) => {
 };
 
 export default function ImportacionTerritorialPanel({ role, data, activeTab, onImported }) {
+  const navigate = useNavigate();
   const [open, setOpen] = React.useState(false);
   const [tipo, setTipo] = React.useState(tipoFromTab(activeTab));
   const [file, setFile] = React.useState(null);
@@ -26,14 +27,10 @@ export default function ImportacionTerritorialPanel({ role, data, activeTab, onI
     id_tramo: '',
     id_nucleo: '',
     id_tramo_nucleo: '',
-    id_entidad_fallback: '',
-    id_municipio_fallback: '',
     fuente: '',
     fecha_vigencia_inicio: '',
     ancho_izquierdo_m: '',
     ancho_derecho_m: '',
-    tipo_nucleo_fallback: 'ejido',
-    ids_tramo_contexto: [],
   });
   const [preview, setPreview] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
@@ -52,26 +49,11 @@ export default function ImportacionTerritorialPanel({ role, data, activeTab, onI
     setPreview(null);
   };
 
-  const toggleTramoContexto = (idTramo) => {
-    setContext((current) => {
-      const selected = current.ids_tramo_contexto.includes(idTramo);
-      return {
-        ...current,
-        ids_tramo_contexto: selected
-          ? current.ids_tramo_contexto.filter((id) => id !== idTramo)
-          : [...current.ids_tramo_contexto, idTramo],
-      };
-    });
-    setPreview(null);
-  };
-
   const buildForm = () => {
     const form = new FormData();
     form.append('file', file);
     Object.entries(context).forEach(([key, value]) => {
-      if (key === 'ids_tramo_contexto') {
-        value.forEach((id) => form.append(key, id));
-      } else if (value !== '' && value != null) {
+      if (value !== '' && value != null) {
         form.append(key, value);
       }
     });
@@ -118,8 +100,8 @@ export default function ImportacionTerritorialPanel({ role, data, activeTab, onI
 
   return (
     <>
-      <button className="admin-button secondary" type="button" onClick={() => setOpen(true)}>
-        <Upload size={16} /> Importar GeoJSON
+      <button className="admin-button secondary" type="button" onClick={() => activeTab === 'nucleos' ? navigate('/administracion/importaciones-geoespaciales') : setOpen(true)}>
+        <Upload size={16} /> {activeTab === 'nucleos' ? 'Importar núcleos' : 'Importar GeoJSON'}
       </button>
       {open && (
         <div className="import-modal-backdrop" role="presentation">
@@ -142,17 +124,6 @@ export default function ImportacionTerritorialPanel({ role, data, activeTab, onI
               {tipo === 'tramos' && <ProyectoSelect data={data} value={context.id_proyecto} onChange={(value) => update('id_proyecto', value)} />}
               {(tipo === 'derecho_via' || tipo === 'cruces_operativos') && <TramoSelect data={data} value={context.id_tramo} onChange={(value) => update('id_tramo', value)} />}
               {(tipo === 'parcelas' || tipo === 'cruces_operativos') && <NucleoSelect data={data} value={context.id_nucleo} onChange={(value) => update('id_nucleo', value)} />}
-              {tipo === 'nucleos' && <EntidadSelect data={data} value={context.id_entidad_fallback} onChange={(value) => { update('id_entidad_fallback', value); update('id_municipio_fallback', ''); }} />}
-              {tipo === 'nucleos' && <MunicipioSelect data={data} idEntidad={context.id_entidad_fallback} value={context.id_municipio_fallback} onChange={(value) => update('id_municipio_fallback', value)} />}
-              {tipo === 'nucleos' && (
-                <label className="import-field">Tipo predeterminado
-                  <select value={context.tipo_nucleo_fallback} onChange={(event) => update('tipo_nucleo_fallback', event.target.value)}>
-                    <option value="ejido">Ejido</option>
-                    <option value="comunidad">Comunidad</option>
-                    <option value="">Usar el tipo de cada feature</option>
-                  </select>
-                </label>
-              )}
               {tipo === 'derecho_via' && (
                 <>
                   <label className="import-field">Fuente<input value={context.fuente} onChange={(event) => update('fuente', event.target.value)} /></label>
@@ -167,17 +138,6 @@ export default function ImportacionTerritorialPanel({ role, data, activeTab, onI
               </label>
             </div>
 
-            {tipo === 'nucleos' && role === 'geografo' && (
-              <fieldset className="tramo-selector compact">
-                <legend>Tramos de contexto</legend>
-                {data.tramos.filter((tramo) => tramo.activo).map((tramo) => (
-                  <label className="check-row" key={tramo.id_tramo}>
-                    <input type="checkbox" checked={context.ids_tramo_contexto.includes(tramo.id_tramo)} onChange={() => toggleTramoContexto(tramo.id_tramo)} />
-                    {tramo.clave_tramo} · {tramo.nombre_tramo}
-                  </label>
-                ))}
-              </fieldset>
-            )}
 
             {error && <div className="import-error">{error}</div>}
             {preview && <PreviewTable preview={preview} />}
@@ -199,7 +159,7 @@ export default function ImportacionTerritorialPanel({ role, data, activeTab, onI
 
 function tipoFromTab(tab) {
   if (tab === 'tramos') return 'tramos';
-  if (tab === 'nucleos') return 'nucleos';
+  if (tab === 'nucleos') return 'tramos';
   if (tab === 'relaciones') return 'cruces_operativos';
   return 'tramos';
 }
@@ -237,32 +197,6 @@ function NucleoSelect({ data, value, onChange }) {
         <option value="">Usar id_nucleo del archivo</option>
         {data.nucleos.filter((item) => item.activo).map((item) => (
           <option key={item.id_nucleo} value={item.id_nucleo}>{item.nombre_nucleo}</option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function EntidadSelect({ data, value, onChange }) {
-  return (
-    <label className="import-field">Entidad predeterminada
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Usar entidad del archivo</option>
-        {data.entidades.map((item) => (
-          <option key={item.id_entidad} value={item.id_entidad}>{item.nombre}</option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function MunicipioSelect({ data, idEntidad, value, onChange }) {
-  return (
-    <label className="import-field">Municipio predeterminado
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Usar municipio de cada feature</option>
-        {data.municipios.filter((item) => !idEntidad || item.id_entidad === Number(idEntidad)).map((item) => (
-          <option key={item.id_municipio} value={item.id_municipio}>{item.nombre}</option>
         ))}
       </select>
     </label>

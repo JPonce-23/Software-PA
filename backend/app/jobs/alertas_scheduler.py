@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from .. import models
 from ..database import SessionLocal
+from ..services.importador_geoespacial import cleanup_expired_files
 
 
 logging.basicConfig(
@@ -44,6 +45,8 @@ def main() -> None:
         try:
             inserted = generate_alerts()
             logger.info("Alertas ORV generadas: %s", inserted)
+            removed = cleanup_expired_files()
+            logger.info("Archivos temporales geoespaciales eliminados: %s", removed)
             delay = interval
         except Exception:
             logger.exception("Falló la generación programada de alertas ORV")

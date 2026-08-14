@@ -27,6 +27,13 @@ for (const viewport of [
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     await page.screenshot({ path: `test-results/administracion-territorial-${viewport.name}.png`, fullPage: true });
 
+    await page.goto('/administracion/importaciones-geoespaciales');
+    await expect(page.getByRole('heading', { name: 'Importaciones geoespaciales' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cargar archivo' })).toBeVisible();
+    await expect(page.locator('.geo-import-list > button').first()).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/importaciones-geoespaciales-${viewport.name}.png`, fullPage: true });
+
     await page.goto('/administracion/usuarios');
     await expect(page.getByRole('heading', { name: 'Administración de usuarios' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Nuevo usuario' })).toBeVisible();

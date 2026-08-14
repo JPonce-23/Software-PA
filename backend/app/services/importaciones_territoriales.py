@@ -23,7 +23,6 @@ from .common import set_audit_context
 
 TIPOS_IMPORTACION = {
     "tramos",
-    "nucleos",
     "derecho_via",
     "parcelas",
     "cruces_operativos",
@@ -581,7 +580,9 @@ def _normalizar_cruce(
     if user.rol != "admin":
         raise HTTPException(status_code=403, detail="Solo administrador puede importar cruces operativos.")
     id_tramo = _int_context(contexto, "id_tramo")
-    id_nucleo = _int_or_none(properties.get("id_nucleo")) or _int_context(contexto, "id_nucleo")
+    # El ID interno siempre proviene de un control autenticado del sistema.
+    # Un atributo del archivo nunca se interpreta como PK de PostgreSQL.
+    id_nucleo = _int_context(contexto, "id_nucleo")
     _tramo_activo(db, id_tramo)
     _nucleo_activo(db, id_nucleo)
     consecutivo = _int_or_none(properties.get("consecutivo"))

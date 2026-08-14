@@ -323,6 +323,7 @@ def test_validacion_falla_cerrado_sin_franja(
         )
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_importacion_admin_global_es_atomica_y_estricta(
     client,
     admin_session,
@@ -397,6 +398,7 @@ def test_importacion_admin_global_es_atomica_y_estricta(
         db.close()
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_geografo_puede_elegir_varios_tramos_asignados(
     client,
     admin_session,

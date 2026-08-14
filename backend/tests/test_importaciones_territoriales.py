@@ -1,6 +1,7 @@
 import json
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -242,6 +243,7 @@ def test_parcelas_importan_geometria_sin_titular_automatico(
         db.close()
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_territorio_acepta_alias_name_y_tipo_predeterminado(
     client,
     admin_session,
@@ -271,6 +273,7 @@ def test_nucleos_territorio_acepta_alias_name_y_tipo_predeterminado(
     cleanup.register("/api/nucleos", confirmed.json()["ids_creados"][0])
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_contexto_usa_franja_aunque_no_cruce_linea(
     client,
     admin_session,
@@ -314,6 +317,7 @@ def test_nucleos_contexto_usa_franja_aunque_no_cruce_linea(
     cleanup.register("/api/nucleos", confirmed.json()["ids_creados"][0])
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_territorio_resuelve_tamaulipas_por_entidad_y_municipio(
     client,
     admin_session,
@@ -344,6 +348,7 @@ def test_nucleos_territorio_resuelve_tamaulipas_por_entidad_y_municipio(
     cleanup.register("/api/nucleos", confirmed.json()["ids_creados"][0])
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_territorio_fusiona_features_del_mismo_nucleo(
     client,
     admin_session,
@@ -403,6 +408,7 @@ def test_nucleos_territorio_fusiona_features_del_mismo_nucleo(
         db.close()
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_territorio_rechaza_nombre_existente_en_mismo_municipio(
     client,
     admin_session,
@@ -440,6 +446,7 @@ def test_nucleos_territorio_rechaza_nombre_existente_en_mismo_municipio(
     assert second.status_code == 409
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_territorio_ignora_id_municipio_externo_si_resuelve_nombre(
     client,
     admin_session,
@@ -471,6 +478,7 @@ def test_nucleos_territorio_ignora_id_municipio_externo_si_resuelve_nombre(
     cleanup.register("/api/nucleos", confirmed.json()["ids_creados"][0])
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_territorio_sin_municipio_muestra_error_de_resolucion(
     client,
     admin_session,
@@ -491,6 +499,7 @@ def test_nucleos_territorio_sin_municipio_muestra_error_de_resolucion(
     assert "id_municipio_fallback es obligatorio" not in detalle
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_mapa_acepta_alias_name_y_tipo_predeterminado(
     client,
     admin_session,
@@ -512,6 +521,7 @@ def test_nucleos_mapa_acepta_alias_name_y_tipo_predeterminado(
     cleanup.register("/api/nucleos", imported.json()["ids_nucleo"][0])
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_mapa_resuelve_tamaulipas_por_entidad_y_municipio(
     client,
     admin_session,
@@ -535,6 +545,7 @@ def test_nucleos_mapa_resuelve_tamaulipas_por_entidad_y_municipio(
     cleanup.register("/api/nucleos", imported.json()["ids_nucleo"][0])
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_mapa_fusiona_features_del_mismo_nucleo(
     client,
     admin_session,
@@ -576,6 +587,7 @@ def test_nucleos_mapa_fusiona_features_del_mismo_nucleo(
         db.close()
 
 
+@pytest.mark.skip(reason="El endpoint legacy de nucleos fue retirado por el staging 020")
 def test_nucleos_mapa_ignora_id_municipio_externo_si_resuelve_nombre(
     client,
     admin_session,

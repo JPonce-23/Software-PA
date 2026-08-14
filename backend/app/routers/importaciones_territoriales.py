@@ -34,6 +34,11 @@ async def previsualizar_importacion(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(["admin", "geografo"])),
 ):
+    if tipo == "nucleos":
+        raise HTTPException(
+            status_code=410,
+            detail="La importacion de nucleos requiere el flujo geoespacial con staging.",
+        )
     if tipo == "cruces_operativos" and current_user.rol != "admin":
         raise HTTPException(status_code=403, detail="Solo administrador puede importar cruces operativos.")
     if not file.filename or not file.filename.lower().endswith((".geojson", ".json")):
@@ -77,6 +82,11 @@ def confirmar_importacion(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(["admin", "geografo"])),
 ):
+    if tipo == "nucleos":
+        raise HTTPException(
+            status_code=410,
+            detail="La importacion de nucleos requiere confirmacion desde staging.",
+        )
     if tipo == "cruces_operativos" and current_user.rol != "admin":
         raise HTTPException(status_code=403, detail="Solo administrador puede importar cruces operativos.")
     return service.confirm(db, tipo, data, current_user)

@@ -17,7 +17,7 @@ from .database import engine, Base, SessionLocal, get_db
 from . import models, schemas
 from . import auth
 from .config import AUTH_SETTINGS
-from .routers import administration, alertas, authentication, documentos, flujo, importaciones_territoriales, minutas, pagos, personas, franjas
+from .routers import administration, alertas, authentication, documentos, flujo, importaciones_geoespaciales, importaciones_territoriales, minutas, pagos, personas, franjas
 from .services import administration as administration_service
 from .services import afectaciones as afectaciones_service
 from .services import authentication as authentication_service
@@ -149,6 +149,7 @@ app.include_router(authentication.router, prefix="/api")
 app.include_router(franjas.router, prefix="/api")
 app.include_router(administration.router, prefix="/api")
 app.include_router(importaciones_territoriales.router, prefix="/api")
+app.include_router(importaciones_geoespaciales.router, prefix="/api")
 
 os.makedirs(os.getenv("UPLOAD_ROOT", "uploads"), exist_ok=True)
 
@@ -667,27 +668,9 @@ async def importacion_masiva_nucleos(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))
 ):
-    if not file.filename or not file.filename.lower().endswith(('.geojson', '.json')):
-        raise HTTPException(400, "El archivo debe tener extensión .geojson o .json")
-
-    max_bytes = 10 * 1024 * 1024
-    content = await file.read(max_bytes + 1)
-    if len(content) > max_bytes:
-        raise HTTPException(413, "Archivo excede el límite de 10MB")
-
-    try:
-        data = json.loads(content)
-    except Exception:
-        raise HTTPException(400, "Archivo JSON inválido")
-
-    return nucleos_service.importar_geojson(
-        db,
-        data,
-        id_municipio_fallback,
-        ids_tramo_contexto or [],
-        current_user,
-        tipo_nucleo_fallback,
-        id_entidad_fallback,
+    raise HTTPException(
+        status_code=410,
+        detail="La importacion directa fue retirada. Use el flujo geoespacial con staging.",
     )
 
 
