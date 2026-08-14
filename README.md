@@ -171,7 +171,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 La migración `001_init_schema.sql` se ejecuta automáticamente **solo cuando el
 volumen de PostgreSQL está vacío**. Una instalación nueva requiere después
-crear el usuario técnico y aplicar en orden las migraciones `004`–`009`.
+crear el usuario técnico y aplicar en orden las migraciones `004`–`018`.
 
 La secuencia exacta, las comprobaciones para bases existentes y los comandos de
 respaldo están documentados en [docs/migraciones.md](docs/migraciones.md).
@@ -189,7 +189,7 @@ docker compose exec \
 docker compose exec -T db sh -lc \
   'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < backend/db/migrations/004_adaptaciones_fase2.sql
-# Repite el mismo patrón, en orden, para 005, 006, 007, 008 y 009.
+# Repite el mismo patrón, en orden, para 005 hasta 018.
 docker compose up -d
 ```
 

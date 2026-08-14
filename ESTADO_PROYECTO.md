@@ -14,20 +14,23 @@
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
 > segundo roadmap ni debe actualizarse con prioridades posteriores.
 
-**Última actualización:** 12 de agosto de 2026
+**Última actualización:** 13 de agosto de 2026
 
 **Rama de trabajo:** `feature/backend-logica`
 
 **Trabajo funcional actual:** la Administración territorial y de accesos quedó
-implementada y validada. El ambiente aislado `software_pa_uat` está preparado
-con 015, fixture reproducible y cuatro roles; backend y scheduler locales están
-conectados actualmente a UAT para iniciar el recorrido real desde el frontend.
-La base original `db_trenes` también quedó alineada con 015 después de respaldo
-verificado y baja lógica de sus dos franjas de prueba incompatibles, con actor,
-fecha, fin de vigencia y motivo. El siguiente trabajo es la aceptación manual
-del flujo completo por rol. El Corte 4 permanece con contracción local
-validada y aceptación operativa TLS/E2E diferida; ese gate no bloquea este
-incremento local, pero sí bloquea liberar autenticación a operación.
+implementada y validada. La importación territorial GeoJSON quedó implementada
+como flujo con previsualización y confirmación para tramos, núcleos agrarios,
+derecho de vía, parcelas y cruces operativos. El ambiente aislado
+`software_pa_uat` quedó migrado a 017 con respaldo previo, y la base aislada
+`software_pa_admin_test_final` quedó alineada a 018 para la regresión.
+La base original `db_trenes` permanece alineada a 016; replicar 017 allí queda
+pendiente de respaldo y autorización operativa. El siguiente trabajo funcional
+vigente es probar desde el frontend con archivos GeoJSON reales y preparar la
+replicación controlada de 017 a las bases que correspondan. El Corte 4
+permanece con contracción local validada y aceptación operativa TLS/E2E
+diferida; ese gate no bloquea este incremento local, pero sí bloquea liberar
+autenticación a operación.
 
 ## 1. Objetivo y dominio
 
@@ -100,6 +103,8 @@ backend/db/migrations/012_*.sql         Regularización correctiva del Corte 5
 backend/db/migrations/013_*.sql         Auditoría de integridad temporal de franjas
 backend/db/migrations/014_*.sql         Auditoría de geometrías de núcleos
 backend/db/migrations/015_*.sql         Integridad de administración territorial
+backend/db/migrations/016_*.sql         Corrección de trigger geométrico 015
+backend/db/migrations/017_*.sql         Importación territorial GeoJSON
 backend/tests/                          regresión e integración
 backend/app/routers/authentication.py   endpoints de sesión y revocación
 backend/app/services/authentication.py  reglas transaccionales de autenticación
@@ -160,6 +165,8 @@ POST            /api/auth/logout
 POST            /api/auth/logout-todas
 POST            /api/usuarios/{id_usuario}/desbloquear
 POST            /api/usuarios/{id_usuario}/revocar-sesiones
+POST            /api/importaciones-territoriales/{tipo}/previsualizar
+POST            /api/importaciones-territoriales/{tipo}/confirmar
 ```
 
 Los routers se incluyen con prefijo `/api` desde `main.py`. Antes de agregar
@@ -496,6 +503,62 @@ motivo, y luego se aplicó 015 con `COMMIT`. La validación posterior confirmó
 PostgreSQL de una franja activa con tramo inactivo mediante
 `ADM_PADRE_INACTIVO`.
 
+### 016 — Corrección de trigger geométrico de 015
+
+Archivo:
+`backend/db/migrations/016_corregir_trigger_geometria_padre_015.sql`
+
+Requiere 015. Corrige `fn_015_validar_geometria_padre()` separando las ramas de
+`tramo` y `nucleo_agrario`, porque la función anterior podía referenciar
+columnas inexistentes para la tabla que disparaba el trigger. No cambia datos ni
+relaja restricciones; sólo reemplaza la función y registra 016.
+
+Se aplicó el 12 de agosto de 2026 sobre `software_pa_admin_test_final`,
+`software_pa_uat` y `db_trenes` con `ON_ERROR_STOP=1`. Antes de UAT y
+`db_trenes` se generaron respaldos legibles por `pg_restore -l`:
+`backups/software_pa_uat_pre_016_20260812.dump`, de 1268722 bytes, SHA-256
+`34449c8e88efd36ee80696ba06fced982d316a100229c855392658add7196a49`, y
+`backups/db_trenes_pre_016_20260812.dump`, de 1244361 bytes, SHA-256
+`a7e655ef6660b399dd1a880d3200b068e137416a1a17d542c46aa70784db5b8a`.
+Ambos quedaron con permisos `0600`.
+
+### 017 — Importación territorial GeoJSON
+
+Archivo:
+`backend/db/migrations/017_importacion_territorial_geojson.sql`
+
+Requiere 016. Es expansiva y transaccional: agrega
+`parcela.geometria_poligono geometry(MultiPolygon,4326)` nullable, índice GiST,
+`CHECK` de geometría válida, trigger de validación parcela-núcleo y trigger
+para impedir que una actualización del núcleo deje parcelas activas fuera de
+su geometría. También agrega un índice único parcial para evitar dos cruces
+operativos activos con el mismo par `id_tramo`/`id_nucleo`, previa validación
+de que no existan duplicados.
+
+Se aplicó el 12 de agosto de 2026 sobre `software_pa_uat` con respaldo previo
+`backups/software_pa_uat_pre_017_20260812.dump`, permisos `0600` y catálogo
+legible por `pg_restore -l`. También se aplicó sobre
+`software_pa_admin_test_final` para ejecutar la regresión automatizada. No se
+ha aplicado todavía sobre `db_trenes`; debe replicarse sólo después de respaldo,
+verificación de `schema_migrations` y preflight de duplicados activos de
+`tramo_nucleo`.
+
+### 018 — Nombre único y agrupación de núcleos importados
+
+Archivo:
+`backend/db/migrations/018_nucleo_nombre_unico_importacion.sql`
+
+Requiere 017. Los importadores de núcleos agrupan las features por municipio,
+tipo y nombre normalizado, y fusionan sus polígonos en una sola geometría
+`MultiPolygon`. La migración agrega un índice único parcial con la misma clave
+para impedir que importaciones futuras vuelvan a crear núcleos activos
+duplicados.
+
+Se aplicó y validó únicamente sobre `software_pa_admin_test_final`. UAT conserva
+los datos importados de Tamaulipas sin modificaciones: contiene 460 grupos con
+nombre repetido y 881 filas excedentes. La migración no debe aplicarse ahí hasta
+conciliar esos grupos y decidir cuáles polígonos pertenecen al mismo núcleo.
+
 ## 6. Trabajo realizado
 
 ### Corte principal 1 — Modelo territorial: terminado
@@ -658,7 +721,7 @@ de agosto de 2026:
 
 ```text
 base/rol:              db_trenes / pa_app
-schema_migrations:     004, 005, 006, 007, 008, 009, 010, 011, 012, 013, 014, 015
+schema_migrations:     004, 005, 006, 007, 008, 009, 010, 011, 012, 013, 014, 015, 016
 datos operativos:      fixtures locales de prueba; no representan producción
 integridad FK:         cero relaciones huérfanas después de la regresión
 autenticación:         un estado por usuario; cero usuarios sin estado
@@ -667,11 +730,11 @@ recuperación F-01A:    fila del usuario 1 restaurada desde respaldo y evento
 vistas activas:        ciclo, afectación, tramo_nucleo y dashboard consultables
 franjas:               cero franjas activas ligadas a tramos inactivos; las
                        franjas de prueba 19 y 41 quedaron con baja lógica
-respaldo:              respaldos previos a 013, 014 y 015 validados con
+respaldo:              respaldos previos a 013, 014, 015 y 016 validados con
                        pg_restore -l
-backend:               131 pruebas aprobadas sobre base desechable con 015;
+backend:               136 pruebas aprobadas sobre base desechable con 016;
                        1 warning deprecado de Starlette
-frontend:              build y lint aprobados; 2 recorridos Playwright de
+frontend:              lint y build aprobados; 2 recorridos Playwright de
                        administración aprobados en escritorio y móvil
 ```
 
@@ -679,13 +742,13 @@ El archivo `.env` local ya permite conectarse al servicio `db`. Estos valores
 describen sólo este entorno; en cada equipo se debe verificar el esquema real.
 En otros equipos, `git pull` descarga las migraciones, pero no las aplica al
 volumen PostgreSQL; cada colaborador debe verificar `schema_migrations` y
-respaldar antes de ejecutar 006, 007, 008, 009, 010, 011, 012, 013, 014 o 015.
+respaldar antes de ejecutar 006, 007, 008, 009, 010, 011, 012, 013, 014, 015 o 016.
 
 Ambiente UAT preparado el 12 de agosto de 2026:
 
 ```text
 base:                   software_pa_uat
-schema_migrations:      004–015
+schema_migrations:      004–016
 escenario:              1 proyecto, 2 tramos, 2 franjas activas,
                         2 núcleos, 2 tramo_nucleo y 1 parcela
 usuarios:               admin, geografo, operador y visualizador
@@ -693,8 +756,9 @@ territorio:             UAT-A asignado; UAT-B reservado para acceso denegado
 servicios conectados:   backend y alertas_scheduler con APP_ENV=test
 frontend:               http://localhost:5173
 credenciales locales:   backups/uat_credentials.env, ignorado por Git, modo 0600
-validación:              login de 4 roles; no-admin 403 en administración;
-                        geografo sólo ve UAT-A y recibe 403 directo sobre UAT-B;
+validación:              login de 4 roles; no-admin 403 en usuarios/asignaciones;
+                        geografo crea proyecto/tramo/núcleo y conserva
+                        aislamiento territorial operativo;
                         Playwright escritorio/móvil 2 aprobadas
 ```
 
@@ -1167,7 +1231,7 @@ Se implementó y validó la propuesta de **Cierre Financiero estricto**.
 
 ### Siguiente incremento aprobado — Administración territorial y de accesos
 
-**Estado:** implementación completa y validada; UAT local activa en 015 y
+**Estado:** implementación completa y validada; UAT local activa en 016 y
 aceptación funcional manual por los cuatro roles pendiente.
 
 #### Motivo
@@ -1255,29 +1319,33 @@ misma operación en interfaces separadas.
 
 #### Autorización aprobada e implementada
 
-La decisión funcional DF-01 aprobó que sólo `admin` administre proyectos,
-tramos, relaciones `tramo_nucleo`, usuarios y asignaciones. El `geografo`
-conserva edición de geometrías, franjas e importaciones en cualquiera de sus
-tramos asignados; no queda atado a un único tramo. `operador` y `visualizador`
-mantienen el acceso operativo o de lectura que corresponda únicamente sobre su
-territorio asignado. La API aplica esta matriz aunque el cliente invoque una
-ruta directamente.
+La decisión funcional DF-01 dejó en `admin` la administración plena de
+relaciones `tramo_nucleo`, usuarios y asignaciones. El ajuste UAT del 12 de
+agosto de 2026 habilitó además al `geografo` para crear proyectos, tramos y
+núcleos agrarios; cuando crea un tramo, el backend crea automáticamente su
+`usuario_tramo` en la misma transacción con el usuario autenticado. El
+`geografo` conserva edición de geometrías, franjas e importaciones en cualquiera
+de sus tramos asignados; no queda atado a un único tramo. `operador` y
+`visualizador` mantienen el acceso operativo o de lectura que corresponda
+únicamente sobre su territorio asignado. La API aplica esta matriz aunque el
+cliente invoque una ruta directamente.
 
 #### Implementación validada
 
-- `/administracion/territorio` permite buscar, listar activos o inactivos,
-  crear, editar, dar de baja y reactivar proyectos, tramos, núcleos y
-  `tramo_nucleo`; la asociación es siempre explícita y ofrece navegación al
-  expediente maestro.
+- `/administracion/territorio` permite al `admin` buscar, listar activos o
+  inactivos, crear, editar, dar de baja y reactivar proyectos, tramos, núcleos
+  y `tramo_nucleo`; la asociación es siempre explícita y ofrece navegación al
+  expediente maestro. Para `geografo`, la vista expone creación de proyectos,
+  tramos y núcleos, filtros territoriales y acciones compatibles con su rol.
 - `/administracion/usuarios` permite buscar, crear, editar, desbloquear,
   revocar sesiones, dar de baja y reactivar usuarios. Las asignaciones por
   tramo se reemplazan atómicamente desde la administración territorial.
 - El router y servicio administrativos aíslan las operaciones de composición,
   validan padres y usuarios activos y configuran auditoría. Las bajas siguen
   siendo lógicas y requieren motivo.
-- La migración 015 protege en PostgreSQL la integridad crítica y el último
-  administrador. La autenticación compara correos normalizados sin distinguir
-  mayúsculas y minúsculas.
+- Las migraciones 015 y 016 protegen en PostgreSQL la integridad crítica, el
+  último administrador y la coherencia geométrica de padres. La autenticación
+  compara correos normalizados sin distinguir mayúsculas y minúsculas.
 - `backend/scripts/seed_uat.py` prepara idempotentemente cuatro roles, un
   proyecto, dos tramos con un escenario permitido y otro denegado, franjas,
   núcleos, `tramo_nucleo` y parcela; sólo admite bases marcadas como test/UAT y
@@ -1300,7 +1368,7 @@ visualizador; acceso permitido y denegado; alta territorial completa; rutas
 colectiva e individual; documentos; errores; reintentos y concurrencia.
 
 El aprovisionamiento técnico ya está completo en `software_pa_uat`: fixture
-ejecutado dos veces para comprobar idempotencia, 015 aplicada, almacenamiento
+ejecutado dos veces para comprobar idempotencia, 016 aplicada, almacenamiento
 persistente configurado y los cuatro inicios de sesión validados. Falta la
 aceptación manual del proceso; el fixture no constituye por sí mismo esa
 aceptación.
@@ -1342,6 +1410,118 @@ cumplidos. La aceptación integral del proceso por los cuatro roles permanece
 pendiente en `software_pa_uat`; no debe declararse aceptación operativa antes
 de completar y registrar ese recorrido manual.
 
+### Incremento completado — Importación territorial GeoJSON
+
+**Estado:** implementación completa y validada localmente el 12 de agosto de
+2026.
+
+#### Alcance implementado
+
+La importación territorial por GeoJSON quedó disponible como flujo principal
+para:
+
+- tramos;
+- núcleos agrarios;
+- derecho de vía;
+- parcelas;
+- cruces operativos.
+
+El flujo reduce la captura manual rígida y permite preparar territorialmente el
+expediente desde archivos geoespaciales, sin romper la jerarquía aprobada:
+
+```text
+Proyecto → Tramo → Cruce operativo → Afectación
+```
+
+`Cruce operativo` es el nombre visible aprobado para `tramo_nucleo`. No se
+aprueba todavía renombrar tablas, modelos ni endpoints; el cambio inicial debe
+ser de lenguaje funcional y UX.
+
+#### Decisiones funcionales vigentes
+
+- GeoJSON será el formato principal de esta fase.
+- Se aceptan archivos con extensión `.geojson` o `.json`, siempre que el
+  contenido sea un GeoJSON válido tipo `FeatureCollection`.
+- KML queda fuera de la implementación inmediata y se conserva sólo como
+  compatibilidad futura a analizar.
+- La importación tiene previsualización antes de guardar.
+- La importación puede crear registros territoriales nuevos, pero no afectaciones.
+- La importación de cruces operativos es explícita, no un efecto lateral
+  oculto de importar tramos, núcleos o derecho de vía.
+- Ninguna importación crea `tramo_nucleo` automáticamente por simple
+  intersección sin confirmación del usuario.
+- Toda geometría persistida queda validada también en PostgreSQL/PostGIS.
+- Toda importación que escribe varias filas se ejecuta en una sola transacción
+  y deja auditoría con el usuario autenticado.
+- Se conserva autorización por rol y pertenencia territorial; ocultar
+  controles en React no sustituye validación backend.
+
+#### Reglas de diseño por entidad
+
+- **Tramos:** importa GeoJSON `LineString` o `MultiLineString`, normaliza a
+  `MULTILINESTRING`, seleccionar proyecto y, si crea un geógrafo, asignar el
+  tramo al usuario autenticado mediante `usuario_tramo` en la misma transacción.
+- **Derecho de vía:** importa GeoJSON `Polygon` o `MultiPolygon`, normaliza a
+  `MULTIPOLYGON`, seleccionar tramo y crear una versión de franja reutilizando
+  las reglas de versionado existentes.
+- **Núcleos agrarios:** reutiliza la validación del importador GeoJSON seguro y
+  la amplía con previsualización, confirmación y contexto territorial. Acepta
+  aliases comunes de archivos GIS como `Name`, `NOMBRE`, `NOM_NUCLEO`,
+  `MUNICIPIO` y `ENTIDAD`, además de tipo de núcleo predeterminado desde
+  pantalla cuando el archivo no trae `tipo_nucleo`. Para archivos estatales,
+  como un GeoJSON de todos los núcleos de Tamaulipas, se puede seleccionar la
+  entidad predeterminada y resolver cada feature por su campo `MUNICIPIO`, sin
+  asignar todo el archivo a un solo municipio.
+- **Parcelas:** importa GeoJSON `Polygon` o `MultiPolygon`, asocia a núcleo y
+  validar pertenencia/intersección sin crear afectaciones.
+- **Cruces operativos:** importa explícitamente registros que relacionan tramo
+  y núcleo; validar padres activos, no ambigüedad, intersección territorial,
+  duplicados activos y geometría `MULTILINESTRING`.
+
+#### Implementación técnica
+
+- `backend/app/services/importaciones_territoriales.py`: servicio común de
+  previsualización, revalidación y confirmación transaccional.
+- `backend/app/routers/importaciones_territoriales.py`: endpoints
+  `/api/importaciones-territoriales/{tipo}/previsualizar` y
+  `/api/importaciones-territoriales/{tipo}/confirmar`.
+- `frontend/src/components/ImportacionTerritorialPanel.jsx`: panel de carga,
+  contexto, tabla de preview y confirmación explícita desde Administración
+  Territorial.
+- `backend/db/migrations/017_importacion_territorial_geojson.sql`: soporte
+  geométrico de parcelas e integridad adicional de cruces.
+- El importador genérico histórico `/api/geometria/importar-geojson` se conserva
+  por compatibilidad, pero no es el flujo vigente para nuevas importaciones
+  territoriales.
+
+#### Validación ejecutada
+
+```text
+python -m py_compile app/services/importaciones_territoriales.py \
+  app/routers/importaciones_territoriales.py tests/test_importaciones_territoriales.py
+DB_NAME=software_pa_admin_test_final pytest -q tests/test_importaciones_territoriales.py
+DB_NAME=software_pa_admin_test_final pytest -q tests/test_administracion_territorial.py tests/test_corte5_regularizacion.py
+DB_NAME=software_pa_admin_test_final pytest -q
+docker compose exec -T frontend npm run lint
+docker compose exec -T frontend npm run build
+verificación de rutas duplicadas FastAPI: 0 duplicadas
+```
+
+Resultado: 151 pruebas backend aprobadas, lint frontend sin errores y build de
+producción aprobado. Ajuste posterior validado: los importadores aceptan
+archivos `.json` con contenido GeoJSON válido; `pytest -q
+tests/test_importaciones_territoriales.py`, lint frontend y build aprobaron.
+Segundo ajuste posterior validado: importación de núcleos desde Mapa y
+Administración Territorial acepta aliases comunes de propiedades GIS y tipo de
+núcleo predeterminado; `pytest -q tests/test_importaciones_territoriales.py`,
+lint frontend y build aprobaron.
+Tercer ajuste posterior validado: importación de núcleos por entidad
+predeterminada y municipio por feature, cubriendo el caso Tamaulipas; `pytest
+-q tests/test_importaciones_territoriales.py`, lint frontend y build aprobaron.
+La corrección posterior agrupa features del mismo núcleo, fusiona sus polígonos
+y rechaza nombres activos ya existentes; la regresión completa aprobó 151
+pruebas sobre `software_pa_admin_test_final` con 018 aplicada.
+
 ## 9. Trabajo técnico transversal pendiente
 
 - Conservar y probar periódicamente la restauración del respaldo previo a 006
@@ -1358,6 +1538,16 @@ de completar y registrar ese recorrido manual.
   `backups/pre_014_corte5_nucleos_20260811.dump`.
 - Conservar el respaldo previo a 015:
   `backups/db_trenes_pre_015_20260812.dump`.
+- Conservar los respaldos previos a 016:
+  `backups/software_pa_uat_pre_016_20260812.dump` y
+  `backups/db_trenes_pre_016_20260812.dump`.
+- Conservar el respaldo previo a 017 de UAT:
+  `backups/software_pa_uat_pre_017_20260812.dump`.
+- Conciliar los núcleos repetidos de Tamaulipas antes de aplicar 018 en UAT; la
+  migración aborta deliberadamente mientras existan claves activas duplicadas.
+- Replicar 017 en `db_trenes` u otros ambientes sólo después de respaldo,
+  verificación individual de `schema_migrations`, preflight de duplicados
+  activos de `tramo_nucleo` y ventana sin escrituras concurrentes.
 - Replicar 007 en otros ambientes sólo después de respaldo, verificación de
   `schema_migrations` y preflight de tipos documentales.
 - Conciliar manualmente relaciones históricas 2B que permanecen nulas; no
@@ -1382,20 +1572,30 @@ de completar y registrar ese recorrido manual.
 
 La siguiente tarea no es reimplementar la administración, crear otra entidad
 Proyecto, cambiar la jerarquía territorial, repetir Adaptaciones 2.0, rediseñar
-2A ni reimplementar 2B. Debe ejecutar y registrar la aceptación funcional del
-incremento ya implementado sobre la UAT activa en 015.
+2A, reimplementar 2B ni rediseñar la importación GeoJSON ya validada. Debe
+probarse el flujo real desde frontend con archivos GeoJSON representativos y,
+después, preparar la réplica controlada de 017 a las bases que correspondan.
 
 Próximo paso operativo:
 
-1. Modelar desde el frontend el flujo real con admin, operador, geógrafo y
-   visualizador, incluyendo territorio permitido/denegado, rutas colectiva e
-   individual, documentos, reintentos y concurrencia.
-2. Registrar defectos técnicos reproducibles sin alterar los datos para ocultar
-   fallos. El escenario se repone idempotentemente con `python -m scripts.seed_uat`.
-3. No tratar la falta del ambiente HTTPS de aceptación como bloqueo general del
+1. Probar desde Administración Territorial la importación GeoJSON de tramos,
+   núcleos agrarios, derecho de vía, parcelas y cruces operativos usando
+   archivos reales o representativos del usuario.
+2. Mantener GeoJSON como formato principal de esta fase. KML queda fuera de la
+   implementación inmediata y sólo debe analizarse como compatibilidad futura.
+3. Usar `Cruce operativo` como nombre visible de `tramo_nucleo`, sin renombrar
+   todavía tablas, modelos ni endpoints.
+4. Verificar durante el recorrido real que la previsualización, errores por
+   feature, validación PostGIS, auditoría, autorización por rol/territorio y
+   transacciones atómicas coinciden con los datos cargados.
+5. No crear afectaciones automáticamente y no crear cruces operativos como
+   efecto lateral oculto de importar tramos, núcleos o derecho de vía.
+6. Replicar 017 en `db_trenes` u otros ambientes sólo después de respaldo,
+   preflight y autorización operativa.
+7. No tratar la falta del ambiente HTTPS de aceptación como bloqueo general del
    desarrollo local; registrarla únicamente como gate pendiente para cierre de
    Corte 4 o liberación operativa.
-4. Antes de declarar Corte 4 terminado, validar detrás del TLS real del ambiente
+8. Antes de declarar Corte 4 terminado, validar detrás del TLS real del ambiente
    de aceptación: cookie
    `Secure`, origen HTTPS exacto y, si se requiere IP cliente, proxies
    confiables configurados por IP exacta. El ambiente puede ser interno de
@@ -1405,12 +1605,12 @@ Próximo paso operativo:
    *(Nota: La contracción de código de bearer/JWT a nivel local fue completada y
    validada estructuralmente el 6 de agosto de 2026. `python-jose`, tests legacy
    y dependencias obsoletas fueron eliminados).*
-5. Ejecutar aceptación E2E de login, quinto fallo, desbloqueo, expiración,
+9. Ejecutar aceptación E2E de login, quinto fallo, desbloqueo, expiración,
    logout y RBAC/territorio en navegadores soportados, utilizando el TLS real
    del ambiente de aceptación.
-6. Replicar 008 y luego 009 en otros ambientes sólo después de respaldo,
+10. Replicar 008 y luego 009 en otros ambientes sólo después de respaldo,
    verificación individual de 004/005/006/007 y preflight de bitácora sensible.
-7. Revisar y confirmar el diff antes de commit/push.
+11. Revisar y confirmar el diff antes de commit/push.
 El derecho de vía versionado está aprobado y terminado como componente del Corte
 5, al igual que el Dashboard Analítico y el Uploader Masivo GeoJSON. La
 regularización correctiva de estos componentes quedó implementada y validada

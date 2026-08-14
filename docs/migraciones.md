@@ -162,7 +162,7 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    variable temporal del proceso; no la dejes persistente en archivos
    compartidos, historial de shell, logs ni capturas.
 
-4. Aplica `004`–`015` en orden, una sola vez cada una. Detén backend y
+4. Aplica `004`–`018` en orden, una sola vez cada una. Detén backend y
    scheduler antes de cada migración y conserva `ON_ERROR_STOP`:
 
    ```bash
@@ -202,6 +202,15 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    docker compose exec -T db sh -lc \
      'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
      < backend/db/migrations/015_administracion_territorial.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/016_corregir_trigger_geometria_padre_015.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/017_importacion_territorial_geojson.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/018_nucleo_nombre_unico_importacion.sql
    ```
 
    La 011 exige 010, toma un bloqueo asesor, ejecuta su preflight y se
@@ -231,6 +240,12 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    inferencia: concílialos con el responsable funcional, crea un respaldo nuevo
    y vuelve a ejecutar la auditoría. Si existe 015 en `schema_migrations`, no la
    repitas.
+
+   La 016 exige 015 y corrige el trigger de geometría padre. La 017 exige 016,
+   agrega geometría territorial de parcelas y protege los cruces operativos
+   activos. La 018 exige 017 y evita núcleos activos duplicados por municipio,
+   tipo y nombre normalizado. Su preflight aborta si ya existen duplicados: no
+   los elimines ni fusiones por inferencia; concílialos antes de reintentar.
 
 5. Verifica el registro:
 
