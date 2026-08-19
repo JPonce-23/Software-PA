@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import codecs
+import select
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
@@ -129,10 +132,12 @@ def inspect_dataset(path: Path) -> DatasetInfo:
         detected_format = "kml"
     elif "geojson" in driver_normalized:
         detected_format = "geojson"
+    elif "esri shapefile" in driver_normalized or driver_normalized == "shapefile":
+        detected_format = "shapefile"
     else:
         raise IngestionError(
             "FORMATO_NO_SOPORTADO",
-            "El contenido detectado no es KML ni GeoJSON.",
+            "El contenido detectado no es KML, GeoJSON ni Shapefile.",
         )
 
     layers: list[LayerInfo] = []
@@ -171,7 +176,11 @@ def inspect_dataset(path: Path) -> DatasetInfo:
     return DatasetInfo(driver=driver, format=detected_format, layers=tuple(layers))
 
 
-def iter_features(path: Path, dataset: DatasetInfo) -> Iterator[tuple[str, dict]]:
+def iter_features(
+    path: Path,
+    dataset: DatasetInfo,
+    limit_per_layer: int | None = None,
+) -> Iterator[tuple[str, dict]]:
     """Convierte cada capa a GeoJSONSeq en stdout y entrega un feature a la vez."""
     timeout = int(os.getenv("IMPORT_GDAL_TIMEOUT_SECONDS", "300"))
     for layer in dataset.layers:
@@ -182,11 +191,15 @@ def iter_features(path: Path, dataset: DatasetInfo) -> Iterator[tuple[str, dict]
             "/vsistdout/",
             str(path),
             layer.name,
+        ]
+        if limit_per_layer is not None:
+            command.extend(["-limit", str(max(1, limit_per_layer))])
+        command.extend([
             "-t_srs",
             "EPSG:4326",
             "-lco",
             "RS=NO",
-        ]
+        ])
         try:
             process = subprocess.Popen(
                 command,
@@ -194,7 +207,6 @@ def iter_features(path: Path, dataset: DatasetInfo) -> Iterator[tuple[str, dict]
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 env=_gdal_environment(),
-                text=True,
             )
         except FileNotFoundError as exc:
             raise IngestionError(
@@ -202,27 +214,61 @@ def iter_features(path: Path, dataset: DatasetInfo) -> Iterator[tuple[str, dict]
                 "El servicio geoespacial no esta disponible en el backend.",
             ) from exc
         assert process.stdout is not None
+        stdout = process.stdout
+        deadline = time.monotonic() + timeout
+        decoder = codecs.getincrementaldecoder("utf-8")()
+        pending = ""
+
+        def consume_line(line: str) -> dict | None:
+            payload = line.lstrip("\x1e").strip()
+            if not payload:
+                return None
+            try:
+                return json.loads(payload)
+            except json.JSONDecodeError as exc:
+                raise IngestionError(
+                    "FEATURE_OGR_INVALIDO",
+                    f'GDAL produjo un feature invalido en la capa "{layer.name}".',
+                ) from exc
+
         try:
-            for line in process.stdout:
-                payload = line.lstrip("\x1e").strip()
-                if not payload:
-                    continue
-                try:
-                    feature = json.loads(payload)
-                except json.JSONDecodeError as exc:
-                    process.kill()
-                    raise IngestionError(
-                        "FEATURE_OGR_INVALIDO",
-                        f'GDAL produjo un feature invalido en la capa "{layer.name}".',
-                    ) from exc
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                readable, _, _ = select.select([stdout], [], [], remaining)
+                if not readable:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                chunk = os.read(stdout.fileno(), 64 * 1024)
+                if not chunk:
+                    break
+                pending += decoder.decode(chunk)
+                while "\n" in pending:
+                    line, pending = pending.split("\n", 1)
+                    feature = consume_line(line)
+                    if feature is not None:
+                        yield layer.name, feature
+            pending += decoder.decode(b"", final=True)
+            feature = consume_line(pending)
+            if feature is not None:
                 yield layer.name, feature
-            process.wait(timeout=timeout)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            process.wait(timeout=remaining)
         except subprocess.TimeoutExpired as exc:
-            process.kill()
             raise IngestionError(
                 "GDAL_TIMEOUT",
                 f'La capa "{layer.name}" excedio el tiempo permitido de conversion.',
             ) from exc
+        finally:
+            if process.poll() is None:
+                process.kill()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+            stdout.close()
         if process.returncode != 0:
             raise IngestionError(
                 "CONVERSION_OGR_FALLIDA",

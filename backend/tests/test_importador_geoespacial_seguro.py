@@ -1,4 +1,5 @@
 import json
+import io
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from types import SimpleNamespace
@@ -36,6 +37,28 @@ def _territory():
             "entidad": entity.nombre,
             "clave_municipio": municipality.clave_inegi,
             "clave_entidad": entity.clave_inegi,
+        }
+
+
+def _other_territory(first_id: int):
+    with SessionLocal() as db:
+        municipality = (
+            db.query(models.Municipio)
+            .join(models.EntidadFederativa)
+            .filter(
+                models.Municipio.activo.is_(True),
+                models.EntidadFederativa.activo.is_(True),
+                models.Municipio.id_municipio != first_id,
+            )
+            .order_by(models.Municipio.id_municipio)
+            .first()
+        )
+        entity = db.get(models.EntidadFederativa, municipality.id_entidad)
+        return {
+            "id_municipio": municipality.id_municipio,
+            "municipio": municipality.nombre,
+            "id_entidad": entity.id_entidad,
+            "entidad": entity.nombre,
         }
 
 
@@ -80,10 +103,20 @@ def _upload(client, headers, content, filename=None, source=None):
     )
 
 
-def _process(client, headers, record, mapping=None, options=None):
+def _process(
+    client,
+    headers,
+    record,
+    mapping=None,
+    options=None,
+    provenance=None,
+    origin_import_id=None,
+):
     payload = {
         "mapeo": mapping or record["mapeo"],
         "opciones": options or {},
+        "procedencia_archivo": provenance or "original",
+        "id_importacion_origen": origin_import_id,
     }
     mapped = client.put(
         f"/api/importaciones-geoespaciales/{record['id_importacion']}/mapeo",
@@ -250,6 +283,30 @@ def test_columnas_desconocidas_requieren_mapeo_manual(client, admin_session):
     assert ready["validos"] == 1
 
 
+def test_muestras_de_columnas_ayudan_al_mapeo_sin_prevalidar(
+    client, admin_session
+):
+    first_name = f"MUESTRA UNO {uuid4().hex[:8]}"
+    second_name = f"MUESTRA DOS {uuid4().hex[:8]}"
+    uploaded = _upload(
+        client,
+        admin_session,
+        _geojson(_feature(name=first_name), _feature(name=second_name)),
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    record = uploaded.json()
+
+    response = client.get(
+        f"/api/importaciones-geoespaciales/{record['id_importacion']}/muestras-columnas",
+        headers=admin_session,
+    )
+    assert response.status_code == 200, response.text
+    samples = response.json()["muestras"]
+    assert samples["NombreNucleoAgrario"] == [first_name, second_name]
+    assert samples["TipoNucleoAgrario"] == ["EJIDO"]
+    assert record["estado"] == "subido"
+
+
 def test_kml_valido_es_detectado_por_ogr(client, admin_session):
     territory = _territory()
     name = f"KML {uuid4().hex[:8]}"
@@ -268,6 +325,13 @@ def test_kml_valido_es_detectado_por_ogr(client, admin_session):
     assert uploaded.status_code == 201, uploaded.text
     assert uploaded.json()["formato_detectado"] == "kml"
     assert "4326" in uploaded.json()["crs_original"]
+    ready = _process(client, admin_session, uploaded.json())
+    assert ready["validos"] == 1
+    with SessionLocal() as db:
+        staged = db.query(models.ImportacionFeature).filter_by(
+            id_importacion=ready["id_importacion"]
+        ).one()
+        assert staged.geometria_normalizada is not None
 
 
 def test_crs_transformable_se_registra_y_normaliza(client, admin_session):
@@ -338,6 +402,507 @@ def test_union_de_partes_requiere_opcion_advertencia_y_aceptacion(client, admin_
     nucleus_ids = {item["id_nucleo_operativo"] for item in page["items"]}
     assert len(nucleus_ids) == 1
     cleanup.register("/api/nucleos", nucleus_ids.pop())
+
+
+def test_multiparte_con_parte_invalida_bloquea_todo_el_nucleo(client, admin_session):
+    external_id = uuid4().hex
+    name = f"MULTIPARTE INCOMPLETO {uuid4().hex[:8]}"
+    invalid_part = _feature(
+        name=name,
+        nucleus_id=external_id,
+        geometry={"type": "Point", "coordinates": [0, 0]},
+    )
+    uploaded = _upload(
+        client,
+        admin_session,
+        _geojson(_feature(name=name, nucleus_id=external_id), invalid_part),
+    )
+    ready = _process(
+        client,
+        admin_session,
+        uploaded.json(),
+        options={"unir_partes_mismo_id": True},
+    )
+    assert ready["errores"] == 2
+    items = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features",
+        headers=admin_session,
+    ).json()["items"]
+    assert all(item["estado"] == "error" for item in items)
+    assert any(
+        problem["codigo"] == "GRUPO_MULTIPARTE_INCOMPLETO"
+        for problem in items[0]["errores"]
+    )
+    blocked = client.post(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/confirmar",
+        headers=admin_session,
+        json={"aceptar_advertencias": True},
+    )
+    assert blocked.status_code == 409
+
+
+def test_multiparte_sin_municipio_resuelto_bloquea_todo_el_id_fuente(client, admin_session):
+    external_id = uuid4().hex
+    name = f"MULTIPARTE SIN MUNICIPIO {uuid4().hex[:8]}"
+    unresolved = _feature(name=name, nucleus_id=external_id, geometry=_polygon(0.02))
+    unresolved["properties"]["NombreMunicipio"] = f"NO RESUELTO {uuid4().hex}"
+    uploaded = _upload(
+        client,
+        admin_session,
+        _geojson(_feature(name=name, nucleus_id=external_id), unresolved),
+    )
+    ready = _process(
+        client,
+        admin_session,
+        uploaded.json(),
+        options={"unir_partes_mismo_id": True},
+    )
+    assert ready["errores"] == 2
+    items = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features",
+        headers=admin_session,
+    ).json()["items"]
+    assert any(
+        problem["codigo"] == "GRUPO_MULTIPARTE_INCOMPLETO"
+        for problem in items[0]["errores"]
+    )
+    assert any(
+        problem["codigo"] == "MUNICIPIO_NO_ENCONTRADO"
+        for problem in items[1]["errores"]
+    )
+
+
+def test_geometria_consolidada_invalida_no_llega_a_nucleo_operativo(client, admin_session):
+    name = f"CONSOLIDADA INVALIDA {uuid4().hex[:8]}"
+    uploaded = _upload(client, admin_session, _geojson(_feature(name=name)))
+    ready = _process(client, admin_session, uploaded.json())
+    with SessionLocal() as db:
+        staged = db.query(models.ImportacionFeature).filter_by(
+            id_importacion=ready["id_importacion"]
+        ).one()
+        record = db.get(models.ImportacionArchivo, ready["id_importacion"])
+        service.set_audit_context(db, record.id_usuario_carga)
+        staged.geometria_normalizada = "MULTIPOLYGON EMPTY"
+        db.commit()
+
+    confirmed = client.post(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/confirmar",
+        headers=admin_session,
+        json={"aceptar_advertencias": False},
+    )
+    assert confirmed.status_code == 202, confirmed.text
+    with SessionLocal() as db:
+        assert db.query(models.NucleoAgrario).filter(
+            models.NucleoAgrario.nombre_nucleo == name,
+            models.NucleoAgrario.activo.is_(True),
+        ).count() == 0
+        staged = db.query(models.ImportacionFeature).filter_by(
+            id_importacion=ready["id_importacion"]
+        ).one()
+        assert staged.estado == "error"
+        assert any(
+            problem["codigo"] == "GEOMETRIA_CONSOLIDADA_INVALIDA"
+            for problem in staged.errores
+        )
+
+
+def test_mismo_id_en_municipios_distintos_no_se_une(client, admin_session, cleanup):
+    first = _territory()
+    second = _other_territory(first["id_municipio"])
+    external_id = uuid4().hex
+    other = _feature(name=f"OTRO MUNICIPIO {uuid4().hex[:8]}", nucleus_id=external_id, geometry=_polygon(0.03))
+    other["properties"].update({
+        "NombreMunicipio": second["municipio"],
+        "NombreEntidadFederativa": second["entidad"],
+    })
+    uploaded = _upload(
+        client,
+        admin_session,
+        _geojson(_feature(name=f"PRIMER MUNICIPIO {uuid4().hex[:8]}", nucleus_id=external_id), other),
+    )
+    ready = _process(client, admin_session, uploaded.json(), options={"unir_partes_mismo_id": True})
+    assert ready["validos"] == 2
+    assert ready["advertencias"] == 0
+    confirmed = client.post(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/confirmar",
+        headers=admin_session,
+        json={"aceptar_advertencias": False},
+    )
+    assert confirmed.status_code == 202
+    items = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features",
+        headers=admin_session,
+    ).json()["items"]
+    nucleus_ids = {item["id_nucleo_operativo"] for item in items}
+    assert len(nucleus_ids) == 2
+    for nucleus_id in nucleus_ids:
+        cleanup.register("/api/nucleos", nucleus_id)
+
+
+def test_edicion_recalcula_contradicciones_multiparte(client, admin_session):
+    external_id = uuid4().hex
+    first_name = f"NOMBRE CONSISTENTE {uuid4().hex[:8]}"
+    uploaded = _upload(
+        client,
+        admin_session,
+        _geojson(
+            _feature(name=first_name, nucleus_id=external_id),
+            _feature(name=f"NOMBRE DISTINTO {uuid4().hex[:8]}", nucleus_id=external_id, geometry=_polygon(0.02)),
+        ),
+    )
+    ready = _process(client, admin_session, uploaded.json(), options={"unir_partes_mismo_id": True})
+    assert ready["errores"] == 2
+    second_feature = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features",
+        headers=admin_session,
+    ).json()["items"][1]
+    revised = client.patch(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features/{second_feature['id_importacion_feature']}",
+        headers=admin_session,
+        json={"nombre_nucleo": first_name},
+    )
+    assert revised.status_code == 200, revised.text
+    items = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features",
+        headers=admin_session,
+    ).json()["items"]
+    assert all(item["estado"] == "advertencia" for item in items)
+    assert all(
+        not any(problem["codigo"] == "ID_EXTERNO_CONTRADICTORIO" for problem in item["errores"])
+        for item in items
+    )
+
+
+def test_edicion_que_mueve_un_id_a_otro_municipio_recalcula_conflicto(client, admin_session):
+    first = _territory()
+    second = _other_territory(first["id_municipio"])
+    external_id = uuid4().hex
+    other = _feature(name=f"SEGUNDO NOMBRE {uuid4().hex[:8]}", nucleus_id=external_id, geometry=_polygon(0.03))
+    other["properties"].update({"NombreMunicipio": second["municipio"], "NombreEntidadFederativa": second["entidad"]})
+    uploaded = _upload(
+        client,
+        admin_session,
+        _geojson(_feature(name=f"PRIMER NOMBRE {uuid4().hex[:8]}", nucleus_id=external_id), other),
+    )
+    ready = _process(client, admin_session, uploaded.json(), options={"unir_partes_mismo_id": True})
+    assert ready["validos"] == 2
+    second_feature = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features",
+        headers=admin_session,
+    ).json()["items"][1]
+    moved = client.patch(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features/{second_feature['id_importacion_feature']}",
+        headers=admin_session,
+        json={"id_entidad": first["id_entidad"], "id_municipio": first["id_municipio"]},
+    )
+    assert moved.status_code == 200, moved.text
+    items = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features",
+        headers=admin_session,
+    ).json()["items"]
+    assert all(item["estado"] == "error" for item in items)
+    assert all(any(problem["codigo"] == "ID_EXTERNO_CONTRADICTORIO" for problem in item["errores"]) for item in items)
+
+
+def test_importacion_completada_reanuda_advertencias_sin_duplicar(client, admin_session, cleanup):
+    multipart_id = uuid4().hex
+    multipart_name = f"MULTIPARTE PENDIENTE {uuid4().hex[:8]}"
+    standalone_name = f"VALIDO INICIAL {uuid4().hex[:8]}"
+    uploaded = _upload(
+        client,
+        admin_session,
+        _geojson(
+            _feature(name=standalone_name, geometry=_polygon(0.04)),
+            _feature(name=multipart_name, nucleus_id=multipart_id),
+            _feature(name=multipart_name, nucleus_id=multipart_id, geometry=_polygon(0.02)),
+        ),
+    )
+    ready = _process(
+        client,
+        admin_session,
+        uploaded.json(),
+        options={"unir_partes_mismo_id": True},
+    )
+    assert ready["validos"] == 1
+    assert ready["advertencias"] == 2
+
+    first_confirmation = client.post(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/confirmar",
+        headers=admin_session,
+        json={"aceptar_advertencias": False},
+    )
+    assert first_confirmation.status_code == 202, first_confirmation.text
+    first_completed = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}",
+        headers=admin_session,
+    ).json()
+    assert first_completed["estado"] == "completado"
+    assert first_completed["importados"] == 1
+
+    resumed = client.post(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/confirmar",
+        headers=admin_session,
+        json={"aceptar_advertencias": True},
+    )
+    assert resumed.status_code == 202, resumed.text
+    completed = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}",
+        headers=admin_session,
+    ).json()
+    assert completed["estado"] == "completado"
+    assert completed["importados"] == 3
+    page = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features",
+        headers=admin_session,
+    ).json()
+    nucleus_ids = {item["id_nucleo_operativo"] for item in page["items"]}
+    assert len(nucleus_ids) == 2
+    for nucleus_id in nucleus_ids:
+        cleanup.register("/api/nucleos", nucleus_id)
+
+
+def test_id_externo_cero_no_se_usa_como_identidad(client, admin_session):
+    uploaded = _upload(
+        client,
+        admin_session,
+        _geojson(_feature(name=f"ID CERO {uuid4().hex[:8]}", nucleus_id="0")),
+    )
+    ready = _process(client, admin_session, uploaded.json())
+    assert ready["validos"] == 1
+    assert ready["errores"] == 0
+    feature_id = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features",
+        headers=admin_session,
+    ).json()["items"][0]["id_importacion_feature"]
+    with SessionLocal() as db:
+        assert db.get(models.ImportacionFeature, feature_id).id_nucleo_fuente is None
+
+
+def test_paginacion_backend_de_features_mayor_a_cien(client, admin_session):
+    territory = _territory()
+    features = [
+        {
+            "type": "Feature",
+            "properties": {
+                "NombreNucleoAgrario": f"PAGINA FEATURE {index} {uuid4().hex[:6]}",
+                "TipoNucleoAgrario": "EJIDO",
+                "NombreMunicipio": territory["municipio"],
+                "NombreEntidadFederativa": territory["entidad"],
+                "IdNucleoAgrario": uuid4().hex,
+            },
+            "geometry": _polygon(index * 0.02),
+        }
+        for index in range(101)
+    ]
+    uploaded = _upload(client, admin_session, _geojson(*features))
+    ready = _process(client, admin_session, uploaded.json())
+    page = client.get(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/features?offset=100&limit=100",
+        headers=admin_session,
+    )
+    assert page.status_code == 200, page.text
+    assert page.json()["total"] == 101
+    assert len(page.json()["items"]) == 1
+
+
+def test_paginacion_backend_de_importaciones_mayor_a_veinticinco(client, admin_session):
+    for index in range(26):
+        response = _upload(
+            client,
+            admin_session,
+            _geojson(_feature(name=f"PAGINA ARCHIVO {index} {uuid4().hex[:8]}")),
+        )
+        assert response.status_code == 201, response.text
+    page = client.get(
+        "/api/importaciones-geoespaciales?estado_vista=todas&offset=25&limit=25",
+        headers=admin_session,
+    )
+    assert page.status_code == 200, page.text
+    assert page.json()["total"] >= 26
+    assert page.json()["items"]
+    assert len(page.json()["items"]) <= 25
+
+
+def test_geografo_no_puede_archivar_importacion_ajena(client, admin_session, cleanup):
+    password = "PruebaGeo!2026"
+    email = f"geografo-import-{uuid4().hex}@pa.test"
+    created = client.post(
+        "/api/usuarios",
+        headers=admin_session,
+        json={
+            "nombre": "Geografo",
+            "apellido_paterno": "Importaciones",
+            "correo": email,
+            "rol": "geografo",
+            "contrasena": password,
+        },
+    )
+    assert created.status_code == 201, created.text
+    cleanup.register("/api/usuarios", created.json()["id_usuario"])
+    owned_by_admin = _upload(client, admin_session, _geojson(_feature()))
+    assert owned_by_admin.status_code == 201
+
+    browser = TestClient(app, raise_server_exceptions=False)
+    login = browser.post(
+        "/api/auth/sesiones",
+        data={"username": email, "password": password},
+        headers={"Origin": ORIGIN},
+    )
+    assert login.status_code == 200, login.text
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": browser.cookies.get(AUTH_SETTINGS.csrf_cookie_name)}
+    archived = browser.post(
+        f"/api/importaciones-geoespaciales/{owned_by_admin.json()['id_importacion']}/archivar",
+        headers=headers,
+        json={"motivo_baja": "Intento no autorizado"},
+    )
+    assert archived.status_code == 404
+
+
+def test_importacion_lista_puede_reconfigurarse_y_reprocesarse(client, admin_session):
+    external_id = uuid4().hex
+    name = f"REPROCESO {uuid4().hex[:8]}"
+    uploaded = _upload(
+        client,
+        admin_session,
+        _geojson(
+            _feature(name=name, nucleus_id=external_id),
+            _feature(name=name, nucleus_id=external_id, geometry=_polygon(0.02)),
+        ),
+    )
+    first_pass = _process(client, admin_session, uploaded.json())
+    assert first_pass["estado"] == "listo_revision"
+    assert first_pass["errores"] == 2
+
+    second_pass = _process(
+        client,
+        admin_session,
+        first_pass,
+        options={"unir_partes_mismo_id": True},
+    )
+    assert second_pass["estado"] == "listo_revision"
+    assert second_pass["errores"] == 0
+    assert second_pass["advertencias"] == 2
+    page = client.get(
+        f"/api/importaciones-geoespaciales/{second_pass['id_importacion']}/features",
+        headers=admin_session,
+    ).json()
+    assert page["total"] == 2
+
+
+def test_conversion_con_perdida_de_features_queda_bloqueada(client, admin_session):
+    territory = _territory()
+    source = f"RAN-CONVERSION-{uuid4().hex}"
+    document_id = uuid4().hex
+    placemarks = "".join(
+        f"""<Placemark><name>ORIGEN {index}</name><ExtendedData>
+        <Data name="TipoNucleoAgrario"><value>EJIDO</value></Data>
+        <Data name="NombreMunicipio"><value>{territory['municipio']}</value></Data>
+        <Data name="NombreEntidadFederativa"><value>{territory['entidad']}</value></Data>
+        </ExtendedData><Polygon><outerBoundaryIs><LinearRing><coordinates>
+        {index},0 {index + 0.01},0 {index + 0.01},0.01 {index},0.01 {index},0
+        </coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>"""
+        for index in range(2)
+    )
+    kml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
+        f"<name>{document_id}</name>"
+        f"{placemarks}</Document></kml>"
+    ).encode()
+    original = _upload(
+        client,
+        admin_session,
+        kml,
+        filename=f"original-{uuid4().hex}.kml",
+        source=source,
+    )
+    assert original.status_code == 201, original.text
+    assert original.json()["total_features"] == 2
+
+    converted = _upload(
+        client,
+        admin_session,
+        _geojson(_feature()),
+        source=source,
+    )
+    assert converted.status_code == 201, converted.text
+    blocked = _process(
+        client,
+        admin_session,
+        converted.json(),
+        provenance="conversion",
+        origin_import_id=original.json()["id_importacion"],
+    )
+    assert blocked["estado"] == "fallido"
+    assert blocked["error_codigo"] == "PERDIDA_CONVERSION"
+    assert "2 features" in blocked["error_detalle"]
+    assert "GeoJSON contiene 1" in blocked["error_detalle"]
+    assert blocked["importados"] == 0
+
+
+def test_conversion_con_mismo_conteo_pero_features_distintos_queda_bloqueada(
+    client, admin_session
+):
+    territory = _territory()
+    source = f"RAN-CONVERSION-HUELLA-{uuid4().hex}"
+    original_token = uuid4().hex
+    kml = f'''<?xml version="1.0" encoding="UTF-8"?>
+    <kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark>
+      <name>ORIGINAL-{original_token}</name><ExtendedData>
+        <Data name="TipoNucleoAgrario"><value>EJIDO</value></Data>
+        <Data name="NombreMunicipio"><value>{territory['municipio']}</value></Data>
+        <Data name="NombreEntidadFederativa"><value>{territory['entidad']}</value></Data>
+        <Data name="IdNucleoAgrario"><value>ORIGINAL-1</value></Data>
+      </ExtendedData><Polygon><outerBoundaryIs><LinearRing><coordinates>
+        0,0 0.01,0 0.01,0.01 0,0.01 0,0
+      </coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark></Document></kml>'''.encode()
+    original = _upload(
+        client, admin_session, kml, filename=f"huella-{uuid4().hex}.kml", source=source
+    )
+    assert original.status_code == 201, original.text
+    converted = _upload(
+        client,
+        admin_session,
+        _geojson(
+            _feature(
+                name=f"SUSTITUTO-{uuid4().hex}",
+                nucleus_id=f"SUSTITUTO-{uuid4().hex}",
+            )
+        ),
+        source=source,
+    )
+    assert converted.status_code == 201, converted.text
+    blocked = _process(
+        client,
+        admin_session,
+        converted.json(),
+        provenance="conversion",
+        origin_import_id=original.json()["id_importacion"],
+    )
+    assert blocked["estado"] == "fallido"
+    assert blocked["error_codigo"] == "CAMBIO_CONVERSION"
+    assert blocked["importados"] == 0
+
+
+def test_geojson_historico_sin_procedencia_no_puede_confirmarse(
+    client, admin_session
+):
+    uploaded = _upload(client, admin_session, _geojson(_feature()))
+    ready = _process(client, admin_session, uploaded.json())
+    with SessionLocal() as db:
+        record = db.get(models.ImportacionArchivo, ready["id_importacion"])
+        service.set_audit_context(db, record.id_usuario_carga)
+        record.procedencia_archivo = None
+        db.commit()
+
+    blocked = client.post(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/confirmar",
+        headers=admin_session,
+        json={"aceptar_advertencias": False},
+    )
+    assert blocked.status_code == 409
+    assert "Indique si el GeoJSON es original" in blocked.json()["detail"]
 
 
 def test_seguridad_archivo_extension_nombre_tamano_y_autorizacion(
@@ -456,6 +1021,41 @@ def test_crs_desconocido_bloquea(monkeypatch, tmp_path):
     assert error.value.code == "CRS_DESCONOCIDO"
 
 
+def test_timeout_ogr2ogr_termina_proceso_y_cierra_stdout(monkeypatch, tmp_path):
+    from app.services import gis_ingestion
+
+    class StalledProcess:
+        def __init__(self):
+            self.stdout = io.BytesIO()
+            self.returncode = None
+            self.killed = False
+
+        def poll(self):
+            return self.returncode
+
+        def kill(self):
+            self.killed = True
+            self.returncode = -9
+
+        def wait(self, timeout=None):
+            return self.returncode
+
+    process = StalledProcess()
+    monkeypatch.setenv("IMPORT_GDAL_TIMEOUT_SECONDS", "1")
+    monkeypatch.setattr(gis_ingestion.subprocess, "Popen", lambda *args, **kwargs: process)
+    monkeypatch.setattr(gis_ingestion.select, "select", lambda *args, **kwargs: ([], [], []))
+    dataset = gis_ingestion.DatasetInfo(
+        driver="GeoJSON",
+        format="geojson",
+        layers=(LayerInfo("capa", 1, (), "EPSG:4326", True),),
+    )
+    with pytest.raises(IngestionError) as error:
+        list(gis_ingestion.iter_features(tmp_path / "origen.geojson", dataset))
+    assert error.value.code == "GDAL_TIMEOUT"
+    assert process.killed
+    assert process.stdout.closed
+
+
 def test_resolucion_territorial_prioriza_claves_y_detecta_ambiguedad():
     entity_a = SimpleNamespace(id_entidad=1, clave_inegi="01", nombre="Entidad A")
     entity_b = SimpleNamespace(id_entidad=2, clave_inegi="02", nombre="Entidad B")
@@ -560,6 +1160,34 @@ def test_falla_operativa_revierte_el_registro_y_conserva_error_en_staging(
         ).one()
         assert feature.estado == "error"
         assert any(item["codigo"] == "FALLO_IMPORTACION_OPERATIVA" for item in feature.errores)
+
+
+def test_reintento_despues_de_confirmacion_fallida_importa_una_sola_vez(
+    client, admin_session, cleanup
+):
+    name = f"REINTENTO {uuid4().hex[:10]}"
+    uploaded = _upload(client, admin_session, _geojson(_feature(name=name)))
+    ready = _process(client, admin_session, uploaded.json())
+    with SessionLocal() as db:
+        record = db.get(models.ImportacionArchivo, ready["id_importacion"])
+        service.set_audit_context(db, record.id_usuario_carga)
+        record.estado = "fallido"
+        record.error_codigo = "CONFIRMACION_FALLIDA"
+        db.commit()
+
+    retried = client.post(
+        f"/api/importaciones-geoespaciales/{ready['id_importacion']}/confirmar",
+        headers=admin_session,
+        json={"aceptar_advertencias": False},
+    )
+    assert retried.status_code == 202, retried.text
+    with SessionLocal() as db:
+        rows = db.query(models.NucleoAgrario).filter(
+            models.NucleoAgrario.nombre_nucleo == name,
+            models.NucleoAgrario.activo.is_(True),
+        ).all()
+        assert len(rows) == 1
+        cleanup.register("/api/nucleos", rows[0].id_nucleo)
 
 
 def test_rutas_legacy_de_nucleos_no_escriben(client, admin_session):

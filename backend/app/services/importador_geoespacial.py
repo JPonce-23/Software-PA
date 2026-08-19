@@ -67,7 +67,22 @@ TYPE_EQUIVALENTS = {
     "c": "comunidad",
 }
 RUNNING_STATES = {"analizando", "normalizando", "resolviendo", "confirmando", "importando"}
+DERIVED_INTEGRITY_CODES = {
+    "ID_EXTERNO_YA_IMPORTADO",
+    "ID_EXTERNO_CONTRADICTORIO",
+    "ID_EXTERNO_DUPLICADO",
+    "PARTES_POR_UNIR",
+    "IDENTIDAD_INSUFICIENTE_DUPLICADA",
+    "NUCLEO_OPERATIVO_EXISTENTE",
+    "GRUPO_MULTIPARTE_INCOMPLETO",
+    "FALLO_IMPORTACION_OPERATIVA",
+    "GEOMETRIA_CONSOLIDADA_INVALIDA",
+}
 logger = logging.getLogger(__name__)
+
+
+class GroupImportError(RuntimeError):
+    """Error controlado que revierte únicamente el grupo operativo actual."""
 
 
 def utcnow() -> datetime:
@@ -241,6 +256,7 @@ async def stage_upload(
             columnas_detectadas=dataset.columns,
             mapeo=mapping,
             opciones_mapeo={},
+            procedencia_archivo="original" if dataset.format == "kml" else None,
             total_features=dataset.total_features,
             id_usuario_carga=user_id,
             tolerancia_area_relativa=_configured_area_tolerance(),
@@ -289,16 +305,39 @@ def get_import_or_404(db: Session, import_id: int, user: models.Usuario) -> mode
     return record
 
 
+def column_samples(record: models.ImportacionArchivo) -> dict[str, list[str]]:
+    dataset = inspect_dataset(stored_path(record))
+    samples = {column: [] for column in record.columnas_detectadas or []}
+    max_values = 3
+    for _, feature in iter_features(stored_path(record), dataset, limit_per_layer=max_values):
+        properties = feature.get("properties") or {}
+        if not isinstance(properties, dict):
+            continue
+        for column in samples:
+            value = properties.get(column)
+            if value is None or isinstance(value, (dict, list)):
+                continue
+            display = str(value).strip()
+            if not display:
+                continue
+            display = display[:80]
+            if display not in samples[column] and len(samples[column]) < max_values:
+                samples[column].append(display)
+    return samples
+
+
 def update_mapping(
     db: Session,
     record: models.ImportacionArchivo,
     payload: MapeoImportacionRequest,
-    user_id: int,
+    user: models.Usuario,
 ) -> models.ImportacionArchivo:
     if record.estado in RUNNING_STATES or record.estado in {"confirmando", "importando", "completado"}:
         raise HTTPException(status_code=409, detail="El mapeo ya no puede modificarse en este estado.")
     validate_mapping(payload.mapeo, record.columnas_detectadas)
     validate_options(payload.opciones)
+    origin = _validate_file_provenance(db, record, payload, user)
+    user_id = user.id_usuario
     profile_id = payload.id_perfil
     if profile_id is not None:
         profile = db.get(models.PerfilMapeoImportacion, profile_id)
@@ -323,11 +362,119 @@ def update_mapping(
     record.mapeo = payload.mapeo
     record.opciones_mapeo = payload.opciones
     record.id_perfil = profile_id
+    record.procedencia_archivo = payload.procedencia_archivo
+    record.id_importacion_origen = origin.id_importacion if origin else None
     record.version_control += 1
     set_audit_context(db, user_id)
     db.commit()
     db.refresh(record)
     return record
+
+
+def _validate_file_provenance(
+    db: Session,
+    record: models.ImportacionArchivo,
+    payload: MapeoImportacionRequest,
+    user: models.Usuario,
+) -> models.ImportacionArchivo | None:
+    provenance = payload.procedencia_archivo
+    origin_id = payload.id_importacion_origen
+    if record.formato_detectado == "kml":
+        if provenance not in {None, "original"} or origin_id is not None:
+            raise HTTPException(status_code=422, detail="Un KML se registra como archivo original y no puede depender de otra importacion.")
+        payload.procedencia_archivo = "original"
+        return None
+    if provenance is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Indique si el GeoJSON es original o fue convertido desde un KML.",
+        )
+    if provenance == "original":
+        if origin_id is not None:
+            raise HTTPException(status_code=422, detail="Un GeoJSON original no debe tener un KML de referencia.")
+        return None
+    if origin_id is None:
+        raise HTTPException(status_code=422, detail="Seleccione el KML original usado para generar el GeoJSON.")
+    if origin_id == record.id_importacion:
+        raise HTTPException(status_code=422, detail="El archivo no puede ser su propio origen.")
+    origin = db.get(models.ImportacionArchivo, origin_id)
+    if not origin or (user.rol != "admin" and origin.id_usuario_carga != user.id_usuario):
+        raise HTTPException(status_code=404, detail="Archivo original de referencia no encontrado.")
+    if origin.formato_detectado != "kml":
+        raise HTTPException(status_code=422, detail="El archivo original de una conversion debe ser KML.")
+    if normalize_text(origin.fuente) != normalize_text(record.fuente):
+        raise HTTPException(status_code=422, detail="El KML original y el GeoJSON deben pertenecer a la misma fuente.")
+    return origin
+
+
+def _validate_conversion_feature_count(db: Session, record: models.ImportacionArchivo) -> None:
+    if record.formato_detectado == "geojson" and not record.procedencia_archivo:
+        raise IngestionError(
+            "PROCEDENCIA_NO_DECLARADA",
+            "Indique si el GeoJSON es original o fue convertido desde un KML antes de prevalidarlo.",
+        )
+    if record.procedencia_archivo != "conversion":
+        return
+    origin = db.get(models.ImportacionArchivo, record.id_importacion_origen)
+    if not origin:
+        raise IngestionError("ORIGEN_NO_DISPONIBLE", "El KML original de referencia no esta disponible.")
+    if origin.total_features != record.total_features:
+        difference = record.total_features - origin.total_features
+        direction = "menos" if difference < 0 else "mas"
+        raise IngestionError(
+            "PERDIDA_CONVERSION",
+            f"El KML original contiene {origin.total_features} features y el GeoJSON contiene {record.total_features}: la conversion produjo {abs(difference)} {direction}. Use el archivo original o repita la conversion.",
+        )
+    _validate_conversion_feature_fingerprints(origin, record)
+
+
+def _feature_conversion_fingerprint(raw_feature: dict) -> str:
+    payload = {
+        "properties": raw_feature.get("properties") or {},
+        "geometry": raw_feature.get("geometry"),
+    }
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _conversion_fingerprints(record: models.ImportacionArchivo) -> list[str]:
+    dataset = inspect_dataset(stored_path(record))
+    fingerprints: list[str] = []
+    for _, raw_feature in iter_features(stored_path(record), dataset):
+        fingerprints.append(_feature_conversion_fingerprint(raw_feature))
+    return sorted(fingerprints)
+
+
+def _validate_conversion_feature_fingerprints(
+    origin: models.ImportacionArchivo,
+    conversion: models.ImportacionArchivo,
+) -> None:
+    try:
+        origin_fingerprints = _conversion_fingerprints(origin)
+        conversion_fingerprints = _conversion_fingerprints(conversion)
+    except (FileNotFoundError, IngestionError) as exc:
+        raise IngestionError(
+            "ORIGEN_NO_COMPARABLE",
+            "No fue posible comparar cada feature con el KML original; la conversion queda bloqueada.",
+        ) from exc
+    if origin_fingerprints != conversion_fingerprints:
+        raise IngestionError(
+            "CAMBIO_CONVERSION",
+            "El GeoJSON convertido no conserva el mismo conjunto de atributos y geometrías del KML original. Use el archivo original o repita la conversion.",
+        )
+
+
+def validate_confirmation_provenance(db: Session, record: models.ImportacionArchivo) -> None:
+    try:
+        _validate_conversion_feature_count(db, record)
+    except IngestionError as exc:
+        raise HTTPException(status_code=409, detail=exc.public_detail) from exc
 
 
 def create_profile(db: Session, payload: Any, user_id: int) -> models.PerfilMapeoImportacion:
@@ -393,7 +540,11 @@ def _clean_source_id(value: Any) -> str | None:
     if value is None:
         return None
     cleaned = str(value).strip()
-    return cleaned[:200] if cleaned else None
+    # Algunos extractos RAN usan 0 como marcador de "sin identificador".
+    # Conservarlo en atributos_originales, pero nunca usarlo como identidad.
+    if not cleaned or cleaned.casefold() in {"0", "null", "n/a", "na", "s/d"}:
+        return None
+    return cleaned[:200]
 
 
 def _normalize_type(value: Any) -> str | None:
@@ -569,12 +720,23 @@ def _normalize_geometry(
         errors.append(_message("GEOMETRIA_NO_RECUPERABLE", "geometria", "La geometria no produjo un MultiPolygon valido y no vacio."))
     delta = Decimal(result["area_delta"]) if result["area_delta"] is not None else None
     if not result["was_valid"]:
-        transformations.append(_message("ST_MAKEVALID", "geometria", "La geometria invalida fue procesada con ST_MakeValid."))
+        delta_str = str(delta) if delta is not None else None
+        transformations.append(_message(
+            "ST_MAKEVALID", 
+            "geometria", 
+            "La geometria invalida fue procesada con ST_MakeValid.",
+            validez_original=result["was_valid"],
+            area_original=float(result["original_area"]) if result["original_area"] is not None else None,
+            area_resultante=float(result["repaired_area"]) if result["repaired_area"] is not None else None,
+            diferencia_absoluta=abs(float(result["repaired_area"]) - float(result["original_area"])) if (result["repaired_area"] is not None and result["original_area"] is not None) else None,
+            diferencia_relativa=float(delta) if delta is not None else None,
+            tolerancia_configurada=float(tolerance) if tolerance is not None else None,
+        ))
         if tolerance is None:
             errors.append(_message("TOLERANCIA_AREA_NO_CONFIGURADA", "geometria", "La geometria fue reparada, pero no existe una tolerancia de area aprobada; el feature queda bloqueado."))
         elif delta is None or delta > tolerance:
             percentage = f"{(delta or Decimal(0)) * 100:.2f}"
-            errors.append(_message("REPARACION_SUPERA_TOLERANCIA", "geometria", f"La reparacion cambio el area {percentage} %, superando la tolerancia configurada.", diferencia_area_relativa=str(delta) if delta is not None else None))
+            errors.append(_message("REPARACION_SUPERA_TOLERANCIA", "geometria", f"La reparacion cambio el area {percentage} %, superando la tolerancia configurada.", diferencia_area_relativa=delta_str))
         else:
             warnings.append(_message("GEOMETRIA_REPARADA", "geometria", f"La geometria fue reparada; la diferencia relativa de area fue {delta * 100:.2f} %."))
     return (
@@ -677,14 +839,59 @@ def _external_identity(record: models.ImportacionArchivo, feature: models.Import
     return None
 
 
+def _multipart_group_identity(record: models.ImportacionArchivo, feature: models.ImportacionFeature) -> tuple | None:
+    """Identidad final de una parte que ya tiene territorio resuelto."""
+    return _external_identity(record, feature)
+
+
+def _source_nucleus_identity(record: models.ImportacionArchivo, feature: models.ImportacionFeature) -> tuple | None:
+    """Clave conservadora para no separar partes mientras una carece de municipio resuelto."""
+    if not feature.id_nucleo_fuente:
+        return None
+    source = normalize_text(record.fuente)
+    scope = (record.opciones_mapeo or {}).get("alcance_id_nucleo_fuente", "territorial")
+    if scope == "global":
+        return ("global", source, feature.id_nucleo_fuente)
+    return ("territorial_pendiente", source, feature.id_nucleo_fuente)
+
+
 def _append_problem(feature: models.ImportacionFeature, problem: dict, warning: bool = False) -> None:
-    if warning:
-        feature.advertencias = [*(feature.advertencias or []), problem]
-        if feature.estado == "valido":
-            feature.estado = "advertencia"
-    else:
-        feature.errores = [*(feature.errores or []), problem]
-        feature.estado = "error"
+    target_list = feature.advertencias if warning else feature.errores
+    current_problems = target_list or []
+    
+    # Check for duplicate
+    is_duplicate = False
+    for existing in current_problems:
+        if (existing.get("codigo") == problem.get("codigo") and
+            existing.get("campo") == problem.get("campo") and
+            existing.get("mensaje") == problem.get("mensaje")):
+            is_duplicate = True
+            break
+            
+    if not is_duplicate:
+        if warning:
+            feature.advertencias = [*current_problems, problem]
+            if feature.estado == "valido":
+                feature.estado = "advertencia"
+        else:
+            feature.errores = [*current_problems, problem]
+            feature.estado = "error"
+
+
+def _reset_derived_integrity_problems(features: Iterable[models.ImportacionFeature]) -> None:
+    """Elimina hallazgos derivados antes de volver a evaluar una importación."""
+    for feature in features:
+        if feature.estado in {"importado", "descartado"}:
+            continue
+        feature.errores = [
+            problem for problem in (feature.errores or [])
+            if problem.get("codigo") not in DERIVED_INTEGRITY_CODES
+        ]
+        feature.advertencias = [
+            problem for problem in (feature.advertencias or [])
+            if problem.get("codigo") not in DERIVED_INTEGRITY_CODES
+        ]
+        feature.estado = "error" if feature.errores else "advertencia" if feature.advertencias else "valido"
 
 
 def _detect_duplicates(db: Session, record: models.ImportacionArchivo) -> None:
@@ -694,17 +901,79 @@ def _detect_duplicates(db: Session, record: models.ImportacionArchivo) -> None:
         .order_by(models.ImportacionFeature.indice_feature)
         .all()
     )
+    _reset_derived_integrity_problems(features)
     identities: dict[tuple, list[models.ImportacionFeature]] = defaultdict(list)
+    source_nucleus_groups: dict[tuple, list[models.ImportacionFeature]] = defaultdict(list)
     names: dict[tuple, list[models.ImportacionFeature]] = defaultdict(list)
     for feature in features:
         identity = _external_identity(record, feature)
         if identity:
             identities[identity].append(feature)
+        source_nucleus_identity = _source_nucleus_identity(record, feature)
+        if source_nucleus_identity:
+            source_nucleus_groups[source_nucleus_identity].append(feature)
         name = normalize_text((feature.atributos_normalizados or {}).get("nombre_nucleo"))
         if name and feature.id_municipio_resuelto:
             names[(feature.id_municipio_resuelto, name)].append(feature)
 
     join_parts = bool((record.opciones_mapeo or {}).get("unir_partes_mismo_id"))
+    for group in source_nucleus_groups.values():
+        if len(group) <= 1:
+            continue
+        # Sin municipio resuelto no puede demostrarse a cuál identidad territorial
+        # pertenece la parte. Se bloquea todo el ID de fuente hasta resolverlo.
+        if any(item.id_municipio_resuelto is None for item in group):
+            for feature in group:
+                if feature.estado != "error":
+                    _append_problem(
+                        feature,
+                        _message(
+                            "GRUPO_MULTIPARTE_INCOMPLETO",
+                            "geometria",
+                            "El núcleo multiparte tiene al menos una parte con error, descartada o sin resolución; ninguna parte puede importarse por separado.",
+                        ),
+                    )
+            continue
+        groups_by_territory: dict[int, list[models.ImportacionFeature]] = defaultdict(list)
+        for feature in group:
+            groups_by_territory[feature.id_municipio_resuelto].append(feature)
+        for territorial_group in groups_by_territory.values():
+            if len(territorial_group) <= 1:
+                continue
+            if any(
+                item.estado in {"error", "pendiente_revision", "descartado"}
+                or item.geometria_normalizada is None
+                for item in territorial_group
+            ):
+                for feature in territorial_group:
+                    if feature.estado != "error":
+                        _append_problem(
+                            feature,
+                            _message(
+                                "GRUPO_MULTIPARTE_INCOMPLETO",
+                                "geometria",
+                                "El núcleo multiparte tiene al menos una parte con error, descartada o sin resolución; ninguna parte puede importarse por separado.",
+                            ),
+                        )
+                continue
+            signatures = {
+                (
+                    normalize_text((item.atributos_normalizados or {}).get("nombre_nucleo")),
+                    (item.atributos_normalizados or {}).get("tipo_nucleo"),
+                    item.id_municipio_resuelto,
+                )
+                for item in territorial_group
+            }
+            if len(signatures) > 1:
+                detalles_contradictorios = list(signatures)
+                for feature in territorial_group:
+                    _append_problem(feature, _message(
+                        "ID_EXTERNO_CONTRADICTORIO", 
+                        "id_nucleo_fuente", 
+                        "El mismo ID externo contiene nombre, tipo o territorio contradictorio.",
+                        valores_encontrados=[{"nombre": s[0], "tipo": s[1], "municipio_id": s[2]} for s in detalles_contradictorios]
+                    ))
+
     for identity, group in identities.items():
         existing_query = db.query(models.NucleoAgrario).filter(
             models.NucleoAgrario.activo.is_(True),
@@ -735,8 +1004,14 @@ def _detect_duplicates(db: Session, record: models.ImportacionArchivo) -> None:
             for item in group
         }
         if len(signatures) > 1:
+            detalles_contradictorios = list(signatures)
             for feature in group:
-                _append_problem(feature, _message("ID_EXTERNO_CONTRADICTORIO", "id_nucleo_fuente", "El mismo ID externo contiene nombre, tipo o territorio contradictorio."))
+                _append_problem(feature, _message(
+                    "ID_EXTERNO_CONTRADICTORIO", 
+                    "id_nucleo_fuente", 
+                    "El mismo ID externo contiene nombre, tipo o territorio contradictorio.",
+                    valores_encontrados=[{"nombre": s[0], "tipo": s[1], "municipio_id": s[2]} for s in detalles_contradictorios]
+                ))
         elif not join_parts:
             for feature in group:
                 _append_problem(feature, _message("ID_EXTERNO_DUPLICADO", "id_nucleo_fuente", "El ID externo aparece mas de una vez. Active explicitamente la union de partes si la fuente documenta esta estructura."))
@@ -774,6 +1049,11 @@ def _recount(db: Session, record: models.ImportacionArchivo) -> None:
     record.errores = counts.get("error", 0)
     record.importados = counts.get("importado", 0)
     record.descartados = counts.get("descartado", 0)
+    
+    total = record.validos + record.advertencias + record.errores + record.importados + record.descartados
+    if total != record.total_features:
+        logger.error(f"Inconsistencia en conteo de features: suma {total} != total {record.total_features}")
+        raise IngestionError("CONTEO_INCONSISTENTE", f"La suma de estados ({total}) no coincide con el total de features ({record.total_features}).")
 
 
 def process_import(import_id: int, user_id: int) -> None:
@@ -808,6 +1088,7 @@ def process_import(import_id: int, user_id: int) -> None:
         dataset = inspect_dataset(stored_path(record))
         if dataset.format != record.formato_detectado or dataset.total_features != record.total_features:
             raise IngestionError("METADATOS_CAMBIARON", "El archivo temporal no coincide con los metadatos registrados.")
+        _validate_conversion_feature_count(db, record)
         catalogs = _catalogs(db)
         record.estado = "normalizando"
         set_audit_context(db, user_id)
@@ -927,10 +1208,12 @@ def revise_feature(
             feature.errores.append(_message("TIPO_NUCLEO_DESCONOCIDO", "tipo_nucleo", "El tipo de nucleo no es valido."))
         if not feature.id_municipio_resuelto:
             feature.errores.append(_message("MUNICIPIO_NO_ENCONTRADO", "municipio", "El municipio no ha sido resuelto."))
-        feature.advertencias_aceptadas = bool(payload.aceptar_advertencias)
+        if payload.aceptar_advertencias is not None:
+            feature.advertencias_aceptadas = payload.aceptar_advertencias
         feature.estado = "error" if feature.errores else "advertencia" if feature.advertencias else "valido"
         feature.id_usuario_revision = user_id
         feature.fecha_revision = utcnow()
+    _detect_duplicates(db, record)
     _recount(db, record)
     set_audit_context(db, user_id)
     db.commit()
@@ -938,12 +1221,40 @@ def revise_feature(
     return feature
 
 
-def _confirmation_groups(record: models.ImportacionArchivo, features: list[models.ImportacionFeature]) -> list[list[models.ImportacionFeature]]:
-    grouped: dict[tuple, list[models.ImportacionFeature]] = defaultdict(list)
-    for feature in features:
-        identity = _external_identity(record, feature)
-        grouped[identity or ("feature", feature.id_importacion_feature)].append(feature)
-    return list(grouped.values())
+def _confirmation_groups(
+    record: models.ImportacionArchivo,
+    candidates: list[models.ImportacionFeature],
+    all_features: list[models.ImportacionFeature],
+) -> list[list[models.ImportacionFeature]]:
+    """Devuelve sólo grupos completos; una parte no autorizada bloquea al núcleo entero."""
+    all_by_identity: dict[tuple, list[models.ImportacionFeature]] = defaultdict(list)
+    for feature in all_features:
+        identity = _multipart_group_identity(record, feature)
+        if identity:
+            all_by_identity[identity].append(feature)
+
+    candidate_ids = {feature.id_importacion_feature for feature in candidates}
+    groups: list[list[models.ImportacionFeature]] = []
+    seen: set[tuple] = set()
+    for feature in candidates:
+        identity = _multipart_group_identity(record, feature)
+        key = identity or ("feature", feature.id_importacion_feature)
+        if key in seen:
+            continue
+        seen.add(key)
+        group = all_by_identity.get(identity, [feature]) if identity else [feature]
+        complete = all(
+            part.id_importacion_feature in candidate_ids
+            and part.estado in {"valido", "advertencia"}
+            and (part.estado != "advertencia" or part.advertencias_aceptadas)
+            and part.geometria_normalizada is not None
+            and part.id_municipio_resuelto is not None
+            for part in group
+        )
+        if not complete:
+            continue
+        groups.append(group)
+    return groups
 
 
 def confirm_import(import_id: int, user_id: int, accept_warnings: bool) -> None:
@@ -962,11 +1273,21 @@ def confirm_import(import_id: int, user_id: int, accept_warnings: bool) -> None:
                    AND (
                        estado = 'listo_revision'
                        OR (estado = 'fallido' AND error_codigo = 'CONFIRMACION_FALLIDA')
+                       OR (
+                           estado = 'completado'
+                           AND EXISTS (
+                               SELECT 1
+                                 FROM importacion_feature feature
+                                WHERE feature.id_importacion = importacion_archivo.id_importacion
+                                  AND feature.estado = 'advertencia'
+                                  AND (feature.advertencias_aceptadas = TRUE OR :accept_warnings = TRUE)
+                           )
+                       )
                    )
                 RETURNING id_importacion
                 """
             ),
-            {"id": import_id, "user_id": user_id},
+            {"id": import_id, "user_id": user_id, "accept_warnings": accept_warnings},
         ).scalar_one_or_none()
         if claimed is None:
             return
@@ -987,7 +1308,7 @@ def confirm_import(import_id: int, user_id: int, accept_warnings: bool) -> None:
         record.estado = "importando"
         set_audit_context(db, user_id)
         db.commit()
-        features = (
+        candidates = (
             db.query(models.ImportacionFeature)
             .filter(
                 models.ImportacionFeature.id_importacion == import_id,
@@ -1002,16 +1323,25 @@ def confirm_import(import_id: int, user_id: int, accept_warnings: bool) -> None:
             .order_by(models.ImportacionFeature.indice_feature)
             .all()
         )
-        groups = _confirmation_groups(record, features)
+        all_features = (
+            db.query(models.ImportacionFeature)
+            .filter(models.ImportacionFeature.id_importacion == import_id)
+            .order_by(models.ImportacionFeature.indice_feature)
+            .all()
+        )
+        groups = _confirmation_groups(record, candidates, all_features)
         batch_size = max(1, int(os.getenv("IMPORT_CONFIRM_BATCH_SIZE", "100")))
         for offset in range(0, len(groups), batch_size):
             for group in groups[offset : offset + batch_size]:
                 try:
                     with db.begin_nested():
                         _import_group(db, record, group, user_id)
-                except (DBAPIError, IntegrityError):
+                except (DBAPIError, IntegrityError, GroupImportError) as exc:
                     for feature in group:
-                        _append_problem(feature, _message("FALLO_IMPORTACION_OPERATIVA", "importacion", "El registro entro en conflicto con la integridad operativa y no fue importado."))
+                        if isinstance(exc, GroupImportError):
+                            _append_problem(feature, _message("GEOMETRIA_CONSOLIDADA_INVALIDA", "geometria", "La geometría consolidada del núcleo multiparte no es válida y no fue importada."))
+                        else:
+                            _append_problem(feature, _message("FALLO_IMPORTACION_OPERATIVA", "importacion", "El registro entro en conflicto con la integridad operativa y no fue importado."))
             set_audit_context(db, user_id)
             db.commit()
         record = db.get(models.ImportacionArchivo, import_id)
@@ -1039,20 +1369,49 @@ def _import_group(
     geometry = db.execute(
         text(
             """
-            SELECT ST_Multi(ST_CollectionExtract(ST_UnaryUnion(ST_Collect(geometria_normalizada)), 3))
-              FROM importacion_feature
-             WHERE id_importacion_feature = ANY(:ids)
+            WITH consolidada AS (
+                SELECT ST_Multi(ST_CollectionExtract(ST_UnaryUnion(ST_Collect(geometria_normalizada)), 3)) AS geom
+                  FROM importacion_feature
+                 WHERE id_importacion_feature = ANY(:ids)
+            )
+            SELECT ST_AsText(geom) AS wkt,
+                   ST_IsValid(geom) AS is_valid,
+                   ST_SRID(geom) AS srid,
+                   ST_GeometryType(geom) AS tipo,
+                   ST_Area(ST_Transform(geom, 6933)) AS area_m2,
+                   NOT ST_IsEmpty(geom)
+                   AND ST_IsValid(geom)
+                   AND ST_SRID(geom) = 4326
+                   AND ST_GeometryType(geom) = 'ST_MultiPolygon'
+                   AND ST_NumGeometries(geom) > 0 AS es_valida
+              FROM consolidada
             """
         ),
         {"ids": [item.id_importacion_feature for item in group]},
-    ).scalar_one()
+    ).mappings().one()
+    
+    if not geometry["es_valida"] or not geometry["wkt"]:
+        raise GroupImportError(
+            f"La geometría consolidada no cumple el contrato MultiPolygon EPSG:4326. Validez: {geometry['is_valid']}, Tipo: {geometry['tipo']}, SRID: {geometry['srid']}"
+        )
+        
+    consolidated_info = _message(
+        "GEOMETRIA_CONSOLIDADA", 
+        "geometria", 
+        "Las partes se consolidaron en un unico MultiPolygon.",
+        partes_originales=len(group),
+        es_valida=geometry["is_valid"],
+        tipo=geometry["tipo"],
+        srid=geometry["srid"],
+        area_final_m2=float(geometry["area_m2"]) if geometry["area_m2"] is not None else None
+    )
     nucleus = models.NucleoAgrario(
         id_municipio=first.id_municipio_resuelto,
         nombre_nucleo=str(attrs["nombre_nucleo"]).strip(),
         tipo_nucleo=attrs["tipo_nucleo"],
         comunidad_indigena=bool(attrs.get("comunidad_indigena")),
         residencia=attrs.get("residencia"),
-        geometria_poligono=geometry,
+        geometria_poligono=geometry["wkt"],
         fuente_datos=record.fuente,
         id_entidad_fuente=first.id_entidad_fuente,
         id_municipio_fuente=first.id_municipio_fuente,
@@ -1067,6 +1426,8 @@ def _import_group(
     db.add(nucleus)
     db.flush()
     for feature in group:
+        if len(group) > 1:
+            feature.transformaciones = [*(feature.transformaciones or []), consolidated_info]
         feature.estado = "importado"
         feature.id_nucleo_operativo = nucleus.id_nucleo
         feature.fecha_importacion = utcnow()
@@ -1080,8 +1441,25 @@ def csv_report(db: Session, record: models.ImportacionArchivo) -> Iterable[str]:
     writer.writerow(["fuente", record.fuente])
     writer.writerow(["usuario_id", record.id_usuario_carga])
     writer.writerow(["fecha_carga", record.fecha_carga.isoformat()])
+    writer.writerow(["formato_detectado", record.formato_detectado])
     writer.writerow(["crs_original", record.crs_original or ""])
+    writer.writerow(["procedencia_archivo", record.procedencia_archivo or ""])
+    writer.writerow(["importacion_origen_id", record.id_importacion_origen or ""])
+    if record.id_importacion_origen:
+        origin = db.get(models.ImportacionArchivo, record.id_importacion_origen)
+        writer.writerow(["archivo_origen", origin.nombre_original if origin else ""])
+        writer.writerow(["sha256_origen", origin.sha256 if origin else ""])
+        writer.writerow(["features_origen", origin.total_features if origin else ""])
     writer.writerow(["perfil_mapeo_id", record.id_perfil or ""])
+    writer.writerow(["mapeo_efectivo", json.dumps(record.mapeo or {}, ensure_ascii=False)])
+    
+    opciones = record.opciones_mapeo or {}
+    writer.writerow(["opciones_efectivas", json.dumps(opciones, ensure_ascii=False)])
+    writer.writerow(["alcance_id_nucleo_fuente", opciones.get("alcance_id_nucleo_fuente", "territorial")])
+    writer.writerow(["unir_partes_mismo_id", opciones.get("unir_partes_mismo_id", False)])
+    writer.writerow(["id_municipio_fuente_semantica", opciones.get("id_municipio_fuente_semantica", "")])
+    writer.writerow(["tolerancia_area_relativa", record.tolerancia_area_relativa if record.tolerancia_area_relativa is not None else ""])
+    
     writer.writerow(["features_recibidos", record.total_features])
     writer.writerow(["validos_pendientes", record.validos])
     writer.writerow(["advertencias_pendientes", record.advertencias])
@@ -1090,10 +1468,14 @@ def csv_report(db: Session, record: models.ImportacionArchivo) -> Iterable[str]:
     writer.writerow(["descartados", record.descartados])
     writer.writerow([])
     writer.writerow([
-        "indice", "estado", "id_externo", "nombre_nucleo", "tipo_nucleo",
+        "indice", "capa_origen", "estado", "id_externo", 
+        "id_entidad_fuente", "id_municipio_fuente", "id_nucleo_fuente",
+        "nombre_nucleo", "tipo_nucleo",
         "entidad_id", "municipio_id", "errores", "advertencias",
         "transformaciones", "area_original_m2", "area_normalizada_m2",
-        "diferencia_area_relativa", "nucleo_operativo_id",
+        "diferencia_area_absoluta_m2", "diferencia_area_relativa", 
+        "advertencias_aceptadas", "usuario_revision", "fecha_revision",
+        "nucleo_operativo_id",
     ])
     yield "\ufeff" + header_buffer.getvalue()
     query = (
@@ -1102,27 +1484,90 @@ def csv_report(db: Session, record: models.ImportacionArchivo) -> Iterable[str]:
         .order_by(models.ImportacionFeature.indice_feature)
         .yield_per(250)
     )
+    def _csv_val(val: Any) -> Any:
+        return "" if val is None else val
+
+    identities_summary = defaultdict(list)
     for feature in query:
         row_buffer = io.StringIO()
         row_writer = csv.writer(row_buffer)
         attrs = feature.atributos_normalizados or {}
+        diff_abs = ""
+        if feature.area_normalizada_m2 is not None and feature.area_original_m2 is not None:
+            diff_abs = abs(feature.area_normalizada_m2 - feature.area_original_m2)
+
+        # Para el resumen territorial
+        ident_key = (
+            normalize_text(record.fuente),
+            feature.id_municipio_resuelto or "NO_RESUELTO",
+            feature.id_nucleo_fuente or "SIN_ID_FUENTE"
+        )
+        identities_summary[ident_key].append(feature)
+
         row_writer.writerow([
             feature.indice_feature,
+            _csv_val(feature.capa_origen),
             feature.estado,
-            feature.id_externo or "",
-            attrs.get("nombre_nucleo") or "",
-            attrs.get("tipo_nucleo") or "",
-            feature.id_entidad_resuelta or "",
-            feature.id_municipio_resuelto or "",
+            _csv_val(feature.id_externo),
+            _csv_val(feature.id_entidad_fuente),
+            _csv_val(feature.id_municipio_fuente),
+            _csv_val(feature.id_nucleo_fuente),
+            _csv_val(attrs.get("nombre_nucleo")),
+            _csv_val(attrs.get("tipo_nucleo")),
+            _csv_val(feature.id_entidad_resuelta),
+            _csv_val(feature.id_municipio_resuelto),
             json.dumps(feature.errores or [], ensure_ascii=False),
             json.dumps(feature.advertencias or [], ensure_ascii=False),
             json.dumps(feature.transformaciones or [], ensure_ascii=False),
-            feature.area_original_m2 or "",
-            feature.area_normalizada_m2 or "",
-            feature.diferencia_area_relativa or "",
-            feature.id_nucleo_operativo or "",
+            _csv_val(feature.area_original_m2),
+            _csv_val(feature.area_normalizada_m2),
+            _csv_val(diff_abs),
+            _csv_val(feature.diferencia_area_relativa),
+            "true" if feature.advertencias_aceptadas else "false",
+            _csv_val(feature.id_usuario_revision),
+            feature.fecha_revision.isoformat() if feature.fecha_revision else "",
+            _csv_val(feature.id_nucleo_operativo),
         ])
         yield row_buffer.getvalue()
+
+    # Escribir resumen por identidad territorial
+    yield "\r\n"
+    resumen_buffer = io.StringIO()
+    resumen_writer = csv.writer(resumen_buffer)
+    resumen_writer.writerow(["RESUMEN POR IDENTIDAD TERRITORIAL"])
+    resumen_writer.writerow([
+        "fuente", "municipio_resuelto", "id_nucleo_fuente",
+        "tipo_nucleo_agrupado", "numero_partes", "nucleos_operativos_generados",
+        "identidad_importable", "bloqueada", "causa_bloqueo"
+    ])
+    yield resumen_buffer.getvalue()
+
+    for (fuente, id_mun, id_nuc), parts in identities_summary.items():
+        resumen_buffer = io.StringIO()
+        resumen_writer = csv.writer(resumen_buffer)
+        
+        # Determinar estado de la identidad
+        bloqueada = any(p.estado in {"error", "descartado"} for p in parts)
+        importable = all(p.estado in {"valido", "importado"} or (p.estado == "advertencia" and p.advertencias_aceptadas) for p in parts)
+        
+        causas = set()
+        for p in parts:
+            for error in (p.errores or []):
+                causas.add(error.get("codigo", ""))
+        
+        operativos = {p.id_nucleo_operativo for p in parts if p.id_nucleo_operativo}
+        tipos = { (p.atributos_normalizados or {}).get("tipo_nucleo", "") for p in parts }
+        
+        resumen_writer.writerow([
+            fuente, id_mun, id_nuc,
+            "|".join(filter(None, tipos)),
+            len(parts),
+            "|".join(map(str, operativos)),
+            "true" if importable and not bloqueada else "false",
+            "true" if bloqueada else "false",
+            "|".join(filter(None, causas))
+        ])
+        yield resumen_buffer.getvalue()
 
 
 def cleanup_expired_files() -> int:
@@ -1155,3 +1600,22 @@ def cleanup_expired_files() -> int:
         return removed
     finally:
         db.close()
+
+
+def archivar_importacion(
+    db: Session,
+    record: models.ImportacionArchivo,
+    id_usuario: int,
+    motivo_baja: str,
+) -> dict[str, str]:
+    if record.estado in RUNNING_STATES:
+        raise HTTPException(409, f"No se puede archivar una importación en estado '{record.estado}'")
+    if record.fecha_baja is not None:
+        raise HTTPException(400, "La importación ya se encuentra archivada")
+
+    set_audit_context(db, id_usuario)
+    record.fecha_baja = utcnow()
+    record.id_usuario_baja = id_usuario
+    record.motivo_baja = motivo_baja
+    db.commit()
+    return {"status": "ok", "message": "Importación archivada correctamente"}

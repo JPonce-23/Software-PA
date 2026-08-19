@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import auth, models
@@ -10,8 +11,10 @@ from ..schemas_importaciones import (
     FeaturePageResponse,
     FeatureRevisionRequest,
     ImportacionArchivoResponse,
+    ImportacionArchivoPageResponse,
     ImportacionFeatureResponse,
     MapeoImportacionRequest,
+    MuestrasColumnasResponse,
     OperacionImportacionResponse,
     PerfilMapeoCreate,
     PerfilMapeoResponse,
@@ -36,16 +39,43 @@ async def upload_import(
     return await service.stage_upload(db, file, fuente, current_user.id_usuario)
 
 
-@router.get("", response_model=list[ImportacionArchivoResponse])
+@router.get("", response_model=ImportacionArchivoPageResponse)
 def list_imports(
+    offset: int = Query(0, ge=0),
     limit: int = Query(25, ge=1, le=100),
+    estado_vista: str = Query("activas", pattern="^(activas|archivadas|todas)$"),
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(allowed),
 ):
     query = db.query(models.ImportacionArchivo)
     if current_user.rol != "admin":
         query = query.filter(models.ImportacionArchivo.id_usuario_carga == current_user.id_usuario)
-    return query.order_by(models.ImportacionArchivo.fecha_carga.desc()).limit(limit).all()
+
+    if estado_vista == "activas":
+        query = query.filter(models.ImportacionArchivo.fecha_baja.is_(None))
+    elif estado_vista == "archivadas":
+        query = query.filter(models.ImportacionArchivo.fecha_baja.is_not(None))
+
+    total = query.count()
+    items = query.order_by(
+        models.ImportacionArchivo.fecha_carga.desc(),
+        models.ImportacionArchivo.id_importacion.desc()
+    ).offset(offset).limit(limit).all()
+    return {"total": total, "items": items}
+
+class ArchivarImportacionRequest(BaseModel):
+    motivo_baja: str
+
+
+@router.post("/{id_importacion}/archivar")
+def archivar_importacion(
+    id_importacion: int,
+    req: ArchivarImportacionRequest,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(allowed),
+):
+    record = service.get_import_or_404(db, id_importacion, current_user)
+    return service.archivar_importacion(db, record, current_user.id_usuario, req.motivo_baja)
 
 
 @router.get("/perfiles", response_model=list[PerfilMapeoResponse])
@@ -97,6 +127,19 @@ def get_import(
     return service.get_import_or_404(db, import_id, current_user)
 
 
+@router.get("/{import_id}/muestras-columnas", response_model=MuestrasColumnasResponse)
+def get_column_samples(
+    import_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(allowed),
+):
+    record = service.get_import_or_404(db, import_id, current_user)
+    try:
+        return MuestrasColumnasResponse(muestras=service.column_samples(record))
+    except service.IngestionError as exc:
+        raise HTTPException(status_code=409, detail=exc.public_detail) from exc
+
+
 @router.put("/{import_id}/mapeo", response_model=ImportacionArchivoResponse)
 def set_mapping(
     import_id: int,
@@ -105,7 +148,7 @@ def set_mapping(
     current_user: models.Usuario = Depends(allowed),
 ):
     record = service.get_import_or_404(db, import_id, current_user)
-    return service.update_mapping(db, record, payload, current_user.id_usuario)
+    return service.update_mapping(db, record, payload, current_user)
 
 
 @router.post("/{import_id}/procesar", response_model=OperacionImportacionResponse, status_code=202)
@@ -175,8 +218,22 @@ def confirm_import(
 ):
     record = service.get_import_or_404(db, import_id, current_user)
     retryable = record.estado == "fallido" and record.error_codigo == "CONFIRMACION_FALLIDA"
-    if record.estado != "listo_revision" and not retryable:
+    pending_warnings = (
+        db.query(models.ImportacionFeature.id_importacion_feature)
+        .filter(
+            models.ImportacionFeature.id_importacion == import_id,
+            models.ImportacionFeature.estado == "advertencia",
+            (
+                models.ImportacionFeature.advertencias_aceptadas.is_(True)
+                | payload.aceptar_advertencias
+            ),
+        )
+        .first()
+    )
+    resumable = record.estado == "completado" and pending_warnings is not None
+    if record.estado != "listo_revision" and not retryable and not resumable:
         raise HTTPException(status_code=409, detail="La importacion no esta lista para confirmarse.")
+    service.validate_confirmation_provenance(db, record)
     eligible = db.query(models.ImportacionFeature.id_importacion_feature).filter(
         models.ImportacionFeature.id_importacion == import_id,
         (

@@ -37,6 +37,8 @@ class MapeoImportacionRequest(BaseModel):
     mapeo: dict[str, str]
     opciones: dict[str, Any] = Field(default_factory=dict)
     id_perfil: int | None = None
+    procedencia_archivo: Literal["original", "conversion"] | None = None
+    id_importacion_origen: int | None = None
     guardar_perfil: PerfilMapeoCreate | None = None
 
 
@@ -76,6 +78,8 @@ class ImportacionArchivoResponse(BaseModel):
     mapeo: dict[str, str]
     opciones_mapeo: dict[str, Any]
     id_perfil: int | None
+    procedencia_archivo: str | None
+    id_importacion_origen: int | None
     estado: str
     total_features: int
     features_procesados: int
@@ -92,7 +96,15 @@ class ImportacionArchivoResponse(BaseModel):
     fecha_completado: datetime | None
     error_codigo: str | None
     error_detalle: str | None
+    fecha_baja: datetime | None = None
+    id_usuario_baja: int | None = None
+    motivo_baja: str | None = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class ImportacionArchivoPageResponse(BaseModel):
+    total: int
+    items: list[ImportacionArchivoResponse]
 
 
 class ImportacionFeatureResponse(BaseModel):
@@ -118,6 +130,10 @@ class ImportacionFeatureResponse(BaseModel):
 class FeaturePageResponse(BaseModel):
     total: int
     items: list[ImportacionFeatureResponse]
+
+
+class MuestrasColumnasResponse(BaseModel):
+    muestras: dict[str, list[str]]
 
 
 class OperacionImportacionResponse(BaseModel):
