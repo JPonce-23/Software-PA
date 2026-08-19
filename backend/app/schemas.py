@@ -130,7 +130,7 @@ class TramoBase(BaseModel):
     clave_tramo: str
     nombre_tramo: str
     descripcion: Optional[str] = None
-    ancho_total_derecho_via_m: Optional[Decimal] = Decimal("40.00")
+    ancho_total_derecho_via_m: Optional[Decimal] = None
     activo: bool = True
     fecha_registro: date
 
@@ -139,14 +139,10 @@ class TramoCreate(AuditableCreate):
     clave_tramo: str
     nombre_tramo: str
     descripcion: Optional[str] = None
-    ancho_total_derecho_via_m: Optional[Decimal] = Decimal("40.00")
-    geometria_wkt: Optional[str] = None
 
 class TramoUpdate(AuditableUpdate):
     nombre_tramo: Optional[str] = None
     descripcion: Optional[str] = None
-    ancho_total_derecho_via_m: Optional[Decimal] = None
-    geometria_wkt: Optional[str] = None
 
 class TramoResponse(TramoBase):
     id_tramo: int
@@ -155,37 +151,54 @@ class TramoResponse(TramoBase):
     model_config = ConfigDict(from_attributes=True)
 
 class FranjaDerechoViaCreate(AuditableCreate):
-    fuente: str = Field(min_length=1, max_length=200)
     fecha_vigencia_inicio: date
-    ancho_izquierdo_m: Optional[Decimal] = Field(default=None, gt=0)
-    ancho_derecho_m: Optional[Decimal] = Field(default=None, gt=0)
-    geometria_wkt: str = Field(min_length=1)
-
-    @field_validator('fuente')
-    @classmethod
-    def normalizar_fuente(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError('La fuente es obligatoria')
-        return value
+    geometria_wkt: Optional[str] = None
+    id_carga_geoespacial_feature: Optional[int] = None
     
     @field_validator('geometria_wkt')
     @classmethod
-    def normalizar_geometria_wkt(cls, value: str) -> str:
+    def normalizar_geometria_wkt(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
         value = value.strip()
         if not value:
             raise ValueError('La geometría es obligatoria')
         return value
 
+    @model_validator(mode='after')
+    def validar_origen_geometria(self):
+        if bool(self.geometria_wkt) == bool(self.id_carga_geoespacial_feature):
+            raise ValueError('Seleccione una geometría confirmada o use la captura avanzada, pero no ambas.')
+        return self
+
 class FranjaDerechoViaResponse(BaseModel):
     id_franja: int
-    id_tramo: int
+    id_proyecto: int
     version: int
-    ancho_izquierdo_m: Optional[Decimal] = None
-    ancho_derecho_m: Optional[Decimal] = None
-    fuente: str
     fecha_vigencia_inicio: date
     fecha_vigencia_fin: Optional[date] = None
+    activo: bool
+    geometria_wkt: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SeccionDerechoViaCreate(BaseModel):
+    fuente: str = Field(min_length=1, max_length=200)
+    geometria_wkt: Optional[str] = None
+    id_carga_geoespacial_feature: Optional[int] = None
+
+    @model_validator(mode='after')
+    def validar_origen_geometria(self):
+        if bool(self.geometria_wkt) == bool(self.id_carga_geoespacial_feature):
+            raise ValueError('Seleccione una geometría confirmada o use la captura avanzada, pero no ambas.')
+        return self
+
+
+class SeccionDerechoViaResponse(BaseModel):
+    id_seccion: int
+    id_franja: int
+    id_tramo: int
+    fuente: str
     activo: bool
     geometria_wkt: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
@@ -206,12 +219,14 @@ class NucleoAgrarioCreate(AuditableCreate):
     comunidad_indigena: bool = False
     residencia: Optional[str] = None
     geometria_wkt: Optional[str] = None
+    id_carga_geoespacial_feature: Optional[int] = None
 
 class NucleoAgrarioUpdate(AuditableUpdate):
     nombre_nucleo: Optional[str] = None
     comunidad_indigena: Optional[bool] = None
     residencia: Optional[str] = None
     geometria_wkt: Optional[str] = None
+    id_carga_geoespacial_feature: Optional[int] = None
 
 class NucleoAgrarioResponse(BaseModel):
     id_nucleo: int
@@ -285,6 +300,7 @@ class ParcelaCreate(AuditableCreate):
     nombre_titular: Optional[str] = None
     documentacion_disponible: bool = False
     documentacion_faltante: Optional[str] = None
+    id_carga_geoespacial_feature: Optional[int] = None
 
 class ParcelaUpdate(AuditableUpdate):
     tipo_parcela: Optional[Literal['individual', 'copropiedad']] = None
@@ -295,6 +311,7 @@ class ParcelaUpdate(AuditableUpdate):
     nombre_titular: Optional[str] = None
     documentacion_disponible: Optional[bool] = None
     documentacion_faltante: Optional[str] = None
+    id_carga_geoespacial_feature: Optional[int] = None
 
 class ParcelaResponse(ParcelaCreate):
     id_parcela: int
@@ -471,6 +488,7 @@ class ParcelaNuevaParaAfectacion(BaseModel):
     documentacion_disponible: bool = False
     documentacion_faltante: Optional[str] = None
     titulares: List['ParcelaTitularCreate'] = Field(min_length=1)
+    id_carga_geoespacial_feature: Optional[int] = None
     model_config = ConfigDict(extra='forbid')
 
     @field_validator(

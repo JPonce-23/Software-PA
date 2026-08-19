@@ -47,7 +47,7 @@ def _login_geografo(email):
     return browser, {"Origin": ORIGIN, "X-CSRF-Token": csrf}
 
 
-def _import_franja_con_sesion(email, password, id_tramo, fuente):
+def _import_franja_con_sesion(email, password, id_proyecto, fuente):
     browser = TestClient(app, raise_server_exceptions=False)
     headers = None
     try:
@@ -62,7 +62,7 @@ def _import_franja_con_sesion(email, password, id_tramo, fuente):
             "X-CSRF-Token": browser.cookies.get(AUTH_SETTINGS.csrf_cookie_name),
         }
         return browser.post(
-            f"/api/tramos/{id_tramo}/franjas/importar",
+            f"/api/proyectos/{id_proyecto}/franjas/importar",
             headers=headers,
             json={
                 "fuente": fuente,
@@ -82,22 +82,10 @@ def test_franja_versionada_sustituye_sin_sobrescribir(
     admin_session,
     seed_tramo,
 ):
-    fuente_invalida = client.post(
-        f"/api/tramos/{seed_tramo['id_tramo']}/franjas/importar",
-        headers=admin_session,
-        json={
-            "fuente": "   ",
-            "fecha_vigencia_inicio": "2026-02-01",
-            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
-        },
-    )
-    assert fuente_invalida.status_code == 422
-
     response = client.post(
-        f"/api/tramos/{seed_tramo['id_tramo']}/franjas/importar",
+        f"/api/proyectos/{seed_tramo['id_proyecto']}/franjas/importar",
         headers=admin_session,
         json={
-            "fuente": "Actualización oficial de prueba",
             "fecha_vigencia_inicio": "2026-02-01",
             "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
         },
@@ -106,7 +94,7 @@ def test_franja_versionada_sustituye_sin_sobrescribir(
     assert response.json()["version"] == 2
 
     history = client.get(
-        f"/api/tramos/{seed_tramo['id_tramo']}/franjas",
+        f"/api/proyectos/{seed_tramo['id_proyecto']}/franjas",
         headers=admin_session,
     )
     assert history.status_code == 200
@@ -114,24 +102,80 @@ def test_franja_versionada_sustituye_sin_sobrescribir(
     assert history.json()[0]["activo"] is True
     assert history.json()[1]["activo"] is False
     assert history.json()[0]["geometria_wkt"].startswith("MULTIPOLYGON")
+    seccion = client.post(
+        f"/api/tramos/{seed_tramo['id_tramo']}/secciones-derecho-via/importar",
+        headers=admin_session,
+        json={
+            "fuente": "Sección de la nueva versión",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
+        },
+    )
+    assert seccion.status_code == 201, seccion.text
 
 
-def test_franja_debe_intersectar_linea_del_tramo(
+def test_seccion_debe_intersectar_el_trazo_activo(
     client,
     admin_session,
     seed_tramo,
 ):
     response = client.post(
-        f"/api/tramos/{seed_tramo['id_tramo']}/franjas/importar",
+        f"/api/tramos/{seed_tramo['id_tramo']}/secciones-derecho-via/importar",
         headers=admin_session,
         json={
-            "fuente": "Franja fuera del trazo",
-            "fecha_vigencia_inicio": "2027-01-01",
+            "fuente": "Sección fuera del trazo",
             "geometria_wkt": "MULTIPOLYGON(((10 10, 11 10, 11 11, 10 11, 10 10)))",
         },
     )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "La franja de derecho de vía no intersecta con la línea del tramo."
+    assert response.status_code == 409
+
+
+def test_seccion_puede_vincularse_a_un_eje_lineal_confirmado(
+    client,
+    admin_session,
+    cleanup,
+):
+    suffix = uuid4().hex[:10]
+    project = client.post(
+        "/api/proyectos",
+        headers=admin_session,
+        json={"clave_proyecto": f"EJE-{suffix}", "nombre_proyecto": f"Proyecto eje {suffix}"},
+    )
+    assert project.status_code == 201, project.text
+    project_id = project.json()["id_proyecto"]
+    cleanup.register("/api/proyectos", project_id)
+
+    trace = client.post(
+        f"/api/proyectos/{project_id}/franjas/importar",
+        headers=admin_session,
+        json={
+            "fecha_vigencia_inicio": "2026-08-17",
+            "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
+        },
+    )
+    assert trace.status_code == 201, trace.text
+    assert trace.json()["geometria_wkt"].startswith("MULTILINESTRING")
+
+    tramo = client.post(
+        "/api/tramos",
+        headers=admin_session,
+        json={
+            "id_proyecto": project_id,
+            "clave_tramo": f"EJE-{suffix}",
+            "nombre_tramo": f"Tramo eje {suffix}",
+        },
+    )
+    assert tramo.status_code == 201, tramo.text
+    cleanup.register("/api/tramos", tramo.json()["id_tramo"])
+
+    section = client.post(
+        f"/api/tramos/{tramo.json()['id_tramo']}/secciones-derecho-via/importar",
+        headers=admin_session,
+        json={
+            "fuente": "Sección oficial del eje",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
+        },
+    )
+    assert section.status_code == 201, section.text
 
 
 def test_franjas_activas_exponen_geometria(
@@ -143,7 +187,7 @@ def test_franjas_activas_exponen_geometria(
     assert response.status_code == 200, response.text
     franja = next(
         item for item in response.json()
-        if item["id_tramo"] == seed_tramo["id_tramo"]
+        if item["id_proyecto"] == seed_tramo["id_proyecto"]
     )
     assert franja["activo"] is True
     assert franja["geometria_wkt"].startswith("MULTIPOLYGON")
@@ -193,7 +237,7 @@ def test_postgresql_protege_versiones_y_delete(seed_tramo):
         franja = (
             db.query(models.FranjaDerechoVia)
             .filter(
-                models.FranjaDerechoVia.id_tramo == seed_tramo["id_tramo"],
+                models.FranjaDerechoVia.id_proyecto == seed_tramo["id_proyecto"],
                 models.FranjaDerechoVia.activo.is_(True),
             )
             .one()
@@ -241,9 +285,9 @@ def test_postgresql_protege_versiones_y_delete(seed_tramo):
             db.execute(
                 text(
                     "INSERT INTO franja_derecho_via ("
-                    "id_tramo, version, geometria_poligono, fuente, "
+                    "id_proyecto, version, geometria_poligono, fuente, "
                     "fecha_vigencia_inicio, activo"
-                    ") SELECT id_tramo, version + 1, geometria_poligono, fuente, "
+                    ") SELECT id_proyecto, version + 1, geometria_poligono, fuente, "
                     "fecha_vigencia_inicio - 1, TRUE "
                     "FROM franja_derecho_via WHERE id_franja = :id_franja"
                 ),
@@ -255,6 +299,8 @@ def test_postgresql_protege_versiones_y_delete(seed_tramo):
 
 
 def test_importaciones_concurrentes_serializan_version(
+    client,
+    admin_session,
     admin_credentials,
     seed_tramo,
 ):
@@ -264,7 +310,7 @@ def test_importaciones_concurrentes_serializan_version(
                 _import_franja_con_sesion,
                 admin_credentials["email"],
                 admin_credentials["password"],
-                seed_tramo["id_tramo"],
+                seed_tramo["id_proyecto"],
                 f"Fuente concurrente {index}",
             )
             for index in range(2)
@@ -278,12 +324,21 @@ def test_importaciones_concurrentes_serializan_version(
     db = SessionLocal()
     try:
         active_count = db.query(models.FranjaDerechoVia).filter(
-            models.FranjaDerechoVia.id_tramo == seed_tramo["id_tramo"],
+            models.FranjaDerechoVia.id_proyecto == seed_tramo["id_proyecto"],
             models.FranjaDerechoVia.activo.is_(True),
         ).count()
         assert active_count == 1
     finally:
         db.close()
+    seccion = client.post(
+        f"/api/tramos/{seed_tramo['id_tramo']}/secciones-derecho-via/importar",
+        headers=admin_session,
+        json={
+            "fuente": "Sección de la versión concurrente",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
+        },
+    )
+    assert seccion.status_code == 201, seccion.text
 
 
 def test_validacion_falla_cerrado_sin_franja(
@@ -298,8 +353,6 @@ def test_validacion_falla_cerrado_sin_franja(
             "id_proyecto": seed_proyecto["id_proyecto"],
             "clave_tramo": f"SIN-FR-{uuid4().hex[:8]}",
             "nombre_tramo": "Tramo temporal sin franja",
-            "geometria_wkt": "MULTILINESTRING((10 10, 11 11))",
-            "ancho_total_derecho_via_m": "40.00",
         },
     )
     assert response.status_code == 201, response.text

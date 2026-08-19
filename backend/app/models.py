@@ -60,7 +60,9 @@ class Tramo(Base, AuditableMixin):
     clave_tramo = Column(String(20), nullable=False)
     nombre_tramo = Column(String(200), nullable=False)
     descripcion = Column(String)
-    ancho_total_derecho_via_m = Column(Numeric(6, 2), default=Decimal("40.00"))
+    # Legado informativo: el ancho y la geometría vigentes viven en el trazo y
+    # sus secciones, no en la división administrativa del tramo.
+    ancho_total_derecho_via_m = Column(Numeric(6, 2))
     geometria_linea = Column(Geometry(geometry_type='MULTILINESTRING', srid=4326))
     activo = Column(Boolean, default=True, nullable=False)
     fecha_registro = Column(Date, nullable=False)
@@ -70,35 +72,39 @@ class Tramo(Base, AuditableMixin):
 class FranjaDerechoVia(Base, AuditableMixin):
     __tablename__ = "franja_derecho_via"
     __table_args__ = (
-        UniqueConstraint("id_tramo", "version", name="uq_franja_tramo_version"),
+        UniqueConstraint("id_proyecto", "version", name="uq_026_franja_proyecto_version"),
         CheckConstraint("version > 0", name="chk_franja_version_positiva"),
-        CheckConstraint(
-            "(ancho_izquierdo_m IS NULL OR ancho_izquierdo_m > 0) AND (ancho_derecho_m IS NULL OR ancho_derecho_m > 0)",
-            name="chk_franja_anchos_positivos"
-        ),
         CheckConstraint(
             "fecha_vigencia_fin IS NULL OR fecha_vigencia_inicio <= fecha_vigencia_fin",
             name="chk_franja_vigencia"
         ),
         CheckConstraint("btrim(fuente) <> ''", name="chk_franja_fuente_no_vacia"),
-        CheckConstraint(
-            "NOT ST_IsEmpty(geometria_poligono) AND ST_IsValid(geometria_poligono) "
-            "AND ST_SRID(geometria_poligono) = 4326 "
-            "AND GeometryType(geometria_poligono) = 'MULTIPOLYGON'",
-            name="chk_franja_geometria_valida",
-        ),
     )
     id_franja = Column(Integer, primary_key=True, index=True)
-    id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
+    id_proyecto = Column(Integer, ForeignKey("proyecto.id_proyecto"), nullable=False)
+    id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"))  # Legado: no usar en reglas nuevas.
     version = Column(Integer, nullable=False)
+    # Metadatos heredados: ya no se capturan ni se usan para inferir superficie.
     ancho_izquierdo_m = Column(Numeric(6, 2))
     ancho_derecho_m = Column(Numeric(6, 2))
-    geometria_poligono = Column(Geometry(geometry_type='MULTIPOLYGON', srid=4326), nullable=False)
+    geometria_linea = Column(Geometry(geometry_type='MULTILINESTRING', srid=4326))
+    geometria_poligono = Column(Geometry(geometry_type='MULTIPOLYGON', srid=4326))
     fuente = Column(String(200), nullable=False)
     fecha_vigencia_inicio = Column(Date, nullable=False)
     fecha_vigencia_fin = Column(Date)
     activo = Column(Boolean, default=True, nullable=False)
     tramo = relationship("Tramo", back_populates="franjas")
+
+
+class SeccionDerechoVia(Base, AuditableMixin):
+    __tablename__ = "seccion_derecho_via"
+    id_seccion = Column(BigInteger, primary_key=True)
+    id_franja = Column(Integer, ForeignKey("franja_derecho_via.id_franja"), nullable=False)
+    id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
+    geometria_poligono = Column(Geometry(geometry_type="MULTIPOLYGON", srid=4326), nullable=False)
+    fuente = Column(String(200), nullable=False)
+    activo = Column(Boolean, nullable=False, default=True)
+    fecha_registro = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 class NucleoAgrario(Base, AuditableMixin):
     __tablename__ = "nucleo_agrario"
@@ -175,6 +181,11 @@ class ImportacionArchivo(Base):
     mapeo = Column(JSONB, nullable=False, default=dict)
     opciones_mapeo = Column(JSONB, nullable=False, default=dict)
     id_perfil = Column(BigInteger, ForeignKey("perfil_mapeo_importacion.id_perfil"))
+    procedencia_archivo = Column(String(20))
+    id_importacion_origen = Column(
+        BigInteger,
+        ForeignKey("importacion_archivo.id_importacion", ondelete="RESTRICT"),
+    )
     estado = Column(String(30), nullable=False, default="subido")
     total_features = Column(Integer, nullable=False, default=0)
     features_procesados = Column(Integer, nullable=False, default=0)
@@ -195,7 +206,9 @@ class ImportacionArchivo(Base):
     error_codigo = Column(String(80))
     error_detalle = Column(Text)
     version_control = Column(Integer, nullable=False, default=1)
-
+    fecha_baja = Column(DateTime(timezone=True))
+    id_usuario_baja = Column(Integer, ForeignKey("usuario.id_usuario"))
+    motivo_baja = Column(String)
 
 class ImportacionFeature(Base):
     __tablename__ = "importacion_feature"
@@ -225,6 +238,75 @@ class ImportacionFeature(Base):
     id_nucleo_operativo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"))
     fecha_procesamiento = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     fecha_importacion = Column(DateTime(timezone=True))
+
+
+class CargaGeoespacial(Base):
+    __tablename__ = "carga_geoespacial"
+
+    id_carga = Column(BigInteger, primary_key=True)
+    tipo_objetivo = Column(String(40), nullable=False)
+    tipo_geometria_esperado = Column(String(20), nullable=False)
+    nombre_original = Column(String(255), nullable=False)
+    nombre_almacenado = Column(String(100), nullable=False, unique=True)
+    formato_detectado = Column(String(20), nullable=False)
+    tamano_bytes = Column(BigInteger, nullable=False)
+    sha256 = Column(String(64), nullable=False)
+    fuente = Column(String(200))
+    crs_original = Column(Text, nullable=False)
+    crs_destino = Column(String(20), nullable=False, default="EPSG:4326")
+    total_features = Column(Integer, nullable=False, default=0)
+    features_validos = Column(Integer, nullable=False, default=0)
+    features_advertencia = Column(Integer, nullable=False, default=0)
+    features_error = Column(Integer, nullable=False, default=0)
+    estado = Column(String(30), nullable=False, default="subido")
+    id_usuario_carga = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    fecha_carga = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    fecha_procesamiento = Column(DateTime(timezone=True))
+    fecha_confirmacion = Column(DateTime(timezone=True))
+    id_usuario_confirmacion = Column(Integer, ForeignKey("usuario.id_usuario"))
+    error_codigo = Column(String(80))
+    error_detalle = Column(Text)
+
+
+class CargaGeoespacialFeature(Base):
+    __tablename__ = "carga_geoespacial_feature"
+
+    id_carga_feature = Column(BigInteger, primary_key=True)
+    id_carga = Column(BigInteger, ForeignKey("carga_geoespacial.id_carga"), nullable=False)
+    indice_feature = Column(Integer, nullable=False)
+    capa_origen = Column(String(200))
+    atributos_originales = Column(JSONB, nullable=False, default=dict)
+    geometria_normalizada = Column(Geometry(geometry_type="GEOMETRY", srid=4326))
+    tipo_geometria = Column(String(40))
+    estado = Column(String(20), nullable=False)
+    errores = Column(JSONB, nullable=False, default=list)
+    advertencias = Column(JSONB, nullable=False, default=list)
+    transformaciones = Column(JSONB, nullable=False, default=list)
+    area_original_m2 = Column(Numeric(24, 4))
+    area_normalizada_m2 = Column(Numeric(24, 4))
+    diferencia_area_relativa = Column(Numeric(16, 12))
+    seleccionado = Column(Boolean, nullable=False, default=False)
+    id_registro_operativo = Column(BigInteger)
+    fecha_consumo = Column(DateTime(timezone=True))
+    id_usuario_consumo = Column(Integer, ForeignKey("usuario.id_usuario"))
+
+
+class CandidatoTramoNucleo(Base):
+    __tablename__ = "candidato_tramo_nucleo"
+
+    id_candidato = Column(BigInteger, primary_key=True)
+    id_tramo = Column(Integer, ForeignKey("tramo.id_tramo"), nullable=False)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    id_franja = Column(Integer, ForeignKey("franja_derecho_via.id_franja"), nullable=False)
+    id_seccion = Column(BigInteger, ForeignKey("seccion_derecho_via.id_seccion"), nullable=False)
+    area_interseccion_m2 = Column(Numeric(24, 4), nullable=False)
+    estado = Column(String(20), nullable=False, default="pendiente")
+    fecha_deteccion = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    id_usuario_deteccion = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    fecha_resolucion = Column(DateTime(timezone=True))
+    id_usuario_resolucion = Column(Integer, ForeignKey("usuario.id_usuario"))
+    motivo_resolucion = Column(String(500))
+    id_tramo_nucleo = Column(Integer, ForeignKey("tramo_nucleo.id_tramo_nucleo"))
 
 class TramoNucleo(Base, AuditableMixin):
     __tablename__ = "tramo_nucleo"
