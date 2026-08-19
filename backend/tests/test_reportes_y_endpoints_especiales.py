@@ -159,7 +159,7 @@ class TestTramoDetalles:
         )
         assert response.status_code == 200, response.text
         assert response.json()
-        assert {item["id_tramo"] for item in response.json()} == {seed_tramo["id_tramo"]}
+        assert {item["id_proyecto"] for item in response.json()} == {seed_proyecto["id_proyecto"]}
 
     def test_tramo_detalles_inexistente(self, client, admin_session):
         res = client.get(

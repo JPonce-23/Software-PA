@@ -226,7 +226,7 @@ def test_creacion_tramo_revierte_si_falla_asignacion_geografo(
     assert all(item["clave_tramo"] != clave for item in tramos.json())
 
 
-def test_geografo_conserva_geometria_solo_en_tramo_asignado(
+def test_la_geometria_directa_de_tramo_esta_retirada(
     client, admin_session, cleanup, seed_proyecto
 ):
     geographer, password = _create_user(client, admin_session, cleanup, "geografo")
@@ -250,8 +250,8 @@ def test_geografo_conserva_geometria_solo_en_tramo_asignado(
         headers=headers,
         json={"geometria_wkt": "MULTILINESTRING((0 0, 1 1))"},
     )
-    assert allowed.status_code == 200, allowed.text
-    assert denied.status_code == 403
+    assert allowed.status_code == 410, allowed.text
+    assert denied.status_code == 410, denied.text
 
 
 def test_reemplazo_asignaciones_es_atomico_y_valida_usuarios(

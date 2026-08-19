@@ -54,10 +54,17 @@ def _tramos_contexto(
     if not ids:
         return []
 
-    query = db.query(models.Tramo.id_tramo).filter(
+    query = db.query(models.Tramo.id_tramo).join(
+        models.SeccionDerechoVia,
+        models.SeccionDerechoVia.id_tramo == models.Tramo.id_tramo,
+    ).join(
+        models.FranjaDerechoVia,
+        models.FranjaDerechoVia.id_franja == models.SeccionDerechoVia.id_franja,
+    ).filter(
         models.Tramo.id_tramo.in_(ids),
         models.Tramo.activo.is_(True),
-        models.Tramo.geometria_linea.is_not(None),
+        models.SeccionDerechoVia.activo.is_(True),
+        models.FranjaDerechoVia.activo.is_(True),
     )
     if user.rol != "admin":
         query = query.join(

@@ -6,10 +6,15 @@ import {
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import AuthContext from '../contexts/auth-context';
-import ImportacionTerritorialPanel from '../components/ImportacionTerritorialPanel';
+import PaginatedTable from '../components/PaginatedTable';
+import GeospatialUpload from '../components/GeospatialUpload';
+import TramoNucleoCandidates from '../components/TramoNucleoCandidates';
+import SeccionDerechoViaPanel from '../components/SeccionDerechoViaPanel';
+import FranjaDerechoViaPanel from '../components/fase2/FranjaDerechoViaPanel';
 
 const allTabs = [
   ['proyectos', 'Proyectos', FolderKanban],
+  ['trazos', 'Trazo ferroviario', Layers],
   ['tramos', 'Tramos', Map],
   ['nucleos', 'Núcleos', Map],
   ['relaciones', 'Tramo - núcleo', Link2],
@@ -19,11 +24,11 @@ const emptyForms = {
   proyectos: { clave_proyecto: '', nombre_proyecto: '', descripcion: '' },
   tramos: {
     id_proyecto: '', clave_tramo: '', nombre_tramo: '', descripcion: '',
-    ancho_total_derecho_via_m: '40.00', geometria_wkt: '',
   },
   nucleos: {
     id_entidad: '', id_municipio: '', nombre_nucleo: '', tipo_nucleo: 'ejido',
     comunidad_indigena: false, residencia: '', geometria_wkt: '',
+    id_carga_geoespacial_feature: null,
   },
   relaciones: {
     id_tramo: '', id_nucleo: '', consecutivo: '', numero_tramo: '',
@@ -40,8 +45,8 @@ function Field({ label, children }) {
 function GeometryField({ label, expected, example, value, onChange }) {
   const invalid = value && !value.trim().toUpperCase().startsWith(expected);
   return (
-    <label className="admin-field admin-field-wide">
-      <span>{label}</span>
+    <details className="admin-field admin-field-wide">
+      <summary>Captura avanzada: {label}</summary>
       <textarea
         className={invalid ? 'admin-input-invalid' : ''}
         value={value ?? ''}
@@ -49,9 +54,9 @@ function GeometryField({ label, expected, example, value, onChange }) {
         spellCheck="false"
         onChange={(event) => onChange(event.target.value)}
       />
-      <small>Formato WKT esperado: {expected}. Ejemplo: {example}</small>
+      <small>Uso exclusivo para soporte técnico. Formato WKT esperado: {expected}. Ejemplo: {example}</small>
       {invalid && <em>La geometría debe iniciar con {expected}; PostgreSQL validará tipo, SRID, topología y vacío.</em>}
-    </label>
+    </details>
   );
 }
 
@@ -156,11 +161,11 @@ export default function AdministracionTerritorial() {
   const { user } = React.useContext(AuthContext);
   const isAdmin = user?.rol === 'admin';
   const tabs = React.useMemo(
-    () => allTabs.filter(([key]) => isAdmin || ['proyectos', 'tramos', 'nucleos'].includes(key)),
+    () => allTabs.filter(([key]) => isAdmin || ['proyectos', 'trazos', 'tramos', 'nucleos'].includes(key)),
     [isAdmin],
   );
   const [activeTab, setActiveTab] = React.useState('proyectos');
-  const [data, setData] = React.useState({ proyectos: [], tramos: [], nucleos: [], relaciones: [], usuarios: [], municipios: [], entidades: [] });
+  const [data, setData] = React.useState({ proyectos: [], trazos: [], tramos: [], nucleos: [], relaciones: [], usuarios: [], municipios: [], entidades: [] });
   const [form, setForm] = React.useState(emptyForms.proyectos);
   const [editingId, setEditingId] = React.useState(null);
   const [showForm, setShowForm] = React.useState(false);
@@ -172,6 +177,8 @@ export default function AdministracionTerritorial() {
   const [showInactive, setShowInactive] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const [nucleoFilters, setNucleoFilters] = React.useState({ id_proyecto: '', id_entidad: '', id_municipio: '' });
+  const [trazoProjectId, setTrazoProjectId] = React.useState('');
+  const [sectionTramo, setSectionTramo] = React.useState(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -196,7 +203,7 @@ export default function AdministracionTerritorial() {
       }
       const [proyectos, tramos, nucleos, municipios, entidades, relaciones, usuarios] = await Promise.all(requests);
       setData({
-        proyectos: proyectos.data, tramos: tramos.data, nucleos: nucleos.data,
+        proyectos: proyectos.data, trazos: [], tramos: tramos.data, nucleos: nucleos.data,
         relaciones: relaciones?.data ?? [], usuarios: usuarios?.data ?? [], municipios: municipios.data,
         entidades: entidades.data,
       });
@@ -208,14 +215,14 @@ export default function AdministracionTerritorial() {
     if (!tabs.some(([key]) => key === activeTab)) setActiveTab('proyectos');
   }, [activeTab, tabs]);
   React.useEffect(() => {
-    setForm({ ...emptyForms[activeTab] });
+    setForm({ ...(emptyForms[activeTab] || emptyForms.proyectos) });
     setEditingId(null);
     setShowForm(false);
     setSearch('');
   }, [activeTab]);
 
   const updateField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const openCreate = () => { setForm({ ...emptyForms[activeTab] }); setEditingId(null); setShowForm(true); };
+  const openCreate = () => { setForm({ ...(emptyForms[activeTab] || emptyForms.proyectos) }); setEditingId(null); setShowForm(true); };
   const openEdit = (item) => {
     const next = { ...emptyForms[activeTab], ...item };
     if (next.geometria_wkt == null) next.geometria_wkt = '';
@@ -287,9 +294,7 @@ export default function AdministracionTerritorial() {
           <Field label="Proyecto"><select required disabled={Boolean(editingId)} value={form.id_proyecto ?? ''} onChange={(e) => updateField('id_proyecto', Number(e.target.value))}><option value="">Selecciona</option>{data.proyectos.filter((p) => p.activo).map((p) => <option key={p.id_proyecto} value={p.id_proyecto}>{p.clave_proyecto} · {p.nombre_proyecto}</option>)}</select></Field>
           <Field label="Clave"><input required disabled={Boolean(editingId)} value={form.clave_tramo ?? ''} onChange={(e) => updateField('clave_tramo', e.target.value)} /></Field>
           <Field label="Nombre"><input required value={form.nombre_tramo ?? ''} onChange={(e) => updateField('nombre_tramo', e.target.value)} /></Field>
-          <Field label="Ancho total (m)"><input type="number" min="0.01" step="0.01" value={form.ancho_total_derecho_via_m ?? ''} onChange={(e) => updateField('ancho_total_derecho_via_m', e.target.value)} /></Field>
           <Field label="Descripción"><input value={form.descripcion ?? ''} onChange={(e) => updateField('descripcion', e.target.value)} /></Field>
-          <GeometryField label="Geometría del eje" expected="MULTILINESTRING" example="MULTILINESTRING((-99.10 19.40, -99.08 19.42))" value={form.geometria_wkt} onChange={(value) => updateField('geometria_wkt', value)} />
         </>}
         {activeTab === 'nucleos' && <>
           <Field label="Entidad federativa"><select required disabled={Boolean(editingId)} value={form.id_entidad ?? ''} onChange={(e) => { updateField('id_entidad', e.target.value); updateField('id_municipio', ''); }}><option value="">Selecciona</option>{data.entidades.map((entidad) => <option key={entidad.id_entidad} value={entidad.id_entidad}>{entidad.nombre}</option>)}</select></Field>
@@ -298,6 +303,7 @@ export default function AdministracionTerritorial() {
           <Field label="Tipo"><select disabled={Boolean(editingId)} value={form.tipo_nucleo ?? 'ejido'} onChange={(e) => updateField('tipo_nucleo', e.target.value)}><option value="ejido">Ejido</option><option value="comunidad">Comunidad</option></select></Field>
           <Field label="Residencia"><input value={form.residencia ?? ''} onChange={(e) => updateField('residencia', e.target.value)} /></Field>
           <label className="admin-toggle"><input type="checkbox" checked={Boolean(form.comunidad_indigena)} onChange={(e) => updateField('comunidad_indigena', e.target.checked)} /><span>Comunidad indígena</span></label>
+          <div className="admin-field admin-field-wide"><GeospatialUpload target="nucleo_agrario" value={form.id_carga_geoespacial_feature} onChange={(id) => { updateField('id_carga_geoespacial_feature', id); updateField('geometria_wkt', ''); }} /></div>
           <GeometryField label="Geometría del núcleo" expected="MULTIPOLYGON" example="MULTIPOLYGON(((-99.10 19.40, -99.08 19.40, -99.08 19.42, -99.10 19.40)))" value={form.geometria_wkt} onChange={(value) => updateField('geometria_wkt', value)} />
         </>}
         {activeTab === 'relaciones' && <>
@@ -328,14 +334,59 @@ export default function AdministracionTerritorial() {
     return `${projects[0].clave_proyecto} +${projects.length - 1}`;
   };
 
+  const tableColumns = [];
+  if (activeTab === 'proyectos') {
+    tableColumns.push({ header: 'Clave', render: (item) => <strong>{item.clave_proyecto}</strong> });
+    tableColumns.push({ header: 'Proyecto', render: (item) => item.nombre_proyecto });
+  } else if (activeTab === 'tramos') {
+    tableColumns.push({ header: 'Clave', render: (item) => <strong>{item.clave_tramo}</strong> });
+    tableColumns.push({ header: 'Tramo', render: (item) => item.nombre_tramo });
+    tableColumns.push({ header: 'Proyecto', render: (item) => projectName(item.id_proyecto) });
+  } else if (activeTab === 'nucleos') {
+    tableColumns.push({ header: 'Núcleo', render: (item) => <strong>{item.nombre_nucleo}</strong> });
+    tableColumns.push({ header: 'Proyecto', render: (item) => nucleoProjectLabel(item) });
+    tableColumns.push({ header: 'Entidad', render: (item) => item.entidad_nombre || '—' });
+    tableColumns.push({ header: 'Municipio', render: (item) => item.municipio_nombre || '—' });
+    tableColumns.push({ header: 'Tipo', render: (item) => item.tipo_nucleo });
+  } else if (activeTab === 'relaciones') {
+    tableColumns.push({ header: 'Tramo', render: (item) => <strong>{tramoName(item.id_tramo)}</strong> });
+    tableColumns.push({ header: 'Núcleo', render: (item) => nucleoName(item.id_nucleo) });
+    tableColumns.push({ header: 'Consecutivo', render: (item) => item.consecutivo });
+    tableColumns.push({ header: 'Número', render: (item) => item.numero_tramo || '—' });
+  }
+
+  tableColumns.push({
+    header: 'Estado',
+    render: (item) => <span className={`admin-status ${item.activo ? 'active' : 'inactive'}`}>{item.activo ? 'Activo' : 'Inactivo'}</span>
+  });
+
+  tableColumns.push({
+    header: 'Acciones',
+    className: 'admin-actions-cell',
+    render: (item) => (
+      <>
+        {isAdmin && item.activo && <ActionButton title="Editar" onClick={() => openEdit(item)}><Edit3 size={16} /></ActionButton>}
+        {activeTab === 'tramos' && item.activo && <ActionButton title="Abrir mapa" onClick={() => navigate(`/mapa?id_tramo=${item.id_tramo}`)}><Layers size={16} /></ActionButton>}
+        {activeTab === 'tramos' && item.activo && <ActionButton title="Cargar sección del trazo" onClick={() => setSectionTramo(item)}><Map size={16} /></ActionButton>}
+        {isAdmin && activeTab === 'tramos' && item.activo && <ActionButton title="Asignar usuarios" onClick={() => setAssignmentTramo(item)}><UserRoundCog size={16} /></ActionButton>}
+        {activeTab === 'relaciones' && item.activo && <ActionButton title="Abrir expediente" onClick={() => navigate(`/expedientes/${item.id_tramo_nucleo}`)}><FolderKanban size={16} /></ActionButton>}
+        {isAdmin && <ActionButton title={item.activo ? 'Dar de baja' : 'Reactivar'} danger={item.activo} onClick={() => setReasonAction({ item, type: activeTab })}>{item.activo ? <Trash2 size={16} /> : <ArchiveRestore size={16} />}</ActionButton>}
+      </>
+    )
+  });
+
+  const idKey = activeTab === 'proyectos' ? 'id_proyecto' :
+                activeTab === 'tramos' ? 'id_tramo' :
+                activeTab === 'nucleos' ? 'id_nucleo' :
+                'id_tramo_nucleo';
+
   return (
     <section className="admin-page">
       <div className="admin-toolbar">
         <div className="admin-tabs" role="tablist">{tabs.map(([key, label, Icon]) => <button key={key} type="button" role="tab" aria-selected={activeTab === key} className={activeTab === key ? 'active' : ''} onClick={() => setActiveTab(key)}><Icon size={16} />{label}</button>)}</div>
         <div className="admin-toolbar-actions">
           {isAdmin && <label className="admin-history-toggle"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />Incluir inactivos</label>}
-          <ImportacionTerritorialPanel role={user?.rol} data={data} activeTab={activeTab} onImported={load} />
-          <button className="admin-button" type="button" onClick={openCreate}><Plus size={16} />Nuevo</button>
+          {activeTab !== 'trazos' && <button className="admin-button" type="button" onClick={openCreate}><Plus size={16} />Nuevo</button>}
         </div>
       </div>
       <label className="admin-search"><Search size={16} /><input type="search" placeholder="Buscar en esta vista" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
@@ -368,44 +419,19 @@ export default function AdministracionTerritorial() {
         </div>
       )}
       {error && <div className="admin-error" role="alert">{error}</div>}
+      {activeTab === 'trazos' && <section className="admin-form-band"><div className="admin-form-heading"><h2>Trazo oficial de derecho de vía</h2></div><Field label="Proyecto"><select value={trazoProjectId} onChange={(event) => setTrazoProjectId(event.target.value)}><option value="">Selecciona un proyecto</option>{data.proyectos.filter((item) => item.activo).map((item) => <option key={item.id_proyecto} value={item.id_proyecto}>{item.clave_proyecto} · {item.nombre_proyecto}</option>)}</select></Field>{trazoProjectId && <FranjaDerechoViaPanel idProyecto={Number(trazoProjectId)} onImportSuccess={load} />}</section>}
       {showForm && renderForm()}
-      <div className="admin-table-wrap">
-        {loading ? <p className="admin-empty">Cargando registros...</p> : items.length === 0 ? <p className="admin-empty">No hay registros.</p> : (
-          <table className="admin-table">
-            <thead><tr>
-              {activeTab === 'proyectos' && <><th>Clave</th><th>Proyecto</th></>}
-              {activeTab === 'tramos' && <><th>Clave</th><th>Tramo</th><th>Proyecto</th><th>Ancho</th></>}
-              {activeTab === 'nucleos' && <><th>Núcleo</th><th>Proyecto</th><th>Entidad</th><th>Municipio</th><th>Tipo</th></>}
-              {activeTab === 'relaciones' && <><th>Tramo</th><th>Núcleo</th><th>Consecutivo</th><th>Número</th></>}
-              <th>Estado</th><th className="admin-actions-cell">Acciones</th>
-            </tr></thead>
-            <tbody>{items.map((item) => {
-              const idKey = activeTab === 'proyectos' ? 'id_proyecto' :
-                            activeTab === 'tramos' ? 'id_tramo' :
-                            activeTab === 'nucleos' ? 'id_nucleo' :
-                            'id_tramo_nucleo';
-
-              const id = item[idKey];
-              return <tr key={`${activeTab}-${id}`} className={!item.activo ? 'inactive' : ''}>
-                {activeTab === 'proyectos' && <><td data-label="Clave"><strong>{item.clave_proyecto}</strong></td><td data-label="Proyecto">{item.nombre_proyecto}</td></>}
-                {activeTab === 'tramos' && <><td data-label="Clave"><strong>{item.clave_tramo}</strong></td><td data-label="Tramo">{item.nombre_tramo}</td><td data-label="Proyecto">{projectName(item.id_proyecto)}</td><td data-label="Ancho">{item.ancho_total_derecho_via_m ?? '—'} m</td></>}
-                {activeTab === 'nucleos' && <><td data-label="Núcleo"><strong>{item.nombre_nucleo}</strong></td><td data-label="Proyecto">{nucleoProjectLabel(item)}</td><td data-label="Entidad">{item.entidad_nombre || '—'}</td><td data-label="Municipio">{item.municipio_nombre || '—'}</td><td data-label="Tipo">{item.tipo_nucleo}</td></>}
-                {activeTab === 'relaciones' && <><td data-label="Tramo"><strong>{tramoName(item.id_tramo)}</strong></td><td data-label="Núcleo">{nucleoName(item.id_nucleo)}</td><td data-label="Consecutivo">{item.consecutivo}</td><td data-label="Número">{item.numero_tramo || '—'}</td></>}
-                <td data-label="Estado"><span className={`admin-status ${item.activo ? 'active' : 'inactive'}`}>{item.activo ? 'Activo' : 'Inactivo'}</span></td>
-                <td data-label="Acciones" className="admin-actions-cell">
-                  {isAdmin && item.activo && <ActionButton title="Editar" onClick={() => openEdit(item)}><Edit3 size={16} /></ActionButton>}
-                  {activeTab === 'tramos' && item.activo && <ActionButton title="Abrir mapa y derecho de vía" onClick={() => navigate(`/mapa?id_tramo=${item.id_tramo}`)}><Layers size={16} /></ActionButton>}
-                  {isAdmin && activeTab === 'tramos' && item.activo && <ActionButton title="Asignar usuarios" onClick={() => setAssignmentTramo(item)}><UserRoundCog size={16} /></ActionButton>}
-                  {activeTab === 'relaciones' && item.activo && <ActionButton title="Abrir expediente" onClick={() => navigate(`/expedientes/${item.id_tramo_nucleo}`)}><FolderKanban size={16} /></ActionButton>}
-                  {isAdmin && <ActionButton title={item.activo ? 'Dar de baja' : 'Reactivar'} danger={item.activo} onClick={() => setReasonAction({ item, type: activeTab })}>{item.activo ? <Trash2 size={16} /> : <ArchiveRestore size={16} />}</ActionButton>}
-                </td>
-              </tr>;
-            })}</tbody>
-          </table>
-        )}
-      </div>
+      {activeTab === 'relaciones' && <TramoNucleoCandidates tramos={data.tramos} onChanged={load} />}
+      {activeTab !== 'trazos' && <PaginatedTable
+          columns={tableColumns}
+          data={items}
+          loading={loading}
+          keyField={idKey}
+          rowClassName={(item) => (!item.activo ? 'inactive' : '')}
+        />}
       {reasonAction && <ReasonDialog title={reasonAction.item.activo ? 'Confirmar baja lógica' : 'Confirmar reactivación'} onCancel={() => setReasonAction(null)} onConfirm={confirmLifecycle} />}
       {assignmentTramo && <AssignmentDialog tramo={assignmentTramo} users={data.usuarios} onCancel={() => setAssignmentTramo(null)} onSaved={async () => { setAssignmentTramo(null); await load(); }} setPageError={setError} />}
+      {sectionTramo && <SeccionDerechoViaPanel tramo={sectionTramo} onSaved={load} onClose={() => setSectionTramo(null)} />}
     </section>
   );
 }

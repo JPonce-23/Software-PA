@@ -12,6 +12,7 @@ from .. import models, schemas
 from .common import get_active, set_audit_context
 from .personas import ensure_persona_nucleo
 from . import franjas
+from . import cargas_geoespaciales
 
 
 def _validar_contexto(
@@ -149,6 +150,11 @@ def _crear_parcela_nueva(
     user_id: int,
 ) -> models.Parcela:
     parcela_data = data.model_dump(exclude={"modo", "titulares"})
+    feature_id = parcela_data.pop("id_carga_geoespacial_feature", None)
+    if feature_id is not None:
+        parcela_data["geometria_poligono"] = cargas_geoespaciales.confirmed_wkt(
+            db, feature_id, "parcela"
+        )
     parcela = models.Parcela(
         id_nucleo=id_nucleo,
         nombre_titular=None,
@@ -156,6 +162,10 @@ def _crear_parcela_nueva(
     )
     db.add(parcela)
     db.flush()
+    if feature_id is not None:
+        cargas_geoespaciales.consume_confirmed_feature(
+            db, feature_id, "parcela", parcela.id_parcela, user_id
+        )
 
     for titular_data in data.titulares:
         persona = get_active(

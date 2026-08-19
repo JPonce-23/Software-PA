@@ -1,10 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File, Form
 import os
-import json
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text, func
+from sqlalchemy import text, func, literal
 from sqlalchemy.inspection import inspect
 from sqlalchemy.exc import InternalError, IntegrityError, DatabaseError
 from typing import List, Type, Any, Optional
@@ -17,12 +16,13 @@ from .database import engine, Base, SessionLocal, get_db
 from . import models, schemas
 from . import auth
 from .config import AUTH_SETTINGS
-from .routers import administration, alertas, authentication, documentos, flujo, importaciones_geoespaciales, importaciones_territoriales, minutas, pagos, personas, franjas
+from .routers import administration, alertas, authentication, cargas_geoespaciales, documentos, flujo, importaciones_geoespaciales, importaciones_territoriales, minutas, pagos, personas, franjas
 from .services import administration as administration_service
 from .services import afectaciones as afectaciones_service
 from .services import authentication as authentication_service
 from .services import flujo as flujo_service
 from .services import nucleos as nucleos_service
+from .services import cargas_geoespaciales as cargas_geoespaciales_service
 from .services.access import (
     filter_by_user_tramos,
     filter_projects_by_user,
@@ -150,6 +150,7 @@ app.include_router(franjas.router, prefix="/api")
 app.include_router(administration.router, prefix="/api")
 app.include_router(importaciones_territoriales.router, prefix="/api")
 app.include_router(importaciones_geoespaciales.router, prefix="/api")
+app.include_router(cargas_geoespaciales.router, prefix="/api")
 
 os.makedirs(os.getenv("UPLOAD_ROOT", "uploads"), exist_ok=True)
 
@@ -215,7 +216,6 @@ def get_entity_by_id(db: Session, model: Type[Any], entity_id: int, id_column: s
     return entity
 
 GEOMETRY_FIELDS = {
-    models.Tramo: "geometria_linea",
     models.NucleoAgrario: "geometria_poligono",
     models.TramoNucleo: "geometria_segmento",
     models.Afectacion: "geometria_afectacion"
@@ -267,6 +267,18 @@ def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
     set_audit_context(db, user_id)
     update_dict = update_data.model_dump(exclude_unset=True)
 
+    feature_id = update_dict.pop("id_carga_geoespacial_feature", None)
+    if feature_id is not None:
+        if update_dict.get("geometria_wkt"):
+            raise HTTPException(
+                status_code=422,
+                detail="Use una sola fuente de geometría por operación.",
+            )
+        target = {models.NucleoAgrario: "nucleo_agrario"}.get(type(entity))
+        if not target:
+            raise HTTPException(status_code=422, detail="Esta entidad no admite una carga geoespacial confirmada.")
+        update_dict["geometria_wkt"] = cargas_geoespaciales_service.confirmed_wkt(db, feature_id, target)
+
     if "geometria_wkt" in update_dict:
         wkt = update_dict.pop("geometria_wkt", None)
         model_class = type(entity)
@@ -285,6 +297,16 @@ def update_entity(db: Session, entity: Any, update_data: Any, user_id: int):
 
     for key, value in update_dict.items():
         setattr(entity, key, value)
+    if feature_id is not None:
+        primary_key = inspect(type(entity)).primary_key[0].name
+        target = {models.NucleoAgrario: "nucleo_agrario"}[type(entity)]
+        cargas_geoespaciales_service.consume_confirmed_feature(
+            db,
+            feature_id,
+            target,
+            getattr(entity, primary_key),
+            user_id,
+        )
     db.commit()
     db.refresh(entity)
     return entity
@@ -366,7 +388,7 @@ def get_tramos(id_proyecto: int = Query(None), skip: int = 0, limit: int = 100, 
         models.Tramo.ancho_total_derecho_via_m,
         models.Tramo.activo,
         models.Tramo.fecha_registro,
-        models.Tramo.geometria_linea.ST_AsText().label('geometria_wkt')
+        literal(None).label('geometria_wkt')
     ).filter(models.Tramo.activo == True)
     query = filter_by_user_tramos(query, db, current_user, models.Tramo.id_tramo)
     if id_proyecto is not None:
@@ -379,9 +401,7 @@ def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), curr
         get_entity_by_id(db, models.Proyecto, tramo.id_proyecto, "id_proyecto")
         set_audit_context(db, current_user.id_usuario)
         data = tramo.model_dump()
-        wkt = data.pop("geometria_wkt", None)
-        validate_wkt(db, wkt, {"ST_MultiLineString"})
-        db_tramo = models.Tramo(**data, geometria_linea=wkt)
+        db_tramo = models.Tramo(**data)
         db_tramo.fecha_registro = datetime.now(timezone.utc).date()
         db.add(db_tramo)
         db.flush()
@@ -408,9 +428,7 @@ def create_tramo(tramo: schemas.TramoCreate, db: Session = Depends(get_db), curr
         db.commit()
         db.refresh(db_tramo)
         resp = db_tramo.__dict__.copy()
-        resp["geometria_wkt"] = db.query(
-            models.Tramo.geometria_linea.ST_AsText()
-        ).filter(models.Tramo.id_tramo == db_tramo.id_tramo).scalar()
+        resp["geometria_wkt"] = None
         return resp
     except Exception:
         db.rollback()
@@ -421,28 +439,23 @@ def update_tramo(id_tramo: int, data: schemas.TramoUpdate, db: Session = Depends
     entity = get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
     db_tramo = update_entity(db, entity, data, current_user.id_usuario)
     resp = db_tramo.__dict__.copy()
-    resp["geometria_wkt"] = db.query(
-        models.Tramo.geometria_linea.ST_AsText()
-    ).filter(models.Tramo.id_tramo == db_tramo.id_tramo).scalar()
+    resp["geometria_wkt"] = None
     return resp
 
 
 @app.put("/api/tramos/{id_tramo}/geometria", tags=["Tramos"], summary="Actualizar geometría de tramo", response_model=schemas.TramoResponse)
 def update_tramo_geometry(id_tramo: int, data: schemas.GeometriaUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'geografo']))):
-    require_tramo_access(db, current_user, id_tramo)
-    entity = get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
-    db_tramo = update_entity(db, entity, data, current_user.id_usuario)
-    resp = db_tramo.__dict__.copy()
-    resp["geometria_wkt"] = db.query(
-        models.Tramo.geometria_linea.ST_AsText()
-    ).filter(models.Tramo.id_tramo == id_tramo).scalar()
-    return resp
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="El tramo es una división administrativa. Cargue su sección poligonal de derecho de vía.",
+    )
 
 @app.delete("/api/tramos/{id_tramo}", tags=["Tramos"], summary="Eliminar tramo")
 def delete_tramo(id_tramo: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))):
     entity = get_entity_by_id(db, models.Tramo, id_tramo, "id_tramo")
     dependencies = (
-        db.query(models.FranjaDerechoVia.id_franja).filter_by(id_tramo=id_tramo, activo=True).first()
+        db.query(models.SeccionDerechoVia.id_seccion).filter_by(id_tramo=id_tramo, activo=True).first()
+        or db.query(models.FranjaDerechoVia.id_franja).filter_by(id_tramo=id_tramo, activo=True).first()
         or db.query(models.TramoNucleo.id_tramo_nucleo).filter_by(id_tramo=id_tramo, activo=True).first()
         or db.query(models.UsuarioTramo.id_usuario_tramo).filter_by(id_tramo=id_tramo, activo=True).first()
     )
@@ -481,13 +494,14 @@ def get_nucleos(
                 ELSE (
                     SELECT ST_Area(
                         ST_CollectionExtract(
-                            ST_Intersection(n.geometria_poligono, f.geometria_poligono),
+                            ST_Intersection(n.geometria_poligono, s.geometria_poligono),
                             3
                         )::geography
                     ) / 10000.0
-                      FROM franja_derecho_via f
-                     WHERE f.id_tramo = :id_tramo_espacial
-                       AND f.activo = TRUE
+                      FROM seccion_derecho_via s
+                      JOIN franja_derecho_via f ON f.id_franja = s.id_franja
+                     WHERE s.id_tramo = :id_tramo_espacial
+                       AND s.activo = TRUE AND f.activo = TRUE
                      LIMIT 1
                 )
             END AS area_afectada_ha
@@ -517,15 +531,16 @@ def get_nucleos(
         base_sql += """
             AND EXISTS (
                 SELECT 1
-                  FROM franja_derecho_via f
-                  JOIN tramo t ON t.id_tramo = f.id_tramo
-                 WHERE f.id_tramo = :id_tramo
-                   AND f.activo = TRUE
+                  FROM seccion_derecho_via s
+                  JOIN franja_derecho_via f ON f.id_franja = s.id_franja
+                  JOIN tramo t ON t.id_tramo = s.id_tramo
+                 WHERE s.id_tramo = :id_tramo
+                   AND s.activo = TRUE AND f.activo = TRUE
                    AND t.activo = TRUE
-                   AND ST_Intersects(n.geometria_poligono, f.geometria_poligono)
+                   AND ST_Intersects(n.geometria_poligono, s.geometria_poligono)
                    AND ST_Area(
                        ST_CollectionExtract(
-                           ST_Intersection(n.geometria_poligono, f.geometria_poligono),
+                           ST_Intersection(n.geometria_poligono, s.geometria_poligono),
                            3
                        )::geography
                    ) > 0
@@ -591,10 +606,9 @@ def get_tramo_detalles(id_tramo: int = Query(...), db: Session = Depends(get_db)
         SELECT
             id_tramo,
             nombre_tramo,
-            ST_AsText(geometria_linea) as geometria_wkt,
-            (ST_Length(geometria_linea::geography) / 1000.0) as longitud_km
-        FROM tramo
-        WHERE id_tramo = :id_tramo AND activo = TRUE
+            NULL::TEXT as geometria_wkt,
+            NULL::NUMERIC as longitud_km
+        FROM tramo WHERE id_tramo = :id_tramo AND activo = TRUE
     """)
     r = db.execute(sql, {"id_tramo": id_tramo}).fetchone()
 
@@ -614,10 +628,20 @@ def create_nucleo(nucleo: schemas.NucleoAgrarioCreate, db: Session = Depends(get
         set_audit_context(db, current_user.id_usuario)
         data = nucleo.model_dump()
         wkt = data.pop("geometria_wkt", None)
+        feature_id = data.pop("id_carga_geoespacial_feature", None)
+        if feature_id is not None:
+            if wkt:
+                raise HTTPException(status_code=422, detail="Use una sola fuente de geometría por operación.")
+            wkt = cargas_geoespaciales_service.confirmed_wkt(db, feature_id, "nucleo_agrario")
         validate_wkt(db, wkt, {"ST_MultiPolygon"})
         db_nucleo = models.NucleoAgrario(**data, geometria_poligono=wkt)
         db_nucleo.fecha_creacion = datetime.now(timezone.utc)
         db.add(db_nucleo)
+        db.flush()
+        if feature_id is not None:
+            cargas_geoespaciales_service.consume_confirmed_feature(
+                db, feature_id, "nucleo_agrario", db_nucleo.id_nucleo, current_user.id_usuario
+            )
         db.commit()
         db.refresh(db_nucleo)
         resp = db_nucleo.__dict__.copy()
@@ -1756,98 +1780,18 @@ def exportar_tramos_csv(db: Session = Depends(get_db), current_user: models.Usua
     return response
 
 # ==================== GEOJSON IMPORTER ==================== #
-@app.post("/api/geometria/importar-geojson", tags=["Geometría"], summary="Importar GeoJSON")
+@app.post("/api/geometria/importar-geojson", tags=["Geometría"], summary="Importación GeoJSON retirada")
 def importar_geojson(
     tipo_entidad: str = Query(..., description="Opciones: tramo, nucleo_agrario, tramo_nucleo, afectacion"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(['admin']))
 ):
-    """
-    Importa masivamente registros desde un archivo GeoJSON.
-    Las 'properties' del GeoJSON deben coincidir con los nombres de las columnas de la tabla destino.
-    """
-    # Mapeo de tablas y sus columnas espaciales
-    mapa_entidades = {
-        "tramo": (models.Tramo, "geometria_linea"),
-        "nucleo_agrario": (models.NucleoAgrario, "geometria_poligono"),
-        "tramo_nucleo": (models.TramoNucleo, "geometria_segmento"),
-        "afectacion": (models.Afectacion, "geometria_afectacion")
-    }
-
-    if tipo_entidad not in mapa_entidades:
-        raise HTTPException(status_code=400, detail="Tipo de entidad no soportado para importación GeoJSON.")
-
-    Modelo, geom_column_name = mapa_entidades[tipo_entidad]
-
-    try:
-        content = file.file.read()
-        geojson_data = json.loads(content)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Archivo GeoJSON inválido o malformado.")
-
-    if "features" not in geojson_data:
-        raise HTTPException(status_code=400, detail="El GeoJSON debe contener un arreglo de 'features'.")
-
-    # Establecer contexto de auditoría
-    set_audit_context(db, current_user.id_usuario)
-
-    columnas_validas = [c.name for c in Modelo.__table__.columns]
-    registros_insertados = 0
-
-    for feature in geojson_data["features"]:
-        propiedades = feature.get("properties", {})
-        geometria = feature.get("geometry", None)
-
-        if not geometria:
-            continue
-
-        # Filtrar propiedades para que solo queden las que existen en el modelo (ignorar geom_column y Primary Key)
-        datos_limpios = {}
-        pk_name = inspect(Modelo).primary_key[0].name
-        for k, v in propiedades.items():
-            if k in columnas_validas and k not in [geom_column_name, pk_name]:
-                datos_limpios[k] = v
-
-        # Asegurar requerimientos de negocio o defaults
-        if "activo" not in datos_limpios:
-            datos_limpios["activo"] = True
-
-        # Dependiendo del modelo, algunas columnas de fecha deben pasarse si no están
-        if Modelo == models.Tramo:
-            if "fecha_registro" not in datos_limpios:
-                datos_limpios["fecha_registro"] = datetime.now(timezone.utc).date()
-
-        if Modelo == models.NucleoAgrario:
-            if "fecha_creacion" not in datos_limpios:
-                datos_limpios["fecha_creacion"] = datetime.now(timezone.utc)
-
-        # Crear instancia del ORM
-        nuevo_registro = Modelo(**datos_limpios)
-
-        # Asignar geometría usando ST_GeomFromGeoJSON
-        # Para que SQLAlchemy acepte la función cruda en la propiedad, usamos text() en un UPDATE,
-        # pero como es INSERT, lo mejor es hacer un flush() y luego un UPDATE,
-        # o asignar la propiedad en la creación usando db.scalar.
-        # Lo más limpio en GeoAlchemy2 es castear el string del geom:
-        # Pero GeoAlchemy soporta WKT, no GeoJSON directo en asignación a propiedad.
-        # Por lo tanto, guardamos temporalmente el registro sin geometría, hacemos flush y luego update con postgis.
-
-        db.add(nuevo_registro)
-        db.flush() # Obtenemos el ID generado
-
-        pk_name = inspect(Modelo).primary_key[0].name
-        pk_value = getattr(nuevo_registro, pk_name)
-
-        # Actualizamos la geometría nativamente en PostGIS para asegurar conversión perfecta
-        geom_str = json.dumps(geometria)
-        stmt = text(f"UPDATE {Modelo.__tablename__} SET {geom_column_name} = ST_SetSRID(ST_GeomFromGeoJSON(:geom), 4326) WHERE {pk_name} = :id")
-        db.execute(stmt, {"geom": geom_str, "id": pk_value})
-
-        registros_insertados += 1
-
-    db.commit()
-    return {"status": "success", "mensaje": f"{registros_insertados} registros importados a la tabla {Modelo.__tablename__}."}
+    """Ruta retirada: las escrituras geoespaciales requieren staging y confirmación."""
+    raise HTTPException(
+        status_code=410,
+        detail="La importación directa fue retirada. Use una carga geoespacial con prevalidación.",
+    )
 
 # ==================== BITÁCORA ==================== #
 @app.get("/api/bitacora", tags=["Bitácora"], summary="Listar entradas de bitácora", response_model=List[schemas.BitacoraResponse])
@@ -1920,7 +1864,7 @@ def get_tramo_by_id(id_tramo: int, db: Session = Depends(get_db), current_user: 
         models.Tramo.nombre_tramo,
         models.Tramo.descripcion,
         models.Tramo.ancho_total_derecho_via_m,
-        models.Tramo.geometria_linea.ST_AsText().label('geometria_wkt'),
+        literal(None).label('geometria_wkt'),
         models.Tramo.activo,
         models.Tramo.fecha_registro,
         models.Tramo.fecha_baja,

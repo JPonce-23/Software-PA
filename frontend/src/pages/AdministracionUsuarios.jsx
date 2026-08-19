@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArchiveRestore, Edit3, KeyRound, Plus, Save, Search, ShieldOff, Trash2, X } from 'lucide-react';
 import api from '../api/axios';
+import PaginatedTable from '../components/PaginatedTable';
 
 const emptyForm = {
   nombre: '', apellido_paterno: '', apellido_materno: '', correo: '',
@@ -87,6 +88,27 @@ export default function AdministracionUsuarios() {
     ? sourceUsers.filter((user) => [user.nombre, user.apellido_paterno, user.apellido_materno, user.correo, user.rol].some((value) => String(value ?? '').toLowerCase().includes(normalizedSearch)))
     : sourceUsers;
 
+  const tableColumns = [
+    { header: 'Nombre', render: (user) => <strong>{user.nombre} {user.apellido_paterno}</strong> },
+    { header: 'Correo', render: (user) => user.correo },
+    { header: 'Rol', render: (user) => roleLabels[user.rol] },
+    { header: 'Estado', render: (user) => <span className={`admin-status ${user.activo ? 'active' : 'inactive'}`}>{user.activo ? 'Activo' : 'Inactivo'}</span> },
+    {
+      header: 'Acciones',
+      className: 'admin-actions-cell',
+      render: (user) => user.activo ? (
+        <>
+          <IconButton title="Editar" onClick={() => openEdit(user)}><Edit3 size={16} /></IconButton>
+          <IconButton title="Desbloquear cuenta" onClick={() => setReasonAction({ type: 'unlock', user })}><KeyRound size={16} /></IconButton>
+          <IconButton title="Revocar sesiones" onClick={() => setReasonAction({ type: 'sessions', user })}><ShieldOff size={16} /></IconButton>
+          <IconButton title="Dar de baja" danger onClick={() => setReasonAction({ type: 'delete', user })}><Trash2 size={16} /></IconButton>
+        </>
+      ) : (
+        <IconButton title="Reactivar" onClick={() => setReasonAction({ type: 'restore', user })}><ArchiveRestore size={16} /></IconButton>
+      )
+    }
+  ];
+
   return <section className="admin-page">
     <div className="admin-toolbar"><div><h2 className="admin-section-title">Usuarios y roles</h2><p className="admin-section-copy">Cuentas, roles y acceso vigente</p></div><div className="admin-toolbar-actions"><label className="admin-history-toggle"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />Incluir inactivos</label><button type="button" className="admin-button" onClick={openCreate}><Plus size={16} />Nuevo usuario</button></div></div>
     <label className="admin-search"><Search size={16} /><input type="search" placeholder="Buscar por nombre, correo o rol" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
@@ -103,13 +125,14 @@ export default function AdministracionUsuarios() {
       </div>
       <div className="admin-form-actions"><button className="admin-button" disabled={saving}><Save size={16} />{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form>}
-    <div className="admin-table-wrap">{loading ? <p className="admin-empty">Cargando usuarios...</p> : visibleUsers.length === 0 ? <p className="admin-empty">No hay usuarios.</p> : <table className="admin-table">
-      <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th className="admin-actions-cell">Acciones</th></tr></thead>
-      <tbody>{visibleUsers.map((user) => <tr key={user.id_usuario} className={!user.activo ? 'inactive' : ''}>
-        <td data-label="Nombre"><strong>{user.nombre} {user.apellido_paterno}</strong></td><td data-label="Correo">{user.correo}</td><td data-label="Rol">{roleLabels[user.rol]}</td><td data-label="Estado"><span className={`admin-status ${user.activo ? 'active' : 'inactive'}`}>{user.activo ? 'Activo' : 'Inactivo'}</span></td>
-        <td data-label="Acciones" className="admin-actions-cell">{user.activo ? <><IconButton title="Editar" onClick={() => openEdit(user)}><Edit3 size={16} /></IconButton><IconButton title="Desbloquear cuenta" onClick={() => setReasonAction({ type: 'unlock', user })}><KeyRound size={16} /></IconButton><IconButton title="Revocar sesiones" onClick={() => setReasonAction({ type: 'sessions', user })}><ShieldOff size={16} /></IconButton><IconButton title="Dar de baja" danger onClick={() => setReasonAction({ type: 'delete', user })}><Trash2 size={16} /></IconButton></> : <IconButton title="Reactivar" onClick={() => setReasonAction({ type: 'restore', user })}><ArchiveRestore size={16} /></IconButton>}</td>
-      </tr>)}</tbody>
-    </table>}</div>
+    <PaginatedTable
+      columns={tableColumns}
+      data={visibleUsers}
+      loading={loading}
+      keyField="id_usuario"
+      rowClassName={(user) => (!user.activo ? 'inactive' : '')}
+      emptyMessage="No hay usuarios."
+    />
     {reasonAction && <ReasonDialog title={reasonAction.type === 'sessions' ? 'Revocar sesiones' : reasonAction.type === 'unlock' ? 'Desbloquear cuenta' : reasonAction.type === 'delete' ? 'Dar de baja al usuario' : 'Reactivar usuario'} onCancel={() => setReasonAction(null)} onConfirm={confirmReason} />}
   </section>;
 }

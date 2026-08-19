@@ -10,6 +10,7 @@ from .common import (
     reactivate,
     set_audit_context,
 )
+from . import cargas_geoespaciales
 
 
 ORV_LEGACY_FIELDS = (
@@ -255,9 +256,19 @@ def create_parcela_compatible(
         "id_nucleo",
         "Núcleo agrario no encontrado",
     )
-    parcela = models.Parcela(**data.model_dump())
+    parcela_data = data.model_dump()
+    feature_id = parcela_data.pop("id_carga_geoespacial_feature", None)
+    if feature_id is not None:
+        parcela_data["geometria_poligono"] = cargas_geoespaciales.confirmed_wkt(
+            db, feature_id, "parcela"
+        )
+    parcela = models.Parcela(**parcela_data)
     db.add(parcela)
     db.flush()
+    if feature_id is not None:
+        cargas_geoespaciales.consume_confirmed_feature(
+            db, feature_id, "parcela", parcela.id_parcela, user_id
+        )
 
     if data.nombre_titular and data.nombre_titular.strip():
         persona = create_legacy_persona(db, data.nombre_titular)
@@ -296,10 +307,19 @@ def create_parcela_normalizada(
         "Persona titular no encontrada",
     )
     parcela_data = data.parcela.model_dump()
+    feature_id = parcela_data.pop("id_carga_geoespacial_feature", None)
+    if feature_id is not None:
+        parcela_data["geometria_poligono"] = cargas_geoespaciales.confirmed_wkt(
+            db, feature_id, "parcela"
+        )
     parcela_data["nombre_titular"] = None
     parcela = models.Parcela(**parcela_data)
     db.add(parcela)
     db.flush()
+    if feature_id is not None:
+        cargas_geoespaciales.consume_confirmed_feature(
+            db, feature_id, "parcela", parcela.id_parcela, user_id
+        )
     ensure_persona_nucleo(
         db,
         persona,
@@ -332,6 +352,11 @@ def update_parcela_compatible(
 ) -> models.Parcela:
     set_audit_context(db, user_id)
     changes = data.model_dump(exclude_unset=True)
+    feature_id = changes.pop("id_carga_geoespacial_feature", None)
+    if feature_id is not None:
+        changes["geometria_poligono"] = cargas_geoespaciales.confirmed_wkt(
+            db, feature_id, "parcela"
+        )
     nuevo_nombre = changes.get("nombre_titular")
     nombre_cambio = (
         "nombre_titular" in changes
@@ -339,6 +364,11 @@ def update_parcela_compatible(
     )
     for field, value in changes.items():
         setattr(parcela, field, value)
+
+    if feature_id is not None:
+        cargas_geoespaciales.consume_confirmed_feature(
+            db, feature_id, "parcela", parcela.id_parcela, user_id
+        )
 
     if nombre_cambio:
         for titular in (

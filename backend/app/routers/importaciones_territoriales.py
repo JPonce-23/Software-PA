@@ -34,13 +34,13 @@ async def previsualizar_importacion(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(["admin", "geografo"])),
 ):
-    if tipo == "nucleos":
-        raise HTTPException(
-            status_code=410,
-            detail="La importacion de nucleos requiere el flujo geoespacial con staging.",
-        )
     if tipo == "cruces_operativos" and current_user.rol != "admin":
         raise HTTPException(status_code=403, detail="Solo administrador puede importar cruces operativos.")
+    if tipo in {"nucleos", "tramos", "derecho_via", "cruces_operativos"}:
+        raise HTTPException(
+            status_code=410,
+            detail="Este recurso requiere el flujo geoespacial con staging y confirmación explícita.",
+        )
     if not file.filename or not file.filename.lower().endswith((".geojson", ".json")):
         raise HTTPException(status_code=400, detail="El archivo debe tener extension .geojson o .json")
     max_bytes = 10 * 1024 * 1024
@@ -82,11 +82,11 @@ def confirmar_importacion(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(["admin", "geografo"])),
 ):
-    if tipo == "nucleos":
-        raise HTTPException(
-            status_code=410,
-            detail="La importacion de nucleos requiere confirmacion desde staging.",
-        )
     if tipo == "cruces_operativos" and current_user.rol != "admin":
         raise HTTPException(status_code=403, detail="Solo administrador puede importar cruces operativos.")
+    if tipo in {"nucleos", "tramos", "derecho_via", "cruces_operativos"}:
+        raise HTTPException(
+            status_code=410,
+            detail="Este recurso requiere confirmación desde el flujo geoespacial con staging.",
+        )
     return service.confirm(db, tipo, data, current_user)

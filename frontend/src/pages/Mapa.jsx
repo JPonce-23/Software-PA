@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect, useMemo, useRef } from 'react';
-import { Layers, Maximize, CheckCircle, MapPin, ChevronUp, ChevronDown, ExternalLink, X } from 'lucide-react';
+import { Layers, CheckCircle, MapPin, ChevronUp, ChevronDown, ExternalLink, X } from 'lucide-react';
 import { MapContainer, TileLayer, GeoJSON, LayersControl, useMap } from 'react-leaflet';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
@@ -9,17 +9,6 @@ import { parse } from 'wellknown';
 import FranjaDerechoViaPanel from '../components/fase2/FranjaDerechoViaPanel';
 import NucleosImportPanel from '../components/fase2/NucleosImportPanel';
 import AuthContext from '../contexts/auth-context';
-
-// Paleta de colores diferenciados por proyecto
-const PROJECT_PALETTE = [
-  '#E63946', '#2A9D8F', '#219EBC', '#023047', '#9B2247',
-  '#F4A261', '#6A4C93', '#1982C4', '#8AC926', '#FF595E',
-];
-
-function getProjectColor(idProyecto, projectIds) {
-  const idx = projectIds.indexOf(idProyecto);
-  return PROJECT_PALETTE[(idx >= 0 ? idx : 0) % PROJECT_PALETTE.length];
-}
 
 // Centro geográfico de México y zoom para vista general
 const MEXICO_CENTER = [23.6345, -102.5528];
@@ -110,7 +99,7 @@ export default function Mapa() {
   const [projectsLoading, setProjectsLoading] = useState(true);
 
   // Capas GeoJSON
-  const [tramosGeoJSON, setTramosGeoJSON] = useState(null);
+  const [tramos, setTramos] = useState([]);
   const [franjasGeoJSON, setFranjasGeoJSON] = useState(null);
   const [nucleosGeoJSON, setNucleosGeoJSON] = useState(null);
 
@@ -126,9 +115,6 @@ export default function Mapa() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // IDs de proyectos disponibles para paleta de colores
-  const projectIds = useMemo(() => proyectos.map(p => p.id_proyecto), [proyectos]);
-
   // 1. Cargar lista de proyectos al montar
   useEffect(() => {
     api.get('/proyectos')
@@ -143,7 +129,7 @@ export default function Mapa() {
   // 2. Cargar datos geoespaciales según el proyecto seleccionado con AbortController
   useEffect(() => {
     // Limpiar geometrías y detalle inmediatamente al cambiar de proyecto (Fase 6)
-    setTramosGeoJSON(null);
+    setTramos([]);
     setFranjasGeoJSON(null);
     setNucleosGeoJSON(null);
     setTramoDetalle(null);
@@ -178,22 +164,9 @@ export default function Mapa() {
         return;
       }
 
-      // Tramos con color por proyecto
-      const tramoFeatures = resTramos.data.map(t => {
-        if (!t.geometria_wkt) return null;
-        return {
-          type: "Feature",
-          properties: {
-            name: t.nombre_tramo,
-            id_tramo: t.id_tramo,
-            id_proyecto: t.id_proyecto,
-            color: getProjectColor(t.id_proyecto, projectIds),
-            weight: 5,
-          },
-          geometry: parse(t.geometria_wkt)
-        };
-      }).filter(Boolean);
-      setTramosGeoJSON({ type: "FeatureCollection", features: tramoFeatures });
+      // El tramo es una división administrativa; su representación espacial es
+      // la sección de derecho de vía, no una línea independiente.
+      setTramos(resTramos.data);
 
       // Franjas
       const franjaFeatures = resFranjas.data
@@ -201,8 +174,7 @@ export default function Mapa() {
         .map(franja => ({
           type: 'Feature',
           properties: {
-            id_tramo: franja.id_tramo,
-            fuente: franja.fuente,
+            id_proyecto: franja.id_proyecto,
             color: '#ca8a04',
             fillColor: '#facc15',
             fillOpacity: 0.35,
@@ -225,7 +197,7 @@ export default function Mapa() {
     });
 
     return () => abortController.abort(); // Cancelar petición si el componente se desmonta o cambia el proyecto (Fase 7)
-  }, [selectedProjectId, selectedTramoId, nucleosRevision, franjasRevision, projectIds, setSearchParams]);
+  }, [selectedProjectId, selectedTramoId, nucleosRevision, franjasRevision, setSearchParams]);
 
   // 3. Cargar detalle de tramo seleccionado
   useEffect(() => {
@@ -276,27 +248,6 @@ export default function Mapa() {
     setSearchParams(nextParams);
   };
 
-  const onEachTramo = (feature, layer) => {
-    if (feature.properties) {
-      const idTramo = feature.properties.id_tramo;
-      const proyecto = proyectos.find(p => p.id_proyecto === feature.properties.id_proyecto);
-      const proyectoLabel = proyecto ? proyecto.nombre_proyecto : '';
-
-      if (feature.properties.name) {
-        layer.bindTooltip(
-          `<strong>${escapeHtml(feature.properties.name)}</strong>${proyectoLabel ? `<br/><span style="font-size:11px;color:#64748b">${escapeHtml(proyectoLabel)}</span>` : ''}`,
-          { sticky: true }
-        );
-      }
-
-      layer.on({
-        click: () => {
-          handleSelectTramo(idTramo);
-        }
-      });
-    }
-  };
-
   const styleFeature = (feature) => {
     return {
       color: feature.properties.color,
@@ -307,18 +258,10 @@ export default function Mapa() {
     };
   };
 
-  // Fase 2: Selección Exclusiva. Filtramos para mostrar SÓLO lo del tramo seleccionado
-  const tramosVisibles = useMemo(() => {
-    if (!tramosGeoJSON) return null;
-    if (!selectedTramoId) return tramosGeoJSON;
-    return { ...tramosGeoJSON, features: tramosGeoJSON.features.filter(f => f.properties.id_tramo === selectedTramoId) };
-  }, [tramosGeoJSON, selectedTramoId]);
-
   const franjasVisibles = useMemo(() => {
     if (!franjasGeoJSON) return null;
-    if (!selectedTramoId) return franjasGeoJSON;
-    return { ...franjasGeoJSON, features: franjasGeoJSON.features.filter(f => f.properties.id_tramo === selectedTramoId) };
-  }, [franjasGeoJSON, selectedTramoId]);
+    return franjasGeoJSON;
+  }, [franjasGeoJSON]);
 
   const nucleosVisibles = useMemo(() => {
     if (!nucleosGeoJSON) return null;
@@ -342,9 +285,7 @@ export default function Mapa() {
     ? nucleosVisibles
     : franjasVisibles?.features.length
       ? franjasVisibles
-      : tramosVisibles?.features.length
-        ? tramosVisibles
-        : null;
+      : null;
 
   // Proyecto actualmente seleccionado (para título del panel)
   const proyectoSeleccionado = typeof selectedProjectId === 'number'
@@ -360,20 +301,8 @@ export default function Mapa() {
     setSearchParams(nextParams);
   };
 
-  // Leyenda de proyectos para modo "Todos"
-  const projectLegend = useMemo(() => {
-    if (selectedProjectId !== 'all' || !tramosGeoJSON) return [];
-    const idsEnMapa = [...new Set(tramosGeoJSON.features.map(f => f.properties.id_proyecto))];
-    return idsEnMapa
-      .map(pid => {
-        const p = proyectos.find(pr => pr.id_proyecto === pid);
-        return p ? { id: pid, name: p.nombre_proyecto, color: getProjectColor(pid, projectIds) } : null;
-      }).filter(Boolean);
-  }, [selectedProjectId, tramosGeoJSON, proyectos, projectIds]);
-
   const noProjectsAssigned = proyectos.length === 0;
-  const hasData = tramosGeoJSON?.features.length > 0
-    || franjasGeoJSON?.features.length > 0
+  const hasData = franjasGeoJSON?.features.length > 0
     || nucleosGeoJSON?.features.length > 0;
 
   // Keys para forzar re-render de GeoJSON cuando cambian los datos
@@ -402,6 +331,17 @@ export default function Mapa() {
               </option>
             ))}
           </select>
+          {typeof selectedProjectId === 'number' && (
+            <select
+              value={selectedTramoId || ''}
+              onChange={(event) => handleSelectTramo(event.target.value)}
+              className="mapa-project-select"
+              aria-label="Tramo"
+            >
+              <option value="">Todos los tramos</option>
+              {tramos.map((tramo) => <option key={tramo.id_tramo} value={tramo.id_tramo}>{tramo.clave_tramo} · {tramo.nombre_tramo}</option>)}
+            </select>
+          )}
           {(loading || projectsLoading) && <div className="mapa-spinner" />}
         </div>
 
@@ -508,14 +448,6 @@ export default function Mapa() {
               <div style={{ padding: '20px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ background: '#e0f2fe', padding: '8px', borderRadius: '8px', color: '#0ea5e9' }}><Maximize size={18} /></div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#64748b' }}>Longitud del Trazo</div>
-                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>{tramoDetalle.longitud_km} km</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ background: '#fef3c7', padding: '8px', borderRadius: '8px', color: '#d97706' }}><Layers size={18} /></div>
                     <div>
                       <div style={{ fontSize: '12px', color: '#64748b' }}>Superficie Afectada</div>
@@ -554,7 +486,7 @@ export default function Mapa() {
 
                   {['admin', 'geografo'].includes(user?.rol) && (
                     <FranjaDerechoViaPanel
-                      idTramo={selectedTramoId}
+                      idProyecto={typeof selectedProjectId === 'number' ? selectedProjectId : null}
                       onImportSuccess={() => setFranjasRevision((revision) => revision + 1)}
                     />
                   )}
@@ -591,18 +523,6 @@ export default function Mapa() {
               <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}><span style={{width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%'}}></span> Problema</span>
             </div>
 
-            {/* Leyenda de proyectos (modo todos) */}
-            {projectLegend.length > 1 && (
-              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px', fontWeight: 600 }}>Proyectos</div>
-                {projectLegend.map(pl => (
-                  <div key={pl.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#334155', marginBottom: '3px' }}>
-                    <span style={{ width: '14px', height: '3px', background: pl.color, borderRadius: '2px', flexShrink: 0 }}></span>
-                    {pl.name}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
@@ -678,16 +598,6 @@ export default function Mapa() {
               </LayersControl.Overlay>
             )}
 
-            {tramosVisibles?.features.length > 0 && (
-              <LayersControl.Overlay checked name="Eje ferroviario">
-                <GeoJSON
-                  key={`${layerKey}-tramo-sel-${selectedTramoId}`}
-                  data={tramosVisibles}
-                  style={styleFeature}
-                  onEachFeature={onEachTramo}
-                />
-              </LayersControl.Overlay>
-            )}
           </LayersControl>
         </MapContainer>
       </div>

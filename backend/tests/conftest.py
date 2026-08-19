@@ -180,6 +180,15 @@ def seed_tramo(client, admin_session, cleanup, seed_proyecto):
         },
     )
     assert franja.status_code == 201, f"No se pudo crear franja semilla: {franja.text}"
+    seccion = client.post(
+        f"/api/tramos/{data['id_tramo']}/secciones-derecho-via/importar",
+        headers=admin_session,
+        json={
+            "fuente": "Sección oficial para pruebas",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
+        },
+    )
+    assert seccion.status_code == 201, f"No se pudo crear sección semilla: {seccion.text}"
     cleanup.register("/api/tramos", data["id_tramo"])
     return data
 @pytest.fixture(scope="session")

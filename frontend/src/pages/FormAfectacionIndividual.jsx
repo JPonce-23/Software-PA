@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FileText, Loader2, MapPinned, UserRound } from 'lucide-react';
 import api from '../api/axios';
 import AfectacionGeometryField from '../components/AfectacionGeometryField';
+import GeospatialUpload from '../components/GeospatialUpload';
 import PersonaSelector from '../components/PersonaSelector';
 import { normalizePolygonWkt } from '../utils/geometry';
 import { nombreCompleto } from '../utils/personas';
@@ -22,6 +23,7 @@ const EMPTY_PARCELA = {
   constancia_vigencia_fecha: '',
   documentacion_disponible: false,
   documentacion_faltante: '',
+  id_carga_geoespacial_feature: null,
 };
 
 function nullable(value) {
@@ -160,6 +162,7 @@ export default function FormAfectacionIndividual({
             constancia_vigencia_fecha: nullable(parcela.constancia_vigencia_fecha),
             documentacion_disponible: parcela.documentacion_disponible,
             documentacion_faltante: nullable(parcela.documentacion_faltante),
+            id_carga_geoespacial_feature: parcela.id_carga_geoespacial_feature || null,
             titulares: personas.map((persona, index) => ({
               id_persona: persona.id_persona,
               tipo_derecho: index === 0 ? 'titular' : 'cotitular',
@@ -408,6 +411,11 @@ function ParcelaFields({ value, onChange }) {
           />
         </Campo>
       )}
+      <GeospatialUpload
+        target="parcela"
+        value={value.id_carga_geoespacial_feature}
+        onChange={(id) => onChange('id_carga_geoespacial_feature', id)}
+      />
     </section>
   );
 }

@@ -3,6 +3,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import literal
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -43,7 +44,7 @@ def list_sections(
         models.Tramo.ancho_total_derecho_via_m,
         models.Tramo.activo,
         models.Tramo.fecha_registro,
-        models.Tramo.geometria_linea.ST_AsText().label("geometria_wkt"),
+        literal(None).label("geometria_wkt"),
     )
     if id_proyecto is not None:
         query = query.filter(models.Tramo.id_proyecto == id_proyecto)

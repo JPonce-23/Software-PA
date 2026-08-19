@@ -223,6 +223,12 @@ La rotación debe ejecutarse por ambiente y sin documentar valores reales:
    docker compose exec -T db sh -lc \
      'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
      < backend/db/migrations/022_identidad_externa_territorio_resuelto.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/023_procedencia_conversion_geoespacial.sql
+   docker compose exec -T db sh -lc \
+     'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < backend/db/migrations/024_archivo_importacion_archivado.sql
    ```
 
    La 011 exige 010, toma un bloqueo asesor, ejecuta su preflight y se
@@ -383,6 +389,62 @@ docker compose exec -T db sh -lc \
   'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < backend/db/migrations/<ARCHIVO_APROBADO>.sql
 ```
+
+### Migración 025: staging geoespacial común
+
+`025_cargas_geoespaciales_genericas.sql` requiere `024`. Crea staging para
+capturas geoespaciales individuales y el registro auditable de candidatos de
+cruce entre franja activa y núcleo. No altera ni rellena tablas operativas.
+
+Antes de aplicarla en un ambiente con datos:
+
+1. verifica que `024` aparezca en `schema_migrations`;
+2. aplícala primero en una copia restaurable de la base;
+3. comprueba las tablas `carga_geoespacial`, `carga_geoespacial_feature` y
+   `candidato_tramo_nucleo` y sus índices GiST;
+4. prueba una carga y confirma que la prevalidación no inserta en `tramo`,
+   `franja_derecho_via`, `nucleo_agrario`, `parcela` ni `tramo_nucleo`.
+
+La migración es expansiva. No se debe eliminar una versión previa de
+`franja_derecho_via` como parte de este despliegue.
+
+### Migración 026: trazo por proyecto y secciones por tramo
+
+`026_trazo_proyecto_secciones_tramo.sql` requiere `025`. Traslada la
+responsabilidad espacial al modelo correcto:
+
+```text
+Proyecto -> trazo/derecho de vía versionado -> sección espacial por tramo
+```
+
+`tramo` conserva sus columnas de línea y ancho únicamente como legado, pero
+ya no recibe ni expone geometría operativa. La migración crea
+`seccion_derecho_via`, vincula cada trazo a su proyecto y hace que candidatos,
+`tramo_nucleo` y afectaciones validen contra la sección activa del tramo.
+
+Antes de aplicarla:
+
+1. verifica que `025` esté registrada y que `candidato_tramo_nucleo` esté
+   vacío; si existen candidatos, deben revisarse y migrarse mediante un plan
+   explícito;
+2. comprueba que cada franja histórica pueda resolver su proyecto a partir de
+   su tramo legado;
+3. realiza respaldo y prueba en un clon restaurable;
+4. después de sustituir un trazo activo, carga y confirma nuevas secciones
+   para sus tramos. La migración no inventa esas divisiones.
+
+### Migración 027: eje lineal segmentado
+
+`027_trazo_lineal_a_franja.sql` requiere `026`. Habilita la prevalidación de
+un trazo compuesto por varios segmentos en staging.
+
+### Migración 028: trazo lineal sin ancho
+
+`028_trazo_lineal_sin_anchos.sql` requiere `027`. Declara que el trazo del
+proyecto se almacena como `MULTILINESTRING`, sin inferir una superficie a
+partir de anchos. Conserva las franjas históricas poligonales y deja que la
+superficie operativa se capture explícitamente en `seccion_derecho_via` para
+cada tramo.
 
 ## Restauración
 

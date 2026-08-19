@@ -97,7 +97,7 @@ def _login(email):
     return browser, {"Origin": ORIGIN, "X-CSRF-Token": browser.cookies.get(AUTH_SETTINGS.csrf_cookie_name)}
 
 
-def test_tramos_preview_no_escribe_y_confirm_geografo_asigna(
+def test_importacion_territorial_heredada_de_tramos_esta_bloqueada(
     client,
     admin_session,
     cleanup,
@@ -105,79 +105,34 @@ def test_tramos_preview_no_escribe_y_confirm_geografo_asigna(
 ):
     geografo = _create_user(client, admin_session, cleanup, "geografo")
     browser, headers = _login(geografo["correo"])
-    clave = f"GEOIMP-{uuid4().hex[:8]}"
     try:
         preview = browser.post(
             "/api/importaciones-territoriales/tramos/previsualizar",
             headers=headers,
             data={"id_proyecto": str(seed_proyecto["id_proyecto"])},
-            files=_collection(_feature({"clave_tramo": clave, "nombre_tramo": "Tramo importado"}, _line())),
+            files=_collection(_feature({"clave_tramo": "GEOIMP", "nombre_tramo": "Tramo importado"}, _line())),
         )
-        assert preview.status_code == 200, preview.text
-        assert preview.json()["validos"] == 1
-        assert preview.json()["errores"] == 0
-
-        before = client.get(
-            f"/api/tramos?id_proyecto={seed_proyecto['id_proyecto']}",
-            headers=admin_session,
-        )
-        assert all(item["clave_tramo"] != clave for item in before.json())
-
-        confirmed = browser.post(
-            "/api/importaciones-territoriales/tramos/confirmar",
-            headers=headers,
-            json={"archivo_sha256": preview.json()["archivo_sha256"], "items": preview.json()["items"]},
-        )
-        assert confirmed.status_code == 200, confirmed.text
-        tramo_id = confirmed.json()["ids_creados"][0]
-        cleanup.register("/api/tramos", tramo_id)
-
-        assignments = client.get(
-            f"/api/administracion/tramos/{tramo_id}/asignaciones",
-            headers=admin_session,
-        )
-        assert assignments.status_code == 200, assignments.text
-        assert [item["id_usuario"] for item in assignments.json()] == [geografo["id_usuario"]]
+        assert preview.status_code == 410, preview.text
     finally:
         browser.post("/api/auth/logout", headers=headers)
         browser.close()
 
 
-def test_confirmacion_revalida_y_revierte_tramos_si_hay_error(
+def test_confirmacion_territorial_heredada_de_tramos_esta_bloqueada(
     client,
     admin_session,
     seed_proyecto,
 ):
-    clave_a = f"RBKIMP-{uuid4().hex[:8]}"
-    clave_b = f"RBKIMP-{uuid4().hex[:8]}"
     preview = client.post(
         "/api/importaciones-territoriales/tramos/previsualizar",
         headers=admin_session,
         data={"id_proyecto": str(seed_proyecto["id_proyecto"])},
         files=_collection(
-            _feature({"clave_tramo": clave_a, "nombre_tramo": "Rollback A"}, _line()),
-            _feature({"clave_tramo": clave_b, "nombre_tramo": "Rollback B"}, _line()),
+            _feature({"clave_tramo": "RBK-A", "nombre_tramo": "Rollback A"}, _line()),
+            _feature({"clave_tramo": "RBK-B", "nombre_tramo": "Rollback B"}, _line()),
         ),
     )
-    assert preview.status_code == 200, preview.text
-    payload = preview.json()
-    payload["items"][1]["datos"]["properties"]["clave_tramo"] = clave_a
-    payload["items"][1]["datos"]["clave_tramo"] = clave_a
-
-    confirmed = client.post(
-        "/api/importaciones-territoriales/tramos/confirmar",
-        headers=admin_session,
-        json={"archivo_sha256": payload["archivo_sha256"], "items": payload["items"]},
-    )
-    assert confirmed.status_code == 400
-
-    tramos = client.get(
-        f"/api/tramos?id_proyecto={seed_proyecto['id_proyecto']}",
-        headers=admin_session,
-    )
-    claves = {item["clave_tramo"] for item in tramos.json()}
-    assert clave_a not in claves
-    assert clave_b not in claves
+    assert preview.status_code == 410, preview.text
 
 
 def test_operador_no_puede_importar_territorio(client, admin_session, cleanup):
@@ -612,7 +567,7 @@ def test_nucleos_mapa_ignora_id_municipio_externo_si_resuelve_nombre(
     cleanup.register("/api/nucleos", imported.json()["ids_nucleo"][0])
 
 
-def test_cruces_operativos_admin_only_y_confirmacion_explicitamente_crea(
+def test_importacion_territorial_heredada_de_cruces_esta_bloqueada(
     client,
     admin_session,
     cleanup,
@@ -633,44 +588,10 @@ def test_cruces_operativos_admin_only_y_confirmacion_explicitamente_crea(
         browser.post("/api/auth/logout", headers=headers)
         browser.close()
 
-    nucleo = client.post(
-        "/api/nucleos",
-        headers=admin_session,
-        json={
-            "id_municipio": seed_municipio_id,
-            "nombre_nucleo": f"Nucleo cruce {uuid4().hex[:8]}",
-            "tipo_nucleo": "ejido",
-            "comunidad_indigena": False,
-            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
-        },
-    )
-    assert nucleo.status_code == 201, nucleo.text
-    id_nucleo = nucleo.json()["id_nucleo"]
-    cleanup.register("/api/nucleos", id_nucleo)
-    consecutivo = int(str(uuid4().int)[-7:])
-
     preview = client.post(
         "/api/importaciones-territoriales/cruces_operativos/previsualizar",
         headers=admin_session,
-        data={"id_tramo": str(seed_tramo["id_tramo"]), "id_nucleo": str(id_nucleo)},
-        files=_collection(_feature({"consecutivo": consecutivo}, _line())),
+        data={"id_tramo": str(seed_tramo["id_tramo"]), "id_nucleo": str(seed_municipio_id)},
+        files=_collection(_feature({"consecutivo": 1}, _line())),
     )
-    assert preview.status_code == 200, preview.text
-    assert preview.json()["validos"] == 1
-
-    confirmed = client.post(
-        "/api/importaciones-territoriales/cruces_operativos/confirmar",
-        headers=admin_session,
-        json={"archivo_sha256": preview.json()["archivo_sha256"], "items": preview.json()["items"]},
-    )
-    assert confirmed.status_code == 200, confirmed.text
-    cleanup.register("/api/tramos-nucleos", confirmed.json()["ids_creados"][0])
-
-    db = SessionLocal()
-    try:
-        auto_afectaciones = db.query(models.Afectacion).filter(
-            models.Afectacion.id_tramo_nucleo == confirmed.json()["ids_creados"][0],
-        ).count()
-        assert auto_afectaciones == 0
-    finally:
-        db.close()
+    assert preview.status_code == 410, preview.text
