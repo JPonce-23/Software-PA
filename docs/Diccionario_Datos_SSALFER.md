@@ -10,9 +10,9 @@
 | Motor | PostgreSQL 15.4 |
 | Extensión espacial | PostGIS 3.3.4 |
 | Esquema | `public` |
-| Migración registrada | `004` — Adaptaciones Fase 2 |
-| Tablas de aplicación | 29 |
-| Vistas de aplicación | 3 |
+| Migración registrada | `028` — Trazo lineal sin inferencia de anchos |
+| Tablas de aplicación | 42 |
+| Vistas de aplicación | 5 |
 | Funciones propias | 19 |
 | Triggers lógicos | 96 |
 | Índices adicionales | 21 |
@@ -26,6 +26,7 @@ La fuente ejecutable sigue siendo:
 - `backend/db/migrations/004_adaptaciones_fase2.sql`: personas normalizadas,
   titulares, integrantes ORV, minutas, acuerdos, versiones documentales,
   pagos y alertas.
+- `backend/db/migrations/028_trazo_lineal_sin_anchos.sql`: Trazo lineal sin inferencia de anchos.
 
 La instancia actual **no contiene** las tablas `frente` ni `usuario_frente`.
 `tramo_nucleo` tampoco contiene `id_frente`.
@@ -217,6 +218,70 @@ Asignación de usuarios a tramos; reemplaza a `usuario_frente`. Usa CV-A.
 | Bloque CV-A | — | — | Ciclo de vida y observaciones. |
 
 Restricción: `UNIQUE(id_usuario, id_tramo)`.
+
+### 4.8 `franja_derecho_via`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_franja` | `SERIAL` | PK, NN | Identificador. |
+| `id_tramo` | `INTEGER` | FK | Tramo. |
+| `version` | `INTEGER` | NN | Versión de franja. |
+| `ancho_izquierdo_m` | `NUMERIC` | — | Ancho izquierdo. |
+| `ancho_derecho_m` | `NUMERIC` | — | Ancho derecho. |
+| `geometria_poligono` | `geometry(MultiPolygon,4326)` | — | Polígono. |
+| `fuente` | `VARCHAR(200)` | NN | Fuente. |
+| `fecha_vigencia_inicio` | `DATE` | NN | Inicio vigencia. |
+| `fecha_vigencia_fin` | `DATE` | — | Fin vigencia. |
+| `id_proyecto` | `INTEGER` | NN | Proyecto. |
+| `geometria_linea` | `geometry(MultiLineString,4326)` | — | Linea. |
+| Bloque CV-A | — | — | Ciclo de vida y observaciones. |
+
+### 4.9 `seccion_derecho_via`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_seccion` | `BIGSERIAL` | PK, NN | Identificador. |
+| `id_franja` | `INTEGER` | NN | Franja. |
+| `id_tramo` | `INTEGER` | NN | Tramo. |
+| `geometria_poligono` | `geometry(MultiPolygon,4326)` | NN | Polígono. |
+| `fuente` | `VARCHAR(200)` | NN | Fuente. |
+| `fecha_registro` | `TIMESTAMPTZ` | NN, D `NOW()` | Fecha de registro. |
+| Bloque CV-A | — | — | Ciclo de vida y observaciones. |
+
+### 4.10 `candidato_tramo_nucleo`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_candidato` | `BIGSERIAL` | PK, NN | Identificador. |
+| `id_tramo` | `INTEGER` | NN | Tramo. |
+| `id_nucleo` | `INTEGER` | NN | Núcleo. |
+| `id_franja` | `INTEGER` | NN | Franja. |
+| `area_interseccion_m2` | `NUMERIC(24,4)` | NN | Área. |
+| `estado` | `VARCHAR(20)` | NN, D `pendiente` | Estado. |
+| `fecha_deteccion` | `TIMESTAMPTZ` | NN, D `NOW()` | Detección. |
+| `id_usuario_deteccion` | `INTEGER` | NN | Usuario que detecta. |
+| `fecha_resolucion` | `TIMESTAMPTZ` | — | Resolución. |
+| `id_usuario_resolucion` | `INTEGER` | — | Usuario resolutor. |
+| `motivo_resolucion` | `VARCHAR(500)` | — | Motivo. |
+| `id_tramo_nucleo` | `INTEGER` | — | Tramo núcleo. |
+| `id_seccion` | `BIGINT` | NN | Sección. |
+
+### 4.11 `catalogo_alias_territorial`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_alias` | `BIGSERIAL` | PK, NN | Identificador. |
+| `id_entidad` | `INTEGER` | NN | Entidad. |
+| `alias_nombre` | `VARCHAR(200)` | — | Nombre. |
+| `alias_normalizado` | `VARCHAR(200)` | NN | Nombre normalizado. |
+| `alias_clave` | `VARCHAR(20)` | — | Clave. |
+| `id_municipio_destino` | `INTEGER` | NN | Municipio destino. |
+| `fuente` | `VARCHAR(300)` | NN | Fuente. |
+| `fecha_vigencia_inicio` | `DATE` | — | Inicio de vigencia. |
+| `fecha_vigencia_fin` | `DATE` | — | Fin de vigencia. |
+| `fecha_aprobacion` | `TIMESTAMPTZ` | NN, D `NOW()` | Aprobación. |
+| `id_usuario_aprobador` | `INTEGER` | NN | Usuario aprobador. |
+| `activo` | `BOOLEAN` | NN, D `TRUE` | Activo. |
 
 ## 5. Personas, representación y derechos individuales
 
@@ -464,6 +529,9 @@ Subexpediente confirmado, colectivo o individual. Usa CV-A.
 | `documentacion_disponible` | `BOOLEAN` | NN, D `FALSE` | Indicador documental. |
 | `documentacion_faltante` | `TEXT` | — | Faltantes o justificación. |
 | `origen_registro` | `VARCHAR(50)` | NN, D `captura_sistema` | `captura_sistema` o `migracion_excel`. |
+| `tipo_salida_terminal` | `VARCHAR(50)` | — | Tipo de salida terminal. |
+| `fecha_salida_terminal` | `TIMESTAMPTZ` | — | Fecha de salida. |
+| `motivo_salida_terminal` | `TEXT` | — | Motivo. |
 | Bloque CV-A | — | — | Ciclo de vida y observaciones. |
 
 Reglas espaciales y de integridad:
@@ -634,6 +702,20 @@ capturado aunque su valor sea cero. La suma de pagos activos no puede superar
 `monto_100 + monto_bdt`, y sólo puede existir un pago total activo por
 trámite.
 
+### 6.9 `afectacion_ciclo`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_ciclo_afectacion` | `SERIAL` | PK, NN | Identificador. |
+| `id_tramo_nucleo` | `INTEGER` | NN | |
+| `id_afectacion` | `INTEGER` | NN | |
+| `tipo_afectacion` | `VARCHAR(20)` | NN | |
+| `tipo_ciclo` | `VARCHAR(50)` | NN | |
+| `consecutivo` | `INTEGER` | NN | |
+| `superficie_base_ciclo_ha` | `NUMERIC` | — | |
+| Bloque CV-A | — | — | Ciclo de vida y observaciones. |
+
+
 ## 7. Documentos y alertas
 
 ### 7.1 `documentacion_soporte`
@@ -761,6 +843,49 @@ triggers de auditoría para evitar recursión.
 Toda escritura auditada requiere que la transacción establezca
 `SET LOCAL app.current_user_id`.
 
+### 8.3 `estado_autenticacion_usuario`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_usuario` | `INTEGER` | PK, NN | |
+| `intentos_fallidos` | `SMALLINT` | NN, D `0` | |
+| `bloqueado_hasta` | `TIMESTAMPTZ` | — | |
+| `ultimo_acceso_en` | `TIMESTAMPTZ` | — | |
+| `actualizado_en` | `TIMESTAMPTZ` | NN, D `NOW()` | |
+
+### 8.4 `evento_acceso`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_evento` | `BIGSERIAL` | PK, NN | Identificador. |
+| `id_usuario` | `INTEGER` | — | |
+| `id_usuario_actor` | `INTEGER` | — | |
+| `id_sesion` | `BIGINT` | — | |
+| `tipo_evento` | `VARCHAR(40)` | NN | |
+| `motivo_codigo` | `VARCHAR(50)` | NN | |
+| `detalle` | `VARCHAR(200)` | — | |
+| `fecha_hora` | `TIMESTAMPTZ` | NN, D `NOW()` | |
+| `ip_origen` | `INET` | — | |
+| `user_agent` | `VARCHAR(512)` | — | |
+| `txid_registro` | `BIGINT` | NN | |
+
+### 8.5 `sesion_usuario`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_sesion` | `BIGSERIAL` | PK, NN | Identificador. |
+| `id_usuario` | `INTEGER` | NN | |
+| `token_hash` | `CHAR(64)` | NN | |
+| `csrf_hash` | `CHAR(64)` | NN | |
+| `fecha_creacion` | `TIMESTAMPTZ` | NN, D `NOW()` | |
+| `ultima_actividad` | `TIMESTAMPTZ` | NN, D `NOW()` | |
+| `expira_en` | `TIMESTAMPTZ` | NN | |
+| `revocada_en` | `TIMESTAMPTZ` | — | |
+| `id_usuario_revoca` | `INTEGER` | — | |
+| `motivo_revocacion` | `VARCHAR(100)` | — | |
+| `ip_creacion` | `INET` | — | |
+| `user_agent_creacion` | `VARCHAR(512)` | — | |
+
 ## 9. Vistas
 
 ### 9.1 `vw_orv_estado`
@@ -816,6 +941,59 @@ Agrega métricas por expediente maestro:
 
 Los modificatorios inscritos más recientes sustituyen el valor de superficie
 del convenio padre para el cálculo; no se suman como una liberación nueva.
+
+### 9.4 `vw_afectacion_estado`
+
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `id_afectacion` | `INTEGER` | |
+| `id_tramo_nucleo` | `INTEGER` | |
+| `id_nucleo` | `INTEGER` | |
+| `tipo_afectacion` | `VARCHAR` | |
+| `estado_terminal` | `TEXT` | |
+| `total_ciclos` | `BIGINT` | |
+| `ciclos_concluidos` | `BIGINT` | |
+| `superficie_total_ciclos_ha` | `NUMERIC` | |
+| `superficie_liberada_ha` | `NUMERIC` | |
+| `estado_liberacion` | `TEXT` | |
+| `estado_registral` | `TEXT` | |
+| `estado_financiero` | `TEXT` | |
+
+### 9.5 `vw_afectacion_ciclo_estado`
+
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `id_ciclo_afectacion` | `INTEGER` | |
+| `id_tramo_nucleo` | `INTEGER` | |
+| `id_afectacion` | `INTEGER` | |
+| `tipo_afectacion` | `VARCHAR` | |
+| `tipo_ciclo` | `VARCHAR` | |
+| `consecutivo` | `INTEGER` | |
+| `superficie_base_ciclo_ha` | `NUMERIC` | |
+| `activo` | `BOOLEAN` | |
+| `fecha_baja` | `TIMESTAMPTZ` | |
+| `id_usuario_baja` | `INTEGER` | |
+| `motivo_baja` | `TEXT` | |
+| `fecha_reactivacion` | `TIMESTAMPTZ` | |
+| `id_usuario_reactivacion` | `INTEGER` | |
+| `motivo_reactivacion` | `TEXT` | |
+| `observaciones` | `TEXT` | |
+| `id_convenio` | `INTEGER` | |
+| `fecha_firma` | `DATE` | |
+| `ingreso_ran_fecha` | `DATE` | |
+| `convenio_inscrito_fecha_ran` | `DATE` | |
+| `superficie_convenio_ha` | `NUMERIC` | |
+| `estado_terminal` | `TEXT` | |
+| `no_conflictos_completo` | `BOOLEAN` | |
+| `indemnizacion_completa` | `BOOLEAN` | |
+| `retiro_fondos_completo` | `BOOLEAN` | |
+| `limite_pagable` | `NUMERIC` | |
+| `total_pagado` | `NUMERIC` | |
+| `estado_operativo` | `TEXT` | |
+| `estado_registral` | `TEXT` | |
+| `estado_financiero` | `TEXT` | |
+| `superficie_ciclo_ha` | `NUMERIC` | |
+| `saldo_disponible` | `NUMERIC` | |
 
 ## 10. Funciones propias
 
@@ -918,7 +1096,7 @@ Controla migraciones incrementales aplicadas después del esquema base.
 | `descripcion` | `TEXT` | NN | Resumen de la migración. |
 | `aplicada_en` | `TIMESTAMPTZ` | NN, D `NOW()` | Momento de aplicación. |
 
-La instancia verificada contiene la versión `004`. El esquema base
+La instancia verificada contiene la versión `028`. El esquema base
 consolidado se crea mediante `001_init_schema.sql` y no agrega una fila propia
 en esta tabla.
 
@@ -951,3 +1129,144 @@ y comprobar que backend, frontend y datos dejaron de depender de ellas.
 También permanece pendiente resolver documentalmente el nivel
 `tramo_nucleo`: el expediente maestro existe en el dominio, pero
 `documentacion_soporte.entidad_relacionada_tipo` todavía no lo admite.
+
+## 15. Importación Geoespacial
+
+### 15.1 `carga_geoespacial`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_carga` | `BIGSERIAL` | PK, NN | Identificador. |
+| `tipo_objetivo` | `VARCHAR(40)` | NN | |
+| `tipo_geometria_esperado` | `VARCHAR(20)` | NN | |
+| `nombre_original` | `VARCHAR(255)` | NN | |
+| `nombre_almacenado` | `VARCHAR(100)` | NN | |
+| `formato_detectado` | `VARCHAR(20)` | NN | |
+| `tamano_bytes` | `BIGINT` | NN | |
+| `sha256` | `VARCHAR(64)` | NN | |
+| `fuente` | `VARCHAR(200)` | — | |
+| `crs_original` | `TEXT` | NN | |
+| `crs_destino` | `VARCHAR(20)` | NN, D `EPSG:4326` | |
+| `total_features` | `INTEGER` | NN, D `0` | |
+| `features_validos` | `INTEGER` | NN, D `0` | |
+| `features_advertencia` | `INTEGER` | NN, D `0` | |
+| `features_error` | `INTEGER` | NN, D `0` | |
+| `estado` | `VARCHAR(30)` | NN, D `subido` | |
+| `id_usuario_carga` | `INTEGER` | NN | |
+| `fecha_carga` | `TIMESTAMPTZ` | NN, D `NOW()` | |
+| `fecha_procesamiento` | `TIMESTAMPTZ` | — | |
+| `fecha_confirmacion` | `TIMESTAMPTZ` | — | |
+| `id_usuario_confirmacion` | `INTEGER` | — | |
+| `error_codigo` | `VARCHAR(80)` | — | |
+| `error_detalle` | `TEXT` | — | |
+
+### 15.2 `carga_geoespacial_feature`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_carga_feature` | `BIGSERIAL` | PK, NN | Identificador. |
+| `id_carga` | `BIGINT` | NN | |
+| `indice_feature` | `INTEGER` | NN | |
+| `capa_origen` | `VARCHAR(200)` | — | |
+| `atributos_originales` | `JSONB` | NN, D `{}` | |
+| `geometria_normalizada` | `geometry(Geometry,4326)` | — | |
+| `tipo_geometria` | `VARCHAR(40)` | — | |
+| `estado` | `VARCHAR(20)` | NN | |
+| `errores` | `JSONB` | NN, D `[]` | |
+| `advertencias` | `JSONB` | NN, D `[]` | |
+| `transformaciones` | `JSONB` | NN, D `[]` | |
+| `area_original_m2` | `NUMERIC` | — | |
+| `area_normalizada_m2` | `NUMERIC` | — | |
+| `diferencia_area_relativa` | `NUMERIC` | — | |
+| `seleccionado` | `BOOLEAN` | NN, D `FALSE` | |
+| `id_registro_operativo` | `BIGINT` | — | |
+| `fecha_consumo` | `TIMESTAMPTZ` | — | |
+| `id_usuario_consumo` | `INTEGER` | — | |
+
+### 15.3 `importacion_archivo`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_importacion` | `BIGSERIAL` | PK, NN | Identificador. |
+| `tipo_objetivo` | `VARCHAR(40)` | NN, D `nucleo_agrario` | |
+| `nombre_original` | `VARCHAR(255)` | NN | |
+| `nombre_almacenado` | `VARCHAR(100)` | NN | |
+| `formato_detectado` | `VARCHAR(20)` | NN | |
+| `tamano_bytes` | `BIGINT` | NN | |
+| `sha256` | `CHAR(64)` | NN | |
+| `fuente` | `VARCHAR(200)` | NN | |
+| `crs_original` | `TEXT` | — | |
+| `crs_destino` | `VARCHAR(20)` | NN, D `EPSG:4326` | |
+| `columnas_detectadas` | `JSONB` | NN, D `[]` | |
+| `mapeo` | `JSONB` | NN, D `{}` | |
+| `opciones_mapeo` | `JSONB` | NN, D `{}` | |
+| `id_perfil` | `BIGINT` | — | |
+| `estado` | `VARCHAR(30)` | NN, D `subido` | |
+| `total_features` | `INTEGER` | NN, D `0` | |
+| `features_procesados` | `INTEGER` | NN, D `0` | |
+| `validos` | `INTEGER` | NN, D `0` | |
+| `advertencias` | `INTEGER` | NN, D `0` | |
+| `errores` | `INTEGER` | NN, D `0` | |
+| `importados` | `INTEGER` | NN, D `0` | |
+| `descartados` | `INTEGER` | NN, D `0` | |
+| `tolerancia_area_relativa` | `NUMERIC` | — | |
+| `id_usuario_carga` | `INTEGER` | NN | |
+| `fecha_carga` | `TIMESTAMPTZ` | NN, D `NOW()` | |
+| `fecha_procesamiento_inicio` | `TIMESTAMPTZ` | — | |
+| `fecha_procesamiento_fin` | `TIMESTAMPTZ` | — | |
+| `fecha_confirmacion` | `TIMESTAMPTZ` | — | |
+| `id_usuario_confirmacion` | `INTEGER` | — | |
+| `fecha_completado` | `TIMESTAMPTZ` | — | |
+| `archivo_eliminado_en` | `TIMESTAMPTZ` | — | |
+| `error_codigo` | `VARCHAR(80)` | — | |
+| `error_detalle` | `TEXT` | — | |
+| `version_control` | `INTEGER` | NN, D `1` | |
+| `procedencia_archivo` | `VARCHAR(20)` | — | |
+| `id_importacion_origen` | `BIGINT` | — | |
+| Bloque CV-A | — | — | Ciclo de vida. |
+
+### 15.4 `importacion_feature`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_importacion_feature` | `BIGSERIAL` | PK, NN | Identificador. |
+| `id_importacion` | `BIGINT` | NN | |
+| `indice_feature` | `INTEGER` | NN | |
+| `capa_origen` | `VARCHAR(200)` | — | |
+| `id_externo` | `VARCHAR(500)` | — | |
+| `id_entidad_fuente` | `VARCHAR(100)` | — | |
+| `id_municipio_fuente` | `VARCHAR(100)` | — | |
+| `id_nucleo_fuente` | `VARCHAR(200)` | — | |
+| `atributos_originales` | `JSONB` | NN, D `{}` | |
+| `atributos_normalizados` | `JSONB` | NN, D `{}` | |
+| `geometria_normalizada` | `geometry(MultiPolygon,4326)` | — | |
+| `id_entidad_resuelta` | `INTEGER` | — | |
+| `id_municipio_resuelto` | `INTEGER` | — | |
+| `estado` | `VARCHAR(30)` | NN, D `pendiente_revision` | |
+| `errores` | `JSONB` | NN, D `[]` | |
+| `advertencias` | `JSONB` | NN, D `[]` | |
+| `transformaciones` | `JSONB` | NN, D `[]` | |
+| `area_original_m2` | `NUMERIC` | — | |
+| `area_normalizada_m2` | `NUMERIC` | — | |
+| `diferencia_area_relativa` | `NUMERIC` | — | |
+| `advertencias_aceptadas` | `BOOLEAN` | NN, D `FALSE` | |
+| `id_usuario_revision` | `INTEGER` | — | |
+| `fecha_revision` | `TIMESTAMPTZ` | — | |
+| `id_nucleo_operativo` | `INTEGER` | — | |
+| `fecha_procesamiento` | `TIMESTAMPTZ` | NN, D `NOW()` | |
+| `fecha_importacion` | `TIMESTAMPTZ` | — | |
+
+### 15.5 `perfil_mapeo_importacion`
+
+| Campo | Tipo | Claves | Descripción |
+| --- | --- | --- | --- |
+| `id_perfil` | `BIGSERIAL` | PK, NN | Identificador. |
+| `nombre` | `VARCHAR(150)` | NN | |
+| `fuente` | `VARCHAR(200)` | NN | |
+| `tipo_objetivo` | `VARCHAR(40)` | NN, D `nucleo_agrario` | |
+| `mapeo` | `JSONB` | NN | |
+| `opciones` | `JSONB` | NN, D `{}` | |
+| `activo` | `BOOLEAN` | NN, D `TRUE` | |
+| `id_usuario_creacion` | `INTEGER` | NN | |
+| `fecha_creacion` | `TIMESTAMPTZ` | NN, D `NOW()` | |
+| `fecha_actualizacion` | `TIMESTAMPTZ` | NN, D `NOW()` | |
