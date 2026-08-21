@@ -1,6 +1,5 @@
 tramo: Representa cada uno de los tramos principales que conforman el proyecto ferroviario. Constituye la unidad geográfica y operativa de mayor nivel dentro del sistema, para el seguimiento del derecho de vía.
 
-frente: es la porción en que el tramo es divido, un tramo del proyecto ferroviuario puede tener varios frentes.
 
 núcleo agrario: Es la entidad central del sistema. Representa cada ejido o comunidad agraria que es atravesado o afectado por el proyecto ferroviario,. Alrededor del cual se articula Todo el seguimiento de derechos colectivos, e individuales, convenios, asambleas, afectaciones  y documentación relacionada con el derecho de vía.
 
