@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
 
 # Env
 .env
@@ -20,3 +21,7 @@ Thumbs.db
 uploads/
 backend/uploads/
 backups/
+
+# Geodata pesada (seed data)
+*.kml
+backend/seed_data/
