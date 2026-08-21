@@ -257,6 +257,19 @@ def ensure_nucleus(db, resolved, properties, geometry: dict, source: str, user_i
     )
     if existing:
         return existing, False
+    same_name_candidates = (
+        db.query(models.NucleoAgrario)
+        .filter(
+            models.NucleoAgrario.id_municipio == municipality.id_municipio,
+            models.NucleoAgrario.tipo_nucleo == kind,
+            models.NucleoAgrario.activo.is_(True),
+        )
+        .all()
+    )
+    normalized_name = normalize(name)
+    for candidate in same_name_candidates:
+        if normalize(candidate.nombre_nucleo) == normalized_name:
+            return candidate, False
     set_audit_context(db, user_id)
     nucleus_id = db.execute(
         text(
@@ -679,7 +692,7 @@ def ensure_convenio_and_followup(db, nucleus, tn, affectation, index: int, user_
 def process_project(db, project_config: dict, user_id: int, entities, municipalities) -> dict:
     project, franja = find_project(db, project_config["name"])
     sections = ensure_tramos_and_sections(db, project, franja, user_id)
-    selected = created = 0
+    imported = intersected = created = 0
     source = f"SEED_RAN_{project_config['key']}"
     seen_identities: set[tuple[int, str]] = set()
     data_root = ROOT / "seed_data"
@@ -689,15 +702,18 @@ def process_project(db, project_config: dict, user_id: int, entities, municipali
         for _, raw in iter_features(path, dataset):
             properties = raw.get("properties") or {}
             resolved = resolve_feature(db, properties, entities, municipalities)
-            if not resolved or not intersects_franja(db, franja.id_franja, raw.get("geometry") or {}):
+            if not resolved:
                 continue
             identity = (resolved[1].id_municipio, resolved[4])
             if identity in seen_identities:
                 continue
             seen_identities.add(identity)
             nucleus, was_created = ensure_nucleus(db, resolved, properties, raw["geometry"], source, user_id)
-            selected += 1
+            imported += 1
             created += int(was_created)
+            if not intersects_franja(db, franja.id_franja, raw.get("geometry") or {}):
+                continue
+            intersected += 1
             section = choose_section(db, nucleus.id_nucleo, sections)
             if not section:
                 continue
@@ -707,9 +723,14 @@ def process_project(db, project_config: dict, user_id: int, entities, municipali
             ensure_activity(db, tn, "sensibilizacion", user_id)
             ensure_activity(db, tn, "caminamiento", user_id)
             parcel, _ = ensure_person_and_parcel(db, nucleus, section, user_id)
-            affectation = ensure_affectation(db, nucleus, tn, section, parcel, selected, user_id)
-            ensure_convenio_and_followup(db, nucleus, tn, affectation, selected, user_id)
-    return {"project": project_config["name"], "selected": selected, "nuclei_created": created}
+            affectation = ensure_affectation(db, nucleus, tn, section, parcel, intersected, user_id)
+            ensure_convenio_and_followup(db, nucleus, tn, affectation, intersected, user_id)
+    return {
+        "project": project_config["name"],
+        "imported": imported,
+        "intersected": intersected,
+        "nuclei_created": created,
+    }
 
 
 def main() -> int:

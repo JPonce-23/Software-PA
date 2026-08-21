@@ -472,12 +472,86 @@ def get_nucleos(
     id_proyecto: int = Query(None),
     id_entidad: int = Query(None),
     id_municipio: int = Query(None),
+    contexto_estatal: bool = Query(False),
+    solo_intersectados: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))
 ):
     from sqlalchemy import text
 
+    usar_contexto_estatal = contexto_estatal and not solo_intersectados
+    if id_tramo is not None:
+        require_tramo_access(db, current_user, id_tramo)
+    if id_proyecto is not None:
+        require_project_access(db, current_user, id_proyecto)
+    if id_tramo is not None and id_proyecto is not None:
+        tramo_proyecto = db.query(models.Tramo.id_tramo).filter(
+            models.Tramo.id_tramo == id_tramo,
+            models.Tramo.id_proyecto == id_proyecto,
+            models.Tramo.activo.is_(True),
+        ).first()
+        if tramo_proyecto is None:
+            raise HTTPException(
+                status_code=400,
+                detail="El tramo no pertenece al proyecto solicitado.",
+            )
+
+    alcance_user_filter = ""
+    expediente_user_filter = ""
+    if current_user.rol != "admin":
+        alcance_user_filter = """
+               AND EXISTS (
+                   SELECT 1
+                     FROM usuario_tramo ut
+                    WHERE ut.id_tramo = t.id_tramo
+                      AND ut.id_usuario = :id_usuario
+                      AND ut.activo = TRUE
+               )
+        """
+        expediente_user_filter = """
+                   AND EXISTS (
+                       SELECT 1
+                         FROM usuario_tramo ut
+                        WHERE ut.id_tramo = tn.id_tramo
+                          AND ut.id_usuario = :id_usuario
+                          AND ut.activo = TRUE
+                   )
+        """
+
     base_sql = """
+        WITH alcance_espacial AS (
+            SELECT s.geometria_poligono, s.id_tramo, t.id_proyecto
+              FROM seccion_derecho_via s
+              JOIN franja_derecho_via f ON f.id_franja = s.id_franja
+              JOIN tramo t ON t.id_tramo = s.id_tramo
+             WHERE s.activo = TRUE
+               AND f.activo = TRUE
+               AND t.activo = TRUE
+               AND (
+                    (:id_tramo_espacial IS NOT NULL AND s.id_tramo = :id_tramo_espacial)
+                    OR
+                    (:id_tramo_espacial IS NULL AND :id_proyecto_espacial IS NOT NULL AND t.id_proyecto = :id_proyecto_espacial)
+                    OR
+                    (:id_tramo_espacial IS NULL AND :id_proyecto_espacial IS NULL)
+               )
+               {alcance_user_filter}
+        ),
+        estados_contexto AS (
+            SELECT DISTINCT m_ctx.id_entidad
+              FROM nucleo_agrario n_ctx
+              JOIN municipio m_ctx ON m_ctx.id_municipio = n_ctx.id_municipio AND m_ctx.activo = TRUE
+              JOIN alcance_espacial ae ON n_ctx.geometria_poligono && ae.geometria_poligono
+             WHERE :usar_contexto_estatal
+               AND n_ctx.activo = TRUE
+               AND n_ctx.geometria_poligono IS NOT NULL
+               AND ST_Intersects(n_ctx.geometria_poligono, ae.geometria_poligono)
+               AND ST_Area(
+                   ST_CollectionExtract(
+                       ST_Intersection(n_ctx.geometria_poligono, ae.geometria_poligono),
+                       3
+                   )::geography
+               ) > 0
+        )
         SELECT
             n.id_nucleo,
             n.nombre_nucleo,
@@ -489,30 +563,71 @@ def get_nucleos(
             ef.nombre AS entidad_nombre,
             ST_AsText(n.geometria_poligono) as geometria_wkt,
             (ST_Area(n.geometria_poligono::geography) / 10000.0) as area_ha,
-            CASE
-                WHEN :id_tramo_espacial IS NULL THEN NULL
-                ELSE (
-                    SELECT ST_Area(
+            COALESCE((
+                SELECT SUM(
+                    ST_Area(
                         ST_CollectionExtract(
-                            ST_Intersection(n.geometria_poligono, s.geometria_poligono),
+                            ST_Intersection(n.geometria_poligono, ae.geometria_poligono),
                             3
                         )::geography
-                    ) / 10000.0
-                      FROM seccion_derecho_via s
-                      JOIN franja_derecho_via f ON f.id_franja = s.id_franja
-                     WHERE s.id_tramo = :id_tramo_espacial
-                       AND s.activo = TRUE AND f.activo = TRUE
-                     LIMIT 1
+                    )
+                ) / 10000.0
+                  FROM alcance_espacial ae
+                 WHERE n.geometria_poligono && ae.geometria_poligono
+                   AND ST_Intersects(n.geometria_poligono, ae.geometria_poligono)
+            ), 0) AS area_afectada_ha,
+            EXISTS (
+                SELECT 1
+                  FROM alcance_espacial ae
+                 WHERE n.geometria_poligono && ae.geometria_poligono
+                   AND ST_Intersects(n.geometria_poligono, ae.geometria_poligono)
+                   AND ST_Area(
+                       ST_CollectionExtract(
+                           ST_Intersection(n.geometria_poligono, ae.geometria_poligono),
+                           3
+                       )::geography
+                   ) > 0
+            ) AS intersecta_trazo,
+            COALESCE((
+                SELECT json_agg(
+                    json_build_object(
+                        'id_tramo_nucleo', tn.id_tramo_nucleo,
+                        'id_tramo', tn.id_tramo,
+                        'numero_tramo', tn.numero_tramo,
+                        'nombre_tramo', t.nombre_tramo,
+                        'id_proyecto', p.id_proyecto,
+                        'nombre_proyecto', p.nombre_proyecto
+                    )
+                    ORDER BY p.nombre_proyecto, t.clave_tramo, tn.consecutivo
                 )
-            END AS area_afectada_ha
+                  FROM tramo_nucleo tn
+                  JOIN tramo t ON t.id_tramo = tn.id_tramo
+                  JOIN proyecto p ON p.id_proyecto = t.id_proyecto
+                 WHERE tn.id_nucleo = n.id_nucleo
+                   AND tn.activo = TRUE
+                   AND t.activo = TRUE
+                   AND p.activo = TRUE
+                   AND (:id_tramo_espacial IS NULL OR tn.id_tramo = :id_tramo_espacial)
+                   AND (:id_proyecto_espacial IS NULL OR t.id_proyecto = :id_proyecto_espacial)
+                   {expediente_user_filter}
+            ), '[]'::json) AS expedientes
         FROM nucleo_agrario n
         JOIN municipio m ON m.id_municipio = n.id_municipio AND m.activo = TRUE
         JOIN entidad_federativa ef ON ef.id_entidad = m.id_entidad AND ef.activo = TRUE
         WHERE n.activo = true
-    """
-    params = {"id_tramo_espacial": id_tramo}
-
+    """.format(
+        alcance_user_filter=alcance_user_filter,
+        expediente_user_filter=expediente_user_filter,
+    )
+    params = {
+        "id_tramo_espacial": id_tramo,
+        "id_proyecto_espacial": id_proyecto,
+        "usar_contexto_estatal": usar_contexto_estatal,
+    }
     if current_user.rol != "admin":
+        params["id_usuario"] = current_user.id_usuario
+
+    if current_user.rol != "admin" and not usar_contexto_estatal and not solo_intersectados:
         base_sql += """
             AND EXISTS (
                 SELECT 1
@@ -524,10 +639,8 @@ def get_nucleos(
                    AND ut.activo = TRUE
             )
         """
-        params["id_usuario"] = current_user.id_usuario
 
-    if id_tramo is not None:
-        require_tramo_access(db, current_user, id_tramo)
+    if id_tramo is not None and not usar_contexto_estatal and not solo_intersectados:
         base_sql += """
             AND EXISTS (
                 SELECT 1
@@ -548,8 +661,7 @@ def get_nucleos(
         """
         params["id_tramo"] = id_tramo
 
-    if id_proyecto is not None:
-        require_project_access(db, current_user, id_proyecto)
+    if id_proyecto is not None and not usar_contexto_estatal and not solo_intersectados:
         base_sql += """
             AND EXISTS (
                 SELECT 1
@@ -562,6 +674,25 @@ def get_nucleos(
             )
         """
         params["id_proyecto"] = id_proyecto
+
+    if usar_contexto_estatal:
+        base_sql += " AND ef.id_entidad IN (SELECT id_entidad FROM estados_contexto)"
+
+    if solo_intersectados:
+        base_sql += """
+            AND EXISTS (
+                SELECT 1
+                  FROM alcance_espacial ae
+                 WHERE n.geometria_poligono && ae.geometria_poligono
+                   AND ST_Intersects(n.geometria_poligono, ae.geometria_poligono)
+                   AND ST_Area(
+                       ST_CollectionExtract(
+                           ST_Intersection(n.geometria_poligono, ae.geometria_poligono),
+                           3
+                       )::geography
+                   ) > 0
+            )
+        """
 
     if id_entidad is not None:
         base_sql += " AND ef.id_entidad = :id_entidad"
@@ -591,6 +722,8 @@ def get_nucleos(
             "geometria_wkt": r.geometria_wkt,
             "area_ha": round(r.area_ha, 2) if r.area_ha else 0,
             "area_afectada_ha": round(r.area_afectada_ha, 4) if r.area_afectada_ha else 0,
+            "intersecta_trazo": bool(r.intersecta_trazo),
+            "expedientes": r.expedientes or [],
             "estatus_simulado": estatus
         })
 
@@ -604,11 +737,20 @@ def get_tramo_detalles(id_tramo: int = Query(...), db: Session = Depends(get_db)
     require_tramo_access(db, current_user, id_tramo)
     sql = text("""
         SELECT
-            id_tramo,
-            nombre_tramo,
+            t.id_tramo,
+            t.nombre_tramo,
             NULL::TEXT as geometria_wkt,
-            NULL::NUMERIC as longitud_km
-        FROM tramo WHERE id_tramo = :id_tramo AND activo = TRUE
+            COALESCE(
+                SUM(
+                    ST_Length(ST_Intersection(f.geometria_linea, s.geometria_poligono)::geography)
+                ) / 1000.0,
+                0
+            ) as longitud_km
+        FROM tramo t
+        LEFT JOIN seccion_derecho_via s ON t.id_tramo = s.id_tramo AND s.activo = TRUE
+        LEFT JOIN franja_derecho_via f ON s.id_franja = f.id_franja AND f.activo = TRUE
+        WHERE t.id_tramo = :id_tramo AND t.activo = TRUE
+        GROUP BY t.id_tramo, t.nombre_tramo
     """)
     r = db.execute(sql, {"id_tramo": id_tramo}).fetchone()
 
@@ -703,8 +845,13 @@ async def importacion_masiva_nucleos(
 def list_tramos_nucleos(
     id_tramo: int = Query(None),
     id_nucleo: int = Query(None),
+    id_proyecto: int = Query(None),
     db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))
 ):
+    if id_tramo is not None:
+        require_tramo_access(db, current_user, id_tramo)
+    if id_proyecto is not None:
+        require_project_access(db, current_user, id_proyecto)
     query = db.query(
         models.TramoNucleo.id_tramo_nucleo,
         models.TramoNucleo.id_tramo,
@@ -750,6 +897,8 @@ def list_tramos_nucleos(
         query = query.filter(models.TramoNucleo.id_tramo == id_tramo)
     if id_nucleo:
         query = query.filter(models.TramoNucleo.id_nucleo == id_nucleo)
+    if id_proyecto:
+        query = query.filter(models.Proyecto.id_proyecto == id_proyecto)
     return query.all()
 
 @app.get("/api/tramos-nucleos/{id_tramo_nucleo}", tags=["Tramos-Nucleos"], summary="Obtener tramo-nucleo", response_model=schemas.TramoNucleoResponse)
@@ -1885,6 +2034,9 @@ def get_nucleo_by_id(id_nucleo: int, db: Session = Depends(get_db), current_user
     row = db.query(
         models.NucleoAgrario.id_nucleo,
         models.NucleoAgrario.id_municipio,
+        models.Municipio.id_entidad.label('id_entidad'),
+        models.Municipio.nombre.label('municipio_nombre'),
+        models.EntidadFederativa.nombre.label('entidad_nombre'),
         models.NucleoAgrario.nombre_nucleo,
         models.NucleoAgrario.tipo_nucleo,
         models.NucleoAgrario.comunidad_indigena,
@@ -1899,6 +2051,10 @@ def get_nucleo_by_id(id_nucleo: int, db: Session = Depends(get_db), current_user
         models.NucleoAgrario.id_usuario_reactivacion,
         models.NucleoAgrario.motivo_reactivacion,
         models.NucleoAgrario.observaciones
+    ).outerjoin(
+        models.Municipio, models.NucleoAgrario.id_municipio == models.Municipio.id_municipio
+    ).outerjoin(
+        models.EntidadFederativa, models.Municipio.id_entidad == models.EntidadFederativa.id_entidad
     ).filter(models.NucleoAgrario.id_nucleo == id_nucleo, models.NucleoAgrario.activo == True).first()
     if not row:
         raise HTTPException(status_code=404, detail="NucleoAgrario not found")
