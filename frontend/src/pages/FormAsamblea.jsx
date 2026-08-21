@@ -49,7 +49,7 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
   useEffect(() => {
     if (!form.id_afectacion) return;
     api.get(`/afectaciones/${form.id_afectacion}/ciclos`)
-      .then((response) => setCiclos(response.data))
+      .then((response) => { console.log("CICLOS:", response.data); setCiclos(response.data); })
       .catch(() => setCiclos([]));
   }, [form.id_afectacion]);
 
@@ -119,8 +119,8 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
               <select required value={form.id_ciclo_afectacion} onChange={e => {
                 const ciclo = ciclos.find(item => item.id_ciclo_afectacion === Number(e.target.value));
                 setForm(prev => ({ ...prev, id_ciclo_afectacion: e.target.value, contexto_proceso: ciclo?.tipo_ciclo || prev.contexto_proceso }));
-              }} style={inputStyle}>
-                <option value="">Seleccione un ciclo</option>
+              }} style={{...inputStyle, opacity: form.id_afectacion ? 1 : 0.6}} disabled={!form.id_afectacion}>
+                <option value="">{form.id_afectacion ? (ciclos.length === 0 ? "Sin ciclos disponibles" : "Seleccione un ciclo") : "Seleccione primero una afectación"}</option>
                 {ciclos.map(item => <option key={item.id_ciclo_afectacion} value={item.id_ciclo_afectacion}>{item.tipo_ciclo} #{item.consecutivo}</option>)}
               </select>
             </Campo>

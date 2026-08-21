@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Users, FileText, ClipboardList,
@@ -21,8 +21,7 @@ const FlujoLiberacionPanel = React.lazy(() => import('../components/fase2/FlujoL
 const TABS = [
   { key: 'general',     label: 'Información General',       icon: Building2 },
   { key: 'flujo',       label: 'Flujo de liberación',       icon: FileText },
-  { key: 'colectivas',  label: 'Afectaciones Colectivas',   icon: Layers },
-  { key: 'individuales',label: 'Afectaciones Individuales', icon: Users },
+  { key: 'afectaciones',label: 'Afectaciones',              icon: Layers },
   { key: 'asambleas',   label: 'Asambleas',                 icon: Calendar },
   { key: 'orv',          label: 'Representación',            icon: ShieldCheck },
   { key: 'minutas',      label: 'Minutas',                   icon: ClipboardList },
@@ -196,8 +195,20 @@ export default function ExpedienteDetail() {
 
         <div role="tabpanel" style={{ padding: '30px' }}>
           {tabActiva === 'general'      && <TabGeneral tramoNucleo={tramoNucleo} nucleo={nucleo} />}
-          {tabActiva === 'colectivas'   && <TabAfectaciones tipo="colectivo" items={colectivas} convenios={convenios} user={user} onNueva={() => setModalColectiva(true)} onEditar={setModalColectiva} onCrearConvenio={setModalConvenio} onAbrir={(afectacion) => navigate(`/expedientes/${id_tramo_nucleo}/afectaciones/${afectacion.id_afectacion}`)} />}
-          {tabActiva === 'individuales' && <TabAfectaciones tipo="individual" items={individuales} convenios={convenios} user={user} onNueva={() => setModalIndividual(true)} onEditar={setModalIndividual} onCrearConvenio={setModalConvenio} onAbrir={(afectacion) => navigate(`/expedientes/${id_tramo_nucleo}/afectaciones/${afectacion.id_afectacion}`)} />}
+          {tabActiva === 'afectaciones' && (
+            <TabAfectacionesUnificadas 
+              colectivas={colectivas} 
+              individuales={individuales} 
+              convenios={convenios} 
+              user={user} 
+              onNuevaColectiva={() => setModalColectiva(true)} 
+              onNuevaIndividual={() => setModalIndividual(true)} 
+              onEditarColectiva={setModalColectiva} 
+              onEditarIndividual={setModalIndividual} 
+              onCrearConvenio={setModalConvenio} 
+              onAbrir={(afectacion) => navigate(`/expedientes/${id_tramo_nucleo}/afectaciones/${afectacion.id_afectacion}`)} 
+            />
+          )}
           {tabActiva === 'asambleas'    && <TabAsambleas items={asambleas} user={user} onNueva={() => setModalAsamblea(true)} onEditar={setModalAsamblea} />}
           <React.Suspense fallback={<div className="panel-loading"><Loader2 className="spin" /> Cargando módulo…</div>}>
             {tabActiva === 'flujo' && (
@@ -271,8 +282,8 @@ export default function ExpedienteDetail() {
 /* ────── Pestaña: Información General ────── */
 function TabGeneral({ tramoNucleo, nucleo }) {
   const campos = [
-    { label: 'Municipio',         valor: nucleo?.municipio },
-    { label: 'Entidad',           valor: nucleo?.entidad },
+    { label: 'Municipio',         valor: nucleo?.municipio_nombre || '—' },
+    { label: 'Entidad',           valor: nucleo?.entidad_nombre || '—' },
     { label: 'Tipo de Núcleo',    valor: nucleo?.tipo_nucleo },
     { label: 'Longitud del tramo',valor: tramoNucleo.longitud_m ? `${Number(tramoNucleo.longitud_m).toLocaleString()} m` : '—' },
     { label: '¿Es Expropiación?', valor: tramoNucleo.es_expropiacion ? 'Sí' : 'No' },
@@ -290,43 +301,86 @@ function TabGeneral({ tramoNucleo, nucleo }) {
   );
 }
 
-/* ────── Pestaña: Afectaciones (Colectivas o Individuales) ────── */
-function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCrearConvenio, onAbrir }) {
-  const esColectivo = tipo === 'colectivo';
+/* ────── Pestaña: Afectaciones Unificadas ────── */
+function TabAfectacionesUnificadas({ colectivas, individuales, convenios, user, onNuevaColectiva, onNuevaIndividual, onEditarColectiva, onEditarIndividual, onCrearConvenio, onAbrir }) {
   const puedeCapturar = user?.rol && ['admin', 'operador'].includes(user.rol);
+  const [filtro, setFiltro] = useState('todas');
+
+  const items = useMemo(() => {
+    const cols = colectivas.map(c => ({ ...c, _tipo: 'colectivo' }));
+    const inds = individuales.map(i => ({ ...i, _tipo: 'individual' }));
+    if (filtro === 'colectivas') return cols;
+    if (filtro === 'individuales') return inds;
+    return [...cols, ...inds].sort((a, b) => b.id_afectacion - a.id_afectacion);
+  }, [colectivas, individuales, filtro]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ fontSize: '16px', color: '#1e293b', fontWeight: '600' }}>
-          Afectaciones {esColectivo ? 'Colectivas' : 'Individuales'}
-          <span style={{ marginLeft: '10px', background: '#f1f5f9', color: '#475569', borderRadius: '20px', padding: '2px 10px', fontSize: '13px', fontWeight: '400' }}>
-            {items.length} registros
-          </span>
-        </h3>
-        {puedeCapturar && (
-          <button
-            style={{ background: esColectivo ? '#006341' : '#d97706', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}
-            onClick={onNueva}
-          >
-            + Nueva Afectación {esColectivo ? 'Colectiva' : 'Individual'}
-          </button>
-        )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <h3 style={{ fontSize: '16px', color: '#1e293b', fontWeight: '600', margin: 0 }}>
+            Afectaciones Registradas
+            <span style={{ marginLeft: '10px', background: '#f1f5f9', color: '#475569', borderRadius: '20px', padding: '2px 10px', fontSize: '13px', fontWeight: '400' }}>
+              {items.length}
+            </span>
+          </h3>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '4px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            {[
+              { id: 'todas', label: 'Todas' },
+              { id: 'colectivas', label: 'Colectivas' },
+              { id: 'individuales', label: 'Individuales' }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setFiltro(f.id)}
+                style={{
+                  padding: '6px 12px', borderRadius: '6px', border: 'none',
+                  background: filtro === f.id ? '#0f172a' : 'transparent',
+                  color: filtro === f.id ? 'white' : '#64748b',
+                  fontSize: '13px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s'
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {puedeCapturar && (
+            <>
+              <button
+                style={{ background: '#006341', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}
+                onClick={onNuevaColectiva}
+              >
+                + Colectiva
+              </button>
+              <button
+                style={{ background: '#d97706', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}
+                onClick={onNuevaIndividual}
+              >
+                + Individual
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {items.length === 0 ? (
         <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '10px', border: '2px dashed #e2e8f0' }}>
           <FileText size={32} style={{ marginBottom: '10px', opacity: 0.4, display: 'block', margin: '0 auto 10px auto' }} />
-          <p>No hay afectaciones {esColectivo ? 'colectivas' : 'individuales'} registradas.</p>
-          {puedeCapturar && <p style={{ fontSize: '13px', marginTop: '6px' }}>Usa el botón de arriba para agregar la primera.</p>}
+          <p>No hay afectaciones registradas con este filtro.</p>
+          {puedeCapturar && <p style={{ fontSize: '13px', marginTop: '6px' }}>Usa los botones superiores para registrar una nueva.</p>}
         </div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           <thead>
             <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               <th style={thStyle}>ID</th>
+              <th style={thStyle}>Tipo</th>
               <th style={thStyle}>Tipo Tenencia</th>
-              {!esColectivo && <th style={thStyle}>Parcela</th>}
+              <th style={thStyle}>Parcela</th>
               <th style={thStyle}>Superficie (Ha)</th>
               <th style={thStyle}>Situación Jurídica</th>
               <th style={thStyle}>Convenios</th>
@@ -337,17 +391,27 @@ function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCr
             {items.map(a => {
               const convs = convenios.filter(c => c.id_afectacion === a.id_afectacion);
               const hasConvenio = convs.length > 0;
+              const esColectivo = a._tipo === 'colectivo';
               return (
               <tr key={a.id_afectacion} style={{ borderBottom: '1px solid #f1f5f9' }}>
                 <td style={tdStyle}><span style={{ background: '#f1f5f9', color: '#475569', borderRadius: '6px', padding: '3px 8px', fontSize: '12px' }}>#{a.id_afectacion}</span></td>
+                <td style={tdStyle}>
+                  <span style={{ 
+                    background: esColectivo ? '#ecfdf5' : '#fffbeb', 
+                    color: esColectivo ? '#059669' : '#d97706', 
+                    borderRadius: '12px', padding: '2px 8px', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase'
+                  }}>
+                    {esColectivo ? 'Colectiva' : 'Individual'}
+                  </span>
+                </td>
                 <td style={tdStyle}>{a.tipo_tenencia || '—'}</td>
-                {!esColectivo && <td style={tdStyle}>#{a.id_parcela || '—'}</td>}
+                <td style={tdStyle}>{!esColectivo && a.id_parcela ? `#${a.id_parcela}` : '—'}</td>
                 <td style={tdStyle}>{a.superficie_afectada_ha ? `${a.superficie_afectada_ha} ha` : '—'}</td>
                 <td style={tdStyle}>{a.situacion_juridica || '—'}</td>
                 <td style={tdStyle}>
                   {hasConvenio ? (
                     <span style={{ background: '#ecfdf5', color: '#059669', borderRadius: '20px', padding: '4px 10px', fontSize: '12px', fontWeight: '500' }}>
-                      {convs.length} Registrado(s)
+                       {convs.length} Registrado(s)
                     </span>
                   ) : (
                     <span style={{ color: '#94a3b8', fontSize: '13px' }}>Ninguno</span>
@@ -368,7 +432,7 @@ function TabAfectaciones({ tipo, items, convenios, user, onNueva, onEditar, onCr
                     {puedeCapturar && (
                       <>
                       <button
-                        onClick={() => onEditar(a)}
+                        onClick={() => esColectivo ? onEditarColectiva(a) : onEditarIndividual(a)}
                         style={{
                           background: 'white', color: '#64748b', border: '1px solid #e2e8f0', 
                           padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer',

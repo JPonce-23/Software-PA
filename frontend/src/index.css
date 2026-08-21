@@ -1562,11 +1562,29 @@ body {
 
 /* ═══════════ VISOR GEOESPACIAL — Selector de Proyecto ═══════════ */
 
+.mapa-map-shell {
+  --map-z-summary: 880;
+  --map-z-controls: 1000;
+  --map-z-legend: 1040;
+  --map-z-context-panel: 1120;
+  --map-z-popup: 1180;
+  position: relative;
+  flex: 1;
+  min-height: 600px;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.mapa-map-shell .leaflet-popup-pane {
+  z-index: var(--map-z-popup);
+}
+
 .mapa-project-selector {
   position: absolute;
   top: 12px;
   left: 60px;
-  z-index: 1000;
+  z-index: var(--map-z-controls);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1638,7 +1656,7 @@ body {
   position: absolute;
   bottom: 20px;
   left: 20px;
-  z-index: 1000;
+  z-index: var(--map-z-summary);
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1648,6 +1666,131 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.8);
   font-family: 'Inter', sans-serif;
   max-width: 280px;
+}
+
+.mapa-intersection-legend {
+  position: absolute;
+  top: 72px;
+  right: 12px;
+  z-index: var(--map-z-legend);
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100% - 24px));
+  max-height: calc(100% - 92px);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  color: #334155;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.mapa-legend-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.32);
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.mapa-legend-scroll {
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 14px 12px;
+}
+
+.mapa-legend-project h4 {
+  margin: 0 0 6px;
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mapa-legend-items {
+  display: grid;
+  gap: 6px;
+}
+
+.mapa-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mapa-legend-row span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mapa-legend-symbol {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.mapa-legend-symbol.intersected {
+  background: #f97316;
+  border: 3px solid #7c2d12;
+}
+
+.mapa-legend-symbol.normal {
+  background: #cbd5e1;
+  border: 1px dashed #475569;
+}
+
+.mapa-legend-separator {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.35);
+  margin: 4px 0;
+}
+
+.mapa-legend-line {
+  display: inline-block;
+  width: 22px;
+  margin-right: 6px;
+  vertical-align: 3px;
+  border-top-width: 4px;
+}
+
+.mapa-popup-action {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #006341;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.mapa-popup-action:hover {
+  background: #004d33;
+}
+
+.mapa-tramo-panel {
+  position: absolute;
+  top: 84px;
+  left: 60px;
+  z-index: var(--map-z-context-panel);
+  display: flex;
+  width: 320px;
+  max-height: calc(100% - 110px);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+  font-family: 'Inter', sans-serif;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 @media (max-width: 760px) {
@@ -1661,14 +1804,9 @@ body {
     width: 100%;
   }
 
-  .map-import-button {
-    left: 12px;
-    top: 72px;
-  }
-
   .mapa-tramo-panel {
     left: 12px !important;
-    top: 122px !important;
+    top: 126px !important;
     width: calc(100% - 24px) !important;
   }
 
@@ -1677,5 +1815,14 @@ body {
     left: 12px;
     max-width: none;
     right: 12px;
+  }
+
+  .mapa-intersection-legend {
+    top: auto;
+    bottom: 130px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: 220px;
   }
 }
