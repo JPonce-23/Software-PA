@@ -52,34 +52,8 @@ Ejemplos:
 
 ---
 
-## 1.1 Modelo territorial y expediente de seguimiento
-
-La estructura funcional del proyecto es:
-
-```text
-Proyecto
-└── Tramo
-    └── Tramo_Núcleo
-        └── Afectación
-            ├── colectiva
-            └── individual
-```
-
-Lectura funcional:
-
-- `proyecto` agrupa los tramos de una obra ferroviaria.
-- `tramo` es la unidad territorial utilizada para consulta, asignación y medición de avance.
-- `tramo_nucleo` representa el cruce territorial y administrativo entre un tramo y un núcleo agrario y constituye el **expediente maestro territorial** de liberación.
-- `afectacion` representa un derecho y una superficie confirmados y constituye un **subexpediente operativo** colectivo o individual.
-
-Debe distinguirse el papel de dos conceptos que no compiten entre sí:
-
-- **Núcleo agrario:** entidad agraria central alrededor de la cual se relacionan ejido/comunidad, representación, padrón, parcelas, derechos y documentación.
-- **Tramo_Núcleo:** expediente maestro de un cruce concreto entre ese núcleo y un tramo dentro de un proyecto.
 
 ### Momento de creación de la afectación
-
-La mera identificación del cruce `tramo_nucleo` no crea automáticamente una afectación.
 
 La secuencia funcional es:
 
@@ -94,12 +68,8 @@ Análisis territorial y jurídico
     ↓
 Confirmación de derecho, superficie, geometría y sujetos
     ↓
-Creación de afectacion
-    ↓
-Apertura del subexpediente colectivo o individual
+Creación de afectacion colectiva o individual
 ```
-
-Las actuaciones compartidas previas a la confirmación permanecen en `tramo_nucleo` y deben poder consultarse como antecedentes desde la afectación correspondiente.
 
 ### Regla geoespacial
 
@@ -625,7 +595,6 @@ Liberado
 
 Cada hito debe conservarse por separado.
 
-Un `tramo_nucleo` sólo puede considerarse liberado cuando todas sus afectaciones activas aplicables estén liberadas. Si combina afectaciones liberadas con salidas terminales, debe conservarse la condición mixta sin ocultar las afectaciones que quedaron fuera del flujo ordinario.
 
 Las salidas por **expropiación directa** o **comunidad indígena** no equivalen a liberación dentro de esta ruta; se conservan como estados terminales fuera del seguimiento ordinario de convenio, RAN, FIFONAFE y pago.
 
@@ -806,8 +775,8 @@ Cuando sea necesario determinar si una de estas extensiones cambia realmente la 
 18. Ante contradicción sobre el flujo, usar como prioridad el flujo fuente.
 19. Ante una necesidad de datos, consultar `estructura_datos_propiedad_social_fuente.md` como fuente complementaria.
 20. No completar vacíos con suposiciones sobre responsabilidades institucionales.
-21. La afectación se crea únicamente cuando estén confirmados el derecho afectado, superficie, geometría y sujetos; antes de ello el seguimiento permanece en `tramo_nucleo`.
-22. `tramo_nucleo` es el expediente maestro territorial y `afectacion` el subexpediente operativo confirmado.
+21. La afectación se crea únicamente cuando estén confirmados el derecho afectado, superficie, geometría y sujetos.
+22. `tramo_nucleo` es el expediente maestro territorial actual pero debe validarse si es correcta esa entidad o debe refactorizarse y `afectacion` el subexpediente operativo confirmado.
 23. Las reglas funcionales de `Descripción proceso.md` prevalecen para el comportamiento objetivo del sistema cuando el flujograma simplificado no detalle una transición.
 24. Las salidas por expropiación directa o comunidad indígena conservan trazabilidad, pero no continúan por la ruta ordinaria de convenio, RAN, FIFONAFE y pago.
 25. El estado de liberación debe derivarse de hitos aplicables y no sustituirlos.

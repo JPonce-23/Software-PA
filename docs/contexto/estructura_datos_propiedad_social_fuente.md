@@ -7,16 +7,6 @@
 > 2. seguimiento de afectación a derechos individuales;
 > 3. FIFONAFE;
 > 4. ORV.
->
-> **Reglas de lectura:**
-> - Este archivo describe **qué información aparece en la estructura de seguimiento**; no define por sí solo el orden causal del procedimiento.
-> - La posición horizontal de los bloques no debe interpretarse automáticamente como una secuencia obligatoria.
-> - Se conservan etiquetas visibles con sufijos o variantes como `FECHA2`, `BDT4`, `INGRESO3`, `REGISTRAL2`, etc. Estos textos proceden de la fuente y **no deben asumirse como nombres técnicos canónicos de campos**.
-> - Las abreviaturas `E/C`, `BDT`, `PPT` y `DGAOPR` se conservan como aparecen. Este documento no les asigna una expansión que la fuente no declare explícitamente.
-> - El bloque rojo de la sección colectiva no contiene encabezado textual en la fuente; por ello se mantiene como **columna sin encabezado textual**.
-> - El bloque **OBSERVACIONES** de ORV aparece como encabezado, pero la fuente no dibuja campos específicos debajo.
->
-> **Uso de este archivo dentro del contexto funcional:** fuente de verdad para nombres de bloques, presencia de campos y diferencias entre seguimiento colectivo, individual, FIFONAFE y ORV.
 
 ---
 

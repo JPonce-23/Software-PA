@@ -4,43 +4,6 @@
 > Describe el proceso objetivo aprobado y, cuando es necesario, distingue ese
 > objetivo del estado actual de la implementación.
 
-## 1. Principio rector
-
-La jerarquía territorial es:
-
-```text
-Proyecto → Tramo → Tramo_Núcleo
-```
-
-- `proyecto` agrupa los tramos de una obra ferroviaria.
-- `tramo` es la unidad territorial utilizada para asignar responsables y
-  medir avance.
-- `tramo_nucleo` representa el cruce territorial y administrativo entre un
-  tramo y un núcleo agrario y constituye el expediente maestro territorial de
-  su liberación de derecho de vía.
-- `afectacion` representa un derecho y una superficie confirmados y constituye
-  un subexpediente operativo colectivo o individual dentro de ese expediente
-  maestro.
-
-Por tanto:
-
-```text
-tramo_nucleo = expediente maestro territorial de liberación
-afectacion   = subexpediente operativo confirmado
-```
-
-Una afectación no sustituye a Proyecto, Tramo o Tramo_Núcleo. Es el registro
-que abre una rama operativa dentro del expediente maestro cuando el
-caminamiento y el análisis territorial y jurídico ya confirmaron el derecho
-afectado, su superficie, geometría y sujetos involucrados.
-
-Antes de esa confirmación, las posibles afectaciones se investigan dentro del
-contexto de `tramo_nucleo`. La sensibilización y el caminamiento ocurren en esa
-etapa del expediente maestro y no crean subexpedientes preliminares. Cuando se
-registra una afectación confirmada, las actuaciones compartidas permanecen en
-`tramo_nucleo` y deben ser visibles desde el subexpediente como antecedentes;
-las actuaciones exclusivas se relacionan con la afectación correspondiente.
-
 ## 2. Secuencia general
 
 ```text
@@ -52,9 +15,9 @@ Acercamiento y sensibilización
         ↓
 Caminamiento y análisis territorial y jurídico
         ↓
-Confirmación de superficie, geometría, sujetos y BDT
+Confirmación de superficie, sujetos y BDT
         ↓
-Registro de la afectación y apertura del subexpediente operativo
+Registro de la afectación y apertura del expediente operativo
         ↓
 Clasificación de la ruta aplicable
     ├── Expropiación directa
@@ -81,21 +44,6 @@ Expropiación directa y comunidad indígena son salidas terminales: se conserva
 su clasificación y evidencia, pero el sistema de la PA no continúa el flujo
 ordinario de convenio, RAN, FIFONAFE y pago.
 
-La navegación para el usuario final conserva una jerarquía más directa:
-
-```text
-Proyecto
-└── Tramo
-    └── Tramo_Núcleo
-        ├── Expediente maestro territorial
-        └── Afectación confirmada
-            └── Subexpediente operativo
-```
-
-El usuario entra al expediente maestro del cruce, consulta sus antecedentes y
-registra las afectaciones con datos confirmados. Desde ahí abre cada
-subexpediente colectivo o individual. En éste puede consultar los antecedentes
-compartidos que le aplican, además de sus actuaciones posteriores.
 
 ## 3. Fase 1 — Configuración e investigación territorial
 
@@ -108,18 +56,13 @@ La Procuraduría Agraria registra o selecciona:
 - Núcleo agrario.
 - Entidad federativa y municipio de adscripción registral.
 - Residencia u oficina regional responsable.
-- Tipo de núcleo: ejido o comunidad.
-- Cruce `tramo_nucleo`, con consecutivo, longitud y geometría.
+- Tipo de núcleo: ejido o comunidad, o el que corresponda.
 - Condiciones especiales: comunidad indígena, expropiación o proyecto que no
   afecta tierras de uso común.
-
-La asignación de usuarios se realiza por tramo mediante `usuario_tramo`. El
-modelo vigente no utiliza Frente.
 
 La condición especial debe registrarse en el nivel al que realmente aplica:
 
 - `nucleo_agrario` cuando la condición corresponde al núcleo completo.
-- `tramo_nucleo` cuando corresponde a todo el cruce territorial.
 - `afectacion` cuando sólo una afectación colectiva o una parcela
   individualizada sale del flujo ordinario.
 
@@ -134,7 +77,7 @@ parcelas cuando existan.
 
 ### 3.2 Identificación de posibles afectaciones
 
-El cruce `tramo_nucleo` permite investigar si el proyecto afecta derechos
+Permite investigar si el proyecto afecta derechos
 colectivos o parcelas individualizadas. En esta etapa se reúnen antecedentes,
 se revisan las condiciones del núcleo y se programan las actuaciones de campo.
 
@@ -234,7 +177,7 @@ y valuación vinculada a la afectación.
 
 La afectación se crea únicamente cuando el caminamiento y el análisis
 territorial y jurídico confirmaron el derecho afectado. En ese momento nace su
-subexpediente operativo dentro de `tramo_nucleo` y el usuario selecciona su
+expediente operativo y el usuario selecciona su
 vía:
 
 ```text
@@ -243,16 +186,8 @@ afectacion.tipo_afectacion
 └── individual
 ```
 
-La captura requiere:
+La captura requiere los campos mostrados en docs/contexto/estructura_datos_propiedad_social_fuente.md:
 
-- Tramo_Núcleo y núcleo agrario.
-- Tipo y subtipo de tenencia.
-- Destino de la superficie, cuando corresponda.
-- Superficie confirmada.
-- Geometría poligonal confirmada.
-- Situación jurídica.
-- Documentación disponible y faltante.
-- Parcela y titulares, cuando sea individual.
 
 Una afectación colectiva corresponde normalmente a tierras de uso común y
 requiere actuaciones del núcleo agrario. Una afectación individual corresponde
@@ -441,12 +376,6 @@ Los hitos intermedios deben conservarse de forma independiente:
 - `tramite_fifonafe`: informe de no conflictos e indemnización.
 - `pago_indemnizacion`: resultado financiero.
 
-El estado no sustituye esos datos ni se captura como una afirmación aislada; se
-calcula a partir de los hitos aplicables. Un `tramo_nucleo` sólo puede
-considerarse liberado cuando todas sus afectaciones activas están liberadas.
-Cuando combina afectaciones liberadas con salidas terminales debe reportarse
-como un expediente mixto, sin ocultar las afectaciones que quedaron fuera del
-seguimiento.
 
 Las afectaciones con salida por expropiación directa o comunidad indígena no
 son liberadas. Se reportan mediante un estado terminal fuera del seguimiento
@@ -469,7 +398,7 @@ de la PA y no continúan acumulando avance ordinario.
 
 ### Implementado
 
-- Proyecto → Tramo → Tramo_Núcleo, sin Frente.
+- Proyecto → Tramo → Tramo_Núcleo.
 - Personas, relaciones con núcleo, titulares e integrantes ORV.
 - Afectaciones colectivas e individuales.
 - Actividades de sensibilización y caminamiento.
@@ -479,36 +408,6 @@ de la PA y no continúan acumulando avance ordinario.
 - Documentos versionados.
 - Alertas y scheduler diario.
 
-### Pendiente del Corte principal 2
-
-El frontend ya abre el expediente maestro por `tramo_nucleo`, pero todavía
-mezcla dentro de una sola vista todas sus afectaciones:
-
-```text
-expediente maestro: /expedientes/:id_tramo_nucleo
-subexpediente:      /expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion
-```
-
-Se debe:
-
-- Conservar y fortalecer el expediente maestro de `tramo_nucleo`.
-- Listar dentro de él sus afectaciones y abrir cada subexpediente.
-- Mantener sensibilización, caminamiento y minutas compartidas en el
-  expediente maestro y mostrarlas como antecedentes en los subexpedientes a
-  los que apliquen.
-- Asociar con claridad documentos, convenios, pagos y estados posteriores con
-  la afectación correspondiente.
-- Mostrar únicamente etapas aplicables a la vía colectiva o individual.
-- Mantener ORV como información compartida del núcleo.
-- Calcular avance legal, geoespacial y financiero por afectación.
-- Aplicar el orden obligatorio entre sensibilización, caminamiento,
-  afectación, asamblea cuando corresponda, convenio, RAN, FIFONAFE y pago.
-- Calcular el estado de liberación a partir de los hitos aplicables.
-- Detener el flujo ordinario y conservar la trazabilidad cuando una afectación
-  salga por expropiación directa o comunidad indígena.
-- Corregir el panel documental: debe admitir documentos del expediente maestro
-  y documentos propios de una afectación, sin asignarlos todos
-  indiscriminadamente a un solo nivel.
 
 ### Capacidades que requieren diseño adicional
 
