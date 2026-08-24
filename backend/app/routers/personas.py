@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services import personas as service
+from ..services.access import filter_by_user_nucleos, require_nucleo_access
 from ..services.common import get_active, mark_inactive, set_audit_context
 
 
@@ -27,7 +28,9 @@ def listar_parcelas(
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     query = db.query(models.Parcela).filter(models.Parcela.activo.is_(True))
+    query = filter_by_user_nucleos(query, db, current_user, models.Parcela.id_nucleo)
     if id_nucleo is not None:
+        require_nucleo_access(db, current_user, id_nucleo)
         query = query.filter(models.Parcela.id_nucleo == id_nucleo)
     if tipo_parcela is not None:
         query = query.filter(models.Parcela.tipo_parcela == tipo_parcela)
@@ -52,7 +55,9 @@ def obtener_parcela(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    return get_active(db, models.Parcela, id_parcela, "id_parcela")
+    parcela = get_active(db, models.Parcela, id_parcela, "id_parcela")
+    require_nucleo_access(db, current_user, parcela.id_nucleo)
+    return parcela
 
 
 @router.get(
@@ -66,7 +71,9 @@ def listar_orvs(
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     query = db.query(models.Orv).filter(models.Orv.activo.is_(True))
+    query = filter_by_user_nucleos(query, db, current_user, models.Orv.id_nucleo)
     if id_nucleo is not None:
+        require_nucleo_access(db, current_user, id_nucleo)
         query = query.filter(models.Orv.id_nucleo == id_nucleo)
     return query.order_by(models.Orv.inicio_vigencia.desc()).all()
 
@@ -151,11 +158,13 @@ def listar_nucleos_persona(
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     get_active(db, models.Persona, id_persona, "id_persona")
-    return (
-        db.query(models.PersonaNucleo)
-        .filter_by(id_persona=id_persona, activo=True)
-        .all()
+    query = db.query(models.PersonaNucleo).filter_by(
+        id_persona=id_persona, activo=True
     )
+    query = filter_by_user_nucleos(
+        query, db, current_user, models.PersonaNucleo.id_nucleo
+    )
+    return query.all()
 
 
 @router.post(
@@ -170,6 +179,7 @@ def vincular_persona_nucleo(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
+    require_nucleo_access(db, current_user, data.id_nucleo)
     set_audit_context(db, current_user.id_usuario)
     persona = get_active(db, models.Persona, id_persona, "id_persona")
     relacion = service.ensure_persona_nucleo(
@@ -197,7 +207,8 @@ def listar_integrantes_orv(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    get_active(db, models.Orv, id_orv, "id_orv")
+    orv = get_active(db, models.Orv, id_orv, "id_orv")
+    require_nucleo_access(db, current_user, orv.id_nucleo)
     return (
         db.query(models.OrvIntegrante)
         .options(joinedload(models.OrvIntegrante.persona))
@@ -220,6 +231,7 @@ def agregar_integrante_orv(
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
     orv = get_active(db, models.Orv, id_orv, "id_orv")
+    require_nucleo_access(db, current_user, orv.id_nucleo)
     return service.add_orv_integrante(db, orv, data, current_user.id_usuario)
 
 
@@ -234,6 +246,8 @@ def eliminar_integrante_orv(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
+    orv = get_active(db, models.Orv, id_orv, "id_orv")
+    require_nucleo_access(db, current_user, orv.id_nucleo)
     integrante = get_active(
         db, models.OrvIntegrante, id_integrante, "id_orv_integrante"
     )
@@ -255,7 +269,8 @@ def listar_titulares_parcela(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    get_active(db, models.Parcela, id_parcela, "id_parcela")
+    parcela = get_active(db, models.Parcela, id_parcela, "id_parcela")
+    require_nucleo_access(db, current_user, parcela.id_nucleo)
     return (
         db.query(models.ParcelaTitular)
         .options(joinedload(models.ParcelaTitular.persona))
@@ -278,6 +293,7 @@ def agregar_titular_parcela(
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
     parcela = get_active(db, models.Parcela, id_parcela, "id_parcela")
+    require_nucleo_access(db, current_user, parcela.id_nucleo)
     return service.add_parcela_titular(
         db, parcela, data, current_user.id_usuario
     )
@@ -294,6 +310,8 @@ def eliminar_titular_parcela(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
+    parcela = get_active(db, models.Parcela, id_parcela, "id_parcela")
+    require_nucleo_access(db, current_user, parcela.id_nucleo)
     titular = get_active(
         db, models.ParcelaTitular, id_titular, "id_parcela_titular"
     )
@@ -317,6 +335,7 @@ def crear_parcela_normalizada(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
+    require_nucleo_access(db, current_user, data.parcela.id_nucleo)
     return service.create_parcela_normalizada(
         db,
         data,
@@ -335,6 +354,7 @@ def crear_parcela_compatible(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
+    require_nucleo_access(db, current_user, data.id_nucleo)
     return service.create_parcela_compatible(db, data, current_user.id_usuario)
 
 
@@ -350,6 +370,7 @@ def actualizar_parcela_compatible(
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
     parcela = get_active(db, models.Parcela, id_parcela, "id_parcela")
+    require_nucleo_access(db, current_user, parcela.id_nucleo)
     return service.update_parcela_compatible(
         db, parcela, data, current_user.id_usuario
     )
@@ -364,6 +385,7 @@ def eliminar_parcela_compatible(
 ):
     set_audit_context(db, current_user.id_usuario)
     parcela = get_active(db, models.Parcela, id_parcela, "id_parcela")
+    require_nucleo_access(db, current_user, parcela.id_nucleo)
     afectacion_activa = (
         db.query(models.Afectacion.id_afectacion)
         .filter_by(id_parcela=id_parcela, activo=True)
@@ -396,6 +418,7 @@ def crear_orv_normalizado(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
+    require_nucleo_access(db, current_user, data.orv.id_nucleo)
     return service.create_orv_normalizado(
         db,
         data,
@@ -414,6 +437,7 @@ def crear_orv_compatible(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
+    require_nucleo_access(db, current_user, data.id_nucleo)
     return service.create_orv_compatible(db, data, current_user.id_usuario)
 
 
@@ -429,6 +453,7 @@ def actualizar_orv_compatible(
     current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
 ):
     orv = get_active(db, models.Orv, id_orv, "id_orv")
+    require_nucleo_access(db, current_user, orv.id_nucleo)
     return service.update_orv_compatible(db, orv, data, current_user.id_usuario)
 
 
@@ -441,6 +466,7 @@ def eliminar_orv_compatible(
 ):
     set_audit_context(db, current_user.id_usuario)
     orv = get_active(db, models.Orv, id_orv, "id_orv")
+    require_nucleo_access(db, current_user, orv.id_nucleo)
     for integrante in (
         db.query(models.OrvIntegrante)
         .filter_by(id_orv=id_orv, activo=True)

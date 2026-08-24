@@ -24,6 +24,7 @@ from .services import flujo as flujo_service
 from .services import nucleos as nucleos_service
 from .services import cargas_geoespaciales as cargas_geoespaciales_service
 from .services.access import (
+    filter_by_user_nucleos,
     filter_by_user_tramos,
     filter_projects_by_user,
     require_afectacion_access,
@@ -1519,12 +1520,17 @@ def delete_convenio(id_convenio: int, motivo: str = Query(...), db: Session = De
 @app.get("/api/padrones", tags=["Padrones"], summary="Listar padrones", response_model=List[schemas.PadronHistorialResponse])
 def list_padrones(id_nucleo: int = Query(None), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'visualizador', 'geografo']))):
     query = db.query(models.PadronHistorial).filter(models.PadronHistorial.activo == True)
+    query = filter_by_user_nucleos(
+        query, db, current_user, models.PadronHistorial.id_nucleo
+    )
     if id_nucleo:
+        require_nucleo_access(db, current_user, id_nucleo)
         query = query.filter(models.PadronHistorial.id_nucleo == id_nucleo)
-    return query.all()
+    return query.order_by(models.PadronHistorial.fecha_padron.desc()).all()
 
 @app.post("/api/padrones", tags=["Padrones"], summary="Crear padron", response_model=schemas.PadronHistorialResponse, status_code=status.HTTP_201_CREATED)
 def create_padron(padron: schemas.PadronHistorialCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
+    require_nucleo_access(db, current_user, padron.id_nucleo)
     set_audit_context(db, current_user.id_usuario)
     db_padron = models.PadronHistorial(**padron.model_dump())
     db_padron.fecha_registro = datetime.now(timezone.utc)
@@ -1537,11 +1543,13 @@ def create_padron(padron: schemas.PadronHistorialCreate, db: Session = Depends(g
 @app.put("/api/padrones/{id_padron}", tags=["Padrones"], summary="Actualizar padron", response_model=schemas.PadronHistorialResponse)
 def update_padron_route(id_padron: int, data: schemas.PadronHistorialUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.PadronHistorial, id_padron, "id_padron")
+    require_nucleo_access(db, current_user, entity.id_nucleo)
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/padrones/{id_padron}", tags=["Padrones"], summary="Eliminar padron")
 def delete_padron(id_padron: int, motivo: str = Query(...), db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador', 'geografo']))):
     entity = get_entity_by_id(db, models.PadronHistorial, id_padron, "id_padron")
+    require_nucleo_access(db, current_user, entity.id_nucleo)
     return soft_delete_entity(db, entity, current_user.id_usuario, motivo)
 
 # ==================== ACTIVIDAD CAMPO ==================== #
@@ -1596,6 +1604,13 @@ def create_actividad(act: schemas.ActividadCampoCreate, db: Session = Depends(ge
 def update_actividad_route(id_actividad: int, data: schemas.ActividadCampoUpdate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(auth.RoleChecker(['admin', 'operador']))):
     entity = get_entity_by_id(db, models.ActividadCampo, id_actividad, "id_actividad")
     require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
+    fecha_programada = data.fecha_programada if data.fecha_programada is not None else entity.fecha_programada
+    fecha_realizada = data.fecha_realizada if data.fecha_realizada is not None else entity.fecha_realizada
+    if fecha_programada and fecha_realizada and fecha_realizada < fecha_programada:
+        raise HTTPException(
+            status_code=422,
+            detail="fecha_realizada no puede ser anterior a fecha_programada",
+        )
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/actividades-campo/{id_actividad}", tags=["Actividades de Campo"], summary="Eliminar actividad de campo")
@@ -1672,6 +1687,33 @@ def update_fifonafe_route(id_tramite: int, data: schemas.TramiteFifonafeUpdate, 
     require_tramo_nucleo_access(db, current_user, entity.id_tramo_nucleo)
     if entity.tipo_tramite == 'indemnizacion' and data.estatus == 'completo':
         raise HTTPException(status_code=409, detail="Use la operación explícita para completar la indemnización.")
+    if entity.tipo_tramite == 'informe_no_conflictos':
+        cambios = data.model_dump(exclude_unset=True)
+        estatus_resultante = cambios.get('estatus', entity.estatus)
+        if estatus_resultante == 'completo':
+            campos_requeridos = (
+                'hay_conflictos',
+                'no_oficio_fifonafe_a_dgaopr',
+                'no_oficio_dgaopr_a_repr',
+                'no_oficio_rpta_repr_a_dgaopr',
+                'no_oficio_rpta_dgaopr_a_fifonafe',
+                'fecha_oficio_fifonafe_a_dgaopr',
+                'fecha_oficio_dgaopr_a_repr',
+                'fecha_oficio_rpta_repr_a_dgaopr',
+                'fecha_oficio_rpta_dgaopr_a_fifonafe',
+            )
+            faltantes = [
+                campo for campo in campos_requeridos
+                if cambios.get(campo, getattr(entity, campo)) is None
+            ]
+            if faltantes:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "Un informe completo requiere resultado y los cuatro "
+                        "oficios con sus fechas"
+                    ),
+                )
     return update_entity(db, entity, data, current_user.id_usuario)
 
 @app.delete("/api/fifonafe/{id_tramite}", tags=["Fifonafe"], summary="Eliminar trámite fifonafe")

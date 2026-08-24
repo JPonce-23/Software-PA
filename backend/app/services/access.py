@@ -179,6 +179,25 @@ def filter_by_user_tramos(
     return query.filter(id_tramo_column.in_(tramos))
 
 
+def filter_by_user_nucleos(
+    query: Query,
+    db: Session,
+    user: models.Usuario,
+    id_nucleo_column,
+) -> Query:
+    if user.rol == "admin":
+        return query
+    nucleos = db.query(models.TramoNucleo.id_nucleo).join(
+        models.UsuarioTramo,
+        models.UsuarioTramo.id_tramo == models.TramoNucleo.id_tramo,
+    ).filter(
+        models.TramoNucleo.activo.is_(True),
+        models.UsuarioTramo.id_usuario == user.id_usuario,
+        models.UsuarioTramo.activo.is_(True),
+    ).distinct()
+    return query.filter(id_nucleo_column.in_(nucleos))
+
+
 def filter_projects_by_user(
     query: Query,
     db: Session,
