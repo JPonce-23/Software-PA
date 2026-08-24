@@ -111,12 +111,6 @@ def _crear_fifonafe_completo(client, headers, cleanup, tramo_nucleo, afectacion,
     assert indemnizacion_response.status_code == 201, indemnizacion_response.text
     indemnizacion = indemnizacion_response.json()
     cleanup.register("/api/fifonafe", indemnizacion["id_tramite_fifonafe"])
-    updated = client.put(
-        f"/api/fifonafe/{indemnizacion['id_tramite_fifonafe']}",
-        json=OFICIOS,
-        headers=headers,
-    )
-    assert updated.status_code == 200, updated.text
 
     limite = float(convenio.get("monto_100") or 0)
     if afectacion["tipo_afectacion"] == "colectivo" or convenio.get("tipo_convenio") != "modificatorio":
@@ -143,6 +137,7 @@ def _crear_fifonafe_completo(client, headers, cleanup, tramo_nucleo, afectacion,
         headers=headers,
     )
     assert completed.status_code == 200, completed.text
+    assert completed.json()["no_oficio_fifonafe_a_dgaopr"] is None
     return completed.json()
 
 
@@ -522,6 +517,7 @@ def test_flujo_respeta_pertenencia_territorial(
     admin_session,
     cleanup,
     seed_tramo,
+    seed_nucleo,
     seed_afectacion_colectiva,
 ):
     correo = f"operador.2b.{time.time_ns()}@pruebas.local"
@@ -561,6 +557,14 @@ def test_flujo_respeta_pertenencia_territorial(
         assert op_browser.get("/api/tramos").json() == []
         assert op_browser.get("/api/tramos-nucleos").json() == []
         assert op_browser.get("/api/dashboard").json() == []
+        assert op_browser.get("/api/padrones").json() == []
+        assert op_browser.get("/api/orvs").json() == []
+        assert op_browser.get(
+            "/api/padrones", params={"id_nucleo": seed_nucleo["id_nucleo"]}
+        ).status_code == 403
+        assert op_browser.get(
+            "/api/orvs", params={"id_nucleo": seed_nucleo["id_nucleo"]}
+        ).status_code == 403
 
         assigned = client.post(
             f"/api/tramos/{seed_tramo['id_tramo']}/asignar-usuario",
@@ -580,6 +584,12 @@ def test_flujo_respeta_pertenencia_territorial(
         assert seed_tramo["id_tramo"] in {
             item["id_tramo"] for item in visible_tramos.json()
         }
+        assert op_browser.get(
+            "/api/padrones", params={"id_nucleo": seed_nucleo["id_nucleo"]}
+        ).status_code == 200
+        assert op_browser.get(
+            "/api/orvs", params={"id_nucleo": seed_nucleo["id_nucleo"]}
+        ).status_code == 200
 
         removed = client.delete(
             f"/api/tramos/{seed_tramo['id_tramo']}/remover-usuario/{user['id_usuario']}",
