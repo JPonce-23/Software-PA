@@ -3,6 +3,19 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, FolderOpen, MapPin, ChevronRight, ChevronDown, Loader2, X, Filter } from 'lucide-react';
 import api from '../api/axios';
 
+function ecLabel(value) {
+  if (value === 'ejido') return 'E · Ejido';
+  if (value === 'comunidad') return 'C · Comunidad';
+  return '—';
+}
+
+function motivoFueraSeguimientoPA(expediente) {
+  if (expediente.es_expropiacion) return 'Expropiación directa';
+  if (expediente.comunidad_indigena) return 'Comunidad indígena';
+  if (expediente.proyecto_no_afecta_uso_comun) return 'No afecta tierras de uso común';
+  return null;
+}
+
 export default function ExpedientesList() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -272,15 +285,18 @@ export default function ExpedientesList() {
                                   <thead>
                                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                                       <th style={{ padding: '10px 16px', textAlign: 'left', color: '#64748b', fontWeight: '600' }}>Núcleo Agrario</th>
+                                      <th style={{ padding: '10px 16px', textAlign: 'left', color: '#64748b', fontWeight: '600' }}>E/C</th>
                                       <th style={{ padding: '10px 16px', textAlign: 'left', color: '#64748b', fontWeight: '600' }}>Municipio</th>
                                       <th style={{ padding: '10px 16px', textAlign: 'left', color: '#64748b', fontWeight: '600' }}>Consecutivo</th>
                                       <th style={{ padding: '10px 16px', textAlign: 'left', color: '#64748b', fontWeight: '600' }}>Longitud</th>
-                                      <th style={{ padding: '10px 16px', textAlign: 'left', color: '#64748b', fontWeight: '600' }}>Estatus</th>
+                                      <th style={{ padding: '10px 16px', textAlign: 'left', color: '#64748b', fontWeight: '600' }}>Seguimiento PA</th>
                                       <th style={{ padding: '10px 16px', textAlign: 'right' }}></th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {tramo.expedientes.map((exp, eIdx) => (
+                                    {tramo.expedientes.map((exp, eIdx) => {
+                                      const motivoNoSeguimiento = motivoFueraSeguimientoPA(exp);
+                                      return (
                                       <tr 
                                         key={exp.id_tramo_nucleo} 
                                         onClick={() => navigate(`/expedientes/${exp.id_tramo_nucleo}`)}
@@ -295,6 +311,9 @@ export default function ExpedientesList() {
                                           </div>
                                         </td>
                                         <td style={{ padding: '12px 16px', color: '#475569' }}>
+                                          {ecLabel(exp.tipo_nucleo)}
+                                        </td>
+                                        <td style={{ padding: '12px 16px', color: '#475569' }}>
                                           {exp.municipio_nombre || '—'}
                                         </td>
                                         <td style={{ padding: '12px 16px', color: '#475569' }}>
@@ -304,8 +323,8 @@ export default function ExpedientesList() {
                                           {exp.longitud_m ? `${Number(exp.longitud_m).toLocaleString()} m` : '—'}
                                         </td>
                                         <td style={{ padding: '12px 16px' }}>
-                                          <span style={{ background: exp.activo ? '#dcfce7' : '#fee2e2', color: exp.activo ? '#16a34a' : '#dc2626', borderRadius: '20px', padding: '2px 8px', fontSize: '11px', fontWeight: '600' }}>
-                                            {exp.activo ? 'Activo' : 'Inactivo'}
+                                          <span style={{ background: motivoNoSeguimiento ? '#ffedd5' : '#dcfce7', color: motivoNoSeguimiento ? '#9a3412' : '#16a34a', borderRadius: '20px', padding: '2px 8px', fontSize: '11px', fontWeight: '600' }}>
+                                            {motivoNoSeguimiento || 'Ordinario'}
                                           </span>
                                         </td>
                                         <td style={{ padding: '12px 16px', textAlign: 'right' }}>
@@ -315,7 +334,7 @@ export default function ExpedientesList() {
                                           </div>
                                         </td>
                                       </tr>
-                                    ))}
+                                    )})}
                                   </tbody>
                                 </table>
                               </div>

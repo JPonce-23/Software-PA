@@ -108,9 +108,23 @@ body {
 
 .content {
   flex: 1;
+  min-width: 0;
   padding: 40px 50px;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+}
+
+.responsive-table {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.responsive-table table {
+  min-width: 860px;
 }
 
 .topbar {

@@ -151,7 +151,7 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
               </select>
             </Campo>
 
-            <Campo label="Contexto del Proceso *">
+            <Campo label="Motivo de la asamblea *">
               <select disabled={Boolean(initialData)} value={form.contexto_proceso} onChange={e => set('contexto_proceso', e.target.value)} style={inputStyle} required>
                 {CONTEXTOS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>

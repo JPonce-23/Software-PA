@@ -14,7 +14,7 @@ function errorText(error) {
 
 export default function FlujoLiberacionPanel({
   idTramoNucleo, idNucleo, idAfectacion = null, afectaciones, convenios,
-  canWrite, onRefresh,
+  canWrite, seguimientoPausado = false, motivoNoSeguimiento = null, onRefresh,
 }) {
   const [activities, setActivities] = useState([]);
   const [tramites, setTramites] = useState([]);
@@ -91,10 +91,17 @@ export default function FlujoLiberacionPanel({
       <ErrorBanner mensaje={error} />
       <header className="phase-panel-header">
         <div>
-          <h3>Secuencia de liberación</h3>
-          <p>Los estados y saldos se derivan en el servidor a partir de evidencia.</p>
+          <h3>Investigación y seguimiento</h3>
+          <p>Sensibilización, caminamiento, afectaciones, RAN, FIFONAFE y pagos se registran sólo cuando el expediente sigue en el flujo ordinario de la PA.</p>
         </div>
       </header>
+
+      {seguimientoPausado && (
+        <section style={{ ...sectionStyle, background: '#fff7ed', borderColor: '#fed7aa', color: '#9a3412' }}>
+          <strong>Flujo ordinario detenido</strong>
+          <div style={hintStyle}>Motivo: {motivoNoSeguimiento}. No se habilitan nuevas actividades, ciclos, trámites FIFONAFE ni salidas terminales de afectación.</div>
+        </section>
+      )}
 
       <section style={sectionStyle}>
         <div style={titleRow}>
@@ -102,7 +109,7 @@ export default function FlujoLiberacionPanel({
             <strong>Antecedentes compartidos</strong>
             <div style={hintStyle}>Sensibilización antes de caminamiento.</div>
           </div>
-          {canWrite && <button className="button" type="button" onClick={() => setActivityForm(true)}><Plus size={15} /> Actividad</button>}
+          {canWrite && !seguimientoPausado && <button className="button" type="button" onClick={() => setActivityForm(true)}><Plus size={15} /> Actividad</button>}
         </div>
         <div className="record-list">
           {activities.map((item) => (
@@ -154,7 +161,7 @@ export default function FlujoLiberacionPanel({
                     <div style={hintStyle}>
                       Límite: {cycle.limite_pagable ?? '—'} · Pagado: {cycle.total_pagado} · Saldo: {cycle.saldo_disponible}
                     </div>
-                    {canWrite && !state.estado_terminal && (
+                    {canWrite && !seguimientoPausado && !state.estado_terminal && (
                       <div style={actionRow}>
                         {base?.convenio_inscrito_fecha_ran && !informe && (
                           <button type="button" className="button secondary" onClick={() => setFifonafeForm({ mode: 'informe', cycle, base })}>Registrar no conflictos</button>
@@ -199,7 +206,7 @@ export default function FlujoLiberacionPanel({
               })}
             </div>
 
-            {canWrite && !state.estado_terminal && state.estado_liberacion !== 'liberada' && (
+            {canWrite && !seguimientoPausado && !state.estado_terminal && state.estado_liberacion !== 'liberada' && (
               <div style={actionRow}>
                 <button type="button" className="button secondary" onClick={() => setCycleForm(affect)}>Abrir ciclo posterior</button>
                 <button type="button" className="button danger" onClick={() => setTerminalForm(affect)}>Registrar salida terminal</button>

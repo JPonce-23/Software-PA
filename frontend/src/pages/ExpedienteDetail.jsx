@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, FileText, ClipboardList,
   Loader2, AlertCircle, Building2, Layers, Calendar,
-  Banknote, FileClock, FolderOpen, ShieldCheck,
+  Banknote, FileClock, FileSignature, FolderOpen, ShieldCheck,
 } from 'lucide-react';
 import api from '../api/axios';
 import AuthContext from '../contexts/auth-context';
@@ -20,15 +20,35 @@ const DocumentosPanel = React.lazy(() => import('../components/fase2/DocumentosP
 const FlujoLiberacionPanel = React.lazy(() => import('../components/fase2/FlujoLiberacionPanel'));
 
 const TABS = [
-  { key: 'general',     label: 'Información General',       icon: Building2 },
-  { key: 'flujo',       label: 'Flujo de liberación',       icon: FileText },
+  { key: 'general',     label: 'Datos generales',           icon: Building2 },
+  { key: 'orv',          label: 'ORV y padrón',              icon: ShieldCheck },
+  { key: 'flujo',       label: 'Investigación y seguimiento', icon: FileText },
   { key: 'afectaciones',label: 'Afectaciones',              icon: Layers },
   { key: 'asambleas',   label: 'Asambleas',                 icon: Calendar },
-  { key: 'orv',          label: 'Representación',            icon: ShieldCheck },
+  { key: 'convenios',   label: 'Convenios',                 icon: FileSignature },
+  { key: 'pagos',        label: 'FIFONAFE y pagos',          icon: Banknote },
   { key: 'minutas',      label: 'Minutas',                   icon: ClipboardList },
-  { key: 'pagos',        label: 'Pagos',                     icon: Banknote },
   { key: 'documentos',   label: 'Documentos',                icon: FileClock },
 ];
+
+function tipoNucleoLabel(value) {
+  if (value === 'ejido') return 'Ejido';
+  if (value === 'comunidad') return 'Comunidad';
+  return value || '—';
+}
+
+function ecLabel(value) {
+  if (value === 'ejido') return 'E · Ejido';
+  if (value === 'comunidad') return 'C · Comunidad';
+  return '—';
+}
+
+function motivoFueraSeguimientoPA(tramoNucleo, nucleo) {
+  if (tramoNucleo?.es_expropiacion) return 'Expropiación directa';
+  if (nucleo?.comunidad_indigena || tramoNucleo?.comunidad_indigena) return 'Comunidad indígena';
+  if (tramoNucleo?.proyecto_no_afecta_uso_comun) return 'El proyecto no afecta tierras de uso común';
+  return null;
+}
 
 export default function ExpedienteDetail() {
   const { id_tramo_nucleo } = useParams();
@@ -125,6 +145,8 @@ export default function ExpedienteDetail() {
   const colectivas   = afectaciones.filter(a => a.tipo_afectacion === 'colectivo');
   const individuales = afectaciones.filter(a => a.tipo_afectacion === 'individual');
   const canWrite = user?.rol && ['admin', 'operador'].includes(user.rol);
+  const motivoNoSeguimiento = motivoFueraSeguimientoPA(tramoNucleo, nucleo);
+  const seguimientoPausado = Boolean(motivoNoSeguimiento);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -151,7 +173,7 @@ export default function ExpedienteDetail() {
                 {nucleo?.nombre_nucleo || `Núcleo Agrario #${tramoNucleo.id_nucleo}`}
               </h2>
               <p style={{ color: '#64748b', fontSize: '14px', margin: '4px 0 0 0' }}>
-                {nucleo?.tipo_nucleo || 'Ejido'} — Tramo {tramoNucleo.numero_tramo || '—'} / Consecutivo {tramoNucleo.consecutivo || '—'}
+                {ecLabel(nucleo?.tipo_nucleo)} · Tramo {tramoNucleo.numero_tramo || '—'} / Consecutivo {tramoNucleo.consecutivo || '—'}
               </p>
             </div>
           </div>
@@ -163,6 +185,17 @@ export default function ExpedienteDetail() {
             <StatBadge label="Asambleas" value={asambleas.length} color="#7c3aed" bg="#f3e8ff" />
           </div>
         </div>
+        {seguimientoPausado && (
+          <div style={{ marginTop: '18px', padding: '14px 16px', background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa', borderRadius: '8px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            <AlertCircle size={18} />
+            <div>
+              <strong>Sin seguimiento ordinario por parte de la PA</strong>
+              <p style={{ margin: '4px 0 0', fontSize: '13px' }}>
+                Motivo: {motivoNoSeguimiento}. Este caso no se marca como liberado y no debe continuar artificialmente con afectaciones, convenios, RAN, FIFONAFE o pagos.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Pestañas */}
@@ -195,7 +228,7 @@ export default function ExpedienteDetail() {
         </div>
 
         <div role="tabpanel" style={{ padding: '30px' }}>
-          {tabActiva === 'general'      && <TabGeneral tramoNucleo={tramoNucleo} nucleo={nucleo} />}
+          {tabActiva === 'general'      && <TabGeneral tramoNucleo={tramoNucleo} nucleo={nucleo} motivoNoSeguimiento={motivoNoSeguimiento} />}
           {tabActiva === 'afectaciones' && (
             <TabAfectacionesUnificadas 
               colectivas={colectivas} 
@@ -208,9 +241,22 @@ export default function ExpedienteDetail() {
               onEditarIndividual={setModalIndividual} 
               onCrearConvenio={setModalConvenio} 
               onAbrir={(afectacion) => navigate(`/expedientes/${id_tramo_nucleo}/afectaciones/${afectacion.id_afectacion}`)} 
+              seguimientoPausado={seguimientoPausado}
+              motivoNoSeguimiento={motivoNoSeguimiento}
             />
           )}
           {tabActiva === 'asambleas'    && <TabAsambleas items={asambleas} user={user} onNueva={() => setModalAsamblea(true)} onEditar={setModalAsamblea} />}
+          {tabActiva === 'convenios'    && (
+            <TabConvenios
+              items={convenios}
+              afectaciones={afectaciones}
+              user={user}
+              onNuevo={(afectacion) => setModalConvenio(afectacion)}
+              onEditar={(afectacion, convenio) => setModalConvenio({ afectacion, convenio, isEdit: true })}
+              seguimientoPausado={seguimientoPausado}
+              motivoNoSeguimiento={motivoNoSeguimiento}
+            />
+          )}
           <React.Suspense fallback={<div className="panel-loading"><Loader2 className="spin" /> Cargando módulo…</div>}>
             {tabActiva === 'flujo' && (
               <FlujoLiberacionPanel
@@ -219,6 +265,8 @@ export default function ExpedienteDetail() {
                 afectaciones={afectaciones}
                 convenios={convenios}
                 canWrite={canWrite}
+                seguimientoPausado={seguimientoPausado}
+                motivoNoSeguimiento={motivoNoSeguimiento}
                 onRefresh={() => {
                   refrescarAfectaciones();
                   refrescarAsambleas();
@@ -286,13 +334,21 @@ export default function ExpedienteDetail() {
 }
 
 /* ────── Pestaña: Información General ────── */
-function TabGeneral({ tramoNucleo, nucleo }) {
+function TabGeneral({ tramoNucleo, nucleo, motivoNoSeguimiento }) {
+  const afectaUsoComun = !motivoNoSeguimiento;
   const campos = [
-    { label: 'Municipio',         valor: nucleo?.municipio_nombre || '—' },
     { label: 'Entidad',           valor: nucleo?.entidad_nombre || '—' },
-    { label: 'Tipo de Núcleo',    valor: nucleo?.tipo_nucleo },
+    { label: 'Municipio',         valor: nucleo?.municipio_nombre || '—' },
+    { label: 'Residencia',        valor: nucleo?.residencia || '—' },
+    { label: 'Núcleo agrario',    valor: nucleo?.nombre_nucleo || tramoNucleo.nombre_nucleo || '—' },
+    { label: 'E/C',               valor: ecLabel(nucleo?.tipo_nucleo || tramoNucleo.tipo_nucleo) },
+    { label: 'Tipo de núcleo',    valor: tipoNucleoLabel(nucleo?.tipo_nucleo || tramoNucleo.tipo_nucleo) },
+    { label: 'Clave del tramo',   valor: tramoNucleo.nombre_tramo || '—' },
+    { label: 'Número de tramo',   valor: tramoNucleo.numero_tramo || '—' },
+    { label: 'Consecutivo',       valor: tramoNucleo.consecutivo || '—' },
     { label: 'Longitud del tramo',valor: tramoNucleo.longitud_m ? `${Number(tramoNucleo.longitud_m).toLocaleString()} m` : '—' },
-    { label: '¿Es Expropiación?', valor: tramoNucleo.es_expropiacion ? 'Sí' : 'No' },
+    { label: '¿El proyecto afecta tierras de uso común?', valor: afectaUsoComun ? 'Sí' : 'No' },
+    { label: 'Motivo sin seguimiento PA', valor: motivoNoSeguimiento || 'No aplica' },
     { label: 'Observaciones',     valor: tramoNucleo.observaciones || '—' },
   ];
   return (
@@ -308,7 +364,7 @@ function TabGeneral({ tramoNucleo, nucleo }) {
 }
 
 /* ────── Pestaña: Afectaciones Unificadas ────── */
-function TabAfectacionesUnificadas({ colectivas, individuales, convenios, user, onNuevaColectiva, onNuevaIndividual, onEditarColectiva, onEditarIndividual, onCrearConvenio, onAbrir }) {
+function TabAfectacionesUnificadas({ colectivas, individuales, convenios, user, onNuevaColectiva, onNuevaIndividual, onEditarColectiva, onEditarIndividual, onCrearConvenio, onAbrir, seguimientoPausado, motivoNoSeguimiento }) {
   const puedeCapturar = user?.rol && ['admin', 'operador'].includes(user.rol);
   const [filtro, setFiltro] = useState('todas');
 
@@ -354,7 +410,7 @@ function TabAfectacionesUnificadas({ colectivas, individuales, convenios, user, 
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }}>
-          {puedeCapturar && (
+          {puedeCapturar && !seguimientoPausado && (
             <>
               <button
                 style={{ background: '#006341', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}
@@ -376,10 +432,12 @@ function TabAfectacionesUnificadas({ colectivas, individuales, convenios, user, 
       {items.length === 0 ? (
         <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '10px', border: '2px dashed #e2e8f0' }}>
           <FileText size={32} style={{ marginBottom: '10px', opacity: 0.4, display: 'block', margin: '0 auto 10px auto' }} />
-          <p>No hay afectaciones registradas con este filtro.</p>
-          {puedeCapturar && <p style={{ fontSize: '13px', marginTop: '6px' }}>Usa los botones superiores para registrar una nueva.</p>}
+          <p>{seguimientoPausado ? 'Este expediente no continúa con afectaciones dentro del seguimiento ordinario de la PA.' : 'No hay afectaciones registradas con este filtro.'}</p>
+          {seguimientoPausado && <p style={{ fontSize: '13px', marginTop: '6px' }}>Motivo: {motivoNoSeguimiento}.</p>}
+          {puedeCapturar && !seguimientoPausado && <p style={{ fontSize: '13px', marginTop: '6px' }}>Usa los botones superiores para registrar una nueva.</p>}
         </div>
       ) : (
+        <div className="responsive-table">
         <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           <thead>
             <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
@@ -435,7 +493,7 @@ function TabAfectacionesUnificadas({ colectivas, individuales, convenios, user, 
                     >
                       <FolderOpen size={14} /> Abrir
                     </button>
-                    {puedeCapturar && (
+                    {puedeCapturar && !seguimientoPausado && (
                       <>
                       <button
                         onClick={() => esColectivo ? onEditarColectiva(a) : onEditarIndividual(a)}
@@ -463,6 +521,7 @@ function TabAfectacionesUnificadas({ colectivas, individuales, convenios, user, 
             )})}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
@@ -497,13 +556,17 @@ function TabAsambleas({ items, user, onNueva, onEditar }) {
           {puedeCapturar && <p style={{ fontSize: '13px', marginTop: '6px' }}>Usa el botón de arriba para registrar la primera asamblea.</p>}
         </div>
       ) : (
+        <div className="responsive-table">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               <th style={thStyle}>ID</th>
               <th style={thStyle}>Tipo</th>
+              <th style={thStyle}>Motivo</th>
               <th style={thStyle}>Resultado</th>
               <th style={thStyle}>Fecha Realizada</th>
+              <th style={thStyle}>RAN</th>
+              <th style={thStyle}>Documentación</th>
               <th style={thStyle}>Estatus</th>
               {puedeCapturar && <th style={{ ...thStyle, textAlign: 'right' }}>Acciones</th>}
             </tr>
@@ -513,8 +576,15 @@ function TabAsambleas({ items, user, onNueva, onEditar }) {
               <tr key={a.id_asamblea} style={{ borderBottom: '1px solid #f1f5f9' }}>
                 <td style={tdStyle}><span style={{ background: '#f1f5f9', color: '#475569', borderRadius: '6px', padding: '3px 8px', fontSize: '12px' }}>#{a.id_asamblea}</span></td>
                 <td style={tdStyle}>{a.tipo_asamblea || '—'}</td>
+                <td style={tdStyle}>{a.contexto_proceso || '—'}</td>
                 <td style={tdStyle}>{a.resultado_anuencia || '—'}</td>
                 <td style={tdStyle}>{a.fecha_realizada || '—'}</td>
+                <td style={tdStyle}>
+                  Ingreso: {a.ingreso_ran_fecha || '—'}<br />
+                  Solicitud: {a.numero_solicitud_ran || '—'}<br />
+                  Inscripción acta: {a.acta_inscripcion_fecha_ran || '—'}
+                </td>
+                <td style={tdStyle}>{a.documentacion_disponible ? 'Disponible' : (a.documentacion_faltante || 'Pendiente')}</td>
                 <td style={tdStyle}>
                   <span style={{ background: a.estatus_asamblea === 'completo' ? '#dcfce7' : '#fef3c7', color: a.estatus_asamblea === 'completo' ? '#16a34a' : '#d97706', borderRadius: '20px', padding: '3px 10px', fontSize: '12px' }}>
                     {a.estatus_asamblea || '—'}
@@ -537,6 +607,123 @@ function TabAsambleas({ items, user, onNueva, onEditar }) {
             ))}
           </tbody>
         </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ────── Pestaña: Convenios ────── */
+function TabConvenios({ items, afectaciones, user, onNuevo, onEditar, seguimientoPausado, motivoNoSeguimiento }) {
+  const puedeCapturar = user?.rol && ['admin', 'operador'].includes(user.rol);
+  const [selectedId, setSelectedId] = useState(String(afectaciones[0]?.id_afectacion || ''));
+  const afectacionMap = useMemo(
+    () => Object.fromEntries(afectaciones.map((item) => [item.id_afectacion, item])),
+    [afectaciones],
+  );
+  const selectedAfectacion = afectacionMap[Number(selectedId)];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <h3 style={{ fontSize: '16px', color: '#1e293b', fontWeight: '600', margin: 0 }}>
+          Convenios
+          <span style={{ marginLeft: '10px', background: '#f1f5f9', color: '#475569', borderRadius: '20px', padding: '2px 10px', fontSize: '13px', fontWeight: '400' }}>
+            {items.length} registros
+          </span>
+        </h3>
+        {puedeCapturar && !seguimientoPausado && afectaciones.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <select
+              value={selectedId}
+              onChange={(event) => setSelectedId(event.target.value)}
+              style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 10px', fontSize: '13px' }}
+            >
+              {afectaciones.map((item) => (
+                <option key={item.id_afectacion} value={item.id_afectacion}>
+                  Afectación #{item.id_afectacion} · {item.tipo_afectacion}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              style={{ background: '#059669', color: 'white', border: 'none', padding: '9px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}
+              disabled={!selectedAfectacion}
+              onClick={() => onNuevo(selectedAfectacion)}
+            >
+              + Nuevo convenio
+            </button>
+          </div>
+        )}
+      </div>
+      {seguimientoPausado && (
+        <div style={{ padding: '14px 16px', background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa', borderRadius: '8px' }}>
+          Sin captura de convenios por seguimiento PA detenido. Motivo: {motivoNoSeguimiento}.
+        </div>
+      )}
+      {items.length === 0 ? (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '10px', border: '2px dashed #e2e8f0' }}>
+          <FileSignature size={32} style={{ display: 'block', margin: '0 auto 10px auto', opacity: 0.4 }} />
+          <p>No hay convenios registrados para este expediente.</p>
+        </div>
+      ) : (
+        <div className="responsive-table">
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+              <th style={thStyle}>ID</th>
+              <th style={thStyle}>Tipo de convenio</th>
+              <th style={thStyle}>Afectación</th>
+              <th style={thStyle}>Firma</th>
+              <th style={thStyle}>Superficie</th>
+              <th style={thStyle}>Montos</th>
+              <th style={thStyle}>RAN</th>
+              <th style={thStyle}>Documentación</th>
+              {puedeCapturar && <th style={{ ...thStyle, textAlign: 'right' }}>Acciones</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((convenio) => {
+              const afectacion = afectacionMap[convenio.id_afectacion];
+              const superficie = convenio.superficie_total_ha
+                || convenio.superficie_real_afectada_ha
+                || convenio.superficie_adicional_ha
+                || convenio.superficie_ampliacion_ha;
+              return (
+                <tr key={convenio.id_convenio} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={tdStyle}><span style={{ background: '#f1f5f9', color: '#475569', borderRadius: '6px', padding: '3px 8px', fontSize: '12px' }}>#{convenio.id_convenio}</span></td>
+                  <td style={tdStyle}>{convenio.tipo_convenio || '—'}</td>
+                  <td style={tdStyle}>#{convenio.id_afectacion} · {afectacion?.tipo_afectacion || convenio.tipo_afectacion || '—'}</td>
+                  <td style={tdStyle}>{convenio.fecha_firma || '—'}</td>
+                  <td style={tdStyle}>{superficie ? `${superficie} ha` : '—'}</td>
+                  <td style={tdStyle}>
+                    100%: {convenio.monto_100 || '—'}<br />
+                    90%: {convenio.monto_90 || '—'}<br />
+                    BDT: {convenio.monto_bdt || '—'}
+                  </td>
+                  <td style={tdStyle}>
+                    Ingreso: {convenio.ingreso_ran_fecha || '—'}<br />
+                    Solicitud: {convenio.numero_solicitud_ingreso || '—'}<br />
+                    Inscripción: {convenio.convenio_inscrito_fecha_ran || '—'}
+                  </td>
+                  <td style={tdStyle}>{convenio.documentacion_disponible ? 'Disponible' : (convenio.documentacion_faltante || 'Pendiente')}</td>
+                  {puedeCapturar && (
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <button
+                        type="button"
+                        onClick={() => onEditar(afectacion || convenio, convenio)}
+                        style={{ background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}
+                      >
+                        Editar
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        </div>
       )}
     </div>
   );

@@ -32,7 +32,8 @@ const emptyForms = {
   },
   relaciones: {
     id_tramo: '', id_nucleo: '', consecutivo: '', numero_tramo: '',
-    geometria_wkt: '', es_expropiacion: false,
+    geometria_wkt: '', es_expropiacion: false, proyecto_no_afecta_uso_comun: false,
+    causa_problema: '',
   },
 };
 
@@ -311,7 +312,29 @@ export default function AdministracionTerritorial() {
           <Field label="Núcleo"><select required disabled={Boolean(editingId)} value={form.id_nucleo ?? ''} onChange={(e) => updateField('id_nucleo', Number(e.target.value))}><option value="">Selecciona</option>{data.nucleos.filter((n) => n.activo).map((n) => <option key={n.id_nucleo} value={n.id_nucleo}>{n.nombre_nucleo}</option>)}</select></Field>
           <Field label="Consecutivo"><input required type="number" min="1" disabled={Boolean(editingId)} value={form.consecutivo ?? ''} onChange={(e) => updateField('consecutivo', Number(e.target.value))} /></Field>
           <Field label="Número de tramo"><input value={form.numero_tramo ?? ''} onChange={(e) => updateField('numero_tramo', e.target.value)} /></Field>
-          <label className="admin-toggle"><input type="checkbox" checked={Boolean(form.es_expropiacion)} onChange={(e) => updateField('es_expropiacion', e.target.checked)} /><span>Es expropiación</span></label>
+          <Field label="¿El proyecto afecta tierras de uso común?">
+            <select
+              value={form.proyecto_no_afecta_uso_comun ? 'no' : 'si'}
+              onChange={(event) => {
+                const noAfecta = event.target.value === 'no';
+                updateField('proyecto_no_afecta_uso_comun', noAfecta);
+                if (!noAfecta) updateField('es_expropiacion', false);
+              }}
+            >
+              <option value="si">Sí</option>
+              <option value="no">No</option>
+            </select>
+          </Field>
+          <label className="admin-toggle"><input type="checkbox" checked={Boolean(form.es_expropiacion)} onChange={(e) => {
+            updateField('es_expropiacion', e.target.checked);
+            if (e.target.checked) updateField('proyecto_no_afecta_uso_comun', true);
+          }} /><span>Motivo: Expropiación directa</span></label>
+          {data.nucleos.find((n) => n.id_nucleo === Number(form.id_nucleo))?.comunidad_indigena && (
+            <div className="admin-field admin-field-wide">
+              <small>Motivo detectado por el núcleo: Comunidad indígena. El caso no continúa en el seguimiento ordinario PA.</small>
+            </div>
+          )}
+          <Field label="Motivo u observación de seguimiento"><textarea value={form.causa_problema ?? ''} onChange={(e) => updateField('causa_problema', e.target.value)} /></Field>
           <GeometryField label="Geometría del segmento" expected="MULTILINESTRING" example="MULTILINESTRING((-99.10 19.40, -99.08 19.42))" value={form.geometria_wkt} onChange={(value) => updateField('geometria_wkt', value)} />
         </>}
       </div>
@@ -327,6 +350,14 @@ export default function AdministracionTerritorial() {
   const projectName = (id) => data.proyectos.find((item) => item.id_proyecto === id)?.clave_proyecto || '—';
   const tramoName = (id) => data.tramos.find((item) => item.id_tramo === id)?.clave_tramo || '—';
   const nucleoName = (id) => data.nucleos.find((item) => item.id_nucleo === id)?.nombre_nucleo || '—';
+  const nucleoById = (id) => data.nucleos.find((item) => item.id_nucleo === Number(id));
+  const relacionMotivoSinSeguimiento = (item) => {
+    const nucleo = nucleoById(item.id_nucleo);
+    if (item.es_expropiacion) return 'Expropiación directa';
+    if (nucleo?.comunidad_indigena) return 'Comunidad indígena';
+    if (item.proyecto_no_afecta_uso_comun) return 'No afecta tierras de uso común';
+    return 'Seguimiento ordinario';
+  };
   const nucleoProjectLabel = (item) => {
     const projects = item.proyectos_territoriales || [];
     if (projects.length === 0) return 'Sin relación';
@@ -347,12 +378,15 @@ export default function AdministracionTerritorial() {
     tableColumns.push({ header: 'Proyecto', render: (item) => nucleoProjectLabel(item) });
     tableColumns.push({ header: 'Entidad', render: (item) => item.entidad_nombre || '—' });
     tableColumns.push({ header: 'Municipio', render: (item) => item.municipio_nombre || '—' });
-    tableColumns.push({ header: 'Tipo', render: (item) => item.tipo_nucleo });
+    tableColumns.push({ header: 'E/C', render: (item) => item.tipo_nucleo === 'ejido' ? 'E · Ejido' : 'C · Comunidad' });
+    tableColumns.push({ header: 'Comunidad indígena', render: (item) => item.comunidad_indigena ? 'Sí' : 'No' });
   } else if (activeTab === 'relaciones') {
     tableColumns.push({ header: 'Tramo', render: (item) => <strong>{tramoName(item.id_tramo)}</strong> });
     tableColumns.push({ header: 'Núcleo', render: (item) => nucleoName(item.id_nucleo) });
     tableColumns.push({ header: 'Consecutivo', render: (item) => item.consecutivo });
     tableColumns.push({ header: 'Número', render: (item) => item.numero_tramo || '—' });
+    tableColumns.push({ header: 'Uso común', render: (item) => item.proyecto_no_afecta_uso_comun || item.es_expropiacion || nucleoById(item.id_nucleo)?.comunidad_indigena ? 'No' : 'Sí' });
+    tableColumns.push({ header: 'Seguimiento PA', render: (item) => relacionMotivoSinSeguimiento(item) });
   }
 
   tableColumns.push({

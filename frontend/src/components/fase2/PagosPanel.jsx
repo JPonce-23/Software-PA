@@ -15,6 +15,7 @@ const money = new Intl.NumberFormat('es-MX', {
 });
 
 export default function PagosPanel({ idTramoNucleo, idAfectacion = null, canWrite }) {
+  const [allTramites, setAllTramites] = useState([]);
   const [tramites, setTramites] = useState([]);
   const [convenios, setConvenios] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -42,6 +43,7 @@ export default function PagosPanel({ idTramoNucleo, idAfectacion = null, canWrit
       const eligible = tramitesResponse.data.filter(
         (item) => item.tipo_tramite === 'indemnizacion' && item.id_convenio,
       );
+      setAllTramites(tramitesResponse.data);
       setTramites(eligible);
       setConvenios(conveniosResponse.data);
       const paymentResponses = await Promise.all(
@@ -80,8 +82,8 @@ export default function PagosPanel({ idTramoNucleo, idAfectacion = null, canWrit
     <div className="phase-panel">
       <header className="phase-panel-header">
         <div>
-          <h3>Pagos de indemnización</h3>
-          <p>El límite incluye tierra más bienes distintos a la tierra.</p>
+          <h3>FIFONAFE y pagos de indemnización</h3>
+          <p>Trámites de informe de no conflictos, indemnización y pagos vinculados.</p>
         </div>
         {canWrite && tramites.length > 0 && (
           <button type="button" className="button" onClick={() => setShowForm(true)}>
@@ -89,6 +91,38 @@ export default function PagosPanel({ idTramoNucleo, idAfectacion = null, canWrit
           </button>
         )}
       </header>
+
+      <section className="form-section">
+        <div className="inline-heading">
+          <strong>Trámites FIFONAFE</strong>
+        </div>
+        {allTramites.length === 0 ? (
+          <div className="empty-state">No hay trámites FIFONAFE registrados.</div>
+        ) : (
+          <div className="record-list">
+            {allTramites.map((tramite) => (
+              <article className="record-card" key={tramite.id_tramite_fifonafe}>
+                <header>
+                  <div>
+                    <strong>Trámite #{tramite.id_tramite_fifonafe} · {tramite.tipo_tramite}</strong>
+                    <span>Afectación #{tramite.id_afectacion || '—'} · Convenio #{tramite.id_convenio || '—'} · Ciclo #{tramite.id_ciclo_afectacion || '—'}</span>
+                  </div>
+                  <span className={tramite.estatus === 'completo' ? 'status success' : 'status warning'}>
+                    {tramite.estatus}
+                  </span>
+                </header>
+                <div className="record-meta">
+                  <span>¿Hay conflictos?: {tramite.hay_conflictos === null || tramite.hay_conflictos === undefined ? '—' : (tramite.hay_conflictos ? 'sí' : 'no')}</span>
+                  <span>FIFONAFE → DGAOPR: {tramite.no_oficio_fifonafe_a_dgaopr || '—'} · {tramite.fecha_oficio_fifonafe_a_dgaopr || '—'}</span>
+                  <span>DGAOPR → Representación: {tramite.no_oficio_dgaopr_a_repr || '—'} · {tramite.fecha_oficio_dgaopr_a_repr || '—'}</span>
+                  <span>Representación → DGAOPR: {tramite.no_oficio_rpta_repr_a_dgaopr || '—'} · {tramite.fecha_oficio_rpta_repr_a_dgaopr || '—'}</span>
+                  <span>DGAOPR → FIFONAFE: {tramite.no_oficio_rpta_dgaopr_a_fifonafe || '—'} · {tramite.fecha_oficio_rpta_dgaopr_a_fifonafe || '—'}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       {tramites.length === 0 ? (
         <div className="empty-state">

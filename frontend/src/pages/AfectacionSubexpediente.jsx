@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle, ArrowLeft, Banknote, Calendar, ClipboardList,
   FileClock, FileSignature, FileText, Loader2,
+  Layers,
 } from 'lucide-react';
 import api from '../api/axios';
 import AuthContext from '../contexts/auth-context';
@@ -16,6 +17,7 @@ const PagosPanel = React.lazy(() => import('../components/fase2/PagosPanel'));
 
 const BASE_TABS = [
   { key: 'flujo', label: 'Flujo', icon: FileText },
+  { key: 'ciclos', label: 'Ciclo', icon: Layers },
   { key: 'convenios', label: 'Convenios', icon: FileSignature },
   { key: 'pagos', label: 'Pagos', icon: Banknote },
   { key: 'minutas', label: 'Minutas', icon: ClipboardList },
@@ -30,6 +32,7 @@ export default function AfectacionSubexpediente() {
   const [data, setData] = useState(null);
   const [asambleas, setAsambleas] = useState([]);
   const [convenios, setConvenios] = useState([]);
+  const [ciclos, setCiclos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('flujo');
@@ -42,7 +45,7 @@ export default function AfectacionSubexpediente() {
     setLoading(true);
     setError(null);
     try {
-      const [subResponse, asambleasResponse, conveniosResponse] = await Promise.all([
+      const [subResponse, asambleasResponse, conveniosResponse, ciclosResponse] = await Promise.all([
         api.get(`/tramos-nucleos/${id_tramo_nucleo}/afectaciones/${id_afectacion}/subexpediente`),
         api.get('/asambleas', {
           params: {
@@ -56,10 +59,12 @@ export default function AfectacionSubexpediente() {
             id_afectacion: id_afectacion,
           },
         }),
+        api.get(`/afectaciones/${id_afectacion}/ciclos`),
       ]);
       setData(subResponse.data);
       setAsambleas(asambleasResponse.data);
       setConvenios(conveniosResponse.data);
+      setCiclos(ciclosResponse.data);
     } catch (requestError) {
       setError(requestError.response?.data?.detail || 'No se pudo cargar el subexpediente.');
     } finally {
@@ -72,17 +77,18 @@ export default function AfectacionSubexpediente() {
   const tabs = useMemo(
     () => data?.afectacion?.tipo_afectacion === 'colectivo'
       ? [
+          BASE_TABS[0],
+          BASE_TABS[1],
           { key: 'asambleas', label: 'Asambleas', icon: Calendar },
-          ...BASE_TABS,
+          ...BASE_TABS.slice(2),
         ]
       : BASE_TABS,
     [data?.afectacion?.tipo_afectacion],
   );
 
   const cicloOperativo = useMemo(() => {
-    const ciclos = data?.estado?.ciclos || [];
     return ciclos.find((item) => item.tipo_ciclo === 'cop_original') || ciclos[0] || null;
-  }, [data?.estado?.ciclos]);
+  }, [ciclos]);
 
   if (loading) {
     return (
@@ -181,6 +187,15 @@ export default function AfectacionSubexpediente() {
                 asambleas={asambleas}
                 canWrite={canWrite}
                 onNueva={() => setModalAsamblea(true)}
+              />
+            )}
+            {tab === 'ciclos' && (
+              <CiclosSection
+                ciclos={ciclos}
+                estadoCiclos={estado.ciclos || []}
+                canWrite={canWrite}
+                idAfectacion={Number(id_afectacion)}
+                onSaved={load}
               />
             )}
             {tab === 'convenios' && (
@@ -286,9 +301,102 @@ function AsambleasSection({ asambleas, canWrite, onNueva }) {
         render={(item) => (
           <>
             <strong>Asamblea #{item.id_asamblea} · {item.tipo_asamblea}</strong>
-            <span>{item.estatus_asamblea} · {item.fecha_realizada || 'Sin fecha realizada'}</span>
+            <span>Motivo: {item.contexto_proceso || '—'} · {item.estatus_asamblea} · {item.fecha_realizada || 'Sin fecha realizada'}</span>
+            <span>RAN: ingreso {item.ingreso_ran_fecha || '—'} · solicitud {item.numero_solicitud_ran || '—'} · inscripción acta {item.acta_inscripcion_fecha_ran || '—'}</span>
+            <span>Documentación: {item.documentacion_disponible ? 'disponible' : (item.documentacion_faltante || 'pendiente')}</span>
           </>
         )}
+      />
+    </div>
+  );
+}
+
+function CiclosSection({ ciclos, estadoCiclos, canWrite, idAfectacion, onSaved }) {
+  const [editingId, setEditingId] = useState(null);
+  const [observaciones, setObservaciones] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const estadoMap = useMemo(
+    () => Object.fromEntries(estadoCiclos.map((item) => [item.id_ciclo_afectacion, item])),
+    [estadoCiclos],
+  );
+
+  const guardar = async (ciclo) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.put(`/afectaciones/${idAfectacion}/ciclos/${ciclo.id_ciclo_afectacion}`, {
+        observaciones: observaciones || null,
+      });
+      setEditingId(null);
+      onSaved();
+    } catch (requestError) {
+      setError(requestError.response?.data?.detail || 'No fue posible guardar el ciclo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="phase-panel">
+      <header className="phase-panel-header">
+        <div>
+          <h3>Ciclo de la afectación</h3>
+          <p>Consulta el ciclo operativo, su estado y las observaciones existentes.</p>
+        </div>
+      </header>
+      {error && <div className="error-banner">{typeof error === 'string' ? error : JSON.stringify(error)}</div>}
+      <SimpleList
+        idKey="id_ciclo_afectacion"
+        items={ciclos}
+        empty="No hay ciclos registrados para esta afectación."
+        render={(item) => {
+          const estado = estadoMap[item.id_ciclo_afectacion] || {};
+          const editing = editingId === item.id_ciclo_afectacion;
+          return (
+            <>
+              <strong>Ciclo #{item.id_ciclo_afectacion} · {item.tipo_ciclo} #{item.consecutivo}</strong>
+              <span>Tipo de afectación: {item.tipo_afectacion}</span>
+              <span>Operativo: {estado.estado_operativo || '—'} · Registral: {estado.estado_registral || '—'} · Financiero: {estado.estado_financiero || '—'}</span>
+              <span>Superficie base: {item.superficie_base_ciclo_ha || '—'} ha · Superficie ciclo: {estado.superficie_ciclo_ha || '—'} ha</span>
+              <span>Límite pagable: {estado.limite_pagable || '—'} · Pagado: {estado.total_pagado || '—'} · Saldo: {estado.saldo_disponible || '—'}</span>
+              {editing ? (
+                <div className="form-stack">
+                  <textarea
+                    value={observaciones}
+                    onChange={(event) => setObservaciones(event.target.value)}
+                    rows={3}
+                    style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px' }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button type="button" className="button secondary compact" onClick={() => setEditingId(null)}>
+                      Cancelar
+                    </button>
+                    <button type="button" className="button compact" disabled={saving} onClick={() => guardar(item)}>
+                      {saving && <Loader2 size={14} className="spin" />} Guardar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span>Observaciones: {item.observaciones || '—'}</span>
+                  {canWrite && (
+                    <button
+                      type="button"
+                      className="button secondary compact"
+                      onClick={() => {
+                        setEditingId(item.id_ciclo_afectacion);
+                        setObservaciones(item.observaciones || '');
+                      }}
+                    >
+                      Editar observaciones
+                    </button>
+                  )}
+                </>
+              )}
+            </>
+          );
+        }}
       />
     </div>
   );
