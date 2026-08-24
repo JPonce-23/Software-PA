@@ -25,3 +25,6 @@ backups/
 # Geodata pesada (seed data)
 *.kml
 backend/seed_data/
+
+# Metadatos de Windows
+*.Zone.Identifier
