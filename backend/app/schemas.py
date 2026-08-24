@@ -606,15 +606,21 @@ class ConvenioCreate(AuditableCreate):
     tipo_afectacion: Literal['colectivo', 'individual']
     tipo_convenio: Literal['cop_original', 'modificatorio', 'superficie_adicional', 'obras_complementarias', 'ampliacion', 'ampliacion_remanente']
     fecha_firma: Optional[date] = None
-    superficie_real_afectada_ha: Optional[Decimal] = None
-    superficie_total_ha: Optional[Decimal] = None
-    superficie_adicional_ha: Optional[Decimal] = None
-    superficie_ampliacion_ha: Optional[Decimal] = None
-    monto_100: Optional[Decimal] = None
-    monto_90: Optional[Decimal] = None
-    monto_bdt: Optional[Decimal] = None
+    superficie_real_afectada_ha: Optional[Decimal] = Field(default=None, ge=0)
+    superficie_total_ha: Optional[Decimal] = Field(default=None, ge=0)
+    superficie_adicional_ha: Optional[Decimal] = Field(default=None, ge=0)
+    superficie_ampliacion_ha: Optional[Decimal] = Field(default=None, ge=0)
+    monto_100: Optional[Decimal] = Field(default=None, ge=0)
+    monto_90: Optional[Decimal] = Field(default=None, ge=0)
+    monto_bdt: Optional[Decimal] = Field(default=None, ge=0)
     id_convenio_padre: Optional[int] = None
     id_asamblea_autorizacion: Optional[int] = None
+    ingreso_ran_fecha: Optional[date] = None
+    numero_solicitud_ingreso: Optional[str] = None
+    calificacion_registral: Optional[str] = None
+    convenio_inscrito_fecha_ran: Optional[date] = None
+    documentacion_disponible: Optional[bool] = False
+    documentacion_faltante: Optional[str] = None
 
 class ConvenioUpdate(AuditableUpdate):
     fecha_firma: Optional[date] = None
@@ -648,6 +654,7 @@ class ConvenioResponse(ConvenioCreate):
 
 class OrvCreate(AuditableCreate):
     id_nucleo: int
+    numero_orv: Optional[str] = None
     inicio_vigencia: date
     fin_vigencia: date
     comisariado_presidente: Optional[str] = None
@@ -657,6 +664,8 @@ class OrvCreate(AuditableCreate):
     consejo_vigilancia_secretario1: Optional[str] = None
     consejo_vigilancia_secretario2: Optional[str] = None
     acta_eleccion_inscrita_ran: Optional[bool] = False
+    documentacion_disponible: Optional[bool] = False
+    documentacion_faltante: Optional[str] = None
 
     @model_validator(mode='after')
     def validar_vigencia(self):
@@ -686,11 +695,11 @@ class OrvResponse(OrvCreate):
 class PadronHistorialCreate(AuditableCreate):
     id_nucleo: int
     fecha_padron: date
-    numero_ejidatarios_comuneros: int
+    numero_ejidatarios_comuneros: int = Field(ge=0)
 
 class PadronHistorialUpdate(AuditableUpdate):
     fecha_padron: Optional[date] = None
-    numero_ejidatarios_comuneros: Optional[int] = None
+    numero_ejidatarios_comuneros: Optional[int] = Field(default=None, ge=0)
 
 class PadronHistorialResponse(PadronHistorialCreate):
     id_padron: int
@@ -704,11 +713,26 @@ class ActividadCampoCreate(AuditableCreate):
     contexto_proceso: Literal['cop_original', 'obras_complementarias', 'superficie_adicional'] = 'cop_original'
     fecha_programada: Optional[date] = None
     fecha_realizada: Optional[date] = None
+    resultado: Optional[str] = None
+
+    @model_validator(mode='after')
+    def validar_fechas(self):
+        if self.fecha_programada and self.fecha_realizada:
+            if self.fecha_realizada < self.fecha_programada:
+                raise ValueError('fecha_realizada no puede ser anterior a fecha_programada')
+        return self
 
 class ActividadCampoUpdate(AuditableUpdate):
     fecha_programada: Optional[date] = None
     fecha_realizada: Optional[date] = None
     resultado: Optional[str] = None
+
+    @model_validator(mode='after')
+    def validar_fechas(self):
+        if self.fecha_programada and self.fecha_realizada:
+            if self.fecha_realizada < self.fecha_programada:
+                raise ValueError('fecha_realizada no puede ser anterior a fecha_programada')
+        return self
 
 class ActividadCampoResponse(ActividadCampoCreate):
     id_actividad: int
@@ -723,7 +747,7 @@ class TramiteFifonafeCreate(AuditableCreate):
     id_tramite_no_conflictos: Optional[int] = None
     tipo_afectacion: Literal['colectivo', 'individual']
     tipo_tramite: Literal['indemnizacion', 'informe_no_conflictos']
-    estatus: str = 'pendiente'
+    estatus: Literal['programado', 'pendiente', 'completo', 'cancelado'] = 'pendiente'
     hay_conflictos: Optional[bool] = None
     no_oficio_fifonafe_a_dgaopr: Optional[str] = None
     no_oficio_dgaopr_a_repr: Optional[str] = None
@@ -734,8 +758,30 @@ class TramiteFifonafeCreate(AuditableCreate):
     fecha_oficio_rpta_repr_a_dgaopr: Optional[date] = None
     fecha_oficio_rpta_dgaopr_a_fifonafe: Optional[date] = None
 
+    @model_validator(mode='after')
+    def validar_informe_completo(self):
+        if self.tipo_tramite != 'informe_no_conflictos' or self.estatus != 'completo':
+            return self
+        requeridos = (
+            'hay_conflictos',
+            'no_oficio_fifonafe_a_dgaopr',
+            'no_oficio_dgaopr_a_repr',
+            'no_oficio_rpta_repr_a_dgaopr',
+            'no_oficio_rpta_dgaopr_a_fifonafe',
+            'fecha_oficio_fifonafe_a_dgaopr',
+            'fecha_oficio_dgaopr_a_repr',
+            'fecha_oficio_rpta_repr_a_dgaopr',
+            'fecha_oficio_rpta_dgaopr_a_fifonafe',
+        )
+        faltantes = [campo for campo in requeridos if getattr(self, campo) is None]
+        if faltantes:
+            raise ValueError(
+                'Un informe completo requiere resultado y los cuatro oficios con sus fechas'
+            )
+        return self
+
 class TramiteFifonafeUpdate(AuditableUpdate):
-    estatus: Optional[str] = None
+    estatus: Optional[Literal['programado', 'pendiente', 'completo', 'cancelado']] = None
     hay_conflictos: Optional[bool] = None
     no_oficio_fifonafe_a_dgaopr: Optional[str] = None
     no_oficio_dgaopr_a_repr: Optional[str] = None
