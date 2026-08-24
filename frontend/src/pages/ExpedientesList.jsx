@@ -148,7 +148,7 @@ export default function ExpedientesList() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#006341', fontWeight: '600', fontSize: '18px' }}>
             <FolderOpen size={24} />
-            Expedientes de Ejidos
+            Expedientes por proyecto, tramo y núcleo
             <span style={{ background: '#e0f0eb', color: '#006341', borderRadius: '20px', padding: '2px 10px', fontSize: '13px', marginLeft: '8px' }}>
               {filtrados.length} expedientes
             </span>

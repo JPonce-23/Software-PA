@@ -87,7 +87,7 @@ export default function AfectacionSubexpediente() {
   if (loading) {
     return (
       <div className="panel-loading">
-        <Loader2 className="spin" /> Cargando subexpediente…
+        <Loader2 className="spin" /> Cargando afectación…
       </div>
     );
   }
@@ -96,7 +96,7 @@ export default function AfectacionSubexpediente() {
     return (
       <div style={errorBox}>
         <AlertCircle size={20} />
-        {typeof error === 'string' ? error : 'Subexpediente no encontrado.'}
+        {typeof error === 'string' ? error : 'Afectación no encontrada.'}
       </div>
     );
   }
@@ -104,18 +104,18 @@ export default function AfectacionSubexpediente() {
   const { afectacion, tramo_nucleo: tramoNucleo, nucleo, estado } = data;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <section style={headerStyle}>
+    <div className="affectation-page">
+      <section className="affectation-header">
         <button
           type="button"
           onClick={() => navigate(`/expedientes/${id_tramo_nucleo}`)}
           style={backButton}
         >
-          <ArrowLeft size={15} /> Expediente maestro
+          <ArrowLeft size={15} /> Expediente del núcleo
         </button>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', alignItems: 'flex-start' }}>
-          <div>
-            <div style={eyebrow}>SUBEXPEDIENTE #{afectacion.id_afectacion}</div>
+        <div className="affectation-header-content">
+          <div className="affectation-heading">
+            <div style={eyebrow}>AFECTACIÓN #{afectacion.id_afectacion}</div>
             <h2 style={{ margin: '4px 0', fontSize: '24px', color: '#0f172a' }}>
               {nucleo.nombre_nucleo}
             </h2>
@@ -123,7 +123,7 @@ export default function AfectacionSubexpediente() {
               {afectacion.tipo_afectacion} · Tramo {tramoNucleo.numero_tramo || '—'} · Expediente #{tramoNucleo.id_tramo_nucleo}
             </p>
           </div>
-          <div style={statusGrid}>
+          <div className="affectation-status-grid">
             <StatusPill label="Liberación" value={estado.estado_liberacion} />
             <StatusPill label="Registral" value={estado.estado_registral} />
             <StatusPill label="Financiero" value={estado.estado_financiero} />
@@ -131,15 +131,15 @@ export default function AfectacionSubexpediente() {
         </div>
       </section>
 
-      <section style={summaryStyle}>
+      <section className="affectation-summary">
         <SummaryItem label="Tipo de tenencia" value={afectacion.tipo_tenencia} />
         <SummaryItem label="Superficie" value={afectacion.superficie_afectada_ha ? `${afectacion.superficie_afectada_ha} ha` : '—'} />
         <SummaryItem label="Parcela" value={afectacion.id_parcela ? `#${afectacion.id_parcela}` : 'No aplica'} />
         <SummaryItem label="Salida terminal" value={afectacion.tipo_salida_terminal || 'No'} />
       </section>
 
-      <section style={panelStyle}>
-        <div role="tablist" aria-label="Secciones del subexpediente" style={tabListStyle}>
+      <section className="affectation-panel">
+        <div role="tablist" aria-label="Secciones de la afectación" className="affectation-tabs">
           {tabs.map((item) => {
             const Icon = item.icon;
             const active = tab === item.key;
@@ -163,7 +163,7 @@ export default function AfectacionSubexpediente() {
           })}
         </div>
 
-        <div style={{ padding: '24px' }}>
+        <div className="affectation-panel-body">
           <React.Suspense fallback={<div className="panel-loading"><Loader2 className="spin" /> Cargando módulo…</div>}>
             {tab === 'flujo' && (
               <FlujoLiberacionPanel
@@ -373,13 +373,6 @@ function SimpleList({ items, idKey, empty, render }) {
   );
 }
 
-const headerStyle = {
-  background: 'white',
-  borderRadius: '12px',
-  padding: '22px 28px',
-  borderLeft: '5px solid #006341',
-  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-};
 const backButton = {
   background: 'none',
   border: 'none',
@@ -398,11 +391,6 @@ const eyebrow = {
   textTransform: 'uppercase',
   letterSpacing: '1px',
 };
-const statusGrid = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(110px, 1fr))',
-  gap: '10px',
-};
 const statusPill = {
   background: '#f8fafc',
   border: '1px solid #e2e8f0',
@@ -414,15 +402,6 @@ const statusPill = {
   fontSize: '12px',
   color: '#64748b',
 };
-const summaryStyle = {
-  background: 'white',
-  borderRadius: '12px',
-  padding: '18px 24px',
-  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-  gap: '16px',
-};
 const summaryLabel = {
   color: '#94a3b8',
   display: 'block',
@@ -433,18 +412,6 @@ const summaryLabel = {
 const summaryValue = {
   color: '#1e293b',
   fontSize: '15px',
-};
-const panelStyle = {
-  background: 'white',
-  borderRadius: '12px',
-  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-  overflow: 'hidden',
-};
-const tabListStyle = {
-  display: 'flex',
-  overflowX: 'auto',
-  borderBottom: '2px solid #f1f5f9',
-  padding: '0 16px',
 };
 const tabButtonStyle = {
   background: 'none',

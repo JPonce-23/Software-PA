@@ -58,7 +58,7 @@ function Sidebar() {
           to="/expedientes"
           style={isActive('/expedientes') ? { outline: '2px solid white' } : {}}
         >
-          Expedientes de Ejidos
+          Expedientes
         </Link>
 
         <div className="menu-group" style={{ marginTop: '10px' }}>
@@ -100,9 +100,9 @@ function Topbar() {
 
   const getTitulo = () => {
     if (location.pathname === '/mapa') return 'Visor de Mapas';
-    if (location.pathname.includes('/afectaciones/')) return 'Subexpediente de Afectación';
-    if (location.pathname.startsWith('/expedientes/')) return 'Expediente de Ejido';
-    if (location.pathname === '/expedientes') return 'Expedientes de Ejidos';
+    if (location.pathname.includes('/afectaciones/')) return 'Afectación del expediente';
+    if (location.pathname.startsWith('/expedientes/')) return 'Expediente del núcleo en el tramo';
+    if (location.pathname === '/expedientes') return 'Expedientes';
     if (location.pathname === '/administracion/territorio') return 'Administración territorial';
     if (location.pathname === '/administracion/usuarios') return 'Administración de usuarios';
     if (location.pathname === '/administracion/importaciones-geoespaciales') return 'Importaciones geoespaciales';

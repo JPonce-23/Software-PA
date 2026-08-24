@@ -68,13 +68,17 @@ export default function OrvPanel({ idNucleo, canWrite }) {
             <article className="record-card" key={orv.id_orv}>
               <header>
                 <div>
-                  <strong>ORV #{orv.id_orv}</strong>
+                  <strong>{orv.numero_orv ? `ORV ${orv.numero_orv}` : `ORV #${orv.id_orv}`}</strong>
                   <span>{orv.inicio_vigencia} — {orv.fin_vigencia}</span>
                 </div>
                 <span className={new Date(orv.fin_vigencia) < new Date() ? 'status danger' : 'status success'}>
                   {new Date(orv.fin_vigencia) < new Date() ? 'Vencido' : 'Vigente'}
                 </span>
               </header>
+              <div className="record-meta">
+                <span>Acta inscrita en RAN: {orv.acta_eleccion_inscrita_ran ? 'sí' : 'no'}</span>
+                <span>Documentación: {orv.documentacion_disponible ? 'disponible' : (orv.documentacion_faltante || 'pendiente')}</span>
+              </div>
               <div className="member-list">
                 {(integrantes[orv.id_orv] || []).map((item) => (
                   <div key={item.id_orv_integrante}>
@@ -106,7 +110,14 @@ export default function OrvPanel({ idNucleo, canWrite }) {
 }
 
 function OrvForm({ idNucleo, onClose, onSaved }) {
-  const [dates, setDates] = useState({ inicio_vigencia: '', fin_vigencia: '' });
+  const [details, setDetails] = useState({
+    numero_orv: '',
+    inicio_vigencia: '',
+    fin_vigencia: '',
+    acta_eleccion_inscrita_ran: false,
+    documentacion_disponible: false,
+    documentacion_faltante: '',
+  });
   const [members, setMembers] = useState([
     { key: crypto.randomUUID(), cargo: CARGOS[0][0], selection: null },
   ]);
@@ -146,7 +157,13 @@ function OrvForm({ idNucleo, onClose, onSaved }) {
     try {
       const people = await Promise.all(members.map((member) => createPersona(member.selection)));
       await api.post('/orvs/con-integrantes', {
-        orv: { id_nucleo: idNucleo, ...dates },
+        orv: {
+          id_nucleo: idNucleo,
+          ...details,
+          numero_orv: details.numero_orv || null,
+          documentacion_faltante: details.documentacion_disponible
+            ? null : (details.documentacion_faltante || null),
+        },
         integrantes: members.map((member, index) => ({
           id_persona: people[index].id_persona,
           cargo: member.cargo,
@@ -172,12 +189,19 @@ function OrvForm({ idNucleo, onClose, onSaved }) {
       <form className="form-stack" onSubmit={submit}>
         <ErrorBanner mensaje={error} />
         <div style={gridDos}>
+          <Campo label="Número o folio del ORV">
+            <input
+              value={details.numero_orv}
+              onChange={(event) => setDetails({ ...details, numero_orv: event.target.value })}
+              style={inputStyle}
+            />
+          </Campo>
           <Campo label="Inicio de vigencia *">
             <input
               required
               type="date"
-              value={dates.inicio_vigencia}
-              onChange={(event) => setDates({ ...dates, inicio_vigencia: event.target.value })}
+              value={details.inicio_vigencia}
+              onChange={(event) => setDetails({ ...details, inicio_vigencia: event.target.value })}
               style={inputStyle}
             />
           </Campo>
@@ -185,13 +209,38 @@ function OrvForm({ idNucleo, onClose, onSaved }) {
             <input
               required
               type="date"
-              min={dates.inicio_vigencia}
-              value={dates.fin_vigencia}
-              onChange={(event) => setDates({ ...dates, fin_vigencia: event.target.value })}
+              min={details.inicio_vigencia}
+              value={details.fin_vigencia}
+              onChange={(event) => setDetails({ ...details, fin_vigencia: event.target.value })}
               style={inputStyle}
             />
           </Campo>
         </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <input
+            type="checkbox"
+            checked={details.acta_eleccion_inscrita_ran}
+            onChange={(event) => setDetails({ ...details, acta_eleccion_inscrita_ran: event.target.checked })}
+          />
+          Acta de elección inscrita en el RAN
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <input
+            type="checkbox"
+            checked={details.documentacion_disponible}
+            onChange={(event) => setDetails({ ...details, documentacion_disponible: event.target.checked })}
+          />
+          Documentación soporte disponible
+        </label>
+        {!details.documentacion_disponible && (
+          <Campo label="Documentación faltante">
+            <input
+              value={details.documentacion_faltante}
+              onChange={(event) => setDetails({ ...details, documentacion_faltante: event.target.value })}
+              style={inputStyle}
+            />
+          </Campo>
+        )}
         {members.map((member, index) => (
           <section className="form-section" key={member.key}>
             <div className="inline-heading">

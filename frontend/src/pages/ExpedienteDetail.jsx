@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, MapPin, Users, FileText, ClipboardList,
+  ArrowLeft, MapPin, FileText, ClipboardList,
   Loader2, AlertCircle, Building2, Layers, Calendar,
   Banknote, FileClock, FolderOpen, ShieldCheck,
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import FormAsamblea from './FormAsamblea';
 import FormConvenio from './FormConvenio';
 
 const OrvPanel = React.lazy(() => import('../components/fase2/OrvPanel'));
+const PadronPanel = React.lazy(() => import('../components/fase2/PadronPanel'));
 const MinutasPanel = React.lazy(() => import('../components/fase2/MinutasPanel'));
 const PagosPanel = React.lazy(() => import('../components/fase2/PagosPanel'));
 const DocumentosPanel = React.lazy(() => import('../components/fase2/DocumentosPanel'));
@@ -144,7 +145,7 @@ export default function ExpedienteDetail() {
             </div>
             <div>
               <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                EXPEDIENTE #{id_tramo_nucleo}
+                EXPEDIENTE DEL NÚCLEO EN EL TRAMO
               </div>
               <h2 style={{ fontSize: '22px', color: '#0f172a', fontWeight: '700', margin: 0 }}>
                 {nucleo?.nombre_nucleo || `Núcleo Agrario #${tramoNucleo.id_nucleo}`}
@@ -225,7 +226,12 @@ export default function ExpedienteDetail() {
                 }}
               />
             )}
-            {tabActiva === 'orv'           && <OrvPanel idNucleo={tramoNucleo.id_nucleo} canWrite={canWrite} />}
+            {tabActiva === 'orv' && (
+              <div className="form-stack">
+                <OrvPanel idNucleo={tramoNucleo.id_nucleo} canWrite={canWrite} />
+                <PadronPanel idNucleo={tramoNucleo.id_nucleo} canWrite={canWrite} />
+              </div>
+            )}
             {tabActiva === 'minutas'       && <MinutasPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite} />}
             {tabActiva === 'pagos'         && <PagosPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite} />}
             {tabActiva === 'documentos'    && <DocumentosPanel idTramoNucleo={Number(id_tramo_nucleo)} canWrite={canWrite} />}

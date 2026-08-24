@@ -67,6 +67,11 @@ export default function FlujoLiberacionPanel({
     () => Object.fromEntries(convenios.map((item) => [item.id_convenio, item])),
     [convenios],
   );
+  const activityCycles = useMemo(
+    () => states.flatMap((state) => state.ciclos)
+      .filter((cycle) => ['superficie_adicional', 'obras_complementarias'].includes(cycle.tipo_ciclo)),
+    [states],
+  );
 
   const action = async (request) => {
     setError(null);
@@ -103,7 +108,12 @@ export default function FlujoLiberacionPanel({
           {activities.map((item) => (
             <article className="record-card" key={item.id_actividad}>
               <strong>{item.tipo_actividad}</strong>
-              <span>{item.contexto_proceso} · {item.fecha_realizada ? `realizada ${item.fecha_realizada}` : 'pendiente'}</span>
+              <span>
+                {item.id_ciclo_afectacion ? `Ciclo ${item.contexto_proceso}` : 'Antecedente común'}
+                {' · '}{item.fecha_programada ? `programada ${item.fecha_programada}` : 'sin programación'}
+                {' · '}{item.fecha_realizada ? `realizada ${item.fecha_realizada}` : 'pendiente'}
+              </span>
+              {item.resultado && <p>{item.resultado}</p>}
             </article>
           ))}
           {activities.length === 0 && <div className="empty-state">Aún no hay actividades.</div>}
@@ -149,7 +159,10 @@ export default function FlujoLiberacionPanel({
                         {base?.convenio_inscrito_fecha_ran && !informe && (
                           <button type="button" className="button secondary" onClick={() => setFifonafeForm({ mode: 'informe', cycle, base })}>Registrar no conflictos</button>
                         )}
-                        {informe?.estatus === 'completo' && !indemnizacion && (
+                        {informe && (
+                          <button type="button" className="button secondary" onClick={() => setFifonafeForm({ mode: 'informe', cycle, base, tramite: informe })}>Actualizar informe</button>
+                        )}
+                        {informe?.estatus === 'completo' && informe.hay_conflictos === false && !indemnizacion && (
                           <button type="button" className="button secondary" onClick={() => setFifonafeForm({ mode: 'indemnizacion', cycle, base, informe })}>Abrir indemnización</button>
                         )}
                         {indemnizacion && indemnizacion.estatus !== 'completo' && (
@@ -196,7 +209,7 @@ export default function FlujoLiberacionPanel({
         );
       })}
 
-      {activityForm && <ActivityForm idTramoNucleo={idTramoNucleo} onClose={() => setActivityForm(null)} onSaved={() => { setActivityForm(null); load(); }} />}
+      {activityForm && <ActivityForm idTramoNucleo={idTramoNucleo} cycles={activityCycles} onClose={() => setActivityForm(null)} onSaved={() => { setActivityForm(null); load(); }} />}
       {cycleForm && <CycleForm affect={cycleForm} onClose={() => setCycleForm(null)} onSaved={() => { setCycleForm(null); load(); }} />}
       {terminalForm && <TerminalForm affect={terminalForm} onClose={() => setTerminalForm(null)} onSaved={() => { setTerminalForm(null); load(); onRefresh?.(); }} />}
       {fifonafeForm && <FifonafeForm data={fifonafeForm} idTramoNucleo={idTramoNucleo} onClose={() => setFifonafeForm(null)} onSaved={() => { setFifonafeForm(null); load(); }} />}
@@ -204,17 +217,32 @@ export default function FlujoLiberacionPanel({
   );
 }
 
-function ActivityForm({ idTramoNucleo, onClose, onSaved }) {
-  const [form, setForm] = useState({ tipo_actividad: 'sensibilizacion', fecha_realizada: today() });
+function ActivityForm({ idTramoNucleo, cycles, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    tipo_actividad: 'sensibilizacion',
+    id_ciclo_afectacion: '',
+    fecha_programada: '',
+    fecha_realizada: '',
+    resultado: '',
+  });
   const [error, setError] = useState(null);
   const submit = async (event) => {
     event.preventDefault();
     try {
-      await api.post('/actividades-campo', { id_tramo_nucleo: idTramoNucleo, contexto_proceso: 'cop_original', ...form });
+      const cycle = cycles.find((item) => item.id_ciclo_afectacion === Number(form.id_ciclo_afectacion));
+      await api.post('/actividades-campo', {
+        id_tramo_nucleo: idTramoNucleo,
+        id_ciclo_afectacion: cycle?.id_ciclo_afectacion || null,
+        contexto_proceso: cycle?.tipo_ciclo || 'cop_original',
+        tipo_actividad: form.tipo_actividad,
+        fecha_programada: form.fecha_programada || null,
+        fecha_realizada: form.fecha_realizada || null,
+        resultado: form.resultado || null,
+      });
       onSaved();
     } catch (requestError) { setError(errorText(requestError)); }
   };
-  return <ModalWrapper titulo="Registrar actividad" onClose={onClose} color="#2563eb"><form className="form-stack" onSubmit={submit}><ErrorBanner mensaje={error} /><Campo label="Actividad"><select style={inputStyle} value={form.tipo_actividad} onChange={(e) => setForm({ ...form, tipo_actividad: e.target.value })}><option value="sensibilizacion">Sensibilización</option><option value="caminamiento">Caminamiento</option></select></Campo><Campo label="Fecha realizada"><input required type="date" style={inputStyle} value={form.fecha_realizada} onChange={(e) => setForm({ ...form, fecha_realizada: e.target.value })} /></Campo><button className="button" type="submit">Guardar</button></form></ModalWrapper>;
+  return <ModalWrapper titulo="Registrar actividad" onClose={onClose} color="#2563eb"><form className="form-stack" onSubmit={submit}><ErrorBanner mensaje={error} /><Campo label="Actividad"><select style={inputStyle} value={form.tipo_actividad} onChange={(e) => setForm({ ...form, tipo_actividad: e.target.value })}><option value="sensibilizacion">Sensibilización</option><option value="caminamiento">Caminamiento</option></select></Campo><Campo label="Ámbito"><select style={inputStyle} value={form.id_ciclo_afectacion} onChange={(e) => setForm({ ...form, id_ciclo_afectacion: e.target.value })}><option value="">Antecedente común del expediente</option>{cycles.map((cycle) => <option key={cycle.id_ciclo_afectacion} value={cycle.id_ciclo_afectacion}>{cycle.tipo_ciclo} #{cycle.consecutivo}</option>)}</select></Campo><Campo label="Fecha programada"><input type="date" style={inputStyle} value={form.fecha_programada} onChange={(e) => setForm({ ...form, fecha_programada: e.target.value })} /></Campo><Campo label="Fecha realizada"><input type="date" min={form.fecha_programada} style={inputStyle} value={form.fecha_realizada} onChange={(e) => setForm({ ...form, fecha_realizada: e.target.value })} /></Campo><Campo label="Resultado"><textarea style={inputStyle} value={form.resultado} onChange={(e) => setForm({ ...form, resultado: e.target.value })} /></Campo><button className="button" type="submit">Guardar</button></form></ModalWrapper>;
 }
 
 function CycleForm({ affect, onClose, onSaved }) {
@@ -235,27 +263,48 @@ function TerminalForm({ affect, onClose, onSaved }) {
 function FifonafeForm({ data, idTramoNucleo, onClose, onSaved }) {
   const [error, setError] = useState(null);
   const [fields, setFields] = useState({
-    no_oficio_fifonafe_a_dgaopr: '', no_oficio_dgaopr_a_repr: '',
-    no_oficio_rpta_repr_a_dgaopr: '', no_oficio_rpta_dgaopr_a_fifonafe: '',
-    fecha_oficio_fifonafe_a_dgaopr: today(), fecha_oficio_dgaopr_a_repr: today(),
-    fecha_oficio_rpta_repr_a_dgaopr: today(), fecha_oficio_rpta_dgaopr_a_fifonafe: today(),
+    estatus: data.tramite?.estatus || 'programado',
+    hay_conflictos: data.tramite?.hay_conflictos == null ? '' : String(data.tramite.hay_conflictos),
+    no_oficio_fifonafe_a_dgaopr: data.tramite?.no_oficio_fifonafe_a_dgaopr || '',
+    no_oficio_dgaopr_a_repr: data.tramite?.no_oficio_dgaopr_a_repr || '',
+    no_oficio_rpta_repr_a_dgaopr: data.tramite?.no_oficio_rpta_repr_a_dgaopr || '',
+    no_oficio_rpta_dgaopr_a_fifonafe: data.tramite?.no_oficio_rpta_dgaopr_a_fifonafe || '',
+    fecha_oficio_fifonafe_a_dgaopr: data.tramite?.fecha_oficio_fifonafe_a_dgaopr || '',
+    fecha_oficio_dgaopr_a_repr: data.tramite?.fecha_oficio_dgaopr_a_repr || '',
+    fecha_oficio_rpta_repr_a_dgaopr: data.tramite?.fecha_oficio_rpta_repr_a_dgaopr || '',
+    fecha_oficio_rpta_dgaopr_a_fifonafe: data.tramite?.fecha_oficio_rpta_dgaopr_a_fifonafe || '',
   });
   const submit = async (event) => {
     event.preventDefault();
     try {
       if (data.mode === 'informe') {
-        await api.post('/fifonafe', { id_tramo_nucleo: idTramoNucleo, id_convenio: data.base.id_convenio, id_afectacion: data.cycle.id_afectacion, id_ciclo_afectacion: data.cycle.id_ciclo_afectacion, tipo_afectacion: data.cycle.tipo_afectacion, tipo_tramite: 'informe_no_conflictos', estatus: 'completo', hay_conflictos: false, ...fields });
+        const payload = Object.fromEntries(Object.entries(fields).map(([key, value]) => [
+          key,
+          key === 'hay_conflictos' ? (value === '' ? null : value === 'true') : (value || null),
+        ]));
+        if (data.tramite) await api.put(`/fifonafe/${data.tramite.id_tramite_fifonafe}`, payload);
+        else await api.post('/fifonafe', { id_tramo_nucleo: idTramoNucleo, id_convenio: data.base.id_convenio, id_afectacion: data.cycle.id_afectacion, id_ciclo_afectacion: data.cycle.id_ciclo_afectacion, tipo_afectacion: data.cycle.tipo_afectacion, tipo_tramite: 'informe_no_conflictos', ...payload });
       } else if (data.mode === 'indemnizacion') {
         await api.post('/fifonafe', { id_tramo_nucleo: idTramoNucleo, id_convenio: data.base.id_convenio, id_afectacion: data.cycle.id_afectacion, id_ciclo_afectacion: data.cycle.id_ciclo_afectacion, id_tramite_no_conflictos: data.informe.id_tramite_fifonafe, tipo_afectacion: data.cycle.tipo_afectacion, tipo_tramite: 'indemnizacion', estatus: 'pendiente' });
       } else {
-        await api.put(`/fifonafe/${data.tramite.id_tramite_fifonafe}`, fields);
         await api.post(`/fifonafe/${data.tramite.id_tramite_fifonafe}/completar-indemnizacion`, { confirmar: true });
       }
       onSaved();
     } catch (requestError) { setError(errorText(requestError)); }
   };
-  const needsFields = data.mode !== 'indemnizacion';
-  return <ModalWrapper titulo={data.mode === 'informe' ? 'Informe de no conflictos' : data.mode === 'indemnizacion' ? 'Abrir indemnización' : 'Completar indemnización'} onClose={onClose} color="#059669"><form className="form-stack" onSubmit={submit}><ErrorBanner mensaje={error} />{needsFields && Object.entries(fields).map(([key, value]) => <Campo key={key} label={key.replaceAll('_', ' ')}><input required type={key.startsWith('fecha_') ? 'date' : 'text'} style={inputStyle} value={value} onChange={(e) => setFields({ ...fields, [key]: e.target.value })} /></Campo>)}<button className="button" type="submit">Confirmar</button></form></ModalWrapper>;
+  const complete = fields.estatus === 'completo';
+  const labels = {
+    no_oficio_fifonafe_a_dgaopr: 'Oficio FIFONAFE a DGAOPR',
+    no_oficio_dgaopr_a_repr: 'Oficio DGAOPR a representación',
+    no_oficio_rpta_repr_a_dgaopr: 'Respuesta de representación a DGAOPR',
+    no_oficio_rpta_dgaopr_a_fifonafe: 'Respuesta DGAOPR a FIFONAFE',
+    fecha_oficio_fifonafe_a_dgaopr: 'Fecha del oficio FIFONAFE a DGAOPR',
+    fecha_oficio_dgaopr_a_repr: 'Fecha del oficio DGAOPR a representación',
+    fecha_oficio_rpta_repr_a_dgaopr: 'Fecha de respuesta de representación',
+    fecha_oficio_rpta_dgaopr_a_fifonafe: 'Fecha de respuesta DGAOPR a FIFONAFE',
+  };
+  const officeKeys = Object.keys(labels);
+  return <ModalWrapper titulo={data.mode === 'informe' ? 'Informe de no conflictos' : data.mode === 'indemnizacion' ? 'Abrir indemnización' : 'Completar indemnización'} onClose={onClose} color="#059669"><form className="form-stack" onSubmit={submit}><ErrorBanner mensaje={error} />{data.mode === 'informe' && <><Campo label="Estatus"><select style={inputStyle} value={fields.estatus} onChange={(e) => setFields({ ...fields, estatus: e.target.value })}><option value="programado">Programado</option><option value="pendiente">Pendiente</option><option value="completo">Completo</option></select></Campo><Campo label="¿Se identificaron conflictos?"><select required={complete} style={inputStyle} value={fields.hay_conflictos} onChange={(e) => setFields({ ...fields, hay_conflictos: e.target.value })}><option value="">Sin determinar</option><option value="false">No</option><option value="true">Sí</option></select></Campo>{officeKeys.map((key) => <Campo key={key} label={labels[key]}><input required={complete} type={key.startsWith('fecha_') ? 'date' : 'text'} style={inputStyle} value={fields[key]} onChange={(e) => setFields({ ...fields, [key]: e.target.value })} /></Campo>)}</>}<button className="button" type="submit">Confirmar</button></form></ModalWrapper>;
 }
 
 const sectionStyle = { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '18px', marginBottom: '16px' };

@@ -26,6 +26,7 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
   const [exito, setExito]         = useState(false);
   const [error, setError]         = useState(null);
   const [ciclos, setCiclos]       = useState([]);
+  const [padrones, setPadrones]   = useState([]);
 
   const [form, setForm] = useState({
     contexto_proceso:        initialData?.contexto_proceso        || 'cop_original',
@@ -37,6 +38,11 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
     fecha_exp_2a:            initialData?.fecha_exp_2a            || '',
     fecha_prog_2a:           initialData?.fecha_prog_2a           || '',
     fecha_realizada:         initialData?.fecha_realizada         || '',
+    ingreso_ran_fecha:       initialData?.ingreso_ran_fecha       || '',
+    numero_solicitud_ran:    initialData?.numero_solicitud_ran    || '',
+    calificacion_registral_ran: initialData?.calificacion_registral_ran || '',
+    acta_inscripcion_fecha_ran: initialData?.acta_inscripcion_fecha_ran || '',
+    id_padron:               initialData?.id_padron               || '',
     documentacion_disponible: initialData?.documentacion_disponible || false,
     documentacion_faltante:  initialData?.documentacion_faltante  || '',
     observaciones:           initialData?.observaciones           || '',
@@ -49,38 +55,52 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
   useEffect(() => {
     if (!form.id_afectacion) return;
     api.get(`/afectaciones/${form.id_afectacion}/ciclos`)
-      .then((response) => { console.log("CICLOS:", response.data); setCiclos(response.data); })
+      .then((response) => setCiclos(response.data))
       .catch(() => setCiclos([]));
   }, [form.id_afectacion]);
+
+  useEffect(() => {
+    api.get('/padrones', { params: { id_nucleo: idNucleo } })
+      .then((response) => setPadrones(response.data))
+      .catch(() => setPadrones([]));
+  }, [idNucleo]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setGuardando(true);
     try {
-      const payload = {
-        id_nucleo:               idNucleo,
-        id_tramo_nucleo:         idTramoNucleo,
-        id_afectacion:           Number(form.id_afectacion),
-        id_ciclo_afectacion:     Number(form.id_ciclo_afectacion),
-        contexto_proceso:        form.contexto_proceso,
-        tipo_asamblea:           form.tipo_asamblea,
-        resultado_anuencia:      form.resultado_anuencia,
+      const mutablePayload = {
+        resultado_anuencia:      ['anuencia', 'conciliacion'].includes(form.tipo_asamblea)
+          ? form.resultado_anuencia : 'no_aplica',
         estatus_asamblea:        form.estatus_asamblea,
         fecha_exp_1a:            form.fecha_exp_1a    || null,
         fecha_prog_1a:           form.fecha_prog_1a   || null,
         fecha_exp_2a:            form.fecha_exp_2a    || null,
         fecha_prog_2a:           form.fecha_prog_2a   || null,
         fecha_realizada:         form.fecha_realizada || null,
+        ingreso_ran_fecha:       form.ingreso_ran_fecha || null,
+        numero_solicitud_ran:    form.numero_solicitud_ran || null,
+        calificacion_registral_ran: form.calificacion_registral_ran || null,
+        acta_inscripcion_fecha_ran: form.acta_inscripcion_fecha_ran || null,
+        id_padron:               form.id_padron ? Number(form.id_padron) : null,
         documentacion_disponible: form.documentacion_disponible,
         documentacion_faltante:  form.documentacion_faltante || null,
         observaciones:           form.observaciones           || null,
       };
 
       if (initialData) {
-        await api.put(`/asambleas/${initialData.id_asamblea}`, payload);
+        await api.put(`/asambleas/${initialData.id_asamblea}`, mutablePayload);
       } else {
-        await api.post('/asambleas', payload);
+        await api.post('/asambleas', {
+          id_nucleo: idNucleo,
+          id_tramo_nucleo: idTramoNucleo,
+          id_afectacion: Number(form.id_afectacion),
+          id_ciclo_afectacion: Number(form.id_ciclo_afectacion),
+          contexto_proceso: form.contexto_proceso,
+          tipo_asamblea: form.tipo_asamblea,
+          ...mutablePayload,
+        });
       }
       setExito(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1200);
@@ -109,7 +129,7 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
 
           <div style={gridDos}>
             <Campo label="Afectación colectiva *">
-              <select required value={form.id_afectacion} onChange={e => setForm(prev => ({ ...prev, id_afectacion: e.target.value, id_ciclo_afectacion: '' }))} style={inputStyle}>
+              <select disabled={Boolean(initialData)} required value={form.id_afectacion} onChange={e => setForm(prev => ({ ...prev, id_afectacion: e.target.value, id_ciclo_afectacion: '' }))} style={inputStyle}>
                 <option value="">Seleccione una afectación</option>
                 {afectaciones.filter(item => item.tipo_afectacion === 'colectivo').map(item => <option key={item.id_afectacion} value={item.id_afectacion}>Afectación #{item.id_afectacion}</option>)}
               </select>
@@ -119,20 +139,20 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
               <select required value={form.id_ciclo_afectacion} onChange={e => {
                 const ciclo = ciclos.find(item => item.id_ciclo_afectacion === Number(e.target.value));
                 setForm(prev => ({ ...prev, id_ciclo_afectacion: e.target.value, contexto_proceso: ciclo?.tipo_ciclo || prev.contexto_proceso }));
-              }} style={{...inputStyle, opacity: form.id_afectacion ? 1 : 0.6}} disabled={!form.id_afectacion}>
+              }} style={{...inputStyle, opacity: form.id_afectacion ? 1 : 0.6}} disabled={Boolean(initialData) || !form.id_afectacion}>
                 <option value="">{form.id_afectacion ? (ciclos.length === 0 ? "Sin ciclos disponibles" : "Seleccione un ciclo") : "Seleccione primero una afectación"}</option>
                 {ciclos.map(item => <option key={item.id_ciclo_afectacion} value={item.id_ciclo_afectacion}>{item.tipo_ciclo} #{item.consecutivo}</option>)}
               </select>
             </Campo>
 
             <Campo label="Tipo de Asamblea *">
-              <select value={form.tipo_asamblea} onChange={e => set('tipo_asamblea', e.target.value)} style={inputStyle} required>
+              <select disabled={Boolean(initialData)} value={form.tipo_asamblea} onChange={e => set('tipo_asamblea', e.target.value)} style={inputStyle} required>
                 {TIPOS_ASAMBLEA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </Campo>
 
             <Campo label="Contexto del Proceso *">
-              <select value={form.contexto_proceso} onChange={e => set('contexto_proceso', e.target.value)} style={inputStyle} required>
+              <select disabled={Boolean(initialData)} value={form.contexto_proceso} onChange={e => set('contexto_proceso', e.target.value)} style={inputStyle} required>
                 {CONTEXTOS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </Campo>
@@ -145,12 +165,25 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
               </select>
             </Campo>
 
-            <Campo label="Resultado de Anuencia">
-              <select value={form.resultado_anuencia} onChange={e => set('resultado_anuencia', e.target.value)} style={inputStyle}>
-                <option value="pendiente">Pendiente</option>
-                <option value="otorgada">Otorgada</option>
-                <option value="negada">Negada</option>
-                <option value="no_aplica">No Aplica</option>
+            {['anuencia', 'conciliacion'].includes(form.tipo_asamblea) && (
+              <Campo label="Resultado de anuencia">
+                <select value={form.resultado_anuencia} onChange={e => set('resultado_anuencia', e.target.value)} style={inputStyle}>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="otorgada">Otorgada</option>
+                  <option value="negada">Negada</option>
+                  <option value="no_aplica">No aplica</option>
+                </select>
+              </Campo>
+            )}
+
+            <Campo label="Padrón utilizado">
+              <select value={form.id_padron} onChange={e => set('id_padron', e.target.value)} style={inputStyle}>
+                <option value="">Sin seleccionar</option>
+                {padrones.map((padron) => (
+                  <option key={padron.id_padron} value={padron.id_padron}>
+                    {padron.fecha_padron} · {padron.numero_ejidatarios_comuneros} integrantes
+                  </option>
+                ))}
               </select>
             </Campo>
           </div>
@@ -175,6 +208,23 @@ export default function FormAsamblea({ idNucleo, idTramoNucleo, afectaciones = [
           <Campo label="Fecha en que se REALIZÓ">
             <input type="date" value={form.fecha_realizada} onChange={e => set('fecha_realizada', e.target.value)} style={inputStyle} />
           </Campo>
+
+          <SeccionHeader icono={<CalendarIcon size={16} />} titulo="Trámite ante el RAN" />
+
+          <div style={gridDos}>
+            <Campo label="Fecha de ingreso al RAN">
+              <input type="date" value={form.ingreso_ran_fecha} onChange={e => set('ingreso_ran_fecha', e.target.value)} style={inputStyle} />
+            </Campo>
+            <Campo label="Número de solicitud">
+              <input value={form.numero_solicitud_ran} onChange={e => set('numero_solicitud_ran', e.target.value)} style={inputStyle} />
+            </Campo>
+            <Campo label="Calificación registral">
+              <input value={form.calificacion_registral_ran} onChange={e => set('calificacion_registral_ran', e.target.value)} style={inputStyle} />
+            </Campo>
+            <Campo label="Fecha de inscripción del acta">
+              <input type="date" value={form.acta_inscripcion_fecha_ran} onChange={e => set('acta_inscripcion_fecha_ran', e.target.value)} style={inputStyle} />
+            </Campo>
+          </div>
 
           <SeccionHeader icono={<CalendarIcon size={16} />} titulo="Observaciones y Soportes" />
 
