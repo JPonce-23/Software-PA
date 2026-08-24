@@ -32,6 +32,7 @@ from .services.access import (
     require_document_relation_access,
     require_nucleo_access,
     require_project_access,
+    require_seguimiento_pa_activo,
     require_tramo_access,
     require_tramo_nucleo_access,
 )
@@ -862,6 +863,8 @@ def list_tramos_nucleos(
         models.Proyecto.nombre_proyecto,
         models.Tramo.nombre_tramo,
         models.NucleoAgrario.nombre_nucleo,
+        models.NucleoAgrario.tipo_nucleo,
+        models.NucleoAgrario.comunidad_indigena,
         models.Municipio.id_municipio,
         models.Municipio.nombre.label("municipio_nombre"),
         models.EntidadFederativa.id_entidad,
@@ -914,6 +917,8 @@ def get_tramo_nucleo(id_tramo_nucleo: int, db: Session = Depends(get_db), curren
         models.Proyecto.nombre_proyecto,
         models.Tramo.nombre_tramo,
         models.NucleoAgrario.nombre_nucleo,
+        models.NucleoAgrario.tipo_nucleo,
+        models.NucleoAgrario.comunidad_indigena,
         models.Municipio.id_municipio,
         models.Municipio.nombre.label("municipio_nombre"),
         models.EntidadFederativa.id_entidad,
@@ -1187,6 +1192,7 @@ def create_afectacion(afectacion: schemas.AfectacionCreate, db: Session = Depend
     ).first()
     if not tramo_nucleo_db:
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
+    require_seguimiento_pa_activo(db, tramo_nucleo_db)
     if tramo_nucleo_db.id_nucleo != afectacion.id_nucleo:
         raise HTTPException(status_code=400, detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.")
 
@@ -1324,6 +1330,7 @@ def create_asamblea(asamblea: schemas.AsambleaCreate, db: Session = Depends(get_
     ).first()
     if not tramo_nucleo_db:
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
+    require_seguimiento_pa_activo(db, tramo_nucleo_db)
     if tramo_nucleo_db.id_nucleo != asamblea.id_nucleo:
         raise HTTPException(status_code=400, detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.")
 
@@ -1421,6 +1428,7 @@ def create_convenio(convenio: schemas.ConvenioCreate, db: Session = Depends(get_
     ).first()
     if not tramo_nucleo_db:
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
+    require_seguimiento_pa_activo(db, tramo_nucleo_db)
 
     # Validación de integridad: La Afectación debe existir y pertenecer al mismo TramoNucleo
     afectacion_db = db.query(models.Afectacion).filter(
@@ -1591,6 +1599,7 @@ def create_actividad(act: schemas.ActividadCampoCreate, db: Session = Depends(ge
     ).first()
     if not tramo_nucleo_db:
         raise HTTPException(status_code=404, detail="El TramoNucleo especificado no existe.")
+    require_seguimiento_pa_activo(db, tramo_nucleo_db)
 
     db_act = models.ActividadCampo(**act.model_dump())
     db_act.fecha_registro = datetime.now(timezone.utc)
@@ -1658,6 +1667,7 @@ def create_fifonafe(tramite: schemas.TramiteFifonafeCreate, db: Session = Depend
     tn_db = db.query(models.TramoNucleo).filter_by(id_tramo_nucleo=tramite.id_tramo_nucleo, activo=True).first()
     if not tn_db:
         raise HTTPException(status_code=404, detail="El TramoNucleo no existe.")
+    require_seguimiento_pa_activo(db, tn_db)
 
     if tramite.id_afectacion:
         afectacion_db = db.query(models.Afectacion).filter_by(id_afectacion=tramite.id_afectacion, activo=True).first()

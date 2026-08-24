@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from .common import commit_or_conflict, get_active, mark_inactive, set_audit_context
+from .access import require_seguimiento_pa_activo
 
 
 PAYMENT_CONFLICTS = {
@@ -55,6 +56,14 @@ def _validar_tramite(db: Session, id_tramite: int) -> models.TramiteFifonafe:
         "id_convenio",
         "Convenio no encontrado",
     )
+    tramo_nucleo = get_active(
+        db,
+        models.TramoNucleo,
+        tramite.id_tramo_nucleo,
+        "id_tramo_nucleo",
+        "Expediente no encontrado",
+    )
+    require_seguimiento_pa_activo(db, tramo_nucleo)
     return tramite
 
 

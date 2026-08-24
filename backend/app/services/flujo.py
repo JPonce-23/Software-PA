@@ -13,7 +13,11 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from .access import require_afectacion_access, require_tramo_nucleo_access
+from .access import (
+    motivo_fuera_seguimiento_pa,
+    require_afectacion_access,
+    require_tramo_nucleo_access,
+)
 from .common import set_audit_context
 
 
@@ -113,6 +117,29 @@ def crear_ciclo(
         observaciones=data.observaciones,
     )
     db.add(ciclo)
+    _commit(db)
+    db.refresh(ciclo)
+    return ciclo
+
+
+def actualizar_ciclo(
+    db: Session,
+    user: models.Usuario,
+    id_afectacion: int,
+    id_ciclo_afectacion: int,
+    data: schemas.AfectacionCicloUpdate,
+) -> models.AfectacionCiclo:
+    require_afectacion_access(db, user, id_afectacion)
+    ciclo = db.query(models.AfectacionCiclo).filter(
+        models.AfectacionCiclo.id_ciclo_afectacion == id_ciclo_afectacion,
+        models.AfectacionCiclo.id_afectacion == id_afectacion,
+        models.AfectacionCiclo.activo.is_(True),
+    ).with_for_update().first()
+    if ciclo is None:
+        raise HTTPException(status_code=404, detail="Ciclo de afectación no encontrado")
+
+    set_audit_context(db, user.id_usuario)
+    ciclo.observaciones = data.observaciones
     _commit(db)
     db.refresh(ciclo)
     return ciclo
@@ -310,7 +337,7 @@ def obtener_estado_afectacion(
 def obtener_estado_tramo_nucleo(
     db: Session, user: models.Usuario, id_tramo_nucleo: int
 ) -> dict:
-    require_tramo_nucleo_access(db, user, id_tramo_nucleo)
+    tramo_nucleo = require_tramo_nucleo_access(db, user, id_tramo_nucleo)
     estado = db.execute(text("""
         SELECT id_tramo_nucleo, id_tramo, id_nucleo, estado_legal,
                estado_geoespacial, total_afectaciones, afectaciones_liberadas,
@@ -320,4 +347,7 @@ def obtener_estado_tramo_nucleo(
     """), {"id": id_tramo_nucleo}).mappings().first()
     if estado is None:
         raise HTTPException(status_code=404, detail="Estado de expediente no encontrado")
-    return dict(estado)
+    resultado = dict(estado)
+    if motivo_fuera_seguimiento_pa(db, tramo_nucleo):
+        resultado["estado_legal"] = "fuera_seguimiento"
+    return resultado

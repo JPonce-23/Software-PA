@@ -37,6 +37,20 @@ def crear_ciclo(
     return service.crear_ciclo(db, current_user, id_afectacion, data)
 
 
+@router.put(
+    "/afectaciones/{id_afectacion}/ciclos/{id_ciclo_afectacion}",
+    response_model=schemas.AfectacionCicloResponse,
+)
+def actualizar_ciclo(
+    id_afectacion: int,
+    id_ciclo_afectacion: int,
+    data: schemas.AfectacionCicloUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(WRITE_ROLES)),
+):
+    return service.actualizar_ciclo(db, current_user, id_afectacion, id_ciclo_afectacion, data)
+
+
 @router.get(
     "/afectaciones/{id_afectacion}/estado",
     response_model=schemas.AfectacionEstadoResponse,

@@ -13,6 +13,7 @@ from .common import get_active, set_audit_context
 from .personas import ensure_persona_nucleo
 from . import franjas
 from . import cargas_geoespaciales
+from .access import require_seguimiento_pa_activo
 
 
 def _validar_contexto(
@@ -32,6 +33,7 @@ def _validar_contexto(
             status_code=400,
             detail="Inconsistencia: El TramoNucleo no pertenece al NucleoAgrario especificado.",
         )
+    require_seguimiento_pa_activo(db, tramo_nucleo)
     return tramo_nucleo
 
 

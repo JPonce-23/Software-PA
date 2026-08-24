@@ -274,6 +274,8 @@ class TramoNucleoResponse(BaseModel):
     nombre_proyecto: Optional[str] = None
     nombre_tramo: Optional[str] = None
     nombre_nucleo: Optional[str] = None
+    tipo_nucleo: Optional[Literal['ejido', 'comunidad']] = None
+    comunidad_indigena: Optional[bool] = None
     id_municipio: Optional[int] = None
     municipio_nombre: Optional[str] = None
     id_entidad: Optional[int] = None
@@ -816,6 +818,11 @@ TipoCicloAfectacion = Literal[
 
 class AfectacionCicloCreate(BaseModel):
     tipo_ciclo: TipoCicloAfectacion
+    observaciones: Optional[str] = None
+    model_config = ConfigDict(extra='forbid')
+
+
+class AfectacionCicloUpdate(BaseModel):
     observaciones: Optional[str] = None
     model_config = ConfigDict(extra='forbid')
 

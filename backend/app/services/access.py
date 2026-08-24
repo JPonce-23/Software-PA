@@ -64,6 +64,42 @@ def require_tramo_nucleo_access(
     return tramo_nucleo
 
 
+def motivo_fuera_seguimiento_pa(
+    db: Session,
+    tramo_nucleo: models.TramoNucleo,
+) -> str | None:
+    nucleo = db.query(models.NucleoAgrario).filter(
+        models.NucleoAgrario.id_nucleo == tramo_nucleo.id_nucleo,
+        models.NucleoAgrario.activo.is_(True),
+    ).first()
+    if tramo_nucleo.es_expropiacion:
+        return "Expropiación directa"
+    if nucleo and nucleo.comunidad_indigena:
+        return "Comunidad indígena"
+    if tramo_nucleo.proyecto_no_afecta_uso_comun:
+        return "El proyecto no afecta tierras de uso común"
+    return None
+
+
+def require_seguimiento_pa_activo(
+    db: Session,
+    tramo_nucleo: models.TramoNucleo,
+) -> None:
+    motivo = motivo_fuera_seguimiento_pa(db, tramo_nucleo)
+    if motivo is None:
+        return
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "PA_SIN_SEGUIMIENTO_ORDINARIO",
+            "message": (
+                "Este expediente está fuera del seguimiento ordinario de la PA; "
+                f"motivo: {motivo}."
+            ),
+        },
+    )
+
+
 def require_afectacion_access(
     db: Session,
     user: models.Usuario,
