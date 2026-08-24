@@ -41,6 +41,20 @@ def _crear_afectacion(client, headers, cleanup, nucleo, tramo_nucleo, tipo, parc
     return afectacion, next(c for c in ciclos if c["tipo_ciclo"] == "cop_original")
 
 
+def _crear_tramo_nucleo_local(client, headers, cleanup, tramo, nucleo):
+    payload = {
+        "id_tramo": tramo["id_tramo"],
+        "id_nucleo": nucleo["id_nucleo"],
+        "consecutivo": int(time.time() * 1000) % 100000000,
+        "geometria_wkt": "MULTILINESTRING((0 0, 1 1))",
+    }
+    response = client.post("/api/tramos-nucleos", json=payload, headers=headers)
+    assert response.status_code == 201, response.text
+    data = response.json()
+    cleanup.register("/api/tramos-nucleos", data["id_tramo_nucleo"])
+    return data
+
+
 def _crear_convenio_individual(client, headers, cleanup, tramo_nucleo, afectacion, ciclo):
     response = client.post(
         "/api/convenios",
@@ -248,6 +262,36 @@ def test_salida_terminal_detiene_nuevos_ciclos(
         headers=admin_session,
     ).json()
     assert state["estado_liberacion"] == "no_aplica_terminal"
+
+
+def test_no_afecta_uso_comun_detiene_nuevas_afectaciones(
+    client, admin_session, cleanup, seed_tramo, seed_nucleo, seed_parcela,
+):
+    tramo_nucleo = _crear_tramo_nucleo_local(
+        client, admin_session, cleanup, seed_tramo, seed_nucleo
+    )
+    marked = client.put(
+        f"/api/tramos-nucleos/{tramo_nucleo['id_tramo_nucleo']}",
+        json={"proyecto_no_afecta_uso_comun": True},
+        headers=admin_session,
+    )
+    assert marked.status_code == 200, marked.text
+
+    blocked = client.post(
+        "/api/afectaciones",
+        json={
+            "id_nucleo": seed_nucleo["id_nucleo"],
+            "id_tramo_nucleo": tramo_nucleo["id_tramo_nucleo"],
+            "id_parcela": seed_parcela["id_parcela"],
+            "tipo_afectacion": "individual",
+            "tipo_tenencia": "Parcelaria",
+            "superficie_afectada_ha": "1.2500",
+            "geometria_wkt": "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))",
+        },
+        headers=admin_session,
+    )
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["detail"]["code"] == "PA_SIN_SEGUIMIENTO_ORDINARIO"
 
 
 def test_modificatorio_individual_sustituye_sin_sumar_y_respeta_pagado(
