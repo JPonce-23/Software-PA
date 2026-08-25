@@ -32,14 +32,18 @@ Proyecto
         ├── Sensibilización
         ├── Caminamiento
         ├── Derechos colectivos
+        │   ├── Asamblea -> RAN del Acta
         │   └── Afectación colectiva
         │       ├── Avalúo simple, cuando exista
-        │       ├── Asamblea -> RAN del Acta
-        │       └── Convenio(s) -> RAN del Convenio -> FIFONAFE -> Indemnización -> Pago
+        │       ├── Convenio(s) -> RAN del Convenio
+        │       ├── FIFONAFE / no conflictos (compartible)
+        │       └── Indemnización -> Pago(s)
         └── Derechos individuales
             └── Parcela
                 └── Afectación individual
-                    └── Convenio(s) -> RAN -> FIFONAFE -> Indemnización -> Pago
+                    ├── Convenio(s) -> RAN
+                    ├── FIFONAFE / no conflictos (compartible)
+                    └── Indemnización -> Pago(s)
 ```
 
 `Tramo` deja de ser entidad funcional obligatoria. Las columnas `CLAVE DEL TRAMO` y `NÚMERO DE TRAMO`, cuando existan, se conservan sólo como referencias históricas/opcionales en `proyecto_nucleo` o en metadatos de importación.
@@ -54,7 +58,7 @@ La ruta individual es `Proyecto -> Entidad -> Municipio -> Núcleo -> Parcela ->
 
 Una afectación colectiva puede existir sin parcela. Representa tierras de uso común, superficie a favor del núcleo, parcela escolar, UAIM, canal, derecho de paso, solares, infraestructura u otros destinos observados. Conserva destino, superficie preliminar, superficie real afectada, avalúo simple si existe, observaciones y soporte.
 
-El RAN del acta de asamblea y el RAN del convenio son seguimientos distintos. El número de solicitud de acta va a `asamblea.numero_solicitud_ran`; el número de solicitud de convenio va a `convenio.numero_solicitud_ingreso`.
+Asamblea pertenece a ProyectoNucleo, es exclusivamente colectiva y no tiene FK directa a una afectación. Una misma asamblea puede autorizar varios convenios colectivos mediante `convenio.id_asamblea_autorizacion`. El RAN del acta y el RAN del convenio son seguimientos distintos: el número de solicitud de acta va a `asamblea.numero_solicitud_ran`; el de convenio, a `convenio.numero_solicitud_ingreso`.
 
 ## Derechos individuales
 
@@ -78,9 +82,9 @@ No se colapsan `SUPERFICIE TOTAL PRELIMINAR` y `SUPERFICIE TOTAL REAL AFECTADA`:
 
 `AVALÚO MAESTRO (INDAABIN) $` se representa de forma simple como `afectacion.avaluo_monto`; `avaluo_fecha`, `avaluo_referencia` e `avaluo_institucion` pueden quedar nulos, usando `INDAABIN` cuando la fuente lo indique.
 
-FIFONAFE conserva cuatro oficios y fechas: FIFONAFE a DGAOPR/Representación, DGAOPR a Representación, respuesta de Representación a DGAOPR y respuesta DGAOPR/Representación a FIFONAFE, además de resultado/no conflictos, estatus, soporte y observaciones.
+FIFONAFE pertenece a ProyectoNucleo, distingue ámbito colectivo/individual y se relaciona N:M con las afectaciones cubiertas, sin depender de un convenio ni duplicar oficios. Conserva cuatro oficios y fechas: FIFONAFE a DGAOPR/Representación, DGAOPR a Representación, respuesta de Representación a DGAOPR y respuesta DGAOPR/Representación a FIFONAFE, además de resultado/no conflictos, estatus, soporte y observaciones.
 
-Indemnización y pago no son equivalentes. Indemnización conserva estatus; pago registra hechos financieros con fecha, monto, beneficiario, referencia/evidencia y observaciones.
+Indemnización y pago no son equivalentes. Indemnización pertenece directamente a una afectación, con máximo una activa por afectación; pago pertenece a indemnización y registra fecha, monto, beneficiario, referencia/evidencia y observaciones. La cadena canónica es `Pago -> Indemnizacion -> Afectacion -> ProyectoNucleo`; FIFONAFE no es su padre obligatorio.
 
 ## Geoespacial
 
@@ -88,7 +92,7 @@ PostgreSQL y PostGIS se mantienen para trazo ferroviario por proyecto, perímetr
 
 ## Dashboard
 
-El Excel general funciona como contrato de aceptación del dashboard. Los KPI se derivan de hechos capturados: núcleos, sensibilizaciones, caminamientos, asambleas, RAN, COP colectivos, modificatorios, superficie adicional, obras complementarias, retiro de fondos, expropiación directa, parcelas afectadas, COP individuales, ampliaciones, indemnizaciones y superficies capturadas.
+El Excel general funciona como contrato de aceptación del dashboard. Los KPI se derivan de hechos capturados mediante agregados independientes antes de joins N:M: Asamblea por ProyectoNucleo, FIFONAFE por trámite, Indemnización por afectación y Pago por indemnización. Incluyen núcleos, sensibilizaciones, caminamientos, asambleas, RAN, COP colectivos, modificatorios, superficie adicional, obras complementarias, retiro de fondos, expropiación directa, parcelas afectadas, COP individuales, ampliaciones, indemnizaciones y superficies capturadas.
 
 Los Excel detallados disponibles validan especialmente Mexico-Queretaro; el Excel general incluye otros proyectos que pueden no tener fuente detallada equivalente disponible localmente.
 

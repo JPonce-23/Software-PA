@@ -19,19 +19,23 @@ Proyecto
         ├── Sensibilización
         ├── Caminamiento
         ├── Derechos colectivos
+        │   ├── Asamblea -> RAN del Acta
         │   └── Afectación colectiva
         │       ├── Avalúo simple, cuando exista
-        │       ├── Asamblea -> RAN del Acta
-        │       └── Convenio(s) -> RAN del Convenio -> FIFONAFE -> Indemnización -> Pago
+        │       ├── Convenio(s) -> RAN del Convenio
+        │       ├── FIFONAFE / no conflictos (compartible)
+        │       └── Indemnización -> Pago(s)
         └── Derechos individuales
             └── Parcela
                 └── Afectación individual
-                    └── Convenio(s) -> RAN -> FIFONAFE -> Indemnización -> Pago
+                    ├── Convenio(s) -> RAN
+                    ├── FIFONAFE / no conflictos (compartible)
+                    └── Indemnización -> Pago(s)
 ```
 
 La navegación administrativa objetivo es `Proyecto -> Entidad Federativa -> Municipio -> Núcleo Agrario`. Dentro del núcleo se muestran Resumen, Datos generales, ORV, Padrón, Sensibilización, Caminamiento, Derechos colectivos y Parcelas/Derechos individuales.
 
-La ruta individual es `Proyecto -> Entidad -> Municipio -> Núcleo -> Parcela -> Convenios`. La ruta colectiva es `Proyecto -> Entidad -> Municipio -> Núcleo -> Afectación colectiva -> Asamblea / Convenios`.
+La ruta individual es `Proyecto -> Entidad -> Municipio -> Núcleo -> Parcela -> Convenios`. La ruta colectiva es `Proyecto -> Entidad -> Municipio -> Núcleo -> Derechos colectivos -> Asamblea / Afectaciones -> Convenios`.
 
 ## Secuencia colectiva
 
@@ -40,9 +44,10 @@ La ruta individual es `Proyecto -> Entidad -> Municipio -> Núcleo -> Parcela ->
 3. Capturar sensibilización y caminamiento cuando existan.
 4. Crear una afectación colectiva sin exigir parcela.
 5. Registrar avalúo simple si existe en fuente.
-6. Registrar asamblea y RAN del acta.
+6. Registrar en ProyectoNucleo la asamblea colectiva y RAN del acta; una misma asamblea puede autorizar varios convenios/afectaciones.
 7. Registrar uno o más convenios: COP original, modificatorio, superficie adicional u obras complementarias.
-8. Registrar RAN del convenio, FIFONAFE, indemnización y pago.
+8. Registrar RAN del convenio; relacionar el trámite FIFONAFE con las afectaciones cubiertas cuando corresponda.
+9. Registrar indemnización por afectación y sus pagos, sin exigir que FIFONAFE sea el padre.
 
 Una ruta colectiva puede no aplicar por no afectación de uso común sin bloquear automáticamente una ruta individual.
 
@@ -53,7 +58,8 @@ Una ruta colectiva puede no aplicar por no afectación de uso común sin bloquea
 3. Registrar titulares, certificado parcelario, folio de derechos y constancia de vigencia.
 4. Crear afectación individual con superficie administrativa capturada.
 5. Registrar convenios: COP original, modificatorio, ampliación o ampliación remanente.
-6. Registrar RAN del convenio, FIFONAFE, indemnización y pago.
+6. Registrar RAN del convenio y relacionar, cuando corresponda, un trámite FIFONAFE que puede cubrir afectaciones de varias parcelas.
+7. Registrar indemnización por afectación y sus pagos, sin exigir que FIFONAFE sea el padre.
 
 La parcela puede no tener geometría. Esa ausencia no impide seguimiento, consulta ni captura documental.
 
@@ -73,13 +79,13 @@ Las fechas programadas no se mezclan: firma programada, ingreso RAN programado, 
 
 RAN del acta y RAN del convenio se separan. En individuales sólo se registra RAN del convenio.
 
-FIFONAFE conserva los cuatro oficios observados en Excel. Indemnización registra estatus; pago registra el hecho financiero.
+FIFONAFE pertenece a ProyectoNucleo, distingue ámbito colectivo/individual y puede cubrir varias afectaciones sin duplicar sus cuatro oficios. Indemnización pertenece directamente a afectación y pago a indemnización. La cadena financiera es `Pago -> Indemnizacion -> Afectacion -> ProyectoNucleo`; FIFONAFE es un seguimiento relacionado, no un padre obligatorio.
 
 ## Lo que no genera módulos objetivo
 
 No crear módulos objetivo para análisis preliminar, revisión social, revisión jurídica, revisión registral general, acercamiento inicial, identificación preliminar u otras etapas del flujograma sin campos necesarios de captura en los Excel.
 
-`afectacion_ciclo` pertenece a la implementación vigente y no es requisito funcional objetivo. El linaje se preserva con tipo de convenio, consecutivo/version, `id_convenio_padre`, contexto de actividad y relaciones directas entre afectación, asamblea y convenio.
+`afectacion_ciclo` pertenece a la implementación vigente y no es requisito funcional objetivo. El linaje se preserva con tipo de convenio, consecutivo/version, `id_convenio_padre`, contexto de actividad, `convenio_afectacion`, la referencia opcional del convenio a su asamblea y los vínculos de FIFONAFE con afectaciones.
 
 ## Geoespacial
 

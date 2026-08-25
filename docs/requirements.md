@@ -30,7 +30,7 @@ El sistema DEBERÁ conservar entidad, municipio, nombre, tipo ejido/comunidad, O
 
 ### R4. Actividades administrativas
 
-El sistema DEBERÁ registrar sensibilizaciones y caminamientos con fecha programada, fecha realizada, responsable, resultado, soporte y observaciones. Los campos `POR NA`, `TRIMESTRE` y similares se DEBERÁN derivar en reportes.
+El sistema DEBERÁ registrar sensibilizaciones y caminamientos como hechos de `ProyectoNucleo`, sin exigir afectación ni ciclo, con contexto `general`, `superficie_adicional`, `obras_complementarias` u `otro`, fecha programada, fecha realizada, responsable, resultado, soporte y observaciones. Los campos `POR NA`, `TRIMESTRE` y similares se DEBERÁN derivar en reportes.
 
 ### R5. Derechos colectivos
 
@@ -58,19 +58,21 @@ Permuta NO DEBERÁ ser tipo ordinario de convenio; DEBERÁ conservarse como moda
 
 ### R9. Asamblea y RAN
 
-El sistema DEBERÁ separar RAN del Acta y RAN del Convenio. Para acta se usará `asamblea.numero_solicitud_ran`; para convenio, `convenio.numero_solicitud_ingreso`.
+El sistema DEBERÁ separar RAN del Acta y RAN del Convenio. Asamblea DEBERÁ pertenecer a `ProyectoNucleo`, ser exclusivamente colectiva y no tener FK directa a una afectación. Uno o varios convenios colectivos PODRÁN referir la misma asamblea de autorización. Para acta se usará `asamblea.numero_solicitud_ran`; para convenio, `convenio.numero_solicitud_ingreso`.
 
 ### R10. FIFONAFE
+
+El sistema DEBERÁ registrar FIFONAFE por `ProyectoNucleo` y ámbito colectivo/individual. Un trámite PODRÁ cubrir varias afectaciones mediante `tramite_fifonafe_afectacion`, validando el mismo ProyectoNucleo y ámbito, sin duplicar sus oficios ni exigir un convenio propietario.
 
 El sistema DEBERÁ conservar oficio FIFONAFE a DGAOPR/Representación y fecha, oficio DGAOPR a Representación y fecha, respuesta Representación a DGAOPR y fecha, respuesta DGAOPR/Representación a FIFONAFE y fecha, resultado/no conflictos, estatus, soporte y observaciones.
 
 ### R11. Indemnización y pago
 
-El sistema DEBERÁ distinguir estatus de indemnización de pago. Pago DEBERÁ registrar fecha, monto, beneficiario, referencia/evidencia y observaciones.
+El sistema DEBERÁ distinguir estatus de indemnización de pago. Indemnización DEBERÁ pertenecer directamente a una afectación, con máximo un registro activo por afectación, sin depender obligatoriamente de FIFONAFE. Pago DEBERÁ pertenecer a indemnización y registrar fecha, monto, beneficiario, referencia/evidencia y observaciones. La cadena canónica será `Pago -> Indemnizacion -> Afectacion -> ProyectoNucleo`.
 
 ### R12. Dashboard y reportes
 
-El sistema DEBERÁ derivar KPI desde hechos capturados y NO almacenar manualmente totales derivables. DEBERÁ poder reproducir el contrato del Excel general: núcleos, sensibilizaciones, caminamientos, asambleas, RAN, COP colectivos, modificatorios, superficie adicional, obras complementarias, retiro de fondos, expropiación directa, parcelas afectadas, COP individuales, ampliaciones, indemnizaciones y superficies capturadas.
+El sistema DEBERÁ derivar KPI desde hechos capturados y NO almacenar manualmente totales derivables. Los agregados de Asamblea, FIFONAFE, Indemnización y Pago DEBERÁN calcularse por separado antes de joins N:M para no duplicar hechos. DEBERÁ poder reproducir el contrato del Excel general: núcleos, sensibilizaciones, caminamientos, asambleas, RAN, COP colectivos, modificatorios, superficie adicional, obras complementarias, retiro de fondos, expropiación directa, parcelas afectadas, COP individuales, ampliaciones, indemnizaciones y superficies capturadas.
 
 ### R13. Geoespacial
 

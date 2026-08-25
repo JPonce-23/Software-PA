@@ -19,13 +19,13 @@ Proyecto
 └── ProyectoNucleo
     └── NucleoAgrario
         ├── ORV / Padrón / ActividadCampo
-        ├── Afectacion colectiva -> Asamblea
+        ├── Asamblea colectiva -> RAN del acta
+        ├── Afectacion colectiva
         └── Parcela -> Afectacion individual
 
 Afectacion(s) <- ConvenioAfectacion -> Convenio
-                                      └── TramiteFifonafe
-                                          └── Indemnizacion
-                                              └── Pago(s)
+Afectacion(s) <- TramiteFifonafeAfectacion -> TramiteFifonafe
+Afectacion -> Indemnizacion -> Pago(s)
 ```
 
 No quedan cardinalidades funcionales importantes abiertas. La relación entre convenio y afectación es exclusivamente `convenio_afectacion`; `convenio` no tendrá `id_afectacion`.
@@ -95,12 +95,12 @@ La búsqueda estática encontró `tramo_nucleo` en 41 archivos con 715 referenci
 | `orv` | MODIFICAR | Se conservan vigencias/RAN; se eliminan nombres de integrantes duplicados. |
 | `orv_integrante` | MODIFICAR | Se conserva; se retira `id_nucleo` redundante y se flexibiliza la multiplicidad de cargos. |
 | `padron_historial` | MODIFICAR | Se conserva como historial; fecha o cantidad pueden ser desconocidas en la fuente. |
-| `actividad_campo` | RECREAR | Cambia `id_tramo_nucleo`/ciclo por `id_proyecto_nucleo` y una sola FK opcional a afectación. |
+| `actividad_campo` | RECREAR | Sensibilización y caminamiento pasan directamente a `proyecto_nucleo`, sin FK a afectación ni ciclo. |
 | `afectacion` | RECREAR | Cambia de expediente legacy a `proyecto_nucleo`, elimina geometría y agrega superficies/avalúo simples. |
 | `afectacion_ciclo` | ELIMINAR | No existe en el modelo objetivo. |
-| `asamblea` | RECREAR | Se vincula directamente a una afectación colectiva y separa RAN del acta. |
+| `asamblea` | RECREAR | Pertenece a `proyecto_nucleo`, es exclusivamente colectiva y separa RAN del acta. |
 | `convenio` | RECREAR | Se vuelve repetible, elimina ciclo y usa `convenio_afectacion` como relación canónica. |
-| `tramite_fifonafe` | RECREAR | Un trámite por convenio, cuatro oficios y sin FK ambiguas a ciclo/afectación. |
+| `tramite_fifonafe` | RECREAR | Pertenece a `proyecto_nucleo` y cubre una o más afectaciones mediante `tramite_fifonafe_afectacion`, sin duplicar oficios. |
 | `pago_indemnizacion` | RECREAR | Se separa en `indemnizacion` y `pago`. |
 | `documentacion_soporte` | RECREAR | Se separa metadata documental de sus vínculos y versiones. |
 | `documento_version` | MODIFICAR | Se conserva el versionado inmutable bajo `documento`. |
@@ -158,7 +158,7 @@ La búsqueda estática encontró `tramo_nucleo` en 41 archivos con 715 referenci
 | GiST de núcleo y parcela | MANTENER | Apoyo cartográfico, nunca fuente oficial. |
 | Constraints compuestas para repetir tramo/núcleo/ciclo en hijos | ELIMINAR | Se reemplazan por FK simples y validaciones de alcance puntuales. |
 
-Los únicos triggers de integridad de dominio nuevos que se justifican son: coherencia parcela-ProyectoNucleo en afectación, asamblea sólo colectiva, coherencia de vínculos y padre de convenio, obligación diferida de al menos una afectación por convenio y validación del vínculo documental/polimórfico. No se reintroduce una secuencia obligatoria de estados.
+Los únicos triggers de integridad de dominio nuevos que se justifican son: coherencia parcela-ProyectoNucleo en afectación, coherencia ProyectoNucleo/ámbito en los vínculos de convenio y FIFONAFE, validación de la asamblea de autorización colectiva, obligaciones diferidas de vínculos requeridos y validación del vínculo documental/polimórfico. No se reintroduce una secuencia obligatoria de estados.
 
 ## 4. Comparación de estrategia
 
@@ -247,20 +247,20 @@ Un CHECK exige metadatos de baja cuando `activo = FALSE`. El rol SQL de la aplic
 
 | Tabla | PK y FK | Columnas y nulabilidad | UNIQUE / CHECK / índices | BL |
 |---|---|---|---|---|
-| `actividad_campo` | PK `id_actividad`; FK `id_proyecto_nucleo NN`; FK `id_afectacion NULL` | `tipo_actividad VARCHAR(30) NN`, `contexto_actividad VARCHAR(40) NN`, `fecha_programada`, `fecha_realizada` NULL, `responsable VARCHAR(300) NULL`, `resultado TEXT NULL` | CHECK tipo `sensibilizacion/caminamiento`; contexto `general/afectacion/superficie_adicional/obras_complementarias`; contexto general exige afectación NULL y los demás exigen afectación; CHECK fechas; índices PN/tipo/fechas y afectación | Sí |
+| `actividad_campo` | PK `id_actividad`; FK `id_proyecto_nucleo NN` | `tipo_actividad VARCHAR(30) NN`, `contexto_actividad VARCHAR(40) NN`, `fecha_programada`, `fecha_realizada` NULL, `responsable VARCHAR(300) NULL`, `resultado TEXT NULL`, `observaciones TEXT NULL` | CHECK tipo `sensibilizacion/caminamiento`; contexto `general/superficie_adicional/obras_complementarias/otro`; CHECK fechas; índices PN/tipo/contexto/fechas | Sí |
 | `afectacion` | PK `id_afectacion`; FK `id_proyecto_nucleo NN`; FK `id_parcela NULL` | `tipo_afectacion VARCHAR(20) NN`, `destino_superficie VARCHAR(100) NULL`, `no_parcela_solar VARCHAR(100) NULL`, `superficie_preliminar_ha`, `superficie_afectada_ha` NULL, `situacion VARCHAR(100) NULL`, `condicion_especial VARCHAR(50) NULL`, `descripcion_condicion TEXT NULL`, `avaluo_monto`, `avaluo_fecha`, `avaluo_referencia`, `avaluo_institucion` NULL | CHECK colectivo <=> parcela NULL; individual <=> parcela NN; superficies/avalúo >= 0; condición NULL o `expropiacion_directa/comunidad_indigena/no_afectacion_uso_comun/otro`; `otro` exige descripción; trigger mínimo verifica que parcela y PN pertenezcan al mismo núcleo; índices PN/tipo, parcela, destino, condición | Sí |
 
 `afectacion` no contiene geometría. Expropiación directa y otras condiciones se registran en la afectación correspondiente y no cambian el estado global de `proyecto_nucleo`. `comunidad_indigena` sigue siendo un atributo del núcleo. Una condición colectiva no bloquea la ruta individual.
 
-`actividad_campo` no agrega `id_convenio`: el contexto permite registrar trabajo previo a que exista un instrumento y evita otra FK nullable. Si una evidencia pertenece específicamente a un convenio ya creado, se vincula mediante `documento_vinculo`.
+`actividad_campo` no agrega `id_afectacion`, `id_convenio` ni ciclo. Sensibilización y caminamiento son hechos del `proyecto_nucleo`; `contexto_actividad` distingue el bloque operativo sin convertirlo en propietario relacional. Si una evidencia pertenece específicamente a otro registro ya creado, se vincula mediante `documento_vinculo`.
 
 ### 6.4 Asamblea y RAN del acta
 
 | Tabla | PK y FK | Columnas y nulabilidad | UNIQUE / CHECK / índices | BL |
 |---|---|---|---|---|
-| `asamblea` | PK `id_asamblea`; FK `id_afectacion NN`; FK `id_padron NULL` | `tipo_asamblea VARCHAR(40) NN`, `proposito TEXT NULL`, `fecha_expedicion_primera`, `fecha_programada_primera`, `fecha_expedicion_segunda`, `fecha_programada_segunda`, `fecha_realizada` NULL; `resultado VARCHAR(50) NULL`; `fecha_ingreso_ran`, `numero_solicitud_ran`, `calificacion_registral_ran`, `fecha_inscripcion_ran` NULL | CHECK tipo `anuencia/retiro_fondos/informacion/otra`; CHECK fechas básicas; trigger verifica afectación colectiva y padrón del mismo núcleo; índices afectación/tipo, fechas RAN, solicitud | Sí |
+| `asamblea` | PK `id_asamblea`; FK `id_proyecto_nucleo NN`; FK `id_padron NULL` | `tipo_asamblea VARCHAR(40) NN`, `proposito TEXT NULL`, `fecha_expedicion_primera`, `fecha_programada_primera`, `fecha_expedicion_segunda`, `fecha_programada_segunda`, `fecha_realizada` NULL; `resultado VARCHAR(50) NULL`; `fecha_ingreso_ran`, `numero_solicitud_ran`, `calificacion_registral_ran`, `fecha_inscripcion_ran` NULL; `observaciones TEXT NULL` | CHECK tipo `anuencia/modificatorio/superficie_adicional/obras_complementarias/retiro_fondos/otra`; CHECK fechas básicas; trigger verifica padrón del mismo núcleo; índices PN/tipo, fechas RAN, solicitud | Sí |
 
-El RAN del acta vive sólo en `asamblea`. No se reutilizan columnas de convenio ni un campo genérico de revisión.
+`asamblea` es exclusivamente de ámbito colectivo y no tiene `id_afectacion`: los marcadores Excel “PROGRAMADA POR NA” y “REALIZADA POR NA” identifican un solo hecho repetido en varias filas. La conciliación/importación debe resolver esas repeticiones a un mismo ID con trazabilidad de fuente; no se impone un UNIQUE inseguro basado sólo en tipo o fecha. El RAN del acta vive sólo en `asamblea`; no se reutilizan columnas de convenio ni un campo genérico de revisión. Uno o varios convenios colectivos pueden referir la misma asamblea mediante `convenio.id_asamblea_autorizacion`; ese FK es nullable y debe apuntar a una asamblea del mismo `proyecto_nucleo`.
 
 ### 6.5 Convenios y relación canónica
 
@@ -279,6 +279,7 @@ Reglas cerradas:
 - la acción excepcional “Asociar otra afectación” agrega un vínculo adicional;
 - todas las afectaciones de un convenio deben pertenecer al mismo `proyecto_nucleo` y al mismo ámbito;
 - el padre debe pertenecer al mismo `proyecto_nucleo` y ámbito;
+- `id_asamblea_autorizacion`, cuando exista, debe pertenecer al mismo `proyecto_nucleo` y sólo se admite en convenios colectivos; una asamblea puede autorizar varios convenios;
 - al crear un modificatorio, el servicio copia como punto de partida los vínculos activos del convenio padre; cualquier cambio posterior sigue las mismas validaciones;
 - `tipo_convenio = cop_original` y `modalidad_especial = permuta` representa el caso ordinario de permuta;
 - si el instrumento real no es un COP, se usa `tipo_instrumento = otro`, `tipo_convenio = NULL` y descripción obligatoria.
@@ -289,18 +290,21 @@ Reglas cerradas:
 
 | Tabla | PK y FK | Columnas y nulabilidad | UNIQUE / CHECK / índices | BL |
 |---|---|---|---|---|
-| `tramite_fifonafe` | PK `id_tramite_fifonafe`; FK `id_convenio NN` | `estatus VARCHAR(30) NN`; `no_oficio_fifonafe_a_dgaopr`, `fecha_oficio_fifonafe_a_dgaopr`; `no_oficio_dgaopr_a_representacion`, `fecha_oficio_dgaopr_a_representacion`; `no_oficio_respuesta_representacion_a_dgaopr`, `fecha_oficio_respuesta_representacion_a_dgaopr`; `no_oficio_respuesta_dgaopr_a_fifonafe`, `fecha_oficio_respuesta_dgaopr_a_fifonafe`, todos NULL; `hay_conflictos BOOLEAN NULL`, `resultado_no_conflictos TEXT NULL` | UNIQUE parcial un trámite activo por convenio; CHECK estatus `programado/pendiente/completo/cancelado/otro`; índices convenio/estatus/fechas | Sí |
-| `indemnizacion` | PK `id_indemnizacion`; FK `id_tramite_fifonafe NN` | `estatus VARCHAR(30) NN`, `descripcion_estatus TEXT NULL`, `fecha_programada`, `fecha_resolucion` NULL | UNIQUE parcial una indemnización activa por trámite; CHECK estatus `pendiente/programado/completo/otro`; `otro` exige descripción; CHECK fechas; índice estatus | Sí |
-| `pago` | PK `id_pago`; FK `id_indemnizacion NN`; FK `id_persona_beneficiaria NULL` | `fecha_pago DATE NN`, `monto NUMERIC(18,2) NN`, `beneficiario_nombre VARCHAR(300) NN`, `referencia VARCHAR(150) NULL`, `medio_pago VARCHAR(30) NULL` | CHECK monto > 0; CHECK medio permitido u `otro`; UNIQUE parcial `(id_indemnizacion,referencia)`; índices indemnización/fecha y persona | Sí |
+| `tramite_fifonafe` | PK `id_tramite_fifonafe`; FK `id_proyecto_nucleo NN` | `ambito VARCHAR(20) NN`, `estatus VARCHAR(30) NN`; `no_oficio_fifonafe_a_dgaopr`, `fecha_oficio_fifonafe_a_dgaopr`; `no_oficio_dgaopr_a_representacion`, `fecha_oficio_dgaopr_a_representacion`; `no_oficio_respuesta_representacion_a_dgaopr`, `fecha_oficio_respuesta_representacion_a_dgaopr`; `no_oficio_respuesta_dgaopr_a_fifonafe`, `fecha_oficio_respuesta_dgaopr_a_fifonafe`, todos NULL; `hay_conflictos BOOLEAN NULL`, `resultado_no_conflictos TEXT NULL`, `observaciones TEXT NULL` | CHECK ámbito `colectivo/individual`; CHECK estatus `programado/pendiente/completo/cancelado/otro`; índices PN/ámbito/estatus/fechas | Sí |
+| `tramite_fifonafe_afectacion` | PK `id_tramite_fifonafe_afectacion`; FK `id_tramite_fifonafe NN`, `id_afectacion NN` | Sin datos de negocio adicionales | UNIQUE `(id_tramite_fifonafe,id_afectacion)`; trigger exige mismo PN y mismo ámbito; índices trámite/afectación | Sí |
+| `indemnizacion` | PK `id_indemnizacion`; FK `id_afectacion NN` | `estatus VARCHAR(30) NN`, `descripcion_estatus TEXT NULL`, `fecha_programada`, `fecha_resolucion` NULL | UNIQUE parcial una indemnización activa por afectación; CHECK estatus `pendiente/programado/completo/otro`; `otro` exige descripción; CHECK fechas; índices afectación/estatus | Sí |
+| `pago` | PK `id_pago`; FK `id_indemnizacion NN`; FK `id_persona_beneficiaria NULL` | `fecha_pago DATE NN`, `monto NUMERIC(18,2) NN`, `beneficiario_nombre VARCHAR(300) NN`, `referencia VARCHAR(150) NULL`, `medio_pago VARCHAR(30) NULL`, `observaciones TEXT NULL` | CHECK monto > 0; CHECK medio permitido u `otro`; UNIQUE parcial `(id_indemnizacion,referencia)`; índices indemnización/fecha y persona | Sí |
 
-La cadena es siempre:
+Las cadenas canónicas son independientes:
 
 ```text
-Pago -> Indemnizacion -> TramiteFifonafe -> Convenio
-      -> ConvenioAfectacion -> Afectacion -> ProyectoNucleo
+Pago -> Indemnizacion -> Afectacion -> ProyectoNucleo
+
+TramiteFifonafe -> TramiteFifonafeAfectacion
+                -> Afectacion -> ProyectoNucleo
 ```
 
-No existen FK alternativas a ciclo o afectación en FIFONAFE, indemnización o pago. Un convenio multiafectación mantiene una sola cadena financiera del instrumento; su distribución por superficie no se inventa si el documento no la proporciona.
+`tramite_fifonafe` no tiene FK a convenio ni a ciclo. Un trámite debe cubrir al menos una afectación activa y puede cubrir varias sin duplicar los cuatro oficios; el vínculo valida `proyecto_nucleo` y ámbito. La conciliación de filas repetidas reutiliza el trámite identificado y conserva trazabilidad, en vez de insertar una copia por afectación. `indemnizacion` no depende obligatoriamente de FIFONAFE y admite como máximo un registro activo por afectación. `pago` depende sólo de indemnización, lo que permite hechos directos o bancarios cuando correspondan.
 
 ### 6.7 Documentos y trazabilidad de fuente
 
@@ -333,7 +337,7 @@ Política de alcance:
 - `geografo` administra importación y geometrías de trazo/núcleo/parcela dentro de proyectos asignados, sin cambiar hechos financieros;
 - las consultas filtran por proyecto antes de paginar;
 - ORV, padrón, núcleo y parcela son maestros compartidos: se accede a ellos si existe al menos un `proyecto_nucleo` del proyecto autorizado; sólo admin/geógrafo cambia geometría del maestro;
-- el contexto de seguridad de convenio, FIFONAFE, indemnización y pago se resuelve por la cadena de FK, no por IDs enviados por el cliente.
+- el contexto de seguridad se resuelve por relaciones canónicas: convenio por `convenio_afectacion`, FIFONAFE por `id_proyecto_nucleo` y sus vínculos, e indemnización/pago por la afectación; no por IDs redundantes enviados por el cliente.
 
 ### 6.9 Trazo e importación geoespacial
 
@@ -357,7 +361,7 @@ Se elige `trazo_proyecto`, no una simplificación nominal de `franja_derecho_via
 - Reemplazar `require_tramo_access`, `require_tramo_nucleo_access` y filtros por tramo con `require_project_access` y resolución de alcance por FK.
 - Eliminar endpoints de ciclos, salida terminal global, candidatos, secciones y asignaciones por tramo.
 - La creación de convenio recibe una afectación inicial y crea convenio + vínculo principal en una sola transacción.
-- FIFONAFE, indemnización y pago no aceptan IDs redundantes de proyecto/afectación; el servidor los deriva.
+- FIFONAFE recibe `id_proyecto_nucleo`, ámbito y afectaciones cubiertas; indemnización recibe su afectación y pago su indemnización. Ningún contrato acepta FK a ciclo ni usa FIFONAFE como padre obligatorio del pago.
 - Consolidar los dos importadores en el flujo `importacion_archivo/importacion_feature`.
 
 ### 7.2 Frontend
@@ -384,7 +388,7 @@ Cada indicador usa un agregado independiente antes de unirse por proyecto para e
 |---|---|
 | Núcleos | `COUNT(proyecto_nucleo)` activo |
 | Sensibilizaciones / caminamientos | `actividad_campo.tipo_actividad`, fechas programada/realizada |
-| Asambleas | `asamblea`, fechas programadas/realizada |
+| Asambleas | `asamblea` agregada directamente por `id_proyecto_nucleo`, fechas programadas/realizada |
 | RAN del acta | ingreso e inscripción en `asamblea` |
 | COP colectivos/individuales | `convenio.ambito`, `tipo_convenio`, `fecha_firma` |
 | Modificatorios | `convenio.tipo_convenio = modificatorio` |
@@ -394,12 +398,12 @@ Cada indicador usa un agregado independiente antes de unirse por proyecto para e
 | Retiro de fondos | `asamblea.tipo_asamblea = retiro_fondos` |
 | Expropiación directa | `afectacion.condicion_especial` |
 | Parcelas afectadas | `COUNT(DISTINCT afectacion.id_parcela)` individual |
-| FIFONAFE / no conflictos | `tramite_fifonafe` y resultado |
-| Indemnizaciones | `indemnizacion.estatus` |
-| Pagos | cantidad y suma de `pago.monto` |
+| FIFONAFE / no conflictos | `tramite_fifonafe` agregado por trámite, sin contar sus vínculos N:M |
+| Indemnizaciones | `indemnizacion` agregada por su `afectacion` |
+| Pagos | `pago` agregado por `indemnizacion`, cantidad y suma de monto |
 | Superficies | suma separada de preliminar, afectada y propia de convenio |
 
-Ninguna definición usa `ST_Area`, presencia de geometría ni intersección. Los números del Excel general son contrato de aceptación; no se insertan como filas de totales.
+Cada familia se agrega de forma independiente antes de cualquier join N:M; cuando un filtro requiera atravesar vínculos se cuenta el ID distinto del hecho. Ninguna definición usa `ST_Area`, presencia de geometría ni intersección. Los números del Excel general son contrato de aceptación; no se insertan como filas de totales.
 
 ## 9. Migraciones propuestas
 
@@ -408,7 +412,7 @@ Ninguna definición usa `ST_Area`, presencia de geometría ni intersección. Los
 - Preflight: versión `030`, entorno/confirmación destructiva, advisory lock y respaldo verificado.
 - Retirar vistas y triggers que dependen de ciclo/tramo antes de tocar tablas.
 - Eliminar primero candidatos, minutas/acuerdos, alertas y todas las tablas funcionales dependientes; retirar después `tramo_nucleo`, `afectacion_ciclo` y las tablas de hechos incompatibles.
-- Crear/recrear ProyectoNucleo, referencias, ORV/padrón/personas/parcelas, actividad, afectación, asamblea, convenio/vínculos, FIFONAFE, indemnización, pago, documentos y trazabilidad.
+- Crear/recrear ProyectoNucleo, referencias, ORV/padrón/personas/parcelas, actividad, afectación, asamblea, convenio/vínculos, FIFONAFE y su vínculo N:M, indemnización, pago, documentos y trazabilidad.
 - Modificar bitácora y crear `usuario_proyecto`.
 - Conservar tablas técnicas de autenticación y catálogos.
 - Registrar `031` sólo al final.
@@ -448,8 +452,10 @@ Datos propuestos:
 - una parcela con geometría sintética válida y las demás sin geometría;
 - afectaciones individuales para las parcelas;
 - COP colectivo, COP individual, modificatorio, superficie adicional, ampliación y ampliación remanente;
-- una asamblea con RAN del acta y convenios con RAN separado;
-- trámite FIFONAFE con los cuatro oficios, indemnización y uno o más pagos;
+- una asamblea colectiva del ProyectoNucleo con RAN del acta, referida por varios convenios que en conjunto autorizan más de una afectación;
+- un trámite FIFONAFE colectivo con los cuatro oficios que cubre varias afectaciones;
+- un trámite FIFONAFE individual compartido por afectaciones de varias parcelas, sin repetir los oficios;
+- una afectación con indemnización y pago directo/bancario sin FK obligatoria a FIFONAFE;
 - `PUEBLO NUEVO DE JASSO` con `cop_original + modalidad_especial=permuta`, preservando la observación fuente;
 - un convenio con vínculo principal y vínculo adicional a dos afectaciones, inspirado en el caso “1 COP PARA DOS SOLARES, DUDA” pero identificado como escenario de prueba de cardinalidad;
 - documentos disponibles/faltantes, versiones pequeñas de fixture, observaciones y `trazabilidad_fuente` sin copiar los Excel.
@@ -473,14 +479,15 @@ Los totales esperados del seed se declaran en tests, no en tablas. El script fij
 - alta única de ProyectoNucleo y múltiples referencias/consecutivos;
 - colectivo sin parcela e individual con parcela obligatoria del mismo núcleo;
 - parcela con/sin geometría y seguimiento completo en ambos casos;
-- actividad general y contextual con CHECK de coherencia;
-- asamblea rechazada para individual y aceptada para colectiva;
+- actividad general y contextual perteneciente a ProyectoNucleo, sin afectación ni ciclo;
+- asamblea colectiva compartida por varios convenios/afectaciones y rechazo de su uso desde convenio individual;
 - RAN del acta independiente de RAN del convenio;
 - tipos de convenio por ámbito, padre/consecutivo y permuta como modalidad;
 - creación transaccional de vínculo principal y asociación multiafectación;
 - rechazo de afectaciones cruzadas entre ProyectoNucleo o ámbitos;
-- FIFONAFE con captura progresiva de cuatro oficios;
-- indemnización separada de múltiples pagos y beneficiario/evidencia;
+- FIFONAFE con captura progresiva de cuatro oficios y asociación N:M a afectaciones del mismo ProyectoNucleo/ámbito;
+- un mismo FIFONAFE individual cubriendo afectaciones de varias parcelas sin duplicar el trámite;
+- indemnización única activa por afectación, separada de FIFONAFE, con múltiples pagos y beneficiario/evidencia;
 - baja lógica y bitácora con contexto de proyecto.
 
 ### 11.3 Seguridad
@@ -495,7 +502,7 @@ Los totales esperados del seed se declaran en tests, no en tablas. El script fij
 ### 11.4 Dashboard y frontend
 
 - conteos exactos del seed para cada KPI y periodo;
-- no duplicación por `convenio_afectacion` N:M;
+- no duplicación por `convenio_afectacion` ni `tramite_fifonafe_afectacion` N:M, y conteo único de asambleas compartidas;
 - superficies iguales a valores capturados aunque cambie la geometría;
 - ProyectoNucleo visible sin trazo y parcela visible sin geometría;
 - navegación desktop/mobile Proyecto -> Entidad -> Municipio -> Núcleo;
@@ -523,8 +530,10 @@ Los totales esperados del seed se declaran en tests, no en tablas. El script fij
 | Ejecutar reset destructivo en una base incorrecta | Crítico | Triple guard entorno + nombre + confirmación, backup y advisory lock. |
 | Catálogo completo no reproducible desde Git | Alto | Crear fixture versionado, fuente/checksum y test exacto 32/2,478 antes del seed. |
 | Gran superficie de referencias legacy | Alto | Búsqueda estática como gate y actualización por capas; no mantener aliases temporales. |
-| Duplicación de filas del dashboard por relación N:M | Alto | Agregados independientes y pruebas exactas con convenio multiafectación. |
+| Duplicación de filas del dashboard por relaciones N:M o asambleas compartidas | Alto | Agregados independientes y pruebas exactas con convenios y trámites multiafectación. |
 | Vínculo convenio-afectación inconsistente | Alto | Relación única, trigger diferido, mismo PN/ámbito y transacción atómica. |
+| Duplicar asambleas u oficios repetidos por fila Excel | Alto | Conciliación por hecho, trazabilidad de fuente y pruebas de importación que reutilicen Asamblea/FIFONAFE. |
+| Vínculo FIFONAFE-afectación fuera de alcance | Alto | UNIQUE del par, trigger de mismo ProyectoNucleo/ámbito y pruebas de rechazo cruzado. |
 | Ruptura del importador geoespacial útil | Medio | Consolidar sobre el importador con staging/perfiles/alias y portar sus pruebas de seguridad. |
 | Datos Excel incompletos o fechas seriales | Medio | Campos NULL, normalización explícita y trazabilidad del literal; no convertir desconocido en falso/cero. |
 | Documentos polimórficos sin FK declarativa | Medio | Lista cerrada de tipos, trigger de existencia, servicio de alcance y pruebas por tipo. |
@@ -542,7 +551,9 @@ La implementación sólo se aprueba para merge/despliegue cuando se cumpla todo 
 - [ ] Backend no contiene `id_tramo_nucleo` ni `id_ciclo_afectacion` en contratos objetivo.
 - [ ] Frontend no navega por tramo ni muestra ciclos.
 - [ ] `convenio_afectacion` es la única relación convenio-afectación y soporta N:M.
-- [ ] FIFONAFE -> indemnización -> pago tiene una sola cadena de FK.
+- [ ] Asamblea pertenece a ProyectoNucleo, es colectiva y puede autorizar varios convenios.
+- [ ] `tramite_fifonafe_afectacion` cubre N:M sin FK obligatoria de FIFONAFE a convenio.
+- [ ] Pago -> indemnización -> afectación -> ProyectoNucleo es la cadena financiera canónica; FIFONAFE no es su padre obligatorio.
 - [ ] Geometría opcional no bloquea capturas y no alimenta KPI oficiales.
 - [ ] RBAC por `usuario_proyecto` cubre lecturas, escrituras, documentos, exportaciones y dashboard.
 - [ ] Seed demo es recreable y sus KPI esperados pasan.

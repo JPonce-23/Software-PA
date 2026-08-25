@@ -19,14 +19,18 @@ Proyecto
         ├── Sensibilización
         ├── Caminamiento
         ├── Derechos colectivos
+        │   ├── Asamblea -> RAN del Acta
         │   └── Afectación colectiva
         │       ├── Avalúo simple, cuando exista
-        │       ├── Asamblea -> RAN del Acta
-        │       └── Convenio(s) -> RAN del Convenio -> FIFONAFE -> Indemnización -> Pago
+        │       ├── Convenio(s) -> RAN del Convenio
+        │       ├── FIFONAFE / no conflictos (puede cubrir varias afectaciones)
+        │       └── Indemnización -> Pago(s)
         └── Derechos individuales
             └── Parcela
                 └── Afectación individual
-                    └── Convenio(s) -> RAN -> FIFONAFE -> Indemnización -> Pago
+                    ├── Convenio(s) -> RAN
+                    ├── FIFONAFE / no conflictos (puede cubrir varias afectaciones)
+                    └── Indemnización -> Pago(s)
 ```
 
 ## Entidades objetivo
@@ -53,9 +57,13 @@ Puede ser colectiva o individual. Colectiva no exige parcela. Individual se rela
 
 Campos de superficie separados: `superficie_preliminar_ha`, `superficie_afectada_ha`. Campos de avalúo: `avaluo_monto`, `avaluo_fecha`, `avaluo_referencia`, `avaluo_institucion`.
 
+### ActividadCampo
+
+Sensibilización y caminamiento pertenecen a `ProyectoNucleo`, sin FK obligatoria a afectación ni ciclo. `contexto_actividad` distingue `general`, `superficie_adicional`, `obras_complementarias` u `otro`.
+
 ### Asamblea
 
-Relacionada con afectación colectiva y, cuando corresponda, con convenio/contexto específico. Conserva convocatorias, realización, resultado, RAN del acta, soporte y observaciones.
+Pertenece a `ProyectoNucleo`, es exclusivamente colectiva y no tiene FK directa a afectación. Conserva tipo, convocatorias, realización, resultado, RAN del acta, soporte y observaciones. Varios convenios colectivos pueden referir una misma asamblea mediante `convenio.id_asamblea_autorizacion` nullable.
 
 ### Convenio
 
@@ -65,7 +73,9 @@ Relación excepcional `convenio_afectacion(id_convenio, id_afectacion)` para con
 
 ### FIFONAFE, indemnización y pago
 
-`tramite_fifonafe` se relaciona con convenio o afectación según corresponda y conserva los cuatro oficios, fechas, resultado/no conflictos, estatus, soporte y observaciones. `indemnizacion` conserva estatus; `pago` conserva hechos financieros.
+`tramite_fifonafe` pertenece a `ProyectoNucleo`, distingue ámbito colectivo/individual y se vincula N:M con las afectaciones cubiertas mediante `tramite_fifonafe_afectacion`; no depende de un convenio. Conserva los cuatro oficios, fechas, resultado/no conflictos, estatus, soporte y observaciones.
+
+`indemnizacion` pertenece directamente a una afectación, con máximo un registro activo por afectación. `pago` pertenece a indemnización. La cadena financiera canónica es `Pago -> Indemnizacion -> Afectacion -> ProyectoNucleo`; FIFONAFE es seguimiento relacionado, no su padre obligatorio.
 
 ## Navegación UI
 
@@ -81,7 +91,7 @@ No usar `ST_Intersects` como regla de negocio para crear expediente/afectación.
 
 ## Dashboard
 
-Las vistas y consultas del dashboard se diseñan sobre hechos capturados. Los totales de Excel se usan como contrato de aceptación y conciliación, no como tabla primaria de totales manuales.
+Las vistas y consultas del dashboard se diseñan sobre hechos capturados. Asamblea se agrega por ProyectoNucleo; FIFONAFE por trámite sin multiplicarlo por sus afectaciones; indemnización por afectación y pago por indemnización. Los agregados se calculan de forma independiente antes de joins N:M. Los totales de Excel se usan como contrato de aceptación y conciliación, no como tabla primaria de totales manuales.
 
 Indicadores mínimos: núcleos, sensibilizaciones, caminamientos, asambleas, ingreso/inscripción RAN de actas y convenios, COP por tipo, superficie adicional, obras complementarias, retiro de fondos, expropiación directa, parcelas afectadas, ampliaciones, indemnizaciones, pagos y superficies capturadas.
 

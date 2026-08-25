@@ -75,8 +75,8 @@ La página 1 organiza el seguimiento de izquierda a derecha en los siguientes bl
 
 | # | Campo |
 |---:|---|
-| 1 | PROGRAMADO (FECHA) |
-| 2 | REALIZADO (FECHA) |
+| 1 | PROGRAMADO (FECHA)2 |
+| 2 | REALIZADO (FECHA)4 |
 
 ### 1.6. ASAMBLEA DE ANUENCIA Y APROBACIÓN DEL CONVENIO DE OCUPACIÓN PREVIA (COP) - INSCRIPCIÓN
 
@@ -428,4 +428,3 @@ El encabezado **OBSERVACIONES** aparece en el esquema, pero no se observan campo
 | 2 | DOCUMENTACIÓN FALTANTE |
 
 ---
-
