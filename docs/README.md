@@ -17,37 +17,35 @@ Ver `docs/fuentes_locales.md`.
 
 Son transcripciones/fuentes literales. No se reescriben para coincidir con la arquitectura técnica.
 
-## Modelo funcional objetivo
+## Modelo funcional objetivo canónico
 
 - `docs/Description.md`
 - `docs/Descripción proceso.md`
 - `docs/requirements.md`
 - `docs/contexto/contexto_funcional_liberacion_propiedad_social_v2.md`
 
-`docs/Descripción proceso.md` es el documento canónico del proceso objetivo.
+`docs/Descripción proceso.md` es el **documento funcional canónico**. Sus definiciones prevalecen sobre descripciones funcionales anteriores.
 
-## Diseño objetivo
+## Diseño técnico objetivo canónico
 
 - `docs/design.md`
-- `docs/propuestas/2026-08-24-refactor-modelo-seguimiento-excel.md`
+- `docs/propuestas/2026-08-25-diseno-reestructuracion-bd.md`
 - `docs/propuestas/2026-08-24-matriz-trazabilidad-excel-modelo.md`
-- `docs/propuestas/2026-08-24-requisitos-modelo-objetivo.md`
-- `docs/propuestas/2026-08-24-diseno-modelo-objetivo.md`
-- `docs/propuestas/2026-08-24-plan-migracion-refactor.md`
 
-Una propuesta histórica no prevalece sobre el modelo objetivo vigente.
+`docs/propuestas/2026-08-25-diseno-reestructuracion-bd.md` es el **DISEÑO TÉCNICO CANÓNICO** para implementar la reestructuración. Si existe una contradicción con una propuesta anterior, prevalece el diseño del 25 de agosto. Cualquier propuesta no incluida en esta sección sirve sólo como antecedente y no es normativa para la implementación.
 
 ## Implementación real actual
 
 - `docs/Arquitectura_Actual.md`
 - `docs/Diccionario_Datos_SSALFER.md`
-- código en `backend/` y `frontend/`
-- migraciones en `backend/db/migrations/`
+- `backend/`
+- `frontend/`
+- `backend/db/migrations/`
 
-Estos documentos y artefactos describen la implementación vigente hasta que exista una migración aprobada.
+Estos documentos y artefactos describen la implementación vigente. Sólo deberán actualizarse después de implementar realmente la reestructuración.
 
 ## Históricos
 
-`docs/historico/*`
+- `docs/historico/*`
 
-Sirven como memoria de decisiones y trabajos previos. No son fuente normativa si contradicen el modelo objetivo actual.
+Sirven como memoria de decisiones y trabajos previos. Los documentos históricos **NO son fuente normativa para implementar**.

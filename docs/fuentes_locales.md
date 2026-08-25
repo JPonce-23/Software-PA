@@ -25,7 +25,7 @@ Los Excel sirven para validar campos reales, columnas, cardinalidades, KPI de da
 Documentos derivados versionados:
 
 - `docs/propuestas/2026-08-24-matriz-trazabilidad-excel-modelo.md`
-- `docs/propuestas/2026-08-24-refactor-modelo-seguimiento-excel.md`
+- `docs/propuestas/2026-08-25-diseno-reestructuracion-bd.md`
 - `docs/requirements.md`
 - `docs/design.md`
 
