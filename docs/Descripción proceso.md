@@ -1,446 +1,305 @@
-# Descripción canónica del proceso de liberación de derecho de vía
+# Descripción funcional objetivo del proceso de liberación en propiedad social
 
-> **Fuente funcional oficial del proyecto.**
-> Describe el proceso objetivo aprobado y, cuando es necesario, distingue ese
-> objetivo del estado actual de la implementación.
+> **Estado:** modelo funcional objetivo para la refactorización.  
+> **Fecha:** 2026-08-24.  
+> **Fuentes rectoras:** Excel de seguimiento, `docs/contexto/estructura_datos_propiedad_social_fuente.md` y `docs/contexto/flujo_liberacion_propiedad_social_fuente.md`.  
+> **Separación obligatoria:** `docs/Arquitectura_Actual.md` continúa describiendo la implementación vigente hasta que la refactorización sea implementada.
+
+## 1. Principio general
+
+SOFTWARE-PA debe representar los hechos administrativos, agrarios, jurídicos y financieros capturados por los usuarios. La arquitectura técnica debe seguir el proceso real y la estructura de los Excel, no obligar al proceso a adaptarse a entidades técnicas creadas previamente.
+
+El contexto principal de trabajo será un **Núcleo Agrario dentro de un Proyecto**. El Tramo deja de ser dueño del expediente y el trazo ferroviario queda como información cartográfica del proyecto.
 
 ## 2. Secuencia general
 
 ```text
-Configuración territorial
+Proyecto
+  ↓
+Núcleo Agrario en seguimiento
+  ↓
+Revisión de ORV y Padrón
+  ↓
+Sensibilización
+  ↓
+Caminamiento
+  ↓
+Identificación de derechos/superficies afectadas
+  ├── Derechos colectivos
+  │     ↓
+  │  Afectación colectiva
+  │     ↓
+  │  Asamblea
+  │     └── RAN del Acta
+  │     ↓
+  │  Convenio(s)
+  │     ↓
+  │  RAN del Convenio
+  │     ↓
+  │  FIFONAFE / No conflictos
+  │     ↓
+  │  Indemnización / Pago
+  │     ↓
+  │  Retiro de fondos, cuando aplique
+  │
+  └── Derechos individuales
         ↓
-Identificación territorial de posibles afectaciones
+     Parcela
         ↓
-Acercamiento y sensibilización
+     Afectación individual
         ↓
-Caminamiento y análisis territorial y jurídico
+     Convenio(s)
         ↓
-Confirmación de superficie, sujetos y BDT
+     RAN
         ↓
-Registro de la afectación y apertura del expediente operativo
+     FIFONAFE / No conflictos
         ↓
-Clasificación de la ruta aplicable
-    ├── Expropiación directa
-    │       └── Salida terminal fuera del seguimiento de la PA
-    ├── Comunidad indígena
-    │       └── Salida terminal fuera del seguimiento de la PA
-    └── Ruta ordinaria colectiva o individual
-                ↓
-      Firma del convenio
-                ↓
-      Consolidación y seguimiento registral ante el RAN
-                ↓
-      FIFONAFE, pago de indemnización y cierre
-                ↓
-             Liberado
+     Indemnización / Pago
 ```
 
-La sensibilización no se elimina ni se reemplaza por el caminamiento. Es una
-etapa social previa. El caminamiento es una actividad técnica de campo.
+## 3. Alta del Proyecto y trazo
 
-La secuencia anterior expresa el orden obligatorio de las etapas aplicables.
-Una actuación posterior no sustituye ni presume cumplidas las anteriores.
-Expropiación directa y comunidad indígena son salidas terminales: se conserva
-su clasificación y evidencia, pero el sistema de la PA no continúa el flujo
-ordinario de convenio, RAN, FIFONAFE y pago.
+Cada Proyecto contiene sus datos administrativos y puede tener una geometría lineal de trazo ferroviario.
 
+El trazo se usa para representación cartográfica, orientación y consulta. No se divide obligatoriamente en entidades `Tramo` para efectos del proceso.
 
-## 3. Fase 1 — Configuración e investigación territorial
+Si existen referencias históricas de clave o número de tramo en una fuente Excel, se preservan como datos opcionales de procedencia.
 
-### 3.1 Proyecto, tramo y núcleo
+## 4. Núcleo Agrario dentro del Proyecto
 
-La Procuraduría Agraria registra o selecciona:
+Un mismo Núcleo Agrario puede aparecer en más de un proyecto. Por ello se necesita una relación mínima Proyecto–Núcleo para mantener separado el seguimiento de cada proyecto.
 
-- Proyecto.
-- Tramo.
-- Núcleo agrario.
-- Entidad federativa y municipio de adscripción registral.
-- Residencia u oficina regional responsable.
-- Tipo de núcleo: ejido o comunidad, o el que corresponda.
-- Condiciones especiales: comunidad indígena, expropiación o proyecto que no
-  afecta tierras de uso común.
+En este contexto pueden registrarse:
 
-La condición especial debe registrarse en el nivel al que realmente aplica:
+- consecutivo;
+- residencia;
+- organizador agrario responsable;
+- teléfono/contacto;
+- observaciones generales;
+- sensibilizaciones;
+- caminamientos.
 
-- `nucleo_agrario` cuando la condición corresponde al núcleo completo.
-- `afectacion` cuando sólo una afectación colectiva o una parcela
-  individualizada sale del flujo ordinario.
+Los datos maestros de ORV, padrón, personas y parcelas continúan perteneciendo al Núcleo Agrario.
 
-Una afectación marcada para expropiación directa o por comunidad indígena
-conserva sus antecedentes, observaciones, documentos y trazabilidad, pero no
-continúa hacia convenio, RAN, FIFONAFE ni pago dentro del sistema de la PA. La
-salida no equivale a liberación ni a un problema pendiente.
+## 5. ORV y Padrón
 
-Cuando el proyecto no afecta tierras de uso común, no se abre la ruta
-colectiva. Esto no impide continuar con afectaciones individuales sobre
-parcelas cuando existan.
+El sistema debe conservar el seguimiento de:
 
-### 3.2 Identificación de posibles afectaciones
+- integrantes/cargos de ORV;
+- vigencia;
+- fecha de vencimiento;
+- inscripción del acta de elección en el RAN;
+- fecha de padrón;
+- número de ejidatarios/comuneros;
+- observaciones y soporte documental.
 
-Permite investigar si el proyecto afecta derechos
-colectivos o parcelas individualizadas. En esta etapa se reúnen antecedentes,
-se revisan las condiciones del núcleo y se programan las actuaciones de campo.
+Estos datos sirven como antecedentes del proceso y para las actuaciones colectivas que corresponda.
 
-Una posible afectación todavía no es una fila de `afectacion` ni un
-subexpediente operativo.
-Si el análisis posterior concluye que no existe afectación, las actuaciones
-territoriales permanecen como evidencia del expediente maestro sin crear un
-subexpediente operativo inexistente.
+## 6. Sensibilización
 
-### 3.3 Identidad y representación
+La sensibilización es una actuación del seguimiento Proyecto–Núcleo.
 
-Las personas se registran una sola vez en el catálogo `persona`. Su relación
-con un núcleo y su calidad agraria se registra en `persona_nucleo`.
+Debe registrar:
 
-```text
-persona
-├── persona_nucleo
-├── parcela_titular
-└── orv_integrante
-```
+- fecha programada;
+- fecha realizada;
+- responsable;
+- resultado;
+- observaciones/acuerdos;
+- soporte documental.
 
-- `parcela_titular` permite titular, cotitulares o posesionarios.
-- `orv_integrante` asigna los cargos del Comisariado y Consejo de Vigilancia.
-- ORV pertenece al núcleo, no a una afectación particular, porque puede
-  respaldar varias actuaciones mientras se encuentre vigente.
-- El padrón registra su fecha y número de ejidatarios o comuneros para apoyar
-  el cálculo del quórum.
+Puede haber varias sensibilizaciones. Las columnas Excel `POR NA` no son hechos nuevos y no deben almacenarse como banderas; su función de conteo se resuelve en reportes.
 
-No se fusionan identidades únicamente porque coincida el nombre. CURP válida,
-RFC, documentos, núcleo, parcela y vigencia son evidencia para una
-conciliación.
+## 7. Caminamiento
 
-## 4. Fase 2 — Acercamiento, sensibilización y caminamiento
+El caminamiento es una actividad técnica/administrativa que permite reconocer la superficie o los derechos que serán materia del seguimiento.
 
-### 4.1 Acercamiento y sensibilización
+Debe registrar:
 
-La PA y las instituciones participantes informan al núcleo o a los titulares:
+- fecha programada;
+- fecha realizada;
+- responsable;
+- resultado;
+- observaciones;
+- soporte documental.
 
-- Alcance y ubicación aproximada del proyecto.
-- Motivo de la ocupación.
-- Derechos de las personas afectadas.
-- Proceso de levantamiento y valuación.
-- Documentación requerida.
-- Próximas reuniones, recorridos o asambleas.
-- Mecanismo de negociación de la tierra y de los BDT.
+La geometría puede apoyar la visualización del recorrido o de las parcelas, pero la superficie oficial informada se captura desde la documentación administrativa.
 
-La sensibilización puede necesitar varias reuniones. Cada actividad debe
-registrar como mínimo:
+## 8. Derechos colectivos
 
-- Fecha programada y realizada.
-- Lugar.
-- Responsable.
-- Resultado y observaciones.
-- Acuerdos y próxima acción.
-- Evidencia documental.
+Una Afectación Colectiva representa un derecho o superficie colectiva del núcleo.
 
-Las minutas conservan los acuerdos. Cada acuerdo tiene un responsable y puede
-registrar prioridad, fecha límite, estatus y fecha de cumplimiento.
+Puede corresponder, entre otros, a tierras de uso común, superficies a favor del núcleo, parcela escolar, UAIM, canal, derecho de paso u otros destinos colectivos observados en los Excel.
 
-Una lista estructurada de participantes por actividad es una capacidad
-planeada; no debe asumirse implementada mientras no exista su modelo.
+Campos mínimos:
 
-### 4.2 Caminamiento
+- destino de la superficie;
+- número de parcela/solar cuando exista;
+- superficie preliminar cuando sea relevante;
+- superficie real afectada informada;
+- situación/observaciones;
+- soporte documental.
 
-El caminamiento es la inspección física con representantes, titulares y
-personal técnico. Permite:
+### 8.1 Asamblea
 
-- Verificar por dónde cruza el proyecto.
-- Delimitar la superficie realmente afectada.
-- Confirmar o corregir la geometría.
-- Identificar parcelas y sujetos involucrados.
-- Detectar desacuerdos o conflictos.
-- Identificar bienes distintos a la tierra.
+La Asamblea debe conservar:
 
-Sus resultados permiten determinar si existe una afectación cierta y reúnen la
-información necesaria para crearla por la vía colectiva o individual.
+- primera convocatoria;
+- segunda convocatoria;
+- fecha realizada;
+- resultado;
+- ingreso al RAN;
+- número de solicitud;
+- calificación registral;
+- inscripción del acta;
+- soporte y observaciones.
 
-### 4.3 Bienes Distintos a la Tierra
+Las variantes de asamblea deben conservarse cuando aparecen en la fuente, incluyendo anuencia, no verificativo, conciliación y retiro de fondos, según aplique.
 
-Los BDT son bienes adheridos al terreno cuyo valor es independiente del suelo,
-por ejemplo:
+### 8.2 Convenios colectivos
 
-- Cultivos y árboles.
-- Cercas, corrales y caminos interiores.
-- Pozos y sistemas de riego.
-- Construcciones.
-- Infraestructura eléctrica, hidráulica o productiva.
+Tipos:
 
-El caminamiento identifica los bienes; posteriormente se valoran y negocian.
-El resultado económico acordado se registra en `convenio.monto_bdt`.
+- COP original;
+- modificatorio;
+- superficie adicional;
+- obras complementarias.
 
-Actualmente no existe un inventario estructurado por cada bien. Si los
-usuarios requieren esa trazabilidad, debe diseñarse una entidad de inventario
-y valuación vinculada a la afectación.
+Cada Convenio registra sus propios datos económicos, de superficie y registrales.
 
-### 4.4 Registro de la afectación confirmada
+Una superficie adicional u obra complementaria puede requerir nuevas actuaciones (sensibilización, caminamiento o asamblea). Esas actuaciones deben relacionarse con el convenio/afectación correspondiente sin obligar al usuario a crear o comprender una entidad `afectacion_ciclo`.
 
-La afectación se crea únicamente cuando el caminamiento y el análisis
-territorial y jurídico confirmaron el derecho afectado. En ese momento nace su
-expediente operativo y el usuario selecciona su
-vía:
+## 9. Derechos individuales
 
-```text
-afectacion.tipo_afectacion
-├── colectivo
-└── individual
-```
+La ruta individual se organiza por Parcela.
 
-La captura requiere los campos mostrados en docs/contexto/estructura_datos_propiedad_social_fuente.md:
+### 9.1 Parcela
 
+Campos mínimos:
 
-Una afectación colectiva corresponde normalmente a tierras de uso común y
-requiere actuaciones del núcleo agrario. Una afectación individual corresponde
-a una parcela o derecho con uno o varios titulares identificables.
+- tipo;
+- número de parcela;
+- número de parcela PPT;
+- certificado parcelario;
+- folio de derechos;
+- constancia de vigencia;
+- titular(es), cotitulares o posesionarios;
+- geometría opcional;
+- soporte y observaciones.
 
-## 5. Fase 3A — Derechos colectivos
+La geometría de la parcela es opcional y puede cargarse cuando exista una fuente cartográfica confiable.
 
-Las tierras de uso común pertenecen al núcleo agrario. Su autorización requiere
-las actuaciones colectivas y registrales aplicables.
+### 9.2 Afectación individual
 
-### 5.1 COP original colectivo
+Representa la afectación del Proyecto sobre la Parcela dentro del contexto Proyecto–Núcleo.
 
-El ciclo contempla:
+Conserva la superficie oficial informada, situación jurídica y observaciones. No requiere que PostGIS calcule esa superficie.
 
-1. Sensibilización y caminamiento.
-2. Convocatorias y asamblea de anuencia.
-3. Registro del quórum y resultado.
-4. Confirmación y captura de la superficie real afectada.
-5. Captura independiente del valor de tierra y de BDT.
-6. Conformación del Acta de Asamblea y firma del Convenio de Ocupación Previa.
-7. Consolidación y gestión del acta y del COP.
-8. Ingreso y seguimiento ante el RAN del Acta de Asamblea y del COP colectivo.
-9. Obtención del aviso y verificación de la inscripción.
+### 9.3 Convenios individuales
 
-### 5.2 Variantes colectivas
+Tipos:
 
-Los tipos permitidos son:
+- COP original;
+- modificatorio;
+- ampliación;
+- ampliación remanente.
 
-```text
-cop_original
-modificatorio
-superficie_adicional
-obras_complementarias
-```
+Cada convenio conserva firma, montos, BDT cuando corresponda, superficie, RAN, soporte y observaciones.
 
-- **Modificatorio:** ajusta el convenio original y conserva su linaje.
-- **Superficie adicional:** incorpora nueva superficie y abre un nuevo ciclo
-  de sensibilización, caminamiento, asamblea, convenio y seguimiento ante el
-  RAN.
-- **Obras complementarias:** crea un ciclo relacional independiente con
-  sensibilización, caminamiento, nueva asamblea, nuevo convenio y seguimiento
-  ante el RAN; no sobrescribe el COP original.
+## 10. RAN
 
-En obras complementarias no se captura `monto_bdt`. El pago corresponde
-solamente al valor pactado por la superficie.
+Hay al menos dos seguimientos registrales que deben distinguirse en derechos colectivos:
 
-No deben recrearse columnas paralelas con sufijos como `_2`. Cada nuevo ciclo
-se representa mediante nuevas filas relacionadas. Las actividades y asambleas
-del ciclo utilizan su `contexto_proceso`; el convenio utiliza el
-`tipo_convenio` correspondiente.
+1. RAN del Acta de Asamblea.
+2. RAN del Convenio.
 
-## 6. Fase 3B — Derechos individuales
+Para Convenios individuales se registra el seguimiento RAN del propio convenio.
 
-La afectación individual se vincula con una parcela y al menos un titular
-activo. Puede soportar copropiedad mediante varios registros en
-`parcela_titular`.
+Campos recurrentes:
 
-La PA verifica:
+- fecha de ingreso;
+- número de solicitud;
+- calificación registral;
+- fecha de inscripción/aviso;
+- soporte documental;
+- observaciones.
 
-- Número o identificación de parcela.
-- Certificado parcelario.
-- Folio de derechos.
-- Constancia de vigencia.
-- Titular, cotitulares o posesionarios.
-- Superficie y geometría afectadas.
+## 11. FIFONAFE e Informe de No Conflictos
 
-La negociación se realiza directamente con los titulares y no requiere una
-asamblea del núcleo para autorizar el convenio individual.
+Se conservan los cuatro oficios observados en las fuentes:
 
-### 6.1 COP original individual
+1. FIFONAFE → DGAOPR/Representación y fecha.
+2. DGAOPR → Representación y fecha.
+3. Respuesta Representación → DGAOPR y fecha.
+4. Respuesta DGAOPR/Representación → FIFONAFE y fecha.
 
-La ruta individual contempla:
+El sistema puede registrar además el resultado del informe, el estatus y observaciones.
 
-1. Confirmación de la parcela, titulares, superficie y situación jurídica.
-2. Integración de la documentación disponible y faltante del subexpediente.
-3. Firma del Convenio de Ocupación Previa individual.
-4. Consolidación y gestión del COP.
-5. Ingreso y seguimiento del convenio ante el RAN.
-6. Obtención del aviso y verificación de la inscripción.
-7. Continuidad hacia FIFONAFE y el pago de indemnización.
+## 12. Indemnización y pago
 
-La ruta utiliza `afectacion`, `parcela`, `parcela_titular`, `convenio`,
-`tramite_fifonafe` y `pago_indemnizacion`. No requiere una asamblea de anuencia.
+El Excel conserva un estatus de indemnización y el sistema actual ya cuenta con pagos. En el modelo objetivo deben distinguirse:
 
-### 6.2 Variantes individuales
+- **estatus de indemnización**: programado, pendiente, completo u otro catálogo aprobado;
+- **pago**: hecho financiero registrado con fecha, monto, beneficiario y evidencia cuando aplique.
 
-Los tipos permitidos son:
+El Dashboard no debe inferir un pago a partir de geometría.
 
-```text
-cop_original
-modificatorio
-ampliacion
-ampliacion_remanente
-```
+## 13. Expropiación directa, comunidad indígena y no afectación de uso común
 
-- **COP original:** registra firma, superficie, valor de tierra, BDT y
-  seguimiento registral.
-- **Modificatorio individual:** ajusta fecha y montos; no registra nueva
-  superficie ni BDT y no requiere inscripción ante el RAN conforme a la regla
-  actualmente modelada.
-- **Ampliación y ampliación remanente:** registran la nueva superficie,
-  montos y seguimiento registral correspondiente.
+Los Excel contienen expresamente estas condiciones y deben preservarse.
 
-## 7. Fase 4 — FIFONAFE, pagos y cierre
+Sin embargo, el efecto exacto sobre el flujo debe mantenerse como decisión funcional auditable. En particular:
 
-### 7.1 Informe de no conflictos
+- `no afecta tierras de uso común` debe impedir o excluir la ruta colectiva cuando corresponda, sin eliminar automáticamente una posible ruta individual;
+- `expropiación directa` debe conservarse como condición/resultado del caso;
+- `comunidad indígena` debe registrarse y permitir el tratamiento específico que el área determine.
 
-Se conserva la cadena de oficios entre FIFONAFE, DGAOPR y la representación de
-la PA:
+No se debe convertir una clasificación del Excel en una salida terminal global si la fuente funcional no lo justifica para todas las rutas.
 
-- Oficio de FIFONAFE a DGAOPR o representación y fecha.
-- Oficio de DGAOPR a representación y fecha.
-- Respuesta de la representación a DGAOPR y fecha.
-- Respuesta final a FIFONAFE y fecha.
+## 14. `afectacion_ciclo`
 
-El objetivo es acreditar que existen condiciones para continuar con el pago.
+El concepto `afectacion_ciclo` fue introducido por la implementación para agrupar COP original y variantes posteriores.
 
-### 7.2 Paquete económico
+El modelo objetivo no lo necesita como concepto de usuario. Antes de retirarlo se debe verificar que:
 
-El paquete de indemnización tiene conceptos complementarios:
+- cada convenio conserva su tipo y linaje;
+- las actuaciones adicionales pueden asociarse al convenio/afectación;
+- asambleas, RAN, FIFONAFE y pagos pueden relacionarse sin pérdida;
+- la migración preserva todos los registros históricos.
 
-```text
-valor de la tierra       = convenio.monto_100
-anticipo de la tierra    = convenio.monto_90
-bienes distintos tierra = convenio.monto_bdt
-límite pagable           = monto_100 + monto_bdt
-```
+Si esas condiciones se cumplen, `afectacion_ciclo` se retira en la fase CONTRACT.
 
-`monto_90` es un anticipo incluido dentro de `monto_100`; no se suma como un
-tercer concepto.
+## 15. Geoespacial
 
-Reglas por convenio:
+Sólo se necesitan como capacidades centrales:
 
-- COP original colectivo o individual: `monto_100` y `monto_bdt` se capturan
-  de forma independiente, aunque BDT pueda valer cero.
-- Ampliaciones: aplican ambos conceptos.
-- Obras complementarias: BDT no aplica y debe ser nulo.
-- Modificatorio individual: no captura BDT.
+- trazo ferroviario por Proyecto;
+- perímetro de Núcleo Agrario;
+- geometría opcional de Parcela.
 
-### 7.3 Pagos
+La geometría se usa para mapa y navegación. No calcula ni sustituye:
 
-Cada pago de indemnización se relaciona con un trámite FIFONAFE de tipo
-`indemnizacion`, que a su vez debe tener un convenio.
+- superficie oficial afectada;
+- superficie liberada;
+- existencia de afectación;
+- monto de convenio;
+- estado RAN;
+- FIFONAFE;
+- pago.
 
-Se registra:
+## 16. Dashboard
 
-- Monto y fecha.
-- Tipo: anticipo, parcial o total.
-- Medio de pago.
-- Banco y referencia.
-- Persona beneficiaria o beneficiario externo.
+El Dashboard deriva sus indicadores de los hechos capturados.
 
-La suma de pagos activos no puede exceder `monto_100 + monto_bdt`. Tampoco
-pueden reducirse los montos del convenio por debajo de lo ya pagado.
+Debe poder reproducir los bloques del Excel general: núcleos, sensibilización, caminamiento, asambleas, RAN, convenios por tipo, parcelas, ampliaciones, expropiaciones, retiro de fondos, indemnizaciones y superficies informadas.
 
-Para derechos individuales el pago se dirige al titular o beneficiario
-correspondiente. Para derechos colectivos el proceso incluye el depósito y la
-asamblea de retiro de fondos cuando proceda.
+Los periodos como trimestre se calculan desde las fechas.
 
-### 7.4 Liberación y salidas terminales
+## 17. Referencias
 
-Para el flujo ordinario descrito en el flujograma de propiedad social, una
-afectación se considera liberada cuando concluyeron las etapas que le resultan
-aplicables:
-
-```text
-Convenio firmado
-        ↓
-Consolidación y seguimiento ante el RAN
-        ↓
-Aviso y verificación de inscripción
-        ↓
-Informe de no conflictos
-        ↓
-Pago de indemnización concluido
-        ↓
-Liberado
-```
-
-Los hitos intermedios deben conservarse de forma independiente:
-
-- `convenio.fecha_firma`: convenio firmado.
-- `convenio.ingreso_ran_fecha`: convenio ingresado al RAN.
-- `convenio.calificacion_registral`: resultado del seguimiento registral.
-- `convenio.convenio_inscrito_fecha_ran`: inscripción registrada.
-- `tramite_fifonafe`: informe de no conflictos e indemnización.
-- `pago_indemnizacion`: resultado financiero.
-
-
-Las afectaciones con salida por expropiación directa o comunidad indígena no
-son liberadas. Se reportan mediante un estado terminal fuera del seguimiento
-de la PA y no continúan acumulando avance ordinario.
-
-## 8. Documentación, alertas y auditoría
-
-- La documentación puede relacionarse con núcleo, afectación, convenio u ORV.
-- Cada carga crea una versión inmutable con nombre original, tamaño, MIME,
-  SHA-256, usuario y fecha.
-- Una nueva versión nunca sobrescribe físicamente la anterior.
-- Las alertas de vencimiento de ORV se generan al modificar el ORV y mediante
-  una tarea diaria.
-- Cada usuario consulta sus alertas no vistas.
-- Las altas, modificaciones y bajas lógicas deben conservar actor y
-  trazabilidad en bitácora.
-- No se realiza borrado físico de entidades operativas.
-
-## 9. Estado actual frente al proceso objetivo
-
-### Implementado
-
-- Proyecto → Tramo → Tramo_Núcleo.
-- Personas, relaciones con núcleo, titulares e integrantes ORV.
-- Afectaciones colectivas e individuales.
-- Actividades de sensibilización y caminamiento.
-- Minutas y acuerdos.
-- Convenios y variantes.
-- Trámite FIFONAFE y pagos.
-- Documentos versionados.
-- Alertas y scheduler diario.
-
-
-### Capacidades que requieren diseño adicional
-
-- Lista estructurada de asistencia por actividad.
-- Inventario y valuación detallada de cada BDT.
-- Tablero de seguimiento visual de acuerdos.
-- Avalúo estructurado con sus datos y documentos propios.
-
-No deben presentarse como terminadas hasta contar con modelo, API, interfaz y
-pruebas.
-
-## 10. Conceptos fundamentales
-
-- **Núcleo agrario:** ejido o comunidad con personalidad jurídica y patrimonio
-  propio.
-- **ORV:** órganos de representación y vigilancia del núcleo.
-- **Asamblea:** órgano colectivo que autoriza las actuaciones que legalmente le
-  corresponden.
-- **Sujeto agrario:** persona con una calidad contextual como ejidatario,
-  comunero, avecindado o posesionario.
-- **Tierras de uso común:** superficie de aprovechamiento colectivo.
-- **Parcela:** superficie con derechos individualizados o compartidos.
-- **COP:** Convenio de Ocupación Previa.
-- **RAN:** Registro Agrario Nacional.
-- **FIFONAFE:** institución que interviene en la administración y dispersión de
-  recursos conforme al tipo de afectación.
-- **BDT:** Bienes Distintos a la Tierra.
-
-El contexto jurídico ampliado se conserva en:
-
-- `docs/Introducción agraria básica.md`.
-- `docs/CONVENIOS DE OCUPACIÓN PREVIA.md`.
-- `docs/Conceptos.md`.
-
-Las reglas legales deben ser confirmadas por el área jurídica cuando cambie la
-normativa o antes de un despliegue con datos reales.
+- `docs/contexto/flujo_liberacion_propiedad_social_fuente.md`
+- `docs/contexto/estructura_datos_propiedad_social_fuente.md`
+- Procuraduría Agraria, Normateca: https://www.pa.gob.mx/normatecapa/lineamientos.html
+- Lineamientos/modelos de COP: https://www.pa.gob.mx/normatecapa/lineamientos/lineamientos_en_materia_de_convenios.pdf
+- Ley Agraria: https://www.diputados.gob.mx/LeyesBiblio/pdf/LAgra.pdf
+- RAN, datos abiertos: https://datos.ran.gob.mx/conjuntoDatosPublico.php
