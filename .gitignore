@@ -27,4 +27,4 @@ backups/
 backend/seed_data/
 
 # Metadatos de Windows
-*.Zone.Identifier
+*:Zone.Identifier
