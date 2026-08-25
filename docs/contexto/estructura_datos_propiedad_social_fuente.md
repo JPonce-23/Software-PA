@@ -128,8 +128,8 @@ La página 1 organiza el seguimiento de izquierda a derecha en los siguientes bl
 
 | # | Campo |
 |---:|---|
-| 1 | PROGRAMADO (FECHA)2 |
-| 2 | REALIZADO (FECHA)4 |
+| 1 | PROGRAMADO (FECHA) |
+| 2 | REALIZADO (FECHA) |
 
 ### 1.11. ASAMBLEA DE ANUENCIA Y APROBACIÓN DE CONVENIO SUPERFICIE ADICIONAL
 

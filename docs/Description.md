@@ -1,293 +1,101 @@
-# SOFTWARE-PA — Descripción funcional objetivo
+# SOFTWARE-PA - Descripción funcional objetivo
 
-> **Estado:** definición funcional objetivo para la refactorización del sistema.  
-> **Rama de trabajo:** `feature/backend-logica`.  
-> **Fecha de actualización:** 2026-08-24.  
-> **Importante:** este documento describe lo que el producto debe representar. La implementación vigente se documenta por separado en `docs/Arquitectura_Actual.md`.
+> Estado: modelo funcional objetivo aprobado para diseño de migración.  
+> Fecha de actualización: 2026-08-25.  
+> Rama de referencia: `feature/backend-logica`.  
+> Este documento describe el producto objetivo; `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md` siguen describiendo la implementación vigente.
 
-## 1. Propósito
+## Propósito
 
-SOFTWARE-PA es un sistema web para digitalizar el seguimiento que la Procuraduría Agraria realiza sobre la liberación de derechos de vía ferroviarios en propiedad social.
+SOFTWARE-PA digitaliza y estructura el seguimiento que hoy se concentra en archivos Excel de la Procuraduría Agraria. Su objetivo principal es producir captura estructurada, consulta, seguimiento administrativo, dashboard/reporteador y un visor geoespacial de apoyo.
 
-El sistema sustituye el seguimiento operativo concentrado históricamente en archivos Excel por información estructurada, auditable y consultable, sin convertir un proceso administrativo relativamente directo en un motor geoespacial o una máquina de estados innecesariamente compleja.
+El sistema no debe convertirse en un GIS complejo ni en una máquina de estados innecesaria. La geometría ayuda a visualizar, seleccionar, resaltar y consultar territorio, pero no crea expedientes ni determina superficies, liberación, indemnización o pago.
 
-El producto tiene dos componentes principales:
+## Fuentes y precedencia
 
-1. **Dashboard / Reporteador**, construido con los datos capturados y actualizados por los usuarios.
-2. **Visor geoespacial**, utilizado como apoyo visual para mostrar el trazo ferroviario, los núcleos agrarios y, cuando exista cartografía disponible, las parcelas.
+Los tres Excel locales se verificaron el 2026-08-25 en `fuentes_locales/excel/`; pudieron abrirse como libros OOXML y se listaron sus hojas. `fuentes_locales/` está excluido en `.gitignore`, por lo que estas fuentes no deben versionarse ni copiarse dentro de directorios de Git.
 
-La información oficial de superficies, montos, fechas, estatus, convenios, RAN, FIFONAFE e indemnizaciones proviene de la captura documental/administrativa de los usuarios y de las fuentes institucionales disponibles. La geometría no sustituye esos datos.
+La documentación institucional se usa sólo para interpretar el dominio: Reglamento de la Ley Agraria en Materia de Ordenamiento de la Propiedad Rural, artículos 56 y 57; Lineamientos en Materia de Convenios de Ocupación Previa y Expropiación de Tierras Ejidales o Comunales de la Procuraduría Agraria; y fuentes oficiales del RAN para núcleos, parcelas/cartografía y trámites registrales. Ninguna de estas fuentes sustituye los campos realmente usados en el seguimiento Excel.
 
-## 2. Fuentes funcionales
+Las fuentes literales versionadas `docs/contexto/estructura_datos_propiedad_social_fuente.md` y `docs/contexto/flujo_liberacion_propiedad_social_fuente.md` se conservan sin reescritura. El flujograma ayuda a entender significado y orden, pero no crea módulos si los Excel no demandan datos de captura.
 
-El modelo objetivo se fundamenta en:
-
-- los archivos Excel de seguimiento utilizados por el área;
-- `docs/contexto/estructura_datos_propiedad_social_fuente.md`, para los campos y bloques de información;
-- `docs/contexto/flujo_liberacion_propiedad_social_fuente.md`, para el orden y bifurcaciones del proceso;
-- la documentación institucional de la Procuraduría Agraria y del Registro Agrario Nacional;
-- la Ley Agraria vigente, como apoyo para distinguir tierras de uso común y tierras parceladas.
-
-Los archivos `*_fuente.md` son transcripciones de fuentes originales y **no deben modificarse para hacerlos coincidir con la arquitectura técnica**.
-
-La implementación existente es evidencia del estado actual, pero no prevalece sobre las fuentes funcionales para definir el modelo objetivo.
-
-## 3. Navegación principal
-
-La navegación administrativa objetivo es:
+## Modelo funcional
 
 ```text
 Proyecto
-  ↓
-Entidad Federativa
-  ↓
-Municipio
-  ↓
-Núcleo Agrario
-  ├── Datos generales
-  ├── ORV
-  ├── Padrón
-  ├── Sensibilización
-  ├── Caminamiento
-  ├── Derechos colectivos
-  └── Parcelas / Derechos individuales
+├── Trazo ferroviario (representación cartográfica)
+└── ProyectoNucleo
+    └── Núcleo Agrario
+        ├── Datos generales
+        ├── ORV
+        ├── Padrón
+        ├── Sensibilización
+        ├── Caminamiento
+        ├── Derechos colectivos
+        │   └── Afectación colectiva
+        │       ├── Avalúo simple, cuando exista
+        │       ├── Asamblea -> RAN del Acta
+        │       └── Convenio(s) -> RAN del Convenio -> FIFONAFE -> Indemnización -> Pago
+        └── Derechos individuales
+            └── Parcela
+                └── Afectación individual
+                    └── Convenio(s) -> RAN -> FIFONAFE -> Indemnización -> Pago
 ```
 
-Para derechos individuales:
+`Tramo` deja de ser entidad funcional obligatoria. Las columnas `CLAVE DEL TRAMO` y `NÚMERO DE TRAMO`, cuando existan, se conservan sólo como referencias históricas/opcionales en `proyecto_nucleo` o en metadatos de importación.
 
-```text
-Proyecto → Entidad → Municipio → Núcleo Agrario → Parcela → Convenios
-```
+`ProyectoNucleo` es deliberadamente simple: proyecto, núcleo, consecutivo, residencia, responsable, teléfono/contacto, referencias históricas de tramo y observaciones. No contiene cálculos GIS ni motor de estados.
 
-Para derechos colectivos:
+La navegación administrativa objetivo es `Proyecto -> Entidad Federativa -> Municipio -> Núcleo Agrario`. Dentro del núcleo se muestran Resumen, Datos generales, ORV, Padrón, Sensibilización, Caminamiento, Derechos colectivos y Parcelas/Derechos individuales.
 
-```text
-Proyecto → Entidad → Municipio → Núcleo Agrario → Afectación colectiva → Asamblea / Convenios
-```
+La ruta individual es `Proyecto -> Entidad -> Municipio -> Núcleo -> Parcela -> Convenios`. La ruta colectiva es `Proyecto -> Entidad -> Municipio -> Núcleo -> Afectación colectiva -> Asamblea / Convenios`.
 
-`Tramo` deja de ser una entidad funcional necesaria para navegar o ser propietario del expediente. Si una fuente histórica conserva `clave_tramo` o `numero_tramo`, pueden mantenerse como referencias opcionales de procedencia, sin crear por ello una jerarquía funcional basada en tramos.
+## Derechos colectivos
 
-## 4. Contexto Proyecto–Núcleo
+Una afectación colectiva puede existir sin parcela. Representa tierras de uso común, superficie a favor del núcleo, parcela escolar, UAIM, canal, derecho de paso, solares, infraestructura u otros destinos observados. Conserva destino, superficie preliminar, superficie real afectada, avalúo simple si existe, observaciones y soporte.
 
-Un núcleo agrario es una entidad maestra agraria y puede participar en más de un proyecto. Por ello, el seguimiento no debe colgar directamente del núcleo sin contexto de proyecto.
+El RAN del acta de asamblea y el RAN del convenio son seguimientos distintos. El número de solicitud de acta va a `asamblea.numero_solicitud_ran`; el número de solicitud de convenio va a `convenio.numero_solicitud_ingreso`.
 
-El modelo objetivo utiliza una relación mínima **Proyecto–Núcleo** para representar que un núcleo está siendo atendido dentro de un proyecto. Esa relación puede contener datos de seguimiento propios del proyecto, por ejemplo:
+## Derechos individuales
 
-- consecutivo de seguimiento;
-- residencia u oficina responsable;
-- persona organizadora agraria responsable;
-- datos de contacto;
-- observaciones generales.
+Parcela es la entidad operativa central. Conserva tipo, número, número PPT, titulares, certificado parcelario, folio de derechos, constancia de vigencia, geometría opcional, fuente de geometría, soporte y observaciones. La falta de geometría no impide crear o dar seguimiento a la parcela ni a su afectación.
 
-No debe convertirse en otra entidad compleja ni contener cálculos espaciales.
+## Convenios
 
-## 5. Datos propios del Núcleo Agrario
+`convenio` es central y repetible. Los bloques horizontales de Excel se normalizan como filas de convenio.
 
-El Núcleo Agrario conserva información que le pertenece por naturaleza y que puede reutilizarse en distintos procesos:
+Tipos ordinarios colectivos: `cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`.
 
-- entidad federativa y municipio;
-- denominación del núcleo;
-- tipo de núcleo (ejido/comunidad);
-- geometría perimetral cuando exista;
-- ORV e integrantes;
-- vigencia de ORV;
-- inscripción del acta de elección en el RAN;
-- historial del padrón de ejidatarios/comuneros;
-- personas relacionadas con el núcleo;
-- parcelas pertenecientes al núcleo.
+Tipos ordinarios individuales: `cop_original`, `modificatorio`, `ampliacion`, `ampliacion_remanente`.
 
-Que estos datos se muestren dentro de una pantalla de seguimiento no cambia su propiedad lógica.
+Permuta no se agrega automáticamente al catálogo ordinario: se representa como `tipo_convenio = cop_original` con `modalidad_especial = permuta`, descripción y observaciones. Si un documento posterior demuestra otro instrumento jurídico, podrá clasificarse como `tipo_instrumento = otro` con descripción libre.
 
-## 6. Actuaciones generales del Proyecto–Núcleo
+Excepcionalmente un convenio puede asociarse a más de una afectación mediante una relación simple `convenio_afectacion(id_convenio, id_afectacion)`. La experiencia normal sigue siendo crear convenio desde una afectación y sólo asociar otra afectación cuando el caso lo requiera.
 
-La sensibilización y el caminamiento iniciales pertenecen al seguimiento de un núcleo dentro de un proyecto. Deben conservar, como mínimo, los datos que muestran las fuentes Excel:
+## Superficies, avalúo, FIFONAFE y pago
 
-- tipo de actividad;
-- fecha programada;
-- fecha realizada;
-- resultado/observaciones;
-- responsable;
-- soporte documental cuando exista.
+No se colapsan `SUPERFICIE TOTAL PRELIMINAR` y `SUPERFICIE TOTAL REAL AFECTADA`: se documentan como `afectacion.superficie_preliminar_ha` y `afectacion.superficie_afectada_ha`. La superficie propia de un instrumento vive en `convenio.superficie_ha` cuando corresponda.
 
-Las columnas de Excel utilizadas sólo para evitar doble conteo por núcleo (`PROGRAMADA POR NA`, `REALIZADA POR NA`, etc.) no necesitan persistirse: los reportes deben calcular esos conteos mediante registros estructurados y conteos distintos por núcleo.
+`AVALÚO MAESTRO (INDAABIN) $` se representa de forma simple como `afectacion.avaluo_monto`; `avaluo_fecha`, `avaluo_referencia` e `avaluo_institucion` pueden quedar nulos, usando `INDAABIN` cuando la fuente lo indique.
 
-## 7. Derechos colectivos
+FIFONAFE conserva cuatro oficios y fechas: FIFONAFE a DGAOPR/Representación, DGAOPR a Representación, respuesta de Representación a DGAOPR y respuesta DGAOPR/Representación a FIFONAFE, además de resultado/no conflictos, estatus, soporte y observaciones.
 
-Una afectación colectiva representa una superficie o derecho colectivo del núcleo. No se exige una parcela individual, porque los Excel distinguen tierras de uso común, tierras parceladas y otros destinos.
+Indemnización y pago no son equivalentes. Indemnización conserva estatus; pago registra hechos financieros con fecha, monto, beneficiario, referencia/evidencia y observaciones.
 
-Ejemplos observados en los archivos de seguimiento incluyen tierras de uso común, superficie a favor del núcleo agrario, parcela escolar, UAIM, canales, derechos de paso y solares.
+## Geoespacial
 
-La ruta objetivo es:
+PostgreSQL y PostGIS se mantienen para trazo ferroviario por proyecto, perímetro del núcleo y geometría opcional de parcela. La geometría no bloquea capturas administrativas, no calcula superficies oficiales con `ST_Area`, no valida liberación ni crea ProyectoNucleo por intersección.
 
-```text
-Afectación colectiva
-  ↓
-Asamblea
-  └── Seguimiento RAN del acta
-  ↓
-Convenio(s)
-  ├── COP original
-  ├── Modificatorio
-  ├── Superficie adicional
-  └── Obras complementarias
-       ↓
-  Seguimiento RAN del convenio
-       ↓
-  FIFONAFE
-       ↓
-  Informe de no conflictos
-       ↓
-  Indemnización / Pago
-       ↓
-  Retiro de fondos, cuando corresponda
-```
+## Dashboard
 
-El seguimiento RAN del acta de asamblea y el seguimiento RAN del convenio son hechos distintos y no deben fusionarse en un único estado genérico.
+El Excel general funciona como contrato de aceptación del dashboard. Los KPI se derivan de hechos capturados: núcleos, sensibilizaciones, caminamientos, asambleas, RAN, COP colectivos, modificatorios, superficie adicional, obras complementarias, retiro de fondos, expropiación directa, parcelas afectadas, COP individuales, ampliaciones, indemnizaciones y superficies capturadas.
 
-## 8. Derechos individuales y Parcela
+Los Excel detallados disponibles validan especialmente Mexico-Queretaro; el Excel general incluye otros proyectos que pueden no tener fuente detallada equivalente disponible localmente.
 
-La Parcela es la entidad operativa central de la ruta individual.
+## Referencias institucionales consultadas
 
-Debe poder representar, como mínimo:
-
-- tipo de parcela;
-- número de parcela;
-- número de parcela PPT;
-- titular, cotitulares o posesionarios;
-- constancia de vigencia de derechos;
-- certificado parcelario;
-- folio de derechos;
-- geometría de la parcela cuando exista una fuente cartográfica identificable;
-- soporte documental y observaciones.
-
-La ruta objetivo es:
-
-```text
-Parcela
-  ↓
-Afectación individual
-  ↓
-Convenio(s)
-  ├── COP original
-  ├── Modificatorio
-  ├── Ampliación
-  └── Ampliación remanente
-       ↓
-  Seguimiento RAN
-       ↓
-  FIFONAFE
-       ↓
-  Informe de no conflictos
-       ↓
-  Indemnización / Pago
-```
-
-Una parcela puede existir aunque todavía no tenga geometría digital disponible. La ausencia de geometría no debe impedir el seguimiento administrativo o jurídico.
-
-## 9. Convenios
-
-El Convenio es una pieza central del seguimiento y normaliza las columnas repetidas de los Excel.
-
-En lugar de crear columnas independientes para cada variante, se registran filas de convenio con `tipo_convenio` y los campos que correspondan: fecha de firma, monto 90 %, monto 100 %, monto BDT cuando aplique, superficie informada, ingreso al RAN, número de solicitud, calificación registral, fecha de inscripción, soporte documental y observaciones.
-
-Tipos objetivo:
-
-- **Colectivos:** `cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`.
-- **Individuales:** `cop_original`, `modificatorio`, `ampliacion`, `ampliacion_remanente`.
-
-## 10. RAN, FIFONAFE e indemnización
-
-El sistema debe conservar íntegramente la información que aparece en los Excel sobre:
-
-- ingreso al RAN;
-- número de solicitud;
-- calificación registral;
-- inscripción de actas;
-- inscripción de convenios;
-- oficio FIFONAFE → DGAOPR/Representación y fecha;
-- oficio DGAOPR → Representación y fecha;
-- respuesta Representación → DGAOPR y fecha;
-- respuesta DGAOPR/Representación → FIFONAFE y fecha;
-- estatus de indemnización;
-- pagos efectivamente registrados;
-- soporte y observaciones.
-
-No se debe exigir una entidad técnica adicional si esos hechos pueden relacionarse directamente con la afectación, asamblea o convenio que les da origen.
-
-## 11. `afectacion_ciclo`
-
-`afectacion_ciclo` pertenece a la arquitectura actualmente implementada, pero **no forma parte del modelo funcional objetivo salvo que una auditoría de datos demuestre una necesidad que no pueda resolverse mediante relaciones directas entre afectación, actividades, asambleas, convenios, RAN y FIFONAFE**.
-
-Las variantes que actualmente se modelan como ciclos aparecen en los Excel como tipos de convenio y actuaciones asociadas. Por ello, la refactorización debe intentar representar esos hechos sin exponer ni depender de un concepto técnico de “ciclo” para el usuario.
-
-## 12. Visor geoespacial
-
-El modelo cartográfico objetivo es deliberadamente pequeño:
-
-```text
-Proyecto
-└── Trazo ferroviario (línea)
-
-Núcleo Agrario
-└── Perímetro (polígono)
-
-Parcela
-└── Geometría opcional (polígono)
-```
-
-El mapa puede mostrar y centrar el trazo, mostrar núcleos, resaltar núcleos seleccionados, mostrar parcelas cuando exista geometría y navegar desde una geometría hacia su información administrativa.
-
-La geometría **no** debe utilizarse como fuente autoritativa para crear expedientes o afectaciones, calcular la superficie oficial afectada/liberada, determinar montos o liberación, bloquear registros por falta de intersección ni inferir automáticamente datos que los usuarios deben capturar desde fuentes oficiales.
-
-Las superficies de los reportes provienen de los campos administrativos capturados.
-
-## 13. Dashboard / Reporteador
-
-El dashboard debe reproducir y mejorar los indicadores actualmente consolidados en los Excel, por proyecto y con filtros territoriales:
-
-- total de núcleos agrarios;
-- sensibilizaciones programadas/realizadas;
-- caminamientos programados/realizados;
-- asambleas;
-- actas ingresadas e inscritas en RAN;
-- convenios colectivos por tipo, firma, ingreso e inscripción;
-- parcelas afectadas;
-- convenios individuales por tipo, firma, ingreso e inscripción;
-- superficies informadas por usuarios;
-- indemnizaciones y pagos;
-- casos de expropiación directa;
-- casos donde no se afectan tierras de uso común;
-- casos de comunidad indígena o tratamiento especial, según la decisión funcional aplicable.
-
-Los campos auxiliares de Excel como `TRIMESTRE` deben derivarse de las fechas, no duplicarse en la base de datos.
-
-## 14. Roles
-
-El sistema conserva cuatro perfiles generales:
-
-- **Operador:** captura y actualiza información administrativa, agraria y jurídica.
-- **Geógrafo:** administra cartografía de proyecto, núcleos y parcelas sin convertir la cartografía en fuente de verdad administrativa.
-- **Visualizador:** consulta dashboard, reportes, expedientes y mapa.
-- **Administrador:** configura usuarios, proyectos, catálogos y permisos.
-
-Al retirar `Tramo` del dominio funcional, el control territorial por `usuario_tramo` debe reauditarse. El modelo objetivo favorece permisos por proyecto o por un alcance equivalente, sin predeterminar todavía su implementación final.
-
-## 15. Documentos relacionados
-
-- `docs/contexto/estructura_datos_propiedad_social_fuente.md`
-- `docs/contexto/flujo_liberacion_propiedad_social_fuente.md`
-- `docs/Descripción proceso.md`
-- `docs/propuestas/2026-08-24-refactor-modelo-seguimiento-excel.md`
-- `docs/propuestas/2026-08-24-matriz-trazabilidad-excel-modelo.md`
-- `docs/propuestas/2026-08-24-requisitos-modelo-objetivo.md`
-- `docs/propuestas/2026-08-24-diseno-modelo-objetivo.md`
-- `docs/propuestas/2026-08-24-plan-migracion-refactor.md`
-
-## 16. Referencias institucionales de apoyo
-
-- Procuraduría Agraria, Normateca — Lineamientos: https://www.pa.gob.mx/normatecapa/lineamientos.html
-- Lineamientos/modelos de Convenios de Ocupación Previa: https://www.pa.gob.mx/normatecapa/lineamientos/lineamientos_en_materia_de_convenios.pdf
-- Ley Agraria vigente: https://www.diputados.gob.mx/LeyesBiblio/pdf/LAgra.pdf
-- Registro Agrario Nacional — Datos abiertos geoespaciales: https://datos.ran.gob.mx/conjuntoDatosPublico.php
-
-Estas referencias apoyan la interpretación del dominio; no sustituyen las decisiones funcionales que correspondan al área responsable del proyecto.
+- Reglamento de la Ley Agraria en Materia de Ordenamiento de la Propiedad Rural, especialmente artículos 56 y 57: https://www.diputados.gob.mx/LeyesBiblio/regley/Reg_LAgra_MOPR.pdf
+- Procuraduría Agraria, Lineamientos en Materia de Convenios de Ocupación Previa y Expropiación de Tierras Ejidales o Comunales: https://www.pa.gob.mx/normatecapa/lineamientos/lineamientos_en_materia_de_convenios.pdf
+- Procuraduría Agraria, Normateca de lineamientos: https://www.pa.gob.mx/normatecapa/lineamientos.html
+- Registro Agrario Nacional, Datos Abiertos: https://datos.ran.gob.mx/conjuntoDatosPublico.php
+- Registro Agrario Nacional, PHINA: https://phina.ran.gob.mx/
