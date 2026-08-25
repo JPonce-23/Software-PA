@@ -10,7 +10,7 @@
 | Motor | PostgreSQL 15.4 |
 | Extensión espacial | PostGIS 3.3.4 |
 | Esquema | `public` |
-| Migración registrada | `028` — Trazo lineal sin inferencia de anchos |
+| Migración registrada | `030` — FIFONAFE: requisitos documentales por tipo de trámite |
 | Tablas de aplicación | 42 |
 | Vistas de aplicación | 5 |
 | Funciones propias | 19 |
@@ -27,6 +27,8 @@ La fuente ejecutable sigue siendo:
   titulares, integrantes ORV, minutas, acuerdos, versiones documentales,
   pagos y alertas.
 - `backend/db/migrations/028_trazo_lineal_sin_anchos.sql`: Trazo lineal sin inferencia de anchos.
+- `backend/db/migrations/029_fifonafe_oficios_por_tipo_expand.sql`: Requisitos de oficios FIFONAFE.
+- `backend/db/migrations/030_fifonafe_oficios_por_tipo_switch.sql`: Switch de la regla FIFONAFE.
 
 La instancia actual **no contiene** las tablas `frente` ni `usuario_frente`.
 `tramo_nucleo` tampoco contiene `id_frente`.
@@ -177,6 +179,11 @@ Ejido o comunidad propietaria de tierra social. Usa CV-A.
 | `comunidad_indigena` | `BOOLEAN` | NN, D `FALSE` | Identifica el régimen de atención correspondiente. |
 | `residencia` | `VARCHAR(300)` | — | Oficina o residencia responsable. |
 | `geometria_poligono` | `geometry(MultiPolygon,4326)` | — | Polígono del núcleo. |
+| `fuente_datos` | `VARCHAR(200)` | — | Fuente de importación. |
+| `id_entidad_fuente` | `VARCHAR(100)` | — | ID de la entidad en la fuente. |
+| `id_municipio_fuente` | `VARCHAR(100)` | — | ID del municipio en la fuente. |
+| `id_nucleo_fuente` | `VARCHAR(200)` | — | ID del núcleo en la fuente. |
+| `alcance_identidad_fuente` | `VARCHAR(20)` | — | Alcance del mapeo en importación. |
 | `fecha_creacion` | `TIMESTAMPTZ` | NN, D `NOW()` | Fecha técnica de creación. |
 | Bloque CV-A | — | — | Ciclo de vida y observaciones. |
 
@@ -196,6 +203,7 @@ liberación. Usa CV-A.
 | `longitud_m` | `NUMERIC(14,2)` | — | Longitud no negativa en metros. |
 | `es_expropiacion` | `BOOLEAN` | NN, D `FALSE` | Marca la vía de expropiación directa. |
 | `causa_problema` | `TEXT` | — | Obstáculo o incidencia del expediente. |
+| `proyecto_no_afecta_uso_comun` | `BOOLEAN` | — | Marca si el proyecto no afecta el uso común. |
 | `proyecto_no_afecta_uso_comun` | `BOOLEAN` | — | Impide afectaciones colectivas cuando es verdadero. |
 | Bloque CV-A | — | — | Ciclo de vida y observaciones. |
 
@@ -389,7 +397,7 @@ Historial del padrón de ejidatarios o comuneros. Usa CV-A.
 | `id_padron` | `SERIAL` | PK, NN | Identificador. |
 | `id_nucleo` | `INTEGER` | FK, NN | → `nucleo_agrario.id_nucleo`. |
 | `fecha_padron` | `DATE` | NN | Fecha de corte. |
-| `numero_ejidatarios_comuneros` | `INTEGER` | NN | Total no negativo. |
+| `numero_ejidatarios_comuneros` | `INTEGER` | NN, CHECK (>=0) | Total no negativo (impartido por Pydantic/BD). |
 | `id_usuario_registro` | `INTEGER` | FK | → `usuario.id_usuario`. |
 | `fecha_registro` | `TIMESTAMPTZ` | NN, D `NOW()` | Registro técnico. |
 | Bloque CV-A | — | — | Ciclo de vida y observaciones. |
@@ -456,6 +464,7 @@ Sensibilización o caminamiento del expediente maestro. Usa CV-A.
 | --- | --- | --- | --- |
 | `id_actividad` | `SERIAL` | PK, NN | Identificador. |
 | `id_tramo_nucleo` | `INTEGER` | FK, NN | → `tramo_nucleo.id_tramo_nucleo`. |
+| `id_ciclo_afectacion` | `INTEGER` | FK | → `afectacion_ciclo.id_ciclo_afectacion`. |
 | `tipo_actividad` | `VARCHAR(50)` | NN | `sensibilizacion` o `caminamiento`. |
 | `contexto_proceso` | `VARCHAR(50)` | NN, D `cop_original` | Contexto operativo. |
 | `fecha_programada` | `DATE` | — | Programación. |
@@ -670,8 +679,7 @@ Seguimiento de oficios y trámite de indemnización o no conflictos. Usa CV-A.
 | `fecha_oficio_rpta_dgaopr_a_fifonafe` | `DATE` | — | Fecha de oficio 4. |
 | Bloque CV-A | — | — | Ciclo de vida y observaciones. |
 
-Un trámite `completo` requiere los cuatro números y las cuatro fechas de
-oficio. Cuando `id_convenio` e `id_afectacion` están informados, las FK
+Un trámite `completo` de tipo `informe_no_conflictos` requiere los cuatro números y las cuatro fechas de oficio. La restricción original que exigía esto a todos los trámites fue retirada en la migración 030. Cuando `id_convenio` e `id_afectacion` están informados, las FK
 compuestas impiden mezclar expedientes, afectaciones, tipos y convenios. Como
 ambas columnas admiten `NULL` y las FK usan `MATCH SIMPLE`, la validación
 compuesta no se ejecuta por completo cuando falta alguno de esos valores.
@@ -908,8 +916,13 @@ Expone las 22 columnas de `orv` y agrega:
 | `causa_problema` | `TEXT` | Incidencia. |
 | `tiene_anuencia` | `BOOLEAN` | Existe asamblea activa con anuencia otorgada. |
 | `tiene_convenio_inscrito_ran` | `BOOLEAN` | Existe convenio activo inscrito. |
-| `estado_legal` | `TEXT` | `problema`, `liberado`, `en_proceso` o `pendiente`. |
+| `estado_legal` | `TEXT` | `problema`, `liberado`, `en_proceso`, `fuera_seguimiento` o `pendiente`. |
 | `estado_geoespacial` | `TEXT` | `pendiente_digitalizacion` o `completo`. |
+| `total_afectaciones` | `BIGINT` | Total de afectaciones ligadas al expediente. |
+| `afectaciones_liberadas` | `BIGINT` | Afectaciones en estado liberado. |
+| `afectaciones_pendientes` | `BIGINT` | Afectaciones en estado pendiente. |
+| `afectaciones_en_proceso` | `BIGINT` | Afectaciones en proceso. |
+| `afectaciones_terminales` | `BIGINT` | Afectaciones en estado no aplica terminal. |
 
 ### 9.3 `vw_dashboard_liberacion`
 
@@ -1137,51 +1150,51 @@ También permanece pendiente resolver documentalmente el nivel
 | Campo | Tipo | Claves | Descripción |
 | --- | --- | --- | --- |
 | `id_carga` | `BIGSERIAL` | PK, NN | Identificador. |
-| `tipo_objetivo` | `VARCHAR(40)` | NN | |
-| `tipo_geometria_esperado` | `VARCHAR(20)` | NN | |
-| `nombre_original` | `VARCHAR(255)` | NN | |
-| `nombre_almacenado` | `VARCHAR(100)` | NN | |
-| `formato_detectado` | `VARCHAR(20)` | NN | |
-| `tamano_bytes` | `BIGINT` | NN | |
-| `sha256` | `VARCHAR(64)` | NN | |
-| `fuente` | `VARCHAR(200)` | — | |
-| `crs_original` | `TEXT` | NN | |
-| `crs_destino` | `VARCHAR(20)` | NN, D `EPSG:4326` | |
-| `total_features` | `INTEGER` | NN, D `0` | |
-| `features_validos` | `INTEGER` | NN, D `0` | |
-| `features_advertencia` | `INTEGER` | NN, D `0` | |
-| `features_error` | `INTEGER` | NN, D `0` | |
-| `estado` | `VARCHAR(30)` | NN, D `subido` | |
-| `id_usuario_carga` | `INTEGER` | NN | |
-| `fecha_carga` | `TIMESTAMPTZ` | NN, D `NOW()` | |
-| `fecha_procesamiento` | `TIMESTAMPTZ` | — | |
-| `fecha_confirmacion` | `TIMESTAMPTZ` | — | |
-| `id_usuario_confirmacion` | `INTEGER` | — | |
-| `error_codigo` | `VARCHAR(80)` | — | |
-| `error_detalle` | `TEXT` | — | |
+| `tipo_objetivo` | `VARCHAR(40)` | NN | Tipo (`tramo`, `franja_derecho_via`, etc.). |
+| `tipo_geometria_esperado` | `VARCHAR(20)` | NN | Tipo de geometría. |
+| `nombre_original` | `VARCHAR(255)` | NN | Nombre original del archivo. |
+| `nombre_almacenado` | `VARCHAR(100)` | UQ, NN | Nombre físico en disco. |
+| `formato_detectado` | `VARCHAR(20)` | NN | KML, GeoJSON, etc. |
+| `tamano_bytes` | `BIGINT` | NN | Tamaño del archivo. |
+| `sha256` | `VARCHAR(64)` | NN | Hash para evitar duplicados. |
+| `fuente` | `VARCHAR(200)` | — | Procedencia. |
+| `crs_original` | `TEXT` | NN | CRS original detectado. |
+| `crs_destino` | `VARCHAR(20)` | NN, D `EPSG:4326` | CRS objetivo (WGS84). |
+| `total_features` | `INTEGER` | NN, D `0` | Total de features detectados. |
+| `features_validos` | `INTEGER` | NN, D `0` | Features válidos. |
+| `features_advertencia` | `INTEGER` | NN, D `0` | Features con advertencias. |
+| `features_error` | `INTEGER` | NN, D `0` | Features inválidos. |
+| `estado` | `VARCHAR(30)` | NN, D `subido` | Estado de la carga. |
+| `id_usuario_carga` | `INTEGER` | FK, NN | → `usuario.id_usuario`. |
+| `fecha_carga` | `TIMESTAMPTZ` | NN, D `NOW()` | Fecha de subida. |
+| `fecha_procesamiento` | `TIMESTAMPTZ` | — | Fecha en que GDAL la procesó. |
+| `fecha_confirmacion` | `TIMESTAMPTZ` | — | Fecha de aceptación final. |
+| `id_usuario_confirmacion` | `INTEGER` | FK | → `usuario.id_usuario`. |
+| `error_codigo` | `VARCHAR(80)` | — | Código de falla. |
+| `error_detalle` | `TEXT` | — | Excepción. |
 
 ### 15.2 `carga_geoespacial_feature`
 
 | Campo | Tipo | Claves | Descripción |
 | --- | --- | --- | --- |
 | `id_carga_feature` | `BIGSERIAL` | PK, NN | Identificador. |
-| `id_carga` | `BIGINT` | NN | |
-| `indice_feature` | `INTEGER` | NN | |
-| `capa_origen` | `VARCHAR(200)` | — | |
-| `atributos_originales` | `JSONB` | NN, D `{}` | |
-| `geometria_normalizada` | `geometry(Geometry,4326)` | — | |
-| `tipo_geometria` | `VARCHAR(40)` | — | |
-| `estado` | `VARCHAR(20)` | NN | |
-| `errores` | `JSONB` | NN, D `[]` | |
-| `advertencias` | `JSONB` | NN, D `[]` | |
-| `transformaciones` | `JSONB` | NN, D `[]` | |
-| `area_original_m2` | `NUMERIC` | — | |
-| `area_normalizada_m2` | `NUMERIC` | — | |
-| `diferencia_area_relativa` | `NUMERIC` | — | |
-| `seleccionado` | `BOOLEAN` | NN, D `FALSE` | |
-| `id_registro_operativo` | `BIGINT` | — | |
-| `fecha_consumo` | `TIMESTAMPTZ` | — | |
-| `id_usuario_consumo` | `INTEGER` | — | |
+| `id_carga` | `BIGINT` | FK, NN | → `carga_geoespacial.id_carga`. |
+| `indice_feature` | `INTEGER` | NN | Posición en el archivo. |
+| `capa_origen` | `VARCHAR(200)` | — | Layer name (KML/SHP). |
+| `atributos_originales` | `JSONB` | NN, D `{}` | Propiedades originales. |
+| `geometria_normalizada` | `geometry(Geometry,4326)` | — | Geometría corregida. |
+| `tipo_geometria` | `VARCHAR(40)` | — | `Polygon`, `LineString`, etc. |
+| `estado` | `VARCHAR(20)` | NN | `valido`, `error`, etc. |
+| `errores` | `JSONB` | NN, D `[]` | Lista de errores. |
+| `advertencias` | `JSONB` | NN, D `[]` | Lista de alertas (ej. cruce detectado). |
+| `transformaciones` | `JSONB` | NN, D `[]` | Transformaciones (ej. `ST_MakeValid`). |
+| `area_original_m2` | `NUMERIC(24,4)` | — | Área original (si polígono). |
+| `area_normalizada_m2` | `NUMERIC(24,4)` | — | Área final (si polígono). |
+| `diferencia_area_relativa` | `NUMERIC(16,12)` | — | Control de distorsión geométrica. |
+| `seleccionado` | `BOOLEAN` | NN, D `FALSE` | Marca si se usó para ingestar. |
+| `id_registro_operativo` | `BIGINT` | — | ID de la entidad generada (ej. id_nucleo). |
+| `fecha_consumo` | `TIMESTAMPTZ` | — | Cuándo se volcó a tablas operativas. |
+| `id_usuario_consumo` | `INTEGER` | FK | → `usuario.id_usuario`. |
 
 ### 15.3 `importacion_archivo`
 

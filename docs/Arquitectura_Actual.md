@@ -856,14 +856,13 @@ nucleo_agrario (entidad operativa con trazabilidad a fuente)
 ## 20. Límites Actuales de la Arquitectura
 
 1. **Sin RLS en PostgreSQL**: el control de acceso territorial depende exclusivamente del backend; una conexión directa a la DB no está restringida por usuario.
-2. **RBAC territorial parcial**: endpoints de personas, ORV, parcelas e integrantes no aplican filtro territorial sistemático.
-3. **`usuario_tramo`**: existe en el esquema y el backend lo usa, pero puede no tener asignaciones activas, resultando en datasets vacíos para usuarios no admin.
-4. **`ActividadCampo`** puede existir con `id_ciclo_afectacion = NULL` (antecedentes compartidos del contexto `cop_original`); no todo trabajo de campo cuelga estrictamente de un ciclo.
-5. **`DocumentoVersion`**: protegido contra borrado físico, pero no es completamente inmutable a nivel PostgreSQL (metadatos de versión pueden actualizarse).
-6. **Migración CONTRACT pendiente**: las columnas legacy de ORV, Parcela y `documentacion_soporte.url_archivo` no han sido eliminadas aún.
-7. **Candidatos `tramo_nucleo`**: el proceso de detección automática mediante `candidato_tramo_nucleo` aún requiere revisión y resolución humana; no hay generación automática de expedientes.
-8. **Sin auditoría de SELECT**: la bitácora solo registra INSERT y UPDATE, no consultas de lectura.
-9. **Franja inmutable**: una franja es inmutable en su geometría tras inserción; modificar el trazo del proyecto requiere insertar una nueva versión (y el sistema bloquea la nueva versión si rompe relaciones de expedientes activos).
+2. **`usuario_tramo`**: existe en el esquema y el backend lo usa, pero puede no tener asignaciones activas, resultando en datasets vacíos para usuarios no admin.
+3. **`ActividadCampo`** puede existir con `id_ciclo_afectacion = NULL` (antecedentes compartidos del contexto `cop_original`); no todo trabajo de campo cuelga estrictamente de un ciclo.
+4. **`DocumentoVersion`**: protegido contra borrado físico, pero no es completamente inmutable a nivel PostgreSQL (metadatos de versión pueden actualizarse).
+5. **Migración CONTRACT pendiente**: las columnas legacy de ORV, Parcela y `documentacion_soporte.url_archivo` no han sido eliminadas aún.
+6. **Candidatos `tramo_nucleo`**: el proceso de detección automática mediante `candidato_tramo_nucleo` aún requiere revisión y resolución humana; no hay generación automática de expedientes.
+7. **Sin auditoría de SELECT**: la bitácora solo registra INSERT y UPDATE, no consultas de lectura.
+8. **Franja inmutable**: una franja es inmutable en su geometría tras inserción; modificar el trazo del proyecto requiere insertar una nueva versión (y el sistema bloquea la nueva versión si rompe relaciones de expedientes activos).
 
 ---
 
@@ -881,6 +880,7 @@ erDiagram
     NucleoAgrario ||--o{ TramoNucleo : "es cruzado por"
     NucleoAgrario ||--o{ Parcela : "contiene"
     NucleoAgrario ||--o{ ORV : "tiene autoridades"
+    NucleoAgrario ||--o{ PadronHistorial : "mantiene historial"
     ORV ||--o{ OrvIntegrante : "tiene"
     Persona ||--o{ OrvIntegrante : "es"
     Persona ||--o{ ParcelaTitular : "es titular"
@@ -907,13 +907,21 @@ erDiagram
     Usuario ||--o{ SesionUsuario : "tiene sesiones"
 ```
 
+### Bloqueo por Seguimiento Ordinario PA
+
+El sistema implementa una restricción de negocio denominada `PA_SIN_SEGUIMIENTO_ORDINARIO`. Si un núcleo agrario es catalogado como **comunidad indígena**, o si el expediente territorial está marcado como **expropiación directa** o **no afecta tierras de uso común**, el backend bloquea automáticamente la creación de nuevas afectaciones, ciclos, trámites FIFONAFE y pagos. 
+
+Estos expedientes se muestran con el estado legal `fuera_seguimiento` y su gestión agraria ordinaria queda interrumpida en la plataforma.
+
 ### Diagrama de Flujo de Liberación
 
 ```mermaid
 flowchart TD
     A["Proyecto\n(FranjaDerechoVia + SeccionDerechoVia)"] --> B["TramoNucleo\n(Expediente)"]
     C["NucleoAgrario\n(con ORV y Parcelas)"] --> B
-    B --> D["ActividadCampo\nsensibilización"]
+    B --> FS{"¿Fuera de\nseguimiento PA?"}
+    FS -- Sí --> FST["Estado\nfuera_seguimiento"]
+    FS -- No --> D["ActividadCampo\nsensibilización"]
     D --> E["ActividadCampo\ncaminamiento"]
     E --> F["Afectacion\ncolectiva o individual"]
     F --> G["AfectacionCiclo\ncop_original auto-creado"]
