@@ -1,202 +1,32 @@
-# Plan de migración — refactor Proyecto–Núcleo / Parcela
+# Plan de migración refactor - Documento objetivo
 
-> **Fecha:** 2026-08-24  
-> **Estrategia:** EXPAND → MIGRATE → SWITCH → CONTRACT.  
-> **Regla:** ninguna eliminación antes de validar cobertura de datos y compatibilidad.
+> Fecha de alineación: 2026-08-25.  
+> Este documento no crea migraciones; define el orden recomendado para una fase posterior.
 
-## 1. Baseline
+## Fase 1. Inventario
 
-Antes de cualquier migración:
+Congelar dependencias actuales de Tramo, TramoNucleo, AfectacionCiclo, usuario_tramo, validaciones espaciales, vistas de dashboard y endpoints. Comparar contra la matriz Excel-modelo.
 
-- congelar inventario de tablas, FKs, triggers, vistas y endpoints dependientes de `tramo`, `tramo_nucleo` y `afectacion_ciclo`;
-- contar filas activas e históricas;
-- obtener casos donde un mismo Proyecto+Núcleo tenga múltiples `tramo_nucleo`;
-- comparar afectaciones, actividades, asambleas, convenios, FIFONAFE, pagos, documentos y estados;
-- generar export de control.
+## Fase 2. Modelo expansivo
 
-## 2. EXPAND
+Agregar estructuras objetivo sin borrar datos: ProyectoNucleo simple, Parcela reforzada, afectación colectiva/individual simplificada, convenio repetible, RAN separado, FIFONAFE sin ciclo, indemnización, pago, documentos y relación excepcional convenio_afectacion.
 
-Crear sin retirar estructuras actuales:
+## Fase 3. Migración de datos
 
-- `proyecto_nucleo`;
-- `usuario_proyecto` o equivalente;
-- campos de relación nuevos en `actividad_campo`, `afectacion`, `asamblea`, `convenio`, `tramite_fifonafe`, pagos y documentación;
-- geometría opcional y procedencia de `parcela` si faltan;
-- entidad/trazo de proyecto simplificado si se decide no reutilizar `franja_derecho_via`.
+Migrar referencias de tramo como campos históricos. Convertir ciclos y columnas paralelas en convenios. Separar superficies preliminar, real afectada y superficie propia del convenio. Llevar solicitudes RAN a los campos correctos.
 
-No hacer `NOT NULL` de inmediato en relaciones nuevas.
+## Fase 4. Conciliación
 
-## 3. MIGRATE — Proyecto–Núcleo
+Reconstruir KPI del Excel general desde los hechos migrados. Validar Mexico-Queretaro con los Excel detallados y documentar proyectos del Excel general sin fuente detallada local equivalente.
 
-Para cada `tramo_nucleo`:
+## Fase 5. UI y API
 
-1. resolver `id_proyecto` desde su tramo;
-2. crear/obtener `proyecto_nucleo(id_proyecto,id_nucleo)`;
-3. migrar consecutivo/responsable/referencias históricas;
-4. registrar mapa `id_tramo_nucleo → id_proyecto_nucleo`.
+Cambiar navegación a Proyecto -> Entidad -> Municipio -> Núcleo. Exponer pestañas de núcleo, colectivos y parcelas. Ocultar ciclo técnico y quitar intersección espacial como gate.
 
-Si existen varios `tramo_nucleo` para el mismo Proyecto+Núcleo, no fusionar silenciosamente datos conflictivos. Crear reporte de conflicto y reglas de consolidación.
+## Fase 6. Contract
 
-## 4. MIGRATE — Actividades
+Sólo después de conciliación completa, retirar dependencias objetivo de TramoNucleo, AfectacionCiclo y usuario_tramo. Mantener vistas de compatibilidad únicamente si un consumidor externo lo requiere.
 
-- actividades iniciales sin ciclo → `id_proyecto_nucleo`;
-- actividades asociadas a un ciclo posterior → vincular a la afectación y/o convenio equivalente;
-- conservar fechas, resultado, contexto y documentación.
+## Reglas de no regresión
 
-## 5. MIGRATE — Afectaciones
-
-- reemplazar dependencia de `id_tramo_nucleo` por `id_proyecto_nucleo`;
-- mantener `id_nucleo` durante compatibilidad si ayuda a validar;
-- conservar colectiva/individual;
-- conservar parcela sólo para individual;
-- conservar superficies capturadas sin recalcular.
-
-## 6. MIGRATE — `afectacion_ciclo`
-
-Construir un reporte por ciclo:
-
-- tipo;
-- afectación;
-- actividades;
-- asambleas;
-- convenio base;
-- modificatorios;
-- FIFONAFE;
-- pagos.
-
-Para cada ciclo debe existir un destino claro en el modelo nuevo.
-
-Tipos:
-
-- `cop_original` → convenio COP original;
-- `superficie_adicional` → convenio superficie adicional;
-- `obras_complementarias` → convenio obras complementarias;
-- `ampliacion` → convenio ampliación;
-- `ampliacion_remanente` → convenio ampliación remanente.
-
-Si un ciclo existe sin convenio, conservar sus actuaciones mediante afectación/contexto y marcarlo para revisión; no perderlo.
-
-## 7. MIGRATE — Asambleas
-
-- asociar a afectación colectiva;
-- asociar al convenio autorizado cuando sea determinable;
-- conservar RAN del Acta;
-- no mezclarlo con RAN del Convenio.
-
-## 8. MIGRATE — Convenios
-
-- conservar cada fila;
-- trasladar tipo;
-- crear `id_convenio_padre` para modificatorios cuando pueda demostrarse;
-- conservar montos, superficies y RAN;
-- retirar `id_ciclo_afectacion` sólo después de validar.
-
-## 9. MIGRATE — FIFONAFE y pagos
-
-- asociar trámite al convenio/afectación correcto;
-- conservar cuatro oficios y fechas;
-- conservar resultado de no conflictos;
-- conservar cada pago y beneficiario;
-- validar totales antes/después.
-
-## 10. MIGRATE — Seguridad
-
-- convertir `usuario_tramo` a alcance por Proyecto cuando sea posible;
-- si un usuario tenía varios tramos del mismo Proyecto, generar una sola relación;
-- no ampliar permisos por accidente entre proyectos.
-
-## 11. SWITCH backend
-
-Cambiar servicios y routers para usar IDs nuevos.
-
-Orden sugerido:
-
-1. consultas lectura;
-2. altas de Proyecto–Núcleo;
-3. actividades;
-4. afectaciones;
-5. asambleas;
-6. convenios;
-7. RAN/FIFONAFE;
-8. pagos;
-9. documentos;
-10. dashboard/reportes;
-11. mapa;
-12. permisos.
-
-## 12. SWITCH frontend
-
-Nueva navegación:
-
-```text
-Proyecto → Entidad → Municipio → Núcleo
-```
-
-Dentro de Núcleo:
-
-```text
-Resumen | ORV | Padrón | Sensibilización | Caminamiento | Colectivos | Parcelas
-```
-
-No mostrar Tramo ni Ciclo como requisito de captura.
-
-## 13. GIS
-
-Desactivar como gates de negocio:
-
-- intersección obligatoria para crear afectación;
-- cálculo de superficie oficial por `ST_Area`;
-- creación automática de expediente por intersección.
-
-Conservar:
-
-- validación técnica de geometría (SRID/validez);
-- mapa de trazo;
-- mapa de núcleos;
-- mapa de parcelas opcionales.
-
-## 14. Validaciones de paridad
-
-Comparar antes/después:
-
-- número de proyectos;
-- núcleos por proyecto;
-- parcelas;
-- afectaciones colectivas/individuales;
-- actividades;
-- asambleas;
-- convenios por tipo;
-- ingresos/inscripciones RAN;
-- trámites FIFONAFE;
-- pagos y totales;
-- superficies capturadas;
-- documentos;
-- KPI del Excel general.
-
-Toda diferencia debe explicarse.
-
-## 15. CONTRACT
-
-Sólo después de paridad y UAT:
-
-- eliminar FKs nuevas/antiguas de compatibilidad;
-- retirar vistas basadas en `tramo_nucleo`;
-- retirar `candidato_tramo_nucleo`;
-- retirar `seccion_derecho_via` si ya no tiene función cartográfica requerida;
-- retirar `afectacion_ciclo`;
-- retirar `tramo_nucleo`;
-- retirar `usuario_tramo`;
-- retirar `tramo` si no queda necesidad histórica/cartográfica;
-- actualizar `Arquitectura_Actual.md` y `Diccionario_Datos_SSALFER.md`.
-
-## 16. Gates
-
-No pasar a CONTRACT si:
-
-- existe un ciclo sin destino;
-- se pierde un convenio;
-- se pierde RAN/FIFONAFE/pago;
-- cambia una superficie capturada;
-- el dashboard no reproduce los conteos esperados;
-- hay permisos sin equivalencia;
-- un Proyecto+Núcleo se fusionó con datos conflictivos no resueltos.
+No perder soporte ni observaciones. No colapsar superficies. No confundir indemnización con pago. No convertir excepciones en catálogo ordinario sin evidencia documental.
