@@ -91,11 +91,12 @@ Compose detendrá la validación si falta una variable obligatoria.
 El backend también rechazará `SECRET_KEY` que sigan siendo placeholders o sean
 demasiado cortas.
 
-Si ya existe un volumen `postgres_data`, configura inicialmente `DB_USER`,
-`DB_PASSWORD` y `DB_NAME` con los valores que usa esa base. Las variables
-`POSTGRES_*` solo crean el rol y la base durante la primera inicialización del
-volumen; cambiarlas después no actualiza PostgreSQL. Consulta el procedimiento
-de rotación segura en [docs/migraciones.md](docs/migraciones.md).
+Configura por separado `POSTGRES_ADMIN_USER`/`POSTGRES_ADMIN_PASSWORD` para
+bootstrap y migraciones, y `DB_RUNTIME_USER`/`DB_RUNTIME_PASSWORD` para
+FastAPI. El backend no recibe las credenciales owner. En un volumen existente,
+recrear el contenedor sólo actualiza su entorno: no vuelve a ejecutar
+`docker-entrypoint-initdb.d`. La secuencia 033→034 y la provisión posterior se
+documentan en [docs/migraciones.md](docs/migraciones.md).
 
 ### Bootstrap del primer administrador
 
@@ -113,12 +114,19 @@ Estas variables no sensibles no se inyectan automáticamente al contenedor en
 ejecución; pásalas al comando de bootstrap. La contraseña se captura por prompt
 interactivo, sin eco:
 
+El primer administrador es un bootstrap owner explícito. El servicio FastAPI
+no cambia de identidad:
+
 ```bash
-docker compose exec \
-  -e ADMIN_EMAIL="$ADMIN_EMAIL" \
-  -e ADMIN_NOMBRE="$ADMIN_NOMBRE" \
-  -e ADMIN_APELLIDO_PATERNO="$ADMIN_APELLIDO_PATERNO" \
-  -e ADMIN_APELLIDO_MATERNO="$ADMIN_APELLIDO_MATERNO" \
+set -a; source .env; set +a
+docker compose run --rm --no-deps \
+  -e ADMIN_DATABASE_MODE=owner \
+  -e POSTGRES_ADMIN_USER \
+  -e POSTGRES_ADMIN_PASSWORD \
+  -e ADMIN_EMAIL \
+  -e ADMIN_NOMBRE \
+  -e ADMIN_APELLIDO_PATERNO \
+  -e ADMIN_APELLIDO_MATERNO \
   backend python scripts/create_admin.py
 ```
 
@@ -169,9 +177,10 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 ## Base de datos, migraciones y datos iniciales
 
-La migración `001_init_schema.sql` se ejecuta automáticamente **solo cuando el
-volumen de PostgreSQL está vacío**. Una instalación nueva requiere después
-crear el usuario técnico y aplicar en orden las migraciones `004`–`019`.
+La migración `001_init_schema.sql` y
+`backend/db/init/002_create_runtime.sh` se ejecutan automáticamente **sólo
+cuando el volumen de PostgreSQL está vacío**. El segundo script provisiona el
+LOGIN del entorno sin imprimir su contraseña; no concede ownership.
 
 La secuencia exacta, las comprobaciones para bases existentes y los comandos de
 respaldo están documentados en [docs/migraciones.md](docs/migraciones.md).
@@ -179,24 +188,20 @@ respaldo están documentados en [docs/migraciones.md](docs/migraciones.md).
 Resumen para una instalación nueva:
 
 ```bash
-docker compose up -d --build db backend
-docker compose exec \
-  -e ADMIN_EMAIL="$ADMIN_EMAIL" \
-  -e ADMIN_NOMBRE="$ADMIN_NOMBRE" \
-  -e ADMIN_APELLIDO_PATERNO="$ADMIN_APELLIDO_PATERNO" \
-  -e ADMIN_APELLIDO_MATERNO="$ADMIN_APELLIDO_MATERNO" \
-  backend python scripts/create_admin.py
-docker compose exec -T db sh -lc \
-  'psql --set ON_ERROR_STOP=on -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-  < backend/db/migrations/004_adaptaciones_fase2.sql
-# Repite el mismo patrón, en orden, para 005 hasta 019.
-docker compose up -d
+docker compose up -d --build db
+# Crea el primer administrador con el bootstrap owner explícito anterior.
+# Aplica la historia real 004-030, fixture territorial y 031-034.
+set -a; source .env; set +a
+backend/scripts/utils/set_runtime_credentials.sh
+docker compose up -d backend
+curl --fail http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/health
 ```
 
 Los datos de prueba son opcionales y deben cargarse después del administrador:
 
 ```bash
-docker compose exec backend python scripts/seed_mock.py
+SEED_OBJECTIVE_CONFIRM=1 docker compose exec \
+  -e SEED_OBJECTIVE_CONFIRM backend python scripts/seed_objective_demo.py
 ```
 
 Las credenciales no se documentan en el repositorio. PgAdmin y PostgreSQL usan

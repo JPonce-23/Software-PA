@@ -1,6 +1,6 @@
 # Design - Modelo objetivo SOFTWARE-PA
 
-> Estado: diseño objetivo implementado mediante migraciones 031-033.
+> Estado: diseño funcional implementado mediante 031-033 y aislamiento PostgreSQL mediante 034.
 > Fecha de actualización: 2026-08-25.  
 > La arquitectura vigente sigue descrita en `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md`.
 

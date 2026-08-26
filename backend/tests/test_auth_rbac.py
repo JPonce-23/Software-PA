@@ -24,7 +24,7 @@ def _login(email: str, password: str) -> tuple[TestClient, dict[str, str]]:
 
 
 def test_auth_health_and_csrf(client, admin_headers):
-    assert client.get("/health").json()["schema"] == 33
+    assert client.get("/health").json()["schema"] == 34
     anonymous = TestClient(app, raise_server_exceptions=False)
     assert anonymous.get("/api/proyectos").status_code == 401
     response = client.post(

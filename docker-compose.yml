@@ -1,9 +1,9 @@
 x-backend-environment: &backend-environment
-  DB_USER: ${DB_USER:?Define DB_USER en el archivo .env}
-  DB_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en el archivo .env}
+  DB_RUNTIME_USER: ${DB_RUNTIME_USER:?Define DB_RUNTIME_USER en el archivo .env}
+  DB_RUNTIME_PASSWORD: ${DB_RUNTIME_PASSWORD:?Define DB_RUNTIME_PASSWORD en el archivo .env}
   DB_HOST: db
   DB_PORT: "5432"
-  DB_NAME: ${DB_NAME:-db_trenes}
+  DB_NAME: ${DB_NAME:-db_pruebas_alfredo}
   SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en el archivo .env}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
   APP_ENV: ${APP_ENV:-development}
@@ -31,14 +31,17 @@ services:
     image: postgis/postgis:15-3.3
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER:?Define DB_USER en el archivo .env}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en el archivo .env}
-      POSTGRES_DB: ${DB_NAME:-db_trenes}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Define POSTGRES_ADMIN_USER en el archivo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Define POSTGRES_ADMIN_PASSWORD en el archivo .env}
+      POSTGRES_DB: ${DB_NAME:-db_pruebas_alfredo}
+      DB_RUNTIME_USER: ${DB_RUNTIME_USER:?Define DB_RUNTIME_USER en el archivo .env}
+      DB_RUNTIME_PASSWORD: ${DB_RUNTIME_PASSWORD:?Define DB_RUNTIME_PASSWORD en el archivo .env}
     ports:
       - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/db/migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql:ro
+      - ./backend/db/init/002_create_runtime.sh:/docker-entrypoint-initdb.d/002_create_runtime.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
@@ -93,7 +96,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=3).read()"
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3).read()"
       interval: 10s
       timeout: 5s
       retries: 10

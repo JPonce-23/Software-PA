@@ -1,23 +1,42 @@
 import os
 from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5433")  # Puerto expuesto en Docker
-DB_NAME = os.getenv("DB_NAME", "db_trenes")
+DB_RUNTIME_USER = os.getenv("DB_RUNTIME_USER")
+DB_RUNTIME_PASSWORD = os.getenv("DB_RUNTIME_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
 
-if not DB_USER or not DB_PASSWORD:
+missing_database_vars = [
+    name
+    for name, value in (
+        ("DB_RUNTIME_USER", DB_RUNTIME_USER),
+        ("DB_RUNTIME_PASSWORD", DB_RUNTIME_PASSWORD),
+        ("DB_HOST", DB_HOST),
+        ("DB_PORT", DB_PORT),
+        ("DB_NAME", DB_NAME),
+    )
+    if not value
+]
+if missing_database_vars:
     raise RuntimeError(
-        "Las variables de entorno DB_USER y DB_PASSWORD son obligatorias. "
-        "Configure el archivo .env o las variables del sistema."
+        "Configuración PostgreSQL runtime incompleta. Variables obligatorias faltantes: "
+        + ", ".join(missing_database_vars)
     )
 
-SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+SQLALCHEMY_DATABASE_URL = URL.create(
+    drivername="postgresql",
+    username=DB_RUNTIME_USER,
+    password=DB_RUNTIME_PASSWORD,
+    host=DB_HOST,
+    port=int(DB_PORT),
+    database=DB_NAME,
+)
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,

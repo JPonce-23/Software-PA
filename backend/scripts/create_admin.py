@@ -4,7 +4,9 @@ import re
 import sys
 from datetime import datetime, timezone
 
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import URL
+from sqlalchemy.orm import sessionmaker
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -19,6 +21,34 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 class BootstrapError(RuntimeError):
     pass
+
+
+def _required_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise BootstrapError(f"{name} es obligatoria.")
+    return value
+
+
+def _database_session_factory():
+    """Use owner credentials only for an explicitly requested bootstrap."""
+    if os.getenv("ADMIN_DATABASE_MODE", "runtime").strip().lower() != "owner":
+        return SessionLocal, None
+
+    owner_user = _required_env("POSTGRES_ADMIN_USER")
+    owner_password = _required_env("POSTGRES_ADMIN_PASSWORD")
+    owner_engine = create_engine(
+        URL.create(
+            drivername="postgresql",
+            username=owner_user,
+            password=owner_password,
+            host=_required_env("DB_HOST"),
+            port=int(_required_env("DB_PORT")),
+            database=_required_env("DB_NAME"),
+        ),
+        pool_pre_ping=True,
+    )
+    return sessionmaker(autocommit=False, autoflush=False, bind=owner_engine), owner_engine
 
 
 def _is_placeholder(value: str) -> bool:
@@ -87,7 +117,8 @@ def get_admin_config() -> dict[str, str | None]:
 
 def create_admin() -> None:
     config = get_admin_config()
-    db = SessionLocal()
+    session_factory, owner_engine = _database_session_factory()
+    db = session_factory()
     triggers_disabled = False
     try:
         existente = (
@@ -153,6 +184,8 @@ def create_admin() -> None:
                 db.rollback()
                 raise
         db.close()
+        if owner_engine is not None:
+            owner_engine.dispose()
 
 
 if __name__ == "__main__":
