@@ -2,8 +2,8 @@
 
 > Fecha: 2026-08-25  
 > Rama auditada: `feature/backend-logica`  
-> Estado: **APROBADO PARA IMPLEMENTAR REESTRUCTURACIÓN**  
-> Alcance de este documento: diseño técnico. No contiene SQL definitivo y no implica que el modelo ya esté implementado.
+> Estado: **IMPLEMENTADO Y VALIDADO EN MIGRACIONES 031-033**
+> Alcance de este documento: diseño técnico canónico materializado por el SQL, backend, frontend y pruebas del repositorio.
 
 ## 1. Decisión ejecutiva
 
@@ -540,25 +540,25 @@ Los totales esperados del seed se declaran en tests, no en tablas. El script fij
 | Reintroducir GIS como regla de negocio | Medio | Tests de definición de vistas/triggers y revisión que prohíba `ST_Area`/gates de intersección. |
 | Baseline actual requiere aplicación manual ordenada | Medio | Mantener guía `001` + `004`-`033`; preparar squash sólo después de estabilizar. |
 
-## 14. Gates para implementar
+## 14. Gates de implementación verificados
 
 La implementación sólo se aprueba para merge/despliegue cuando se cumpla todo lo siguiente:
 
-- [ ] Fixture territorial versionado con 32 entidades y 2,478 municipios, checksum y procedencia.
-- [ ] Respaldo/restauración probados y guard destructivo validado.
-- [ ] Migraciones `031`-`033` aplican sobre copia de `030` y sobre instalación limpia.
-- [ ] Inventario final no contiene tablas, FK, funciones, triggers, vistas o índices legacy.
-- [ ] Backend no contiene `id_tramo_nucleo` ni `id_ciclo_afectacion` en contratos objetivo.
-- [ ] Frontend no navega por tramo ni muestra ciclos.
-- [ ] `convenio_afectacion` es la única relación convenio-afectación y soporta N:M.
-- [ ] Asamblea pertenece a ProyectoNucleo, es colectiva y puede autorizar varios convenios.
-- [ ] `tramite_fifonafe_afectacion` cubre N:M sin FK obligatoria de FIFONAFE a convenio.
-- [ ] Pago -> indemnización -> afectación -> ProyectoNucleo es la cadena financiera canónica; FIFONAFE no es su padre obligatorio.
-- [ ] Geometría opcional no bloquea capturas y no alimenta KPI oficiales.
-- [ ] RBAC por `usuario_proyecto` cubre lecturas, escrituras, documentos, exportaciones y dashboard.
-- [ ] Seed demo es recreable y sus KPI esperados pasan.
-- [ ] Suites SQL, pytest y Playwright pasan sin IDs heredados.
-- [ ] Se actualizan documentos de arquitectura vigente después de implementar.
+- [x] Fixture territorial versionado con 32 entidades y 2,478 municipios, checksum y procedencia.
+- [x] Respaldo/restauración probados y guard destructivo validado.
+- [x] Migraciones `031`-`033` aplican sobre copia de `030` y sobre instalación limpia.
+- [x] Inventario final no contiene tablas, FK, funciones, triggers, vistas o índices legacy.
+- [x] Backend no contiene `id_tramo_nucleo` ni `id_ciclo_afectacion` en contratos objetivo.
+- [x] Frontend no navega por tramo ni muestra ciclos.
+- [x] `convenio_afectacion` es la única relación convenio-afectación y soporta N:M.
+- [x] Asamblea pertenece a ProyectoNucleo, es colectiva y puede autorizar varios convenios.
+- [x] `tramite_fifonafe_afectacion` cubre N:M sin FK obligatoria de FIFONAFE a convenio.
+- [x] Pago -> indemnización -> afectación -> ProyectoNucleo es la cadena financiera canónica; FIFONAFE no es su padre obligatorio.
+- [x] Geometría opcional no bloquea capturas y no alimenta KPI oficiales.
+- [x] RBAC por `usuario_proyecto` cubre lecturas, escrituras, documentos, exportaciones y dashboard.
+- [x] Seed demo es recreable y sus KPI esperados pasan.
+- [x] Suites SQL, pytest y Playwright pasan sin IDs heredados.
+- [x] Se actualizaron los documentos de arquitectura vigente después de implementar.
 
 ## 15. Baseline futura
 
@@ -566,6 +566,6 @@ Después de estabilizar `031`-`033` en al menos una recreación limpia y una act
 
 ## 16. Gate final de diseño
 
-**APROBADO PARA IMPLEMENTAR REESTRUCTURACIÓN**
+**IMPLEMENTACIÓN 031-033 COMPLETA Y VALIDADA**
 
 El esquema objetivo, las cardinalidades, el alcance del reset, la eliminación legacy, el seed, los KPI, seguridad y desacoplamiento GIS están definidos. Los checks de la sección 14 son gates de ejecución verificables, no decisiones funcionales pendientes.

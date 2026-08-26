@@ -1,9 +1,9 @@
 # SOFTWARE-PA - Descripción funcional objetivo
 
-> Estado: modelo funcional objetivo aprobado para diseño de migración.  
+> Estado: modelo funcional implementado y validado en el esquema 033.
 > Fecha de actualización: 2026-08-25.  
 > Rama de referencia: `feature/backend-logica`.  
-> Este documento describe el producto objetivo; `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md` siguen describiendo la implementación vigente.
+> Este documento describe el modelo funcional; `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md` documentan su implementación vigente.
 
 ## Propósito
 

@@ -1,8 +1,8 @@
 # Requirements - Modelo funcional objetivo SOFTWARE-PA
 
-> Estado: requisitos objetivo alineados a Excel.  
+> Estado: requisitos objetivo implementados y validados en el esquema 033.
 > Fecha de actualización: 2026-08-25.  
-> No describe la implementación vigente basada en TramoNucleo; para eso ver `docs/Arquitectura_Actual.md`.
+> La implementación vigente se detalla en `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md`.
 
 ## Alcance
 

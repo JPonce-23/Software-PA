@@ -1,6 +1,6 @@
 # Design - Modelo objetivo SOFTWARE-PA
 
-> Estado: diseño objetivo documental, previo a migraciones.  
+> Estado: diseño objetivo implementado mediante migraciones 031-033.
 > Fecha de actualización: 2026-08-25.  
 > La arquitectura vigente sigue descrita en `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md`.
 
@@ -99,9 +99,9 @@ Indicadores mínimos: núcleos, sensibilizaciones, caminamientos, asambleas, ing
 
 Se mantienen roles y auditoría. El alcance objetivo se define por proyecto o por una regla territorial equivalente aprobada. `usuario_tramo` puede existir durante compatibilidad, pero no es autorización objetivo.
 
-## Migración futura
+## Migración implementada
 
-La fase de migración deberá preservar linaje sin `afectacion_ciclo`: tipo de convenio, versión/consecutivo, convenio padre, contexto de actividad y relaciones directas. `TramoNucleo` y `AfectacionCiclo` no se exponen como piezas necesarias del modelo objetivo.
+La migración preserva linaje sin `afectacion_ciclo` mediante tipo de convenio, versión/consecutivo, convenio padre, contexto de actividad, referencias y relaciones directas. `TramoNucleo` y `AfectacionCiclo` no se exponen como piezas del modelo implementado.
 
 ## Exclusiones de diseño objetivo
 
