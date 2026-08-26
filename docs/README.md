@@ -32,7 +32,7 @@ Son transcripciones/fuentes literales. No se reescriben para coincidir con la ar
 - `docs/propuestas/2026-08-25-diseno-reestructuracion-bd.md`
 - `docs/propuestas/2026-08-24-matriz-trazabilidad-excel-modelo.md`
 
-`docs/propuestas/2026-08-25-diseno-reestructuracion-bd.md` es el **DISEÑO TÉCNICO CANÓNICO** implementado por las migraciones 031-033. Si existe una contradicción con una propuesta anterior, prevalece el diseño del 25 de agosto. Cualquier propuesta no incluida en esta sección sirve sólo como antecedente y no es normativa para la implementación.
+`docs/propuestas/2026-08-25-diseno-reestructuracion-bd.md` es el **DISEÑO TÉCNICO CANÓNICO** implementado por las migraciones 031-033; la migración 034 separa owner y runtime sin cambiar ese dominio. Si existe una contradicción con una propuesta anterior, prevalece el diseño del 25 de agosto. Cualquier propuesta no incluida en esta sección sirve sólo como antecedente y no es normativa para la implementación.
 
 ## Implementación real actual
 
@@ -42,7 +42,7 @@ Son transcripciones/fuentes literales. No se reescriben para coincidir con la ar
 - `frontend/`
 - `backend/db/migrations/`
 
-Estos documentos y artefactos describen la implementación vigente del esquema 033 y se validan conjuntamente.
+Estos documentos y artefactos describen la implementación vigente del esquema 035 y se validan conjuntamente. La operación owner/runtime se documenta en `docs/migraciones.md`.
 
 ## Históricos
 

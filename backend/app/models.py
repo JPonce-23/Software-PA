@@ -415,6 +415,7 @@ class Asamblea(Base, AuditableMixin):
     )
     id_padron = Column(Integer, ForeignKey("padron_historial.id_padron"))
     tipo_asamblea = Column(String(40), nullable=False)
+    contexto_proceso = Column(String(40))
     proposito = Column(Text)
     fecha_expedicion_primera = Column(Date)
     fecha_programada_primera = Column(Date)
@@ -499,6 +500,7 @@ class TramiteFifonafe(Base, AuditableMixin):
     )
     ambito = Column(String(20), nullable=False)
     estatus = Column(String(30), nullable=False, default="pendiente")
+    acuse_fifonafe_fecha = Column(Date)
     no_oficio_fifonafe_a_dgaopr = Column(String(100))
     fecha_oficio_fifonafe_a_dgaopr = Column(Date)
     no_oficio_dgaopr_a_representacion = Column(String(100))
@@ -546,6 +548,7 @@ class Indemnizacion(Base, AuditableMixin):
     descripcion_estatus = Column(Text)
     fecha_programada = Column(Date)
     fecha_resolucion = Column(Date)
+    fecha_entrega_expediente_pa = Column(Date)
 
     afectacion = relationship("Afectacion", back_populates="indemnizacion")
     pagos = relationship("Pago", back_populates="indemnizacion", lazy="selectin")
@@ -576,6 +579,8 @@ class Documento(Base, AuditableMixin):
     tipo_documento = Column(String(80), nullable=False)
     estado = Column(String(20), nullable=False)
     titulo = Column(String(250))
+    fecha_documento = Column(Date)
+    numero_folio = Column(String(150))
     descripcion = Column(Text)
 
     versiones = relationship(

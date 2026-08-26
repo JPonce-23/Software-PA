@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services import documents as service
+from ..services import domain as domain_service
 from ..services.access import (
     require_document_access,
     require_document_target_access,
@@ -50,6 +51,59 @@ def create_document(
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
     return service.create_document(db, entidad_tipo, entidad_id, data, user)
+
+
+@router.patch("/documentos/{id_documento}", response_model=schemas.DocumentoResponse)
+def update_document(
+    id_documento: int,
+    data: schemas.DocumentoUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    document = require_document_access(db, user, id_documento, mode="capture")
+    return domain_service.update_entity(db, document, data, user)
+
+
+@router.get(
+    "/trazabilidad/objetivos/{entidad_tipo}/{entidad_id}",
+    response_model=list[schemas.TrazabilidadFuenteResponse],
+)
+def list_source_traceability(
+    entidad_tipo: str,
+    entidad_id: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_document_target_access(db, user, entidad_tipo, entidad_id)
+    return db.query(models.TrazabilidadFuente).filter(
+        models.TrazabilidadFuente.entidad_tipo == entidad_tipo,
+        models.TrazabilidadFuente.entidad_id == entidad_id,
+    ).order_by(models.TrazabilidadFuente.registrado_en.desc()).all()
+
+
+@router.post(
+    "/trazabilidad/objetivos/{entidad_tipo}/{entidad_id}",
+    response_model=schemas.TrazabilidadFuenteResponse,
+    status_code=201,
+)
+def create_source_traceability(
+    entidad_tipo: str,
+    entidad_id: int,
+    data: schemas.TrazabilidadFuenteCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    require_document_target_access(db, user, entidad_tipo, entidad_id, mode="capture")
+    entity = models.TrazabilidadFuente(
+        entidad_tipo=entidad_tipo,
+        entidad_id=entidad_id,
+        id_usuario_registro=user.id_usuario,
+        **data.model_dump(),
+    )
+    db.add(entity)
+    db.commit()
+    db.refresh(entity)
+    return entity
 
 
 @router.post(

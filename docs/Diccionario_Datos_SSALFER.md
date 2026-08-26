@@ -1,8 +1,8 @@
 # Diccionario de datos SSALFER
 
-> Esquema verificado: PostgreSQL/PostGIS, `schema_migrations = 033`
+> Esquema verificado: PostgreSQL/PostGIS, `schema_migrations = 035`
 > Fecha de verificación: 2026-08-25
-> Alcance: objetos propios vigentes después del reset controlado 031-033.
+> Alcance: objetos propios vigentes después del reset controlado 031-033, la separación de privilegios 034 y la completitud operativa aditiva 035.
 
 ## 1. Convenciones
 
@@ -52,6 +52,8 @@ Los administradores tienen alcance global; los demás roles requieren una asigna
 - `estado_autenticacion_usuario`: intentos fallidos, bloqueo y último acceso por usuario.
 - `sesion_usuario`: hashes de token y CSRF, expiración, revocación, IP y user-agent.
 - `evento_acceso`: evento, actor, sesión, motivo, detalle, origen y `txid`.
+
+Roles PostgreSQL: `software_pa_app` es `NOLOGIN` sin atributos administrativos; `pa_runtime` es `LOGIN`, sin `SUPERUSER`, `CREATEDB`, `CREATEROLE`, `REPLICATION` ni `BYPASSRLS`, y hereda únicamente `software_pa_app`. El owner de tablas es `pa_app`; el owner nominal de `public` es `pg_database_owner`. Runtime sólo recibe `USAGE` de schema, DML `SELECT/INSERT/UPDATE` y uso/lectura de secuencias. `schema_migrations` y `spatial_ref_sys` son sólo lectura para runtime.
 
 ## 3. Contexto administrativo
 
@@ -144,7 +146,7 @@ Incluye bloque auditable. CHECK exige colectiva sin parcela e individual con par
 
 ### `asamblea`
 
-`id_asamblea` PK; `id_proyecto_nucleo`; `id_padron` opcional; `tipo_asamblea` (`anuencia`, `modificatorio`, `superficie_adicional`, `obras_complementarias`, `retiro_fondos`, `otra`); propósito; expedición/programación de primera y segunda convocatoria; `fecha_realizada`; `resultado`; programación/ingreso RAN; `numero_solicitud_ran`; `calificacion_registral_ran`; `fecha_inscripcion_ran`; bloque auditable.
+`id_asamblea` PK; `id_proyecto_nucleo`; `id_padron` opcional; `tipo_asamblea` (`anuencia`, `modificatorio`, `superficie_adicional`, `obras_complementarias`, `retiro_fondos`, `otra`); `contexto_proceso` opcional (`cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`, `retiro_fondos`, `otro`); propósito; expedición/programación de primera y segunda convocatoria; `fecha_realizada`; `resultado`; programación/ingreso RAN; `numero_solicitud_ran`; `calificacion_registral_ran`; `fecha_inscripcion_ran`; bloque auditable. La UI de nuevas capturas separa tipo jurídico y motivo operativo.
 
 Un trigger exige que el padrón opcional pertenezca al mismo núcleo. Asamblea no tiene FK a afectación.
 
@@ -170,7 +172,7 @@ Triggers normales y diferidos validan contexto, ámbito, entidades activas y que
 
 ### `tramite_fifonafe`
 
-`id_tramite_fifonafe` PK; `id_proyecto_nucleo`; `ambito` colectivo/individual; `estatus` (`programado`, `pendiente`, `completo`, `cancelado`, `otro`); cuatro campos de número de oficio y sus cuatro fechas:
+`id_tramite_fifonafe` PK; `id_proyecto_nucleo`; `ambito` colectivo/individual; `estatus` (`programado`, `pendiente`, `completo`, `cancelado`, `otro`); `acuse_fifonafe_fecha`; cuatro campos de número de oficio y sus cuatro fechas:
 
 1. `no_oficio_fifonafe_a_dgaopr` / `fecha_oficio_fifonafe_a_dgaopr`;
 2. `no_oficio_dgaopr_a_representacion` / `fecha_oficio_dgaopr_a_representacion`;
@@ -185,7 +187,7 @@ Además: `hay_conflictos`, `resultado_no_conflictos` y bloque auditable. El esta
 
 ### `indemnizacion`
 
-`id_indemnizacion` PK; `id_afectacion`; `estatus` (`pendiente`, `programado`, `completo`, `otro`); `descripcion_estatus`; `fecha_programada`; `fecha_resolucion`; bloque auditable. UNIQUE parcial limita a una indemnización activa por afectación.
+`id_indemnizacion` PK; `id_afectacion`; `estatus` (`pendiente`, `programado`, `completo`, `otro`); `descripcion_estatus`; `fecha_programada`; `fecha_resolucion`; `fecha_entrega_expediente_pa`; bloque auditable. UNIQUE parcial limita a una indemnización activa por afectación.
 
 ### `pago`
 
@@ -197,7 +199,7 @@ La cadena financiera es `pago -> indemnizacion -> afectacion -> proyecto_nucleo`
 
 ### `documento`
 
-`id_documento` PK; `tipo_documento`; `estado` (`disponible`, `faltante`, `referenciado`); título; descripción; bloque auditable.
+`id_documento` PK; `tipo_documento`; `estado` (`disponible`, `faltante`, `referenciado`); título; `fecha_documento`; `numero_folio`; descripción; bloque auditable.
 
 ### `documento_version`
 
@@ -283,6 +285,6 @@ Las funciones N:M usan constraint triggers diferidos para permitir creación tra
 
 ## 10. Objetos técnicos y objetos retirados
 
-`schema_migrations(version, descripcion, aplicada_en)` registra hasta 033. `spatial_ref_sys`, `geometry_columns` y `geography_columns` pertenecen a PostGIS.
+`schema_migrations(version, descripcion, aplicada_en)` registra hasta 035. `spatial_ref_sys`, `geometry_columns` y `geography_columns` pertenecen a PostGIS. Los default privileges del owner conceden al rol NOLOGIN sólo `SELECT/INSERT/UPDATE` en tablas futuras y `USAGE/SELECT` en secuencias; PUBLIC no recibe DML ni `CREATE` en `public`.
 
-No existen en el esquema 033 las tablas/vistas funcionales retiradas: `tramo`, `tramo_nucleo`, `afectacion_ciclo`, `usuario_tramo`, `seccion_derecho_via`, `franja_derecho_via`, `candidato_tramo_nucleo`, `carga_geoespacial` ni `carga_geoespacial_feature`. Su historia permanece únicamente en migraciones 001-030.
+No existen en el esquema 035 las tablas/vistas funcionales retiradas: `tramo`, `tramo_nucleo`, `afectacion_ciclo`, `usuario_tramo`, `seccion_derecho_via`, `franja_derecho_via`, `candidato_tramo_nucleo`, `carga_geoespacial` ni `carga_geoespacial_feature`. Su historia permanece únicamente en migraciones 001-030.

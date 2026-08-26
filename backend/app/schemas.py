@@ -196,6 +196,11 @@ class ProyectoNucleoReferenciaResponse(ProyectoNucleoReferenciaCreate, AuditRead
     id_proyecto_nucleo: int
 
 
+class ProyectoNucleoReferenciaUpdate(AuditInput):
+    valor: str | None = Field(default=None, min_length=1, max_length=150)
+    es_principal: bool | None = None
+
+
 class ProyectoNucleoCreate(AuditInput):
     id_nucleo: int = Field(gt=0)
     residencia: str | None = Field(default=None, max_length=300)
@@ -290,6 +295,20 @@ class OrvIntegranteResponse(OrvIntegranteCreate, AuditRead):
     id_orv: int
 
 
+class OrvIntegranteDetailResponse(OrvIntegranteResponse):
+    nombre: str
+    apellido_paterno: str | None = None
+    apellido_materno: str | None = None
+    telefono: str | None = None
+    correo_electronico: str | None = None
+
+
+class OrvIntegranteUpdate(AuditInput):
+    cargo: str | None = Field(default=None, min_length=1, max_length=80)
+    fecha_inicio: date | None = None
+    fecha_fin: date | None = None
+
+
 class PadronHistorialCreate(AuditInput):
     fecha_padron: date | None = None
     numero_ejidatarios_comuneros: int | None = Field(default=None, ge=0)
@@ -304,6 +323,11 @@ class PadronHistorialCreate(AuditInput):
 class PadronHistorialResponse(PadronHistorialCreate, AuditRead):
     id_padron: int
     id_nucleo: int
+
+
+class PadronHistorialUpdate(AuditInput):
+    fecha_padron: date | None = None
+    numero_ejidatarios_comuneros: int | None = Field(default=None, ge=0)
 
 
 class ParcelaCreate(AuditInput):
@@ -341,6 +365,21 @@ class ParcelaTitularCreate(AuditInput):
 class ParcelaTitularResponse(ParcelaTitularCreate, AuditRead):
     id_parcela_titular: int
     id_parcela: int
+
+
+class ParcelaTitularDetailResponse(ParcelaTitularResponse):
+    nombre: str
+    apellido_paterno: str | None = None
+    apellido_materno: str | None = None
+    telefono: str | None = None
+    correo_electronico: str | None = None
+
+
+class ParcelaTitularUpdate(AuditInput):
+    tipo_derecho: str | None = Field(default=None, min_length=1, max_length=50)
+    porcentaje_participacion: Decimal | None = Field(default=None, gt=0, le=100)
+    fecha_inicio: date | None = None
+    fecha_fin: date | None = None
 
 
 class ActividadCampoCreate(AuditInput):
@@ -433,6 +472,14 @@ class AsambleaCreate(AuditInput):
         "retiro_fondos",
         "otra",
     ]
+    contexto_proceso: Literal[
+        "cop_original",
+        "modificatorio",
+        "superficie_adicional",
+        "obras_complementarias",
+        "retiro_fondos",
+        "otro",
+    ] | None = None
     proposito: str | None = None
     fecha_expedicion_primera: date | None = None
     fecha_programada_primera: date | None = None
@@ -537,6 +584,7 @@ class ConvenioResponse(ConvenioCreate, AuditRead):
 class TramiteFifonafeCreate(AuditInput):
     ids_afectacion: list[int] = Field(min_length=1)
     estatus: Literal["programado", "pendiente", "completo", "cancelado", "otro"] = "pendiente"
+    acuse_fifonafe_fecha: date | None = None
     no_oficio_fifonafe_a_dgaopr: str | None = Field(default=None, max_length=100)
     fecha_oficio_fifonafe_a_dgaopr: date | None = None
     no_oficio_dgaopr_a_representacion: str | None = Field(default=None, max_length=100)
@@ -558,6 +606,7 @@ class TramiteFifonafeCreate(AuditInput):
 
 class TramiteFifonafeUpdate(AuditInput):
     estatus: Literal["programado", "pendiente", "completo", "cancelado", "otro"] | None = None
+    acuse_fifonafe_fecha: date | None = None
     no_oficio_fifonafe_a_dgaopr: str | None = Field(default=None, max_length=100)
     fecha_oficio_fifonafe_a_dgaopr: date | None = None
     no_oficio_dgaopr_a_representacion: str | None = Field(default=None, max_length=100)
@@ -589,6 +638,7 @@ class IndemnizacionCreate(AuditInput):
     descripcion_estatus: str | None = None
     fecha_programada: date | None = None
     fecha_resolucion: date | None = None
+    fecha_entrega_expediente_pa: date | None = None
 
     @model_validator(mode="after")
     def validar_otro(self):
@@ -639,11 +689,22 @@ class DocumentoCreate(AuditInput):
     tipo_documento: str = Field(min_length=1, max_length=80)
     estado: Literal["disponible", "faltante", "referenciado"]
     titulo: str | None = Field(default=None, max_length=250)
+    fecha_documento: date | None = None
+    numero_folio: str | None = Field(default=None, max_length=150)
     descripcion: str | None = None
 
 
 class DocumentoResponse(DocumentoCreate, AuditRead):
     id_documento: int
+
+
+class DocumentoUpdate(AuditInput):
+    tipo_documento: str | None = Field(default=None, min_length=1, max_length=80)
+    estado: Literal["disponible", "faltante", "referenciado"] | None = None
+    titulo: str | None = Field(default=None, max_length=250)
+    fecha_documento: date | None = None
+    numero_folio: str | None = Field(default=None, max_length=150)
+    descripcion: str | None = None
 
 
 class DocumentoVinculoResponse(AuditRead):

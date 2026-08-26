@@ -1,6 +1,6 @@
 # Requirements - Modelo funcional objetivo SOFTWARE-PA
 
-> Estado: requisitos objetivo implementados y validados en el esquema 033.
+> Estado: requisitos objetivo implementados y validados en el esquema 035.
 > Fecha de actualización: 2026-08-25.  
 > La implementación vigente se detalla en `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md`.
 

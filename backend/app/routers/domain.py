@@ -159,6 +159,17 @@ def get_nucleus(
     return result
 
 
+@router.patch("/nucleos/{id_nucleo}", response_model=schemas.NucleoAgrarioResponse)
+def update_nucleus(
+    id_nucleo: int,
+    data: schemas.NucleoAgrarioUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    nucleus = require_nucleus_access(db, user, id_nucleo, mode="capture")
+    return service.update_entity(db, nucleus, data, user)
+
+
 @router.patch(
     "/nucleos/{id_nucleo}/geometria",
     response_model=schemas.NucleoAgrarioResponse,
@@ -303,6 +314,27 @@ def add_reference(
     return service.add_reference(db, id_proyecto_nucleo, data, user)
 
 
+@router.patch(
+    "/referencias/{id_referencia}",
+    response_model=schemas.ProyectoNucleoReferenciaResponse,
+)
+def update_reference(
+    id_referencia: int,
+    data: schemas.ProyectoNucleoReferenciaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.ProyectoNucleoReferencia,
+        models.ProyectoNucleoReferencia.id_referencia,
+        id_referencia, "Referencia no encontrada",
+    )
+    require_project_nucleus_access(
+        db, user, entity.id_proyecto_nucleo, mode="capture"
+    )
+    return service.update_entity(db, entity, data, user)
+
+
 @router.post(
     "/proyectos/{id_proyecto}/personas",
     response_model=schemas.PersonaResponse,
@@ -348,6 +380,18 @@ def create_orv(
     return service.create_orv(db, id_proyecto_nucleo, data, user)
 
 
+@router.patch("/orv/{id_orv}", response_model=schemas.OrvResponse)
+def update_orv(
+    id_orv: int,
+    data: schemas.OrvUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(db, models.Orv, models.Orv.id_orv, id_orv, "ORV no encontrado")
+    require_nucleus_access(db, user, entity.id_nucleo, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
 @router.post(
     "/orv/{id_orv}/integrantes",
     response_model=schemas.OrvIntegranteResponse,
@@ -362,6 +406,56 @@ def add_orv_member(
     orv = _active_or_404(db, models.Orv, models.Orv.id_orv, id_orv, "ORV no encontrado")
     require_nucleus_access(db, user, orv.id_nucleo, mode="capture")
     return service.add_orv_member(db, orv, data, user)
+
+
+@router.get(
+    "/orv/{id_orv}/integrantes",
+    response_model=list[schemas.OrvIntegranteDetailResponse],
+)
+def list_orv_members(
+    id_orv: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    orv = _active_or_404(db, models.Orv, models.Orv.id_orv, id_orv, "ORV no encontrado")
+    require_nucleus_access(db, user, orv.id_nucleo)
+    rows = db.query(models.OrvIntegrante, models.Persona).join(
+        models.Persona, models.Persona.id_persona == models.OrvIntegrante.id_persona
+    ).filter(
+        models.OrvIntegrante.id_orv == id_orv,
+        models.OrvIntegrante.activo.is_(True),
+        models.Persona.activo.is_(True),
+    ).order_by(models.OrvIntegrante.cargo, models.Persona.nombre).all()
+    return [
+        {
+            **schemas.OrvIntegranteResponse.model_validate(link).model_dump(),
+            "nombre": person.nombre,
+            "apellido_paterno": person.apellido_paterno,
+            "apellido_materno": person.apellido_materno,
+            "telefono": person.telefono,
+            "correo_electronico": person.correo_electronico,
+        }
+        for link, person in rows
+    ]
+
+
+@router.patch(
+    "/orv-integrantes/{id_orv_integrante}",
+    response_model=schemas.OrvIntegranteResponse,
+)
+def update_orv_member(
+    id_orv_integrante: int,
+    data: schemas.OrvIntegranteUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.OrvIntegrante, models.OrvIntegrante.id_orv_integrante,
+        id_orv_integrante, "Integrante ORV no encontrado",
+    )
+    orv = _active_or_404(db, models.Orv, models.Orv.id_orv, entity.id_orv, "ORV no encontrado")
+    require_nucleus_access(db, user, orv.id_nucleo, mode="capture")
+    return service.update_entity(db, entity, data, user)
 
 
 @router.get(
@@ -392,6 +486,21 @@ def create_register(
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
     return service.create_register(db, id_proyecto_nucleo, data, user)
+
+
+@router.patch("/padrones/{id_padron}", response_model=schemas.PadronHistorialResponse)
+def update_register(
+    id_padron: int,
+    data: schemas.PadronHistorialUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.PadronHistorial, models.PadronHistorial.id_padron,
+        id_padron, "Padrón no encontrado",
+    )
+    require_nucleus_access(db, user, entity.id_nucleo, mode="capture")
+    return service.update_entity(db, entity, data, user)
 
 
 @router.get(
@@ -491,6 +600,17 @@ def get_parcel(
     return result
 
 
+@router.patch("/parcelas/{id_parcela}", response_model=schemas.ParcelaResponse)
+def update_parcel(
+    id_parcela: int,
+    data: schemas.ParcelaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    parcel = require_parcel_access(db, user, id_parcela, mode="capture")
+    return service.update_entity(db, parcel, data, user)
+
+
 @router.patch(
     "/parcelas/{id_parcela}/geometria",
     response_model=schemas.ParcelaResponse,
@@ -507,7 +627,7 @@ def update_parcel_geometry(
 
 @router.get(
     "/parcelas/{id_parcela}/titulares",
-    response_model=list[schemas.ParcelaTitularResponse],
+    response_model=list[schemas.ParcelaTitularDetailResponse],
 )
 def list_parcel_holders(
     id_parcela: int,
@@ -515,10 +635,24 @@ def list_parcel_holders(
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     require_parcel_access(db, user, id_parcela)
-    return db.query(models.ParcelaTitular).filter(
+    rows = db.query(models.ParcelaTitular, models.Persona).join(
+        models.Persona, models.Persona.id_persona == models.ParcelaTitular.id_persona
+    ).filter(
         models.ParcelaTitular.id_parcela == id_parcela,
         models.ParcelaTitular.activo.is_(True),
-    ).order_by(models.ParcelaTitular.id_parcela_titular).all()
+        models.Persona.activo.is_(True),
+    ).order_by(models.Persona.nombre, models.ParcelaTitular.id_parcela_titular).all()
+    return [
+        {
+            **schemas.ParcelaTitularResponse.model_validate(link).model_dump(),
+            "nombre": person.nombre,
+            "apellido_paterno": person.apellido_paterno,
+            "apellido_materno": person.apellido_materno,
+            "telefono": person.telefono,
+            "correo_electronico": person.correo_electronico,
+        }
+        for link, person in rows
+    ]
 
 
 @router.post(
@@ -534,6 +668,24 @@ def add_parcel_holder(
 ):
     parcel = require_parcel_access(db, user, id_parcela, mode="capture")
     return service.add_parcel_holder(db, parcel, data, user)
+
+
+@router.patch(
+    "/parcela-titulares/{id_parcela_titular}",
+    response_model=schemas.ParcelaTitularResponse,
+)
+def update_parcel_holder(
+    id_parcela_titular: int,
+    data: schemas.ParcelaTitularUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.ParcelaTitular, models.ParcelaTitular.id_parcela_titular,
+        id_parcela_titular, "Titular de parcela no encontrado",
+    )
+    require_parcel_access(db, user, entity.id_parcela, mode="capture")
+    return service.update_entity(db, entity, data, user)
 
 
 @router.get(

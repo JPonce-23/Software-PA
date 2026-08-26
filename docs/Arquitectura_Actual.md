@@ -1,7 +1,7 @@
 # Arquitectura actual de SOFTWARE-PA
 
 > Rama verificada: `feature/backend-logica`
-> Esquema vigente: migraciones `001` a `033`
+> Esquema vigente: migraciones `001` a `035`
 > Última validación: 2026-08-25
 > Fuente de verdad: SQL aplicado, modelos SQLAlchemy, contratos Pydantic, API, frontend y pruebas del repositorio.
 
@@ -40,7 +40,7 @@ Proyecto
 | Pruebas | Contrato SQL, pytest, ESLint/build y Playwright |
 | Ejecución local | Docker Compose: `db`, `backend`, `frontend` y `pgadmin` |
 
-El backend valida al iniciar que el esquema sea al menos 033. La salud se expone en `/health` y devuelve la versión del esquema efectiva. Las credenciales se obtienen del entorno; ningún seed SQL incorpora contraseñas.
+La salud se expone en `/health` y devuelve la versión efectiva del esquema. FastAPI construye su engine exclusivamente con `DB_RUNTIME_USER` y `DB_RUNTIME_PASSWORD`; las credenciales owner no se inyectan al servicio backend. Ningún seed SQL incorpora contraseñas.
 
 ## 3. Base de datos
 
@@ -64,17 +64,17 @@ La falta de geometría de parcela no bloquea una afectación, convenio, trámite
 
 - `actividad_campo`: sensibilización o caminamiento de `ProyectoNucleo`, con contexto, programación y realización.
 - `afectacion`: colectiva sin parcela o individual con parcela del mismo núcleo.
-- `asamblea`: hecho colectivo de `ProyectoNucleo`; puede autorizar varios convenios y no depende de una afectación.
+- `asamblea`: hecho colectivo de `ProyectoNucleo`; separa el tipo jurídico de su `contexto_proceso`, puede autorizar varios convenios y no depende de una afectación.
 - `convenio`: instrumento repetible; se asocia a afectaciones exclusivamente por `convenio_afectacion`.
-- `tramite_fifonafe`: trámite colectivo o individual de `ProyectoNucleo`, con sus cuatro pares oficio/fecha; su cobertura se expresa en `tramite_fifonafe_afectacion`.
-- `indemnizacion`: máximo una activa por afectación.
+- `tramite_fifonafe`: trámite colectivo o individual de `ProyectoNucleo`, con fecha de acuse y sus cuatro pares oficio/fecha; su cobertura se expresa en `tramite_fifonafe_afectacion`.
+- `indemnizacion`: máximo una activa por afectación; registra la entrega del expediente SICT–PA.
 - `pago`: uno o varios pagos por indemnización.
 
 Los triggers diferidos validan que las asociaciones N:M mantengan `ProyectoNucleo` y ámbito, que exista como máximo un vínculo principal activo por convenio y que un convenio confirmado no quede sin afectación. Las operaciones normales crean convenio más vínculo principal y FIFONAFE más coberturas en una transacción.
 
 ### 3.4 Documentos, trazabilidad y auditoría
 
-- `documento`: identidad lógica del documento.
+- `documento`: identidad lógica del documento con fecha propia y número de oficio/folio.
 - `documento_version`: versión inmutable con SHA-256, tamaño, MIME, ruta y usuario de carga.
 - `documento_vinculo`: vínculo controlado a un tipo de entidad permitido; un trigger comprueba la existencia del objetivo.
 - `trazabilidad_fuente`: archivo, hoja, celda, valor original y tratamiento de la fuente.
@@ -127,6 +127,8 @@ La aplicación monta seis routers activos:
 
 `require_project_access` y sus variantes de lectura/escritura/GIS derivan el proyecto desde el recurso. Listados, exportaciones, documentos y dashboard se filtran antes de consultar o agregar datos.
 
+PostgreSQL separa identidades técnicas: el owner `pa_app` ejecuta bootstrap y migraciones; `software_pa_app` es `NOLOGIN` y contiene sólo el contrato DML; `pa_runtime` es el LOGIN de FastAPI y hereda únicamente ese rol. Runtime no posee `public` ni tablas, no tiene atributos administrativos, no puede crear en `public` y carece de `DELETE`, `TRUNCATE` y DDL. La migración 034 instala ACL actuales y default privileges para el owner real de migraciones; la contraseña runtime se provisiona fuera del SQL versionado.
+
 ## 6. Frontend
 
 La navegación administrativa implementada es `Proyecto -> Entidad -> Municipio -> Núcleo`. El detalle de `ProyectoNucleo` contiene resumen, datos generales, ORV, padrón, sensibilización, caminamiento, derechos colectivos y parcelas/derechos individuales.
@@ -145,6 +147,8 @@ Los flujos principales son:
 - `031_reset_dominio_proyecto_nucleo.sql`: reset protegido y creación del dominio administrativo objetivo.
 - `032_cleanup_legacy_gis_importacion.sql`: trazo por proyecto, importador consolidado y retiro de GIS legacy.
 - `033_dashboard_modelo_objetivo.sql`: vistas objetivo y KPI.
+- `034_separacion_usuario_runtime_postgresql.sql`: separación owner/runtime, cierre de PUBLIC y default privileges no destructivos.
+- `035_completitud_seguimiento_operativo.sql`: tipo/contexto de Asamblea y metadatos operativos/documentales confirmados por Excel.
 
 031 y 032 adquieren advisory lock y abortan antes del DDL si faltan entorno autorizado, confirmación destructiva o respaldo verificado. Las migraciones 001-030 permanecen intactas.
 
@@ -154,7 +158,7 @@ El fixture territorial está separado del seed demo, ordenado de forma determini
 
 La implementación se valida mediante:
 
-- construcción limpia real `001 -> 004...030 -> 031 -> 032 -> 033`;
+- construcción limpia real `001 -> 004...030 -> 031 -> 032 -> 033 -> 034 -> 035`;
 - migración desde un respaldo equivalente a 030;
 - pruebas de rollback inducido de los gates 031/032;
 - contrato SQL de tablas, constraints, triggers, ausencia legacy, catálogo y KPI del seed;
