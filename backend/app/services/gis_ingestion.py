@@ -133,11 +133,13 @@ def inspect_dataset(path: Path) -> DatasetInfo:
     elif "geojson" in driver_normalized:
         detected_format = "geojson"
     elif "esri shapefile" in driver_normalized or driver_normalized == "shapefile":
-        detected_format = "shapefile"
+        detected_format = "shp"
+    elif "gpkg" in driver_normalized or "geopackage" in driver_normalized:
+        detected_format = "gpkg"
     else:
         raise IngestionError(
             "FORMATO_NO_SOPORTADO",
-            "El contenido detectado no es KML, GeoJSON ni Shapefile.",
+            "El contenido detectado no es KML, GeoJSON, GeoPackage ni Shapefile.",
         )
 
     layers: list[LayerInfo] = []
