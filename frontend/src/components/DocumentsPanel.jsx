@@ -1,42 +1,44 @@
 import React from 'react';
-import { Download, FileText, Upload } from 'lucide-react';
+import { Download, FileText, Pencil, Upload } from 'lucide-react';
 import api from '../api/axios';
 import AuthContext from '../contexts/auth-context';
-import { Empty, Field, Notice } from './TargetUI';
+import { Empty, Field, Modal, Notice, SubmitBar, UnavailableBajaButton } from './TargetUI';
 import { apiMessage } from '../utils/target';
+
+const EMPTY_DOCUMENT = { tipo_documento: 'soporte', estado: 'disponible', titulo: '', fecha_documento: '', numero_folio: '', descripcion: '' };
+const EMPTY_TRACE = { archivo: '', hoja: '', fila: '', columna: '', valor_original: '', tratamiento: 'PERSISTIR' };
 
 export default function DocumentsPanel({ targetType, targetId }) {
   const { user } = React.useContext(AuthContext);
   const writable = ['admin', 'operador'].includes(user?.rol);
   const [documents, setDocuments] = React.useState([]);
+  const [traces, setTraces] = React.useState([]);
   const [versions, setVersions] = React.useState({});
   const [error, setError] = React.useState('');
-  const [form, setForm] = React.useState({ tipo_documento: 'soporte', estado: 'disponible', titulo: '' });
+  const [form, setForm] = React.useState(EMPTY_DOCUMENT);
+  const [traceForm, setTraceForm] = React.useState(EMPTY_TRACE);
+  const [editing, setEditing] = React.useState(null);
+  const [saving, setSaving] = React.useState(false);
   const load = React.useCallback(async () => {
-    try { setDocuments((await api.get(`/documentos/objetivos/${targetType}/${targetId}`)).data); setError(''); }
-    catch (requestError) { setError(apiMessage(requestError)); }
+    try {
+      const [documentResponse, traceResponse] = await Promise.all([api.get(`/documentos/objetivos/${targetType}/${targetId}`), api.get(`/trazabilidad/objetivos/${targetType}/${targetId}`)]);
+      setDocuments(documentResponse.data); setTraces(traceResponse.data); setError('');
+    } catch (requestError) { setError(apiMessage(requestError)); }
   }, [targetId, targetType]);
   React.useEffect(() => { load(); }, [load]);
-  const loadVersions = async (id) => {
-    try {
-      const response = await api.get(`/documentos/${id}/versiones`);
-      setVersions((current) => ({ ...current, [id]: response.data }));
-    }
-    catch (requestError) { setError(apiMessage(requestError)); }
-  };
-  const create = async (event) => {
-    event.preventDefault();
-    try { await api.post(`/documentos/objetivos/${targetType}/${targetId}`, form); setForm({ tipo_documento: 'soporte', estado: 'disponible', titulo: '' }); await load(); }
-    catch (requestError) { setError(apiMessage(requestError)); }
-  };
-  const upload = async (id, file) => {
-    if (!file) return;
-    const data = new FormData(); data.append('archivo', file);
-    try { await api.post(`/documentos/${id}/versiones`, data); await loadVersions(id); }
-    catch (requestError) { setError(apiMessage(requestError)); }
-  };
-  return <section className="subsection"><div className="section-heading"><div><h3>Documentos</h3><p>Metadatos y versiones inmutables con hash SHA-256.</p></div></div><Notice error={error} />
-    {writable && <form className="inline-form" onSubmit={create}><Field label="Tipo"><input required value={form.tipo_documento} onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })} /></Field><Field label="Título"><input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} /></Field><button className="button" type="submit"><FileText />Registrar</button></form>}
-    {documents.length === 0 ? <Empty title="Sin documentos">La captura puede continuar; el soporte se agrega cuando esté disponible.</Empty> : <div className="record-list">{documents.map((document) => <article className="record" key={document.id_documento}><div><strong>{document.titulo || document.tipo_documento}</strong><span>{document.estado} · {document.tipo_documento}</span></div><div className="record-actions"><button className="link-button" type="button" onClick={() => loadVersions(document.id_documento)}>Ver versiones</button>{writable && <label className="link-button upload-control"><Upload />Nueva versión<input type="file" onChange={(e) => upload(document.id_documento, e.target.files?.[0])} /></label>}</div>{versions[document.id_documento]?.map((version) => <a className="version" key={version.id_documento_version} href={`/api/documentos/versiones/${version.id_documento_version}/descarga`}><Download />v{version.numero_version} · {version.nombre_original}<small>{version.hash_sha256.slice(0, 12)}…</small></a>)}</article>)}</div>}
+  const loadVersions = async (id) => { try { const response = await api.get(`/documentos/${id}/versiones`); setVersions((current) => ({ ...current, [id]: response.data })); } catch (requestError) { setError(apiMessage(requestError)); } };
+  const saveDocument = async (event) => { event.preventDefault(); setSaving(true); try { await api.post(`/documentos/objetivos/${targetType}/${targetId}`, { ...form, titulo: form.titulo || null, fecha_documento: form.fecha_documento || null, numero_folio: form.numero_folio || null, descripcion: form.descripcion || null }); setForm(EMPTY_DOCUMENT); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setSaving(false); } };
+  const saveEdit = async (event) => { event.preventDefault(); setSaving(true); try { await api.patch(`/documentos/${editing.id_documento}`, { tipo_documento: editing.tipo_documento, estado: editing.estado, titulo: editing.titulo || null, fecha_documento: editing.fecha_documento || null, numero_folio: editing.numero_folio || null, descripcion: editing.descripcion || null }); setEditing(null); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setSaving(false); } };
+  const saveTrace = async (event) => { event.preventDefault(); setSaving(true); try { await api.post(`/trazabilidad/objetivos/${targetType}/${targetId}`, { ...traceForm, hoja: traceForm.hoja || null, fila: traceForm.fila ? Number(traceForm.fila) : null, columna: traceForm.columna || null, valor_original: traceForm.valor_original || null }); setTraceForm(EMPTY_TRACE); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setSaving(false); } };
+  const upload = async (id, file) => { if (!file) return; const data = new FormData(); data.append('archivo', file); try { await api.post(`/documentos/${id}/versiones`, data); await loadVersions(id); } catch (requestError) { setError(apiMessage(requestError)); } };
+  return <section className="subsection"><div className="section-heading"><div><h3>Documentos</h3><p>Metadatos editables y versiones inmutables con hash SHA-256.</p></div></div><Notice error={error} />
+    {writable && <form className="form-grid" onSubmit={saveDocument}><DocumentFields form={form} setForm={setForm} /><button className="button" disabled={saving} type="submit"><FileText />Registrar</button></form>}
+    {documents.length === 0 ? <Empty title="Sin documentos">La captura puede continuar; el soporte se agrega cuando esté disponible.</Empty> : <div className="record-list">{documents.map((document) => <article className="record" key={document.id_documento}><div><strong>{document.titulo || document.tipo_documento}</strong><span>{document.estado} · {document.tipo_documento}{document.numero_folio ? ` · Folio ${document.numero_folio}` : ''}</span><p>{document.fecha_documento ? `Fecha del documento: ${document.fecha_documento} · ` : ''}{document.descripcion || 'Sin descripción'}</p></div><div className="record-actions"><button className="link-button" type="button" onClick={() => loadVersions(document.id_documento)}>Ver versiones</button>{writable && <><button className="icon-button" type="button" aria-label="Editar documento" onClick={() => setEditing({ ...document })}><Pencil /></button><label className="link-button upload-control"><Upload />Nueva versión<input type="file" onChange={(event) => upload(document.id_documento, event.target.files?.[0])} /></label><UnavailableBajaButton label="Dar de baja documento" /></>}</div>{versions[document.id_documento]?.map((version) => <a className="version" key={version.id_documento_version} href={`/api/documentos/versiones/${version.id_documento_version}/descarga`}><Download />v{version.numero_version} · {version.nombre_original}<small>{new Date(version.fecha_carga).toLocaleDateString('es-MX')} · {version.hash_sha256.slice(0, 12)}…</small></a>)}</article>)}</div>}
+    <div className="section-heading"><div><h3>Trazabilidad de fuente</h3><p>Procedencia auditable de datos sin copiar los Excel al repositorio.</p></div></div>
+    {writable && <form className="form-grid" onSubmit={saveTrace}><Field label="Archivo"><input required value={traceForm.archivo} onChange={(event) => setTraceForm({ ...traceForm, archivo: event.target.value })} /></Field><Field label="Hoja"><input value={traceForm.hoja} onChange={(event) => setTraceForm({ ...traceForm, hoja: event.target.value })} /></Field><Field label="Fila"><input type="number" min="1" value={traceForm.fila} onChange={(event) => setTraceForm({ ...traceForm, fila: event.target.value })} /></Field><Field label="Columna"><input value={traceForm.columna} onChange={(event) => setTraceForm({ ...traceForm, columna: event.target.value })} /></Field><Field label="Valor original"><textarea value={traceForm.valor_original} onChange={(event) => setTraceForm({ ...traceForm, valor_original: event.target.value })} /></Field><Field label="Tratamiento"><select value={traceForm.tratamiento} onChange={(event) => setTraceForm({ ...traceForm, tratamiento: event.target.value })}>{['PERSISTIR', 'DERIVAR', 'REFERENCIA', 'DOCUMENTAR', 'REVISAR', 'NO IMPLEMENTAR'].map((value) => <option key={value} value={value}>{value}</option>)}</select></Field><button className="button" disabled={saving} type="submit">Registrar trazabilidad</button></form>}
+    {traces.length === 0 ? <Empty title="Sin trazabilidad registrada" /> : <div className="record-list">{traces.map((trace) => <article className="record" key={trace.id_trazabilidad}><div><strong>{trace.archivo}</strong><span>{[trace.hoja, trace.fila && `fila ${trace.fila}`, trace.columna].filter(Boolean).join(' · ') || 'Sin coordenada de origen'}</span><p>{trace.tratamiento} · {trace.valor_original || 'sin valor original'}</p></div></article>)}</div>}
+    {editing && <Modal title="Editar metadatos documentales" onClose={() => setEditing(null)}><form className="form-grid" onSubmit={saveEdit}><Notice error={error} /><DocumentFields form={editing} setForm={setEditing} /><SubmitBar saving={saving} onCancel={() => setEditing(null)} /></form></Modal>}
   </section>;
 }
+
+function DocumentFields({ form, setForm }) { return <><Field label="Tipo de documento"><input required value={form.tipo_documento} onChange={(event) => setForm({ ...form, tipo_documento: event.target.value })} /></Field><Field label="Estado"><select value={form.estado} onChange={(event) => setForm({ ...form, estado: event.target.value })}><option value="disponible">Disponible</option><option value="faltante">Faltante</option><option value="referenciado">Referenciado</option></select></Field><Field label="Título"><input value={form.titulo || ''} onChange={(event) => setForm({ ...form, titulo: event.target.value })} /></Field><Field label="Fecha del documento"><input type="date" value={form.fecha_documento || ''} onChange={(event) => setForm({ ...form, fecha_documento: event.target.value })} /></Field><Field label="Número de oficio / folio"><input value={form.numero_folio || ''} onChange={(event) => setForm({ ...form, numero_folio: event.target.value })} /></Field><Field label="Descripción / observaciones"><textarea value={form.descripcion || ''} onChange={(event) => setForm({ ...form, descripcion: event.target.value })} /></Field></>; }

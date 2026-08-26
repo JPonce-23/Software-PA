@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, Plus, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Plus, Trash2, X } from 'lucide-react';
 
 export function PageHeader({ eyebrow, title, description, action }) {
   return <header className="page-header"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</header>;
@@ -24,6 +24,10 @@ export function SubmitBar({ saving, onCancel, label = 'Guardar' }) {
 
 export function AddButton({ children, onClick }) {
   return <button className="button" type="button" onClick={onClick}><Plus />{children}</button>;
+}
+
+export function UnavailableBajaButton({ label = 'Dar de baja' }) {
+  return <button className="icon-button danger" type="button" disabled title="Disponible después de la corrección de integridad de bajas lógicas" aria-label={`${label} (no disponible)`}><Trash2 /></button>;
 }
 
 export function Field({ label, children, hint }) {

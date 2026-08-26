@@ -55,9 +55,10 @@ function ProtectedApp() {
   if (loading) return <div className="app-loading">Restaurando sesión…</div>;
   if (!user && location.pathname !== '/login') return <Navigate to="/login" replace />;
   if (user && location.pathname === '/login') return <Navigate to="/dashboard" replace />;
+  if (!user) return <Login />;
   const only = (roles, element) => roles.includes(user?.rol) ? element : <Navigate to="/dashboard" replace />;
   return <div className="app-shell"><Sidebar /><main className="main-content"><Topbar /><React.Suspense fallback={<div className="card">Cargando módulo…</div>}><Routes>
-    <Route path="/login" element={<Login />} /><Route path="/" element={<Navigate to="/dashboard" replace />} /><Route path="/dashboard" element={<Dashboard />} />
+    <Route path="/" element={<Navigate to="/dashboard" replace />} /><Route path="/dashboard" element={<Dashboard />} />
     <Route path="/proyectos" element={<ProjectNavigator />} /><Route path="/proyecto-nucleo/:idProyectoNucleo" element={<ProjectNucleus />} /><Route path="/afectaciones/:idAfectacion" element={<AffectationDetail />} />
     <Route path="/mapa" element={<ProjectMap />} /><Route path="/importaciones" element={only(['admin', 'geografo'], <GeospatialImports />)} /><Route path="/administracion/usuarios" element={only(['admin'], <UserAdministration />)} />
     <Route path="*" element={<Navigate to="/dashboard" replace />} />
