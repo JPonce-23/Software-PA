@@ -1,138 +1,17 @@
 import React from 'react';
-import { ArchiveRestore, Edit3, KeyRound, Plus, Save, Search, ShieldOff, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, Trash2, UserRoundCheck } from 'lucide-react';
 import api from '../api/axios';
-import PaginatedTable from '../components/PaginatedTable';
+import { Empty, Field, Modal, Notice, PageHeader, SubmitBar } from '../components/TargetUI';
+import { apiMessage } from '../utils/target';
 
-const emptyForm = {
-  nombre: '', apellido_paterno: '', apellido_materno: '', correo: '',
-  rol: 'operador', contrasena: '',
-};
-const roleLabels = {
-  admin: 'Administrador', operador: 'Operador', geografo: 'Geógrafo', visualizador: 'Visualizador',
-};
-const apiError = (error) => error.response?.data?.detail || 'No fue posible completar la operación.';
-
-function IconButton({ title, onClick, danger = false, children }) {
-  return <button type="button" className={`admin-icon-button${danger ? ' danger' : ''}`} title={title} aria-label={title} onClick={onClick}>{children}</button>;
-}
-
-function ReasonDialog({ title, onCancel, onConfirm }) {
-  const [reason, setReason] = React.useState('');
-  const [saving, setSaving] = React.useState(false);
-  return <div className="admin-dialog-backdrop"><form className="admin-dialog" onSubmit={async (event) => { event.preventDefault(); setSaving(true); try { await onConfirm(reason.trim()); } finally { setSaving(false); } }}>
-    <header><h2>{title}</h2><IconButton title="Cerrar" onClick={onCancel}><X size={18} /></IconButton></header>
-    <label className="admin-field"><span>Motivo</span><textarea required minLength={3} value={reason} onChange={(event) => setReason(event.target.value)} /></label>
-    <footer><button type="button" className="admin-button secondary" onClick={onCancel}>Cancelar</button><button className="admin-button" disabled={saving || reason.trim().length < 3}>Confirmar</button></footer>
-  </form></div>;
-}
-
-export default function AdministracionUsuarios() {
-  const [users, setUsers] = React.useState([]);
-  const [form, setForm] = React.useState(emptyForm);
-  const [editing, setEditing] = React.useState(null);
-  const [showForm, setShowForm] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState('');
-  const [reasonAction, setReasonAction] = React.useState(null);
-  const [showInactive, setShowInactive] = React.useState(false);
-  const [search, setSearch] = React.useState('');
-
-  const load = React.useCallback(async () => {
-    setLoading(true); setError('');
-    try { setUsers((await api.get('/administracion/usuarios?incluir_inactivos=true')).data); }
-    catch (requestError) { setError(apiError(requestError)); }
-    finally { setLoading(false); }
-  }, []);
+const EMPTY = { nombre: '', apellido_paterno: '', apellido_materno: '', correo: '', rol: 'operador', contrasena: '' };
+export default function UserAdministration() {
+  const [users, setUsers] = React.useState([]); const [projects, setProjects] = React.useState([]); const [assignments, setAssignments] = React.useState({}); const [modal, setModal] = React.useState(null); const [error, setError] = React.useState(''); const [success, setSuccess] = React.useState('');
+  const load = React.useCallback(async () => { try { const [userResponse, projectResponse] = await Promise.all([api.get('/usuarios'), api.get('/proyectos')]); setUsers(userResponse.data); setProjects(projectResponse.data); const entries = await Promise.all(projectResponse.data.map(async (project) => [project.id_proyecto, (await api.get(`/proyectos/${project.id_proyecto}/usuarios`)).data])); setAssignments(Object.fromEntries(entries)); setError(''); } catch (requestError) { setError(apiMessage(requestError)); } }, []);
   React.useEffect(() => { load(); }, [load]);
-
-  const openCreate = () => { setForm(emptyForm); setEditing(null); setShowForm(true); };
-  const openEdit = (user) => {
-    setForm({
-      nombre: user.nombre, apellido_paterno: user.apellido_paterno,
-      apellido_materno: user.apellido_materno || '', correo: user.correo,
-      rol: user.rol, contrasena: '',
-    });
-    setEditing(user.id_usuario); setShowForm(true);
-  };
-  const change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-
-  const submit = async (event) => {
-    event.preventDefault(); setSaving(true); setError('');
-    try {
-      if (editing) {
-        const { nombre, apellido_paterno, apellido_materno, rol } = form;
-        await api.put(`/usuarios/${editing}`, { nombre, apellido_paterno, apellido_materno: apellido_materno || null, rol });
-      } else {
-        await api.post('/usuarios', { ...form, apellido_materno: form.apellido_materno || null });
-      }
-      setShowForm(false); await load();
-    } catch (requestError) { setError(apiError(requestError)); }
-    finally { setSaving(false); }
-  };
-
-  const confirmReason = async (reason) => {
-    const { type, user } = reasonAction;
-    try {
-      if (type === 'delete') await api.delete(`/usuarios/${user.id_usuario}?motivo=${encodeURIComponent(reason)}`);
-      if (type === 'restore') await api.post(`/administracion/usuarios/${user.id_usuario}/reactivar`, { motivo: reason });
-      if (type === 'sessions') await api.post(`/usuarios/${user.id_usuario}/revocar-sesiones`, { motivo: reason });
-      if (type === 'unlock') await api.post(`/usuarios/${user.id_usuario}/desbloquear`, { motivo: reason });
-      setReasonAction(null); await load();
-    } catch (requestError) { setError(apiError(requestError)); setReasonAction(null); }
-  };
-
-  const sourceUsers = showInactive ? users : users.filter((user) => user.activo);
-  const normalizedSearch = search.trim().toLowerCase();
-  const visibleUsers = normalizedSearch
-    ? sourceUsers.filter((user) => [user.nombre, user.apellido_paterno, user.apellido_materno, user.correo, user.rol].some((value) => String(value ?? '').toLowerCase().includes(normalizedSearch)))
-    : sourceUsers;
-
-  const tableColumns = [
-    { header: 'Nombre', render: (user) => <strong>{user.nombre} {user.apellido_paterno}</strong> },
-    { header: 'Correo', render: (user) => user.correo },
-    { header: 'Rol', render: (user) => roleLabels[user.rol] },
-    { header: 'Estado', render: (user) => <span className={`admin-status ${user.activo ? 'active' : 'inactive'}`}>{user.activo ? 'Activo' : 'Inactivo'}</span> },
-    {
-      header: 'Acciones',
-      className: 'admin-actions-cell',
-      render: (user) => user.activo ? (
-        <>
-          <IconButton title="Editar" onClick={() => openEdit(user)}><Edit3 size={16} /></IconButton>
-          <IconButton title="Desbloquear cuenta" onClick={() => setReasonAction({ type: 'unlock', user })}><KeyRound size={16} /></IconButton>
-          <IconButton title="Revocar sesiones" onClick={() => setReasonAction({ type: 'sessions', user })}><ShieldOff size={16} /></IconButton>
-          <IconButton title="Dar de baja" danger onClick={() => setReasonAction({ type: 'delete', user })}><Trash2 size={16} /></IconButton>
-        </>
-      ) : (
-        <IconButton title="Reactivar" onClick={() => setReasonAction({ type: 'restore', user })}><ArchiveRestore size={16} /></IconButton>
-      )
-    }
-  ];
-
-  return <section className="admin-page">
-    <div className="admin-toolbar"><div><h2 className="admin-section-title">Usuarios y roles</h2><p className="admin-section-copy">Cuentas, roles y acceso vigente</p></div><div className="admin-toolbar-actions"><label className="admin-history-toggle"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />Incluir inactivos</label><button type="button" className="admin-button" onClick={openCreate}><Plus size={16} />Nuevo usuario</button></div></div>
-    <label className="admin-search"><Search size={16} /><input type="search" placeholder="Buscar por nombre, correo o rol" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
-    {error && <div className="admin-error" role="alert">{error}</div>}
-    {showForm && <form className="admin-form-band" onSubmit={submit}>
-      <div className="admin-form-heading"><h2>{editing ? 'Editar usuario' : 'Nuevo usuario'}</h2><IconButton title="Cerrar formulario" onClick={() => setShowForm(false)}><X size={18} /></IconButton></div>
-      <div className="admin-form-grid">
-        <label className="admin-field"><span>Nombre</span><input required value={form.nombre} onChange={(e) => change('nombre', e.target.value)} /></label>
-        <label className="admin-field"><span>Apellido paterno</span><input required value={form.apellido_paterno} onChange={(e) => change('apellido_paterno', e.target.value)} /></label>
-        <label className="admin-field"><span>Apellido materno</span><input value={form.apellido_materno} onChange={(e) => change('apellido_materno', e.target.value)} /></label>
-        <label className="admin-field"><span>Correo</span><input type="email" required disabled={Boolean(editing)} value={form.correo} onChange={(e) => change('correo', e.target.value)} /></label>
-        <label className="admin-field"><span>Rol</span><select value={form.rol} onChange={(e) => change('rol', e.target.value)}>{Object.entries(roleLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-        {!editing && <label className="admin-field"><span>Contraseña temporal</span><input type="password" required minLength={12} autoComplete="new-password" value={form.contrasena} onChange={(e) => change('contrasena', e.target.value)} /></label>}
-      </div>
-      <div className="admin-form-actions"><button className="admin-button" disabled={saving}><Save size={16} />{saving ? 'Guardando...' : 'Guardar'}</button></div>
-    </form>}
-    <PaginatedTable
-      columns={tableColumns}
-      data={visibleUsers}
-      loading={loading}
-      keyField="id_usuario"
-      rowClassName={(user) => (!user.activo ? 'inactive' : '')}
-      emptyMessage="No hay usuarios."
-    />
-    {reasonAction && <ReasonDialog title={reasonAction.type === 'sessions' ? 'Revocar sesiones' : reasonAction.type === 'unlock' ? 'Desbloquear cuenta' : reasonAction.type === 'delete' ? 'Dar de baja al usuario' : 'Reactivar usuario'} onCancel={() => setReasonAction(null)} onConfirm={confirmReason} />}
-  </section>;
+  const remove = async (user) => { const motive = window.prompt(`Motivo para dar de baja a ${user.nombre}:`); if (!motive?.trim()) return; try { await api.delete(`/usuarios/${user.id_usuario}`, { data: { motivo: motive.trim() } }); setSuccess('Usuario y asignaciones activos dados de baja; sus sesiones fueron revocadas.'); await load(); } catch (requestError) { setError(apiMessage(requestError)); } };
+  return <section><PageHeader eyebrow="RBAC por proyecto" title="Usuarios y accesos" description="Admin tiene acceso global; los demás perfiles sólo operan los proyectos asignados." action={<button className="button" type="button" onClick={() => setModal({ type: 'user' })}><Plus />Nuevo usuario</button>} /><Notice error={error} success={success} />{users.length === 0 ? <Empty /> : <div className="table-wrap card"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Proyectos asignados</th><th>Acciones</th></tr></thead><tbody>{users.map((user) => { const assigned = projects.filter((project) => assignments[project.id_proyecto]?.some((item) => item.id_usuario === user.id_usuario)); return <tr key={user.id_usuario}><td><strong>{user.nombre} {user.apellido_paterno}</strong><small>{user.correo}</small></td><td><span className="pill">{user.rol}</span></td><td>{user.rol === 'admin' ? 'Acceso global' : assigned.length ? assigned.map((item) => item.nombre_proyecto).join(', ') : 'Sin asignación'}</td><td><div className="record-actions"><button className="icon-button" type="button" title="Editar" onClick={() => setModal({ type: 'user', user })}><Pencil /></button>{user.rol !== 'admin' && <button className="icon-button" type="button" title="Asignar proyecto" onClick={() => setModal({ type: 'assignment', user })}><UserRoundCheck /></button>}<button className="icon-button danger" type="button" title="Dar de baja" onClick={() => remove(user)}><Trash2 /></button></div></td></tr>; })}</tbody></table></div>}{modal?.type === 'user' && <UserForm current={modal.user} onClose={() => setModal(null)} onDone={async () => { setModal(null); await load(); }} />}{modal?.type === 'assignment' && <AssignmentForm user={modal.user} projects={projects.filter((project) => !assignments[project.id_proyecto]?.some((item) => item.id_usuario === modal.user.id_usuario))} onClose={() => setModal(null)} onDone={async () => { setModal(null); await load(); }} />}</section>;
 }
+
+function UserForm({ current, onClose, onDone }) { const [form, setForm] = React.useState(current ? { nombre: current.nombre, apellido_paterno: current.apellido_paterno, apellido_materno: current.apellido_materno || '', correo: current.correo, rol: current.rol, contrasena: '' } : EMPTY); const [saving, setSaving] = React.useState(false); const [error, setError] = React.useState(''); const submit = async (event) => { event.preventDefault(); setSaving(true); try { if (current) await api.patch(`/usuarios/${current.id_usuario}`, { nombre: form.nombre, apellido_paterno: form.apellido_paterno, apellido_materno: form.apellido_materno || null, rol: form.rol }); else await api.post('/usuarios', { ...form, apellido_materno: form.apellido_materno || null }); await onDone(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setSaving(false); } }; return <Modal title={current ? 'Editar usuario' : 'Nuevo usuario'} onClose={onClose}><form className="form-grid" onSubmit={submit}><Notice error={error} /><Field label="Nombre"><input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></Field><Field label="Apellido paterno"><input required value={form.apellido_paterno} onChange={(e) => setForm({ ...form, apellido_paterno: e.target.value })} /></Field><Field label="Apellido materno"><input value={form.apellido_materno} onChange={(e) => setForm({ ...form, apellido_materno: e.target.value })} /></Field><Field label="Correo"><input type="email" disabled={Boolean(current)} required value={form.correo} onChange={(e) => setForm({ ...form, correo: e.target.value })} /></Field><Field label="Rol"><select value={form.rol} onChange={(e) => setForm({ ...form, rol: e.target.value })}><option value="admin">Administrador</option><option value="operador">Operador</option><option value="visualizador">Visualizador</option><option value="geografo">Geógrafo</option></select></Field>{!current && <Field label="Contraseña temporal" hint="12+ caracteres, mayúscula, minúscula, número y símbolo"><input type="password" autoComplete="new-password" minLength="12" required value={form.contrasena} onChange={(e) => setForm({ ...form, contrasena: e.target.value })} /></Field>}<SubmitBar saving={saving} onCancel={onClose} /></form></Modal>; }
+function AssignmentForm({ user, projects, onClose, onDone }) { const [projectId, setProjectId] = React.useState(''); const [saving, setSaving] = React.useState(false); const [error, setError] = React.useState(''); const submit = async (event) => { event.preventDefault(); setSaving(true); try { await api.post(`/proyectos/${projectId}/usuarios`, { id_usuario: user.id_usuario }); await onDone(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setSaving(false); } }; return <Modal title={`Asignar proyecto a ${user.nombre}`} onClose={onClose}><form className="form-grid" onSubmit={submit}><Notice error={error} /><Field label="Proyecto"><select required value={projectId} onChange={(e) => setProjectId(e.target.value)}><option value="">Selecciona</option>{projects.map((project) => <option key={project.id_proyecto} value={project.id_proyecto}>{project.nombre_proyecto}</option>)}</select></Field><SubmitBar saving={saving} onCancel={onClose} label="Asignar" /></form></Modal>; }

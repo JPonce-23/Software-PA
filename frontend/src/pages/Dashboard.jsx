@@ -1,186 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { Download, TrendingUp } from 'lucide-react';
 import api from '../api/axios';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Files, FolderKanban, Layers, Map } from 'lucide-react';
+import { Empty, Field, Notice, PageHeader } from '../components/TargetUI';
+import { apiMessage, formatNumber } from '../utils/target';
 
-function ProjectCard({ tramo, proyecto, nucleosTramo }) {
-  const navigate = useNavigate();
-
-  // Agregamos métricas reales de los tramos-núcleos
-  const nucleosTotales = nucleosTramo.length;
-  const conveniosTotales = nucleosTramo.reduce((acc, curr) => acc + (curr.total_convenios_formalizados_ran || 0), 0);
-  const superficieLiberada = nucleosTramo.reduce((acc, curr) => acc + parseFloat(curr.superficie_liberada_ha || 0), 0).toFixed(2);
-
-  return (
-    <article
-      className="project-card"
-      onClick={() => navigate(`/mapa?id_proyecto=${tramo.id_proyecto}&seleccionar_tramo=${tramo.id_tramo}`)}
-      style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
-    >
-      <div className="project-card-badge">
-        <FolderKanban size={14} />
-        <span>{proyecto?.clave_proyecto || 'S/P'}</span>
-        <strong>{proyecto?.nombre_proyecto || 'Proyecto sin asignar'}</strong>
-      </div>
-      <h2>{tramo.nombre_tramo}</h2>
-
-      <div className="metrics">
-
-        {/* Requerimiento 10.3 */}
-        <div className="metric">
-          <div className="icon dark"><Map size={20} /></div>
-          <div>
-            <small>Total Núcleos Afectados</small>
-            <strong>{nucleosTotales}</strong>
-            <span>Ejidos y Comunidades</span>
-          </div>
-        </div>
-
-        {/* Requerimiento 10.2 / 10.1 consolidado */}
-        <div className="metric">
-          <div className="icon blue"><Files size={20} /></div>
-          <div>
-            <small>Convenios Formalizados</small>
-            <strong style={{color: '#0284c7'}}>{conveniosTotales}</strong>
-            <span>Inscritos en RAN</span>
-          </div>
-        </div>
-
-        {/* Requerimiento 11.1 y 11.2 */}
-        <div className="metric">
-          <div className="icon green"><Layers size={20} /></div>
-          <div>
-            <small>Superficie Total Liberada</small>
-            <strong style={{color: '#006341'}}>{superficieLiberada}</strong>
-            <span>Hectáreas liberadas</span>
-          </div>
-        </div>
-
-      </div>
-    </article>
-  );
-}
+const LABELS = {
+  nucleos: 'Núcleos', sensibilizacion: 'Sensibilización', caminamiento: 'Caminamiento', asambleas: 'Asambleas',
+  ingreso_ran_acta: 'Ingreso RAN acta', inscripcion_ran_acta: 'Inscripción RAN acta', cop_colectivos: 'COP colectivos',
+  cop_individuales: 'COP individuales', modificatorios: 'Modificatorios', superficies_adicionales: 'Superficies adicionales',
+  obras_complementarias: 'Obras complementarias', ampliaciones: 'Ampliaciones', ampliaciones_remanentes: 'Ampliaciones remanentes',
+  retiro_fondos: 'Retiro de fondos', expropiacion_directa: 'Expropiación directa', parcelas_afectadas: 'Parcelas afectadas',
+  ingreso_ran_convenio: 'Ingreso RAN convenio', inscripcion_ran_convenio: 'Inscripción RAN convenio', fifonafe: 'FIFONAFE',
+  no_conflictos: 'Sin conflictos', indemnizaciones: 'Indemnizaciones', pagos: 'Pagos',
+  superficie_preliminar_administrativa: 'Superficie preliminar administrativa',
+  superficie_afectada_administrativa: 'Superficie afectada administrativa',
+};
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const [tramosData, setTramosData] = useState([]);
-  const [proyectosData, setProyectosData] = useState([]);
-  const [metricsData, setMetricsData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const proyectoFiltro = Number(searchParams.get('id_proyecto')) || null;
-
-  useEffect(() => {
-    const urlDashboard = proyectoFiltro ? `/dashboard?id_proyecto=${proyectoFiltro}` : `/dashboard`;
-    Promise.all([
-      api.get('/tramos'),
-      api.get('/proyectos'),
-      api.get(urlDashboard)
-    ])
-      .then(([resTramos, resProyectos, resMetrics]) => {
-        setTramosData(resTramos.data);
-        setProyectosData(resProyectos.data);
-        setMetricsData(resMetrics.data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error al conectar con la API:', err);
-        setTramosData([]);
-        setProyectosData([]);
-        setMetricsData([]);
-        setLoading(false);
-      });
-  }, [proyectoFiltro]);
-
-  if (loading) return <div>Cargando métricas...</div>;
-
-  // Filtramos la lista de tarjetas si existe un parámetro en la URL
-  const handleProjectChange = (e) => {
-    const value = e.target.value;
-    if (value) {
-      searchParams.set('id_proyecto', value);
-    } else {
-      searchParams.delete('id_proyecto');
-    }
-    setSearchParams(searchParams);
-  };
-
-  const proyectoSeleccionado = proyectosData.find((proyecto) => proyecto.id_proyecto === proyectoFiltro);
-  const tramosFiltrados = proyectoFiltro
-    ? tramosData.filter((tramo) => tramo.id_proyecto === proyectoFiltro)
-    : tramosData;
-
-  const titulo = proyectoSeleccionado
-    ? `Tramos activos: ${proyectoSeleccionado.nombre_proyecto}`
-    : 'Tramos activos (visión general)';
-
-  // Agregados por proyecto (suma de todos los tramos filtrados)
-  const totalConvenios = tramosFiltrados.reduce((acc, tramo) => {
-    const mt = metricsData.filter(m => m.id_tramo === tramo.id_tramo);
-    return acc + mt.reduce((a, c) => a + (c.total_convenios_formalizados_ran || 0), 0);
-  }, 0);
-  const totalColectivos = tramosFiltrados.reduce((acc, tramo) => {
-    const mt = metricsData.filter(m => m.id_tramo === tramo.id_tramo);
-    return acc + mt.reduce((a, c) => a + (c.total_convenios_colectivos_formalizados_ran || 0), 0);
-  }, 0);
-  const totalIndividuales = tramosFiltrados.reduce((acc, tramo) => {
-    const mt = metricsData.filter(m => m.id_tramo === tramo.id_tramo);
-    return acc + mt.reduce((a, c) => a + (c.total_convenios_individuales_formalizados_ran || 0), 0);
-  }, 0);
-
-  return (
-    <div>
-      <div className="dashboard-header">
-        <h2 style={{color: '#1e293b', margin: 0}}>{titulo}</h2>
-        <div className="dashboard-map-actions">
-          <label className="project-filter">
-            <span>Proyecto</span>
-            <select value={proyectoFiltro || ''} onChange={handleProjectChange}>
-              <option value="">Todos</option>
-              {proyectosData.map(p => (
-                <option key={p.id_proyecto} value={p.id_proyecto}>{p.nombre_proyecto}</option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            className="dashboard-map-button"
-            onClick={() => navigate(proyectoFiltro ? `/mapa?id_proyecto=${proyectoFiltro}` : `/mapa?id_proyecto=all`)}
-          >
-            <Map size={16} />
-            Ver Mapa
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-        <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', flex: 1, border: '1px solid #e2e8f0' }}>
-          <h4 style={{ margin: 0, color: '#64748b', fontSize: '12px', textTransform: 'uppercase' }}>Convenios (Total)</h4>
-          <p style={{ margin: '5px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#0f172a' }}>{totalConvenios}</p>
-        </div>
-        <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', flex: 1, border: '1px solid #e2e8f0' }}>
-          <h4 style={{ margin: 0, color: '#64748b', fontSize: '12px', textTransform: 'uppercase' }}>Colectivos</h4>
-          <p style={{ margin: '5px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#0f172a' }}>{totalColectivos}</p>
-        </div>
-        <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', flex: 1, border: '1px solid #e2e8f0' }}>
-          <h4 style={{ margin: 0, color: '#64748b', fontSize: '12px', textTransform: 'uppercase' }}>Individuales</h4>
-          <p style={{ margin: '5px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#0f172a' }}>{totalIndividuales}</p>
-        </div>
-      </div>
-
-      {tramosFiltrados.length === 0 ? (
-        <div style={{ padding: '40px', textAlign: 'center', background: 'white', borderRadius: '12px', color: '#64748b' }}>
-          No hay tramos registrados para este proyecto todavía.
-        </div>
-      ) : (
-        <section className="cards">
-          {tramosFiltrados.map(tramo => {
-            const metricsForTramo = metricsData.filter(m => m.id_tramo === tramo.id_tramo);
-            const proyecto = proyectosData.find((item) => item.id_proyecto === tramo.id_proyecto);
-            return <ProjectCard key={tramo.id_tramo} tramo={tramo} proyecto={proyecto} nucleosTramo={metricsForTramo} />;
-          })}
-        </section>
-      )}
-    </div>
-  );
+  const [projects, setProjects] = React.useState([]);
+  const [rows, setRows] = React.useState([]);
+  const [projectId, setProjectId] = React.useState('');
+  const [year, setYear] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {}; if (projectId) params.id_proyecto = projectId; if (year) params.anio = year;
+      const [projectResponse, kpiResponse] = await Promise.all([api.get('/proyectos'), api.get('/dashboard/kpi', { params })]);
+      setProjects(projectResponse.data); setRows(kpiResponse.data); setError('');
+    } catch (requestError) { setError(apiMessage(requestError)); }
+    finally { setLoading(false); }
+  }, [projectId, year]);
+  React.useEffect(() => { load(); }, [load]);
+  const projectNames = Object.fromEntries(projects.map((item) => [item.id_proyecto, item.nombre_proyecto]));
+  const years = [...new Set(rows.map((item) => item.anio))].sort((a, b) => b - a);
+  const exportUrl = `/api/exportaciones/dashboard.csv?${new URLSearchParams({ ...(projectId ? { id_proyecto: projectId } : {}), ...(year ? { anio: year } : {}) })}`;
+  return <section><PageHeader eyebrow="Indicadores derivados" title="Dashboard del modelo objetivo" description="Cada familia de hechos se agrega antes de combinarse; los vínculos N:M no multiplican indicadores." action={<a className="button secondary" href={exportUrl}><Download />Exportar CSV</a>} /><Notice error={error} /><div className="filter-bar"><Field label="Proyecto"><select aria-label="Proyecto" value={projectId} onChange={(e) => setProjectId(e.target.value)}><option value="">Todos los autorizados</option>{projects.map((item) => <option key={item.id_proyecto} value={item.id_proyecto}>{item.nombre_proyecto}</option>)}</select></Field><Field label="Año"><select aria-label="Año" value={year} onChange={(e) => setYear(e.target.value)}><option value="">Todos</option>{years.map((value) => <option key={value} value={value}>{value}</option>)}</select></Field></div>{loading ? <div className="card">Calculando indicadores…</div> : rows.length === 0 ? <Empty title="Sin hechos en el periodo">Los KPI se mostrarán al registrar actividades, convenios y hechos financieros.</Empty> : <div className="kpi-grid">{rows.map((row) => <article className="kpi-card" key={`${row.id_proyecto}-${row.anio}-${row.indicador}`}><header><span>{projectNames[row.id_proyecto] || `Proyecto #${row.id_proyecto}`}</span><b>{row.anio}</b></header><div><TrendingUp /><h3>{LABELS[row.indicador] || row.indicador.replaceAll('_', ' ')}</h3></div><strong>{row.indicador === 'pagos' ? formatNumber(row.monto, ' MXN') : row.indicador.startsWith('superficie_') ? formatNumber(row.superficie_ha, ' ha') : formatNumber(row.cantidad)}</strong>{(row.programado > 0 || row.realizado > 0) && <p>{row.programado} programado · {row.realizado} realizado</p>}</article>)}</div>}</section>;
 }

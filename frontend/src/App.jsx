@@ -1,188 +1,67 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import Login from './pages/Login';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BarChart3, FileText, FolderTree, LogOut, Map, Upload, Users } from 'lucide-react';
+
+import api from './api/axios';
 import { AuthProvider } from './contexts/AuthContext';
 import AuthContext from './contexts/auth-context';
-import api from './api/axios';
-import AlertCenter from './components/AlertCenter';
+import Login from './pages/Login';
 import './index.css';
 
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const Mapa = React.lazy(() => import('./pages/Mapa'));
-const ExpedientesList = React.lazy(() => import('./pages/ExpedientesList'));
-const ExpedienteDetail = React.lazy(() => import('./pages/ExpedienteDetail'));
-const AfectacionSubexpediente = React.lazy(() => import('./pages/AfectacionSubexpediente'));
-const AdministracionTerritorial = React.lazy(() => import('./pages/AdministracionTerritorial'));
-const AdministracionUsuarios = React.lazy(() => import('./pages/AdministracionUsuarios'));
-const ImportacionesGeoespaciales = React.lazy(() => import('./pages/ImportacionesGeoespaciales'));
+const ProjectNavigator = React.lazy(() => import('./pages/ProjectNavigator'));
+const ProjectNucleus = React.lazy(() => import('./pages/ProjectNucleus'));
+const AffectationDetail = React.lazy(() => import('./pages/AffectationDetail'));
+const ProjectMap = React.lazy(() => import('./pages/Mapa'));
+const GeospatialImports = React.lazy(() => import('./pages/ImportacionesGeoespaciales'));
+const UserAdministration = React.lazy(() => import('./pages/AdministracionUsuarios'));
 
-const ROL_LABELS = {
-  admin: 'Administrador',
-  operador: 'Operador de Campo',
-  geografo: 'Geógrafo',
-  visualizador: 'Visualizador',
-};
+const ROLE_LABELS = { admin: 'Administrador', operador: 'Operador', visualizador: 'Visualizador', geografo: 'Geógrafo' };
 
 function Sidebar() {
   const { logout, user } = React.useContext(AuthContext);
   const location = useLocation();
-  const [proyectos, setProyectos] = React.useState([]);
-  const canManageTerritory = ['admin', 'geografo'].includes(user?.rol);
-  const canManageUsers = user?.rol === 'admin';
-
+  const [projects, setProjects] = React.useState([]);
   React.useEffect(() => {
-    if (location.pathname === '/login') return undefined;
-
-    api.get('/proyectos')
-      .then(({ data }) => setProyectos(data))
-      .catch(() => setProyectos([]));
-    return undefined;
+    if (location.pathname === '/login') return;
+    api.get('/proyectos').then(({ data }) => setProjects(data)).catch(() => setProjects([]));
   }, [location.pathname]);
-
   if (location.pathname === '/login') return null;
-
-  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
-
-  return (
-    <aside className="sidebar">
-      <div className="sidebar-logo">
-        <h2 style={{ color: 'white', fontSize: '20px', letterSpacing: '1px' }}>SISTEMA<br/>LIBERACIÓN</h2>
-      </div>
-
-      <nav className="sidebar-menu">
-        <Link className={`menu-item ${location.pathname === '/' ? 'active' : ''}`} to="/">Dashboard</Link>
-
-        {/* Acceso a expedientes (reemplaza a Captura) */}
-        <Link
-          className="captura"
-          to="/expedientes"
-          style={isActive('/expedientes') ? { outline: '2px solid white' } : {}}
-        >
-          Expedientes
-        </Link>
-
-        <div className="menu-group" style={{ marginTop: '10px' }}>
-          <h4>Proyectos</h4>
-          <ul style={{ listStyle: 'none', paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '8px', margin: '10px 0' }}>
-            <li><Link className="menu-item" style={{ padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1' }} to="/">Visión General (Todos)</Link></li>
-            {proyectos.map((proyecto) => (
-              <li key={proyecto.id_proyecto}>
-                <Link className="menu-item" style={{ padding: '5px', fontSize: '13px', background: 'transparent', color: '#cbd5e1' }} to={`/?id_proyecto=${proyecto.id_proyecto}`}>
-                  {proyecto.nombre_proyecto}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <Link className={`menu-item ${location.pathname === '/mapa' ? 'active' : ''}`} to="/mapa">Mapa Geoespacial</Link>
-        </div>
-
-        {canManageTerritory && <div className="menu-group admin-menu-group">
-          <h4>Administración</h4>
-          <Link className={`menu-item ${isActive('/administracion/territorio') ? 'active' : ''}`} to="/administracion/territorio">Territorio</Link>
-          <Link className={`menu-item ${isActive('/administracion/importaciones-geoespaciales') ? 'active' : ''}`} to="/administracion/importaciones-geoespaciales">Importaciones GIS</Link>
-          {canManageUsers && <Link className={`menu-item ${isActive('/administracion/usuarios') ? 'active' : ''}`} to="/administracion/usuarios">Usuarios y accesos</Link>}
-        </div>}
-
-        <Link className="menu-item logout" to="/login" onClick={logout}>Cerrar sesión</Link>
-      </nav>
-    </aside>
-  );
+  const active = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+  return <aside className="sidebar">
+    <Link className="brand" to="/"><span>PA</span><strong>SSALFER</strong><small>Liberación de derecho de vía</small></Link>
+    <nav aria-label="Navegación principal">
+      <Link className={active('/dashboard') || location.pathname === '/' ? 'active' : ''} to="/dashboard"><BarChart3 />Dashboard</Link>
+      <Link className={active('/proyectos') || active('/proyecto-nucleo') || active('/afectaciones') ? 'active' : ''} to="/proyectos"><FolderTree />Proyectos y núcleos</Link>
+      <Link className={active('/mapa') ? 'active' : ''} to="/mapa"><Map />Mapa por proyecto</Link>
+      {['admin', 'geografo'].includes(user?.rol) && <Link className={active('/importaciones') ? 'active' : ''} to="/importaciones"><Upload />Importaciones GIS</Link>}
+      {user?.rol === 'admin' && <Link className={active('/administracion/usuarios') ? 'active' : ''} to="/administracion/usuarios"><Users />Usuarios y accesos</Link>}
+    </nav>
+    <div className="sidebar-projects"><h3>Proyectos autorizados</h3>{projects.length === 0 && <p>Sin proyectos disponibles</p>}{projects.map((project) => <Link key={project.id_proyecto} to={`/proyectos?id_proyecto=${project.id_proyecto}`}><FileText />{project.nombre_proyecto}</Link>)}</div>
+    <button className="logout" type="button" onClick={logout}><LogOut />Cerrar sesión</button>
+  </aside>;
 }
 
 function Topbar() {
-  const location = useLocation();
   const { user } = React.useContext(AuthContext);
-
+  const location = useLocation();
   if (location.pathname === '/login') return null;
-
-  const getTitulo = () => {
-    if (location.pathname === '/mapa') return 'Visor de Mapas';
-    if (location.pathname.includes('/afectaciones/')) return 'Afectación del expediente';
-    if (location.pathname.startsWith('/expedientes/')) return 'Expediente del núcleo en el tramo';
-    if (location.pathname === '/expedientes') return 'Expedientes';
-    if (location.pathname === '/administracion/territorio') return 'Administración territorial';
-    if (location.pathname === '/administracion/usuarios') return 'Administración de usuarios';
-    if (location.pathname === '/administracion/importaciones-geoespaciales') return 'Importaciones geoespaciales';
-    return '¡Bienvenido!';
-  };
-
-  const nombreUsuario = user
-    ? `${user.nombre || user.email || 'Usuario'}`
-    : 'Usuario';
-
-  const rolUsuario = user?.rol ? (ROL_LABELS[user.rol] || user.rol) : '';
-
-  return (
-    <header className="topbar">
-      <div>
-        <h1>{getTitulo()}</h1>
-        <p>Sistema Interno de Reportes para la Procuraduría Agraria</p>
-      </div>
-      <div className="topbar-actions">
-        <AlertCenter />
-        <div className="user-box">
-          <div className="user-info">
-            <h3>{nombreUsuario}</h3>
-            {rolUsuario && <p>{rolUsuario}</p>}
-          </div>
-        </div>
-      </div>
-    </header>
-  );
+  return <header className="topbar"><div><p className="eyebrow">Propiedad social · seguimiento administrativo</p><h1>Sistema de Liberación</h1></div><div className="identity"><strong>{user?.nombre || user?.correo}</strong><span>{ROLE_LABELS[user?.rol] || user?.rol}</span></div></header>;
 }
 
-function AppContent() {
+function ProtectedApp() {
   const { user, loading } = React.useContext(AuthContext);
   const location = useLocation();
-
-  if (loading) return <div>Cargando...</div>;
-
-  if (!user && location.pathname !== '/login') {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (user && location.pathname === '/login') {
-    return <Navigate to="/" replace />;
-  }
-
-  const roleElement = (element, roles) => roles.includes(user?.rol)
-    ? element
-    : <Navigate to="/" replace />;
-
-  return (
-    <div className="app-container">
-      <Sidebar />
-      <main className="content">
-        <Topbar />
-        <React.Suspense fallback={<div className="panel-loading">Cargando módulo…</div>}>
-          <Routes>
-            <Route path="/login"                        element={<Login />} />
-            <Route path="/"                             element={<Dashboard />} />
-            <Route path="/mapa"                         element={<Mapa />} />
-            <Route path="/expedientes"                  element={<ExpedientesList />} />
-            <Route path="/expedientes/:id_tramo_nucleo/afectaciones/:id_afectacion" element={<AfectacionSubexpediente />} />
-            <Route path="/expedientes/:id_tramo_nucleo" element={<ExpedienteDetail />} />
-            <Route path="/administracion/territorio" element={roleElement(<AdministracionTerritorial />, ['admin', 'geografo'])} />
-            <Route path="/administracion/usuarios" element={roleElement(<AdministracionUsuarios />, ['admin'])} />
-            <Route path="/administracion/importaciones-geoespaciales" element={roleElement(<ImportacionesGeoespaciales />, ['admin', 'geografo'])} />
-          </Routes>
-        </React.Suspense>
-      </main>
-    </div>
-  );
+  if (loading) return <div className="app-loading">Restaurando sesión…</div>;
+  if (!user && location.pathname !== '/login') return <Navigate to="/login" replace />;
+  if (user && location.pathname === '/login') return <Navigate to="/dashboard" replace />;
+  const only = (roles, element) => roles.includes(user?.rol) ? element : <Navigate to="/dashboard" replace />;
+  return <div className="app-shell"><Sidebar /><main className="main-content"><Topbar /><React.Suspense fallback={<div className="card">Cargando módulo…</div>}><Routes>
+    <Route path="/login" element={<Login />} /><Route path="/" element={<Navigate to="/dashboard" replace />} /><Route path="/dashboard" element={<Dashboard />} />
+    <Route path="/proyectos" element={<ProjectNavigator />} /><Route path="/proyecto-nucleo/:idProyectoNucleo" element={<ProjectNucleus />} /><Route path="/afectaciones/:idAfectacion" element={<AffectationDetail />} />
+    <Route path="/mapa" element={<ProjectMap />} /><Route path="/importaciones" element={only(['admin', 'geografo'], <GeospatialImports />)} /><Route path="/administracion/usuarios" element={only(['admin'], <UserAdministration />)} />
+    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+  </Routes></React.Suspense></main></div>;
 }
 
-function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AuthProvider>
-  );
-}
-
-export default App;
+export default function App() { return <AuthProvider><BrowserRouter><ProtectedApp /></BrowserRouter></AuthProvider>; }
