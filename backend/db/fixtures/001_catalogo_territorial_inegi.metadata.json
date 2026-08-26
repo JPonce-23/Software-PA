@@ -1,0 +1,12 @@
+{
+  "nombre": "Catálogo territorial mexicano para SOFTWARE-PA",
+  "version": "2026-08-25",
+  "procedencia": "Exportación determinista del catálogo efectivo local auditado en db_pruebas_alfredo, esquema 030",
+  "criterio_orden": "clave_inegi ascendente",
+  "clave_natural_entidad": "clave_inegi CHAR(2)",
+  "clave_natural_municipio": "clave_inegi CHAR(5)",
+  "entidades_activas": 32,
+  "municipios_activos": 2478,
+  "archivo": "001_catalogo_territorial_inegi.sql",
+  "sha256": "99184affa3c50b18e7ea6531a3c0d8786e250befe40a507c459bd49ff5a5759b"
+}

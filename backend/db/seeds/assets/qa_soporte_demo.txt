@@ -1,0 +1,3 @@
+SSALFER — soporte documental sintético de QA
+Este archivo verifica versionado inmutable y hash SHA-256.
+No contiene información oficial ni datos personales.
