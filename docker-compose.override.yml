@@ -14,10 +14,6 @@ services:
       - ./backend:/app
       - ./backend/uploads:/app/uploads
 
-  alertas_scheduler:
-    volumes:
-      - ./backend:/app
-
   frontend:
     build:
       target: development
