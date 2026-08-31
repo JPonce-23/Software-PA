@@ -1,8 +1,8 @@
 # Diccionario de datos SSALFER
 
-> Esquema verificado: PostgreSQL/PostGIS, `schema_migrations = 035`
-> Fecha de verificación: 2026-08-25
-> Alcance: objetos propios vigentes después del reset controlado 031-033, la separación de privilegios 034 y la completitud operativa aditiva 035.
+> Esquema verificado: PostgreSQL/PostGIS, `schema_migrations = 036`
+> Fecha de verificación: 2026-08-31
+> Alcance: objetos propios vigentes después del reset controlado 031-033, la separación de privilegios 034, la completitud 035 y el modelo operativo colectivo normalizado 036.
 
 ## 1. Convenciones
 
@@ -68,8 +68,9 @@ Roles PostgreSQL: `software_pa_app` es `NOLOGIN` sin atributos administrativos; 
 | `id_nucleo` | integer | PK |
 | `id_municipio` | integer | FK obligatoria |
 | `nombre_nucleo` | varchar | obligatorio |
-| `tipo_nucleo` | varchar | `ejido` o `comunidad` |
-| `comunidad_indigena` | boolean | obligatorio |
+| `tipo_nucleo` | varchar | proyección legacy sincronizada (`ejido` o `comunidad`) |
+| `id_tipo_tenencia` | bigint | FK obligatoria a catálogo `tipo_tenencia` |
+| `comunidad_indigena` | boolean | trivalente: `NULL` no capturado, `true` sí, `false` no |
 | `geometria_poligono` | geometry | `MULTIPOLYGON(4326)`, opcional, válida y no vacía |
 | `fuente_geometria`, `fecha_fuente_geometria` | varchar, date | procedencia cartográfica |
 | `fuente_datos` | varchar | procedencia de identidad |
@@ -79,7 +80,7 @@ La identidad activa normalizada es única por municipio, nombre y tipo. Tiene í
 
 ### `proyecto_nucleo`
 
-`id_proyecto_nucleo` PK; `id_proyecto` y `id_nucleo` FK; `residencia`; `responsable_nombre`; `contacto`; bloque auditable. UNIQUE parcial garantiza un solo contexto activo por proyecto+núcleo.
+`id_proyecto_nucleo` PK; `id_proyecto` y `id_nucleo` FK; `id_residencia` catalogada; `total_cops_planeados >= 0`; campos legacy de residencia/responsable sólo para compatibilidad; bloque auditable. UNIQUE parcial garantiza un solo contexto activo por proyecto+núcleo. `proyecto_nucleo_responsable` conserva responsables sucesivos 1:N con nombre, cargo, contacto y vigencia.
 
 ### `proyecto_nucleo_referencia`
 
@@ -93,15 +94,15 @@ La identidad activa normalizada es única por municipio, nombre y tipo. Tiene í
 
 ### `orv`
 
-`id_orv` PK; `id_nucleo` FK; `numero_orv`; `inicio_vigencia`; `fin_vigencia`; `estatus_fuente`; `acta_eleccion_inscrita_ran`; `fecha_inscripcion_acta_ran`; bloque auditable. La fecha final no puede preceder a la inicial.
+`id_orv` PK; `id_nucleo` FK; `numero_orv`; `inicio_vigencia`; `fin_vigencia`; `estatus_fuente`; `id_estado_registral` catalogado (`no_ingresada`, `en_proceso`, `prevenida`, `inscrita`, `otro`); campos boolean/fecha legacy como proyección; bloque auditable. La fecha final no puede preceder a la inicial.
 
 ### `orv_integrante`
 
-`id_orv_integrante` PK; `id_orv`; `id_persona`; `cargo`; fechas de participación; bloque auditable. Una persona/cargo no se duplica dentro del ORV activo.
+`id_orv_integrante` PK; `id_orv`; `id_persona`; `id_organo`, `id_cargo` e `id_calidad` catalogados; `cargo` legacy; fechas de participación; bloque auditable. Permite Comisariado y Consejo de Vigilancia, cargos Presidente/Secretario/Tesorero/Secretario 1/Secretario 2 y calidad propietario/suplente.
 
 ### `padron_historial`
 
-`id_padron` PK; `id_nucleo`; `fecha_padron`; `numero_ejidatarios_comuneros`; bloque auditable. Debe existir fecha o conteo, el conteo no puede ser negativo y cada núcleo tiene un corte activo por fecha.
+`id_padron` PK; `id_nucleo`; `fecha_padron`; `numero_ejidatarios_comuneros`; `fuente`; `id_documento`; bloque auditable. Debe existir fecha o conteo, el conteo no puede ser negativo y cada núcleo tiene un corte activo por fecha. La fuente tabular conserva textos no normalizables como `SD` sin forzarlos a `date`.
 
 ### `parcela`
 
@@ -142,11 +143,15 @@ Tiene bloque auditable e índice GiST. La geometría no es requisito para la rut
 | `condicion_especial`, `descripcion_condicion` | varchar, text | condición y detalle coherente |
 | `avaluo_monto`, `avaluo_fecha`, `avaluo_referencia`, `avaluo_institucion` | numeric/date/varchar | avalúo simple |
 
-Incluye bloque auditable. CHECK exige colectiva sin parcela e individual con parcela. Un trigger exige que la parcela individual esté activa y pertenezca al núcleo del mismo `ProyectoNucleo`. No contiene geometría.
+Incluye bloque auditable. CHECK exige parcela sólo para la afectación individual; una colectiva sí puede referenciar una parcela. El trigger exige que cualquier parcela relacionada esté activa y pertenezca al núcleo del mismo `ProyectoNucleo`. `tipo_afectacion` es independiente de `tipo_gestion`.
 
 ### `asamblea`
 
-`id_asamblea` PK; `id_proyecto_nucleo`; `id_padron` opcional; `tipo_asamblea` (`anuencia`, `modificatorio`, `superficie_adicional`, `obras_complementarias`, `retiro_fondos`, `otra`); `contexto_proceso` opcional (`cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`, `retiro_fondos`, `otro`); propósito; expedición/programación de primera y segunda convocatoria; `fecha_realizada`; `resultado`; programación/ingreso RAN; `numero_solicitud_ran`; `calificacion_registral_ran`; `fecha_inscripcion_ran`; bloque auditable. La UI de nuevas capturas separa tipo jurídico y motivo operativo.
+`id_asamblea` PK; `id_proyecto_nucleo`; `id_padron` opcional; `id_tipo_asamblea` e `id_contexto_asamblea` catalogados; propósito; fecha/resultado de cierre; bloque auditable. Los campos de primera/segunda convocatoria y RAN permanecen temporalmente como proyección legacy, no como fuente canónica.
+
+### `asamblea_convocatoria`
+
+`id_convocatoria` PK; `id_asamblea`; `ordinal > 0`; fechas de expedición, programación y realización; `id_resultado` catalogado; observaciones; `id_documento`; bloque auditable. UNIQUE parcial por asamblea+ordinal. Es la fuente canónica repetible para convocatorias y actas de no verificativo.
 
 Un trigger exige que el padrón opcional pertenezca al mismo núcleo. Asamblea no tiene FK a afectación.
 
@@ -172,7 +177,7 @@ Triggers normales y diferidos validan contexto, ámbito, entidades activas y que
 
 ### `tramite_fifonafe`
 
-`id_tramite_fifonafe` PK; `id_proyecto_nucleo`; `ambito` colectivo/individual; `estatus` (`programado`, `pendiente`, `completo`, `cancelado`, `otro`); `acuse_fifonafe_fecha`; cuatro campos de número de oficio y sus cuatro fechas:
+`id_tramite_fifonafe` PK; `id_proyecto_nucleo`; `ambito` colectivo/individual; estatus, acuse, conflictos y bloque auditable. Los cuatro pares históricos siguientes se conservan temporalmente como proyección de compatibilidad:
 
 1. `no_oficio_fifonafe_a_dgaopr` / `fecha_oficio_fifonafe_a_dgaopr`;
 2. `no_oficio_dgaopr_a_representacion` / `fecha_oficio_dgaopr_a_representacion`;
@@ -180,6 +185,10 @@ Triggers normales y diferidos validan contexto, ámbito, entidades activas y que
 4. `no_oficio_respuesta_dgaopr_a_fifonafe` / `fecha_oficio_respuesta_dgaopr_a_fifonafe`.
 
 Además: `hay_conflictos`, `resultado_no_conflictos` y bloque auditable. El estado completo requiere los cuatro pares oficio/fecha y resultado coherente.
+
+### `tramite_fifonafe_evento`
+
+`id_evento_fifonafe` PK; `id_tramite_fifonafe`; `ordinal > 0`; `id_tipo_evento` catalogado; origen/destino; número y fecha de oficio; `id_documento`; observaciones; bloque auditable. Es la fuente canónica 1:N y admite reenvíos, correcciones y respuestas múltiples.
 
 ### `tramite_fifonafe_afectacion`
 
@@ -287,4 +296,36 @@ Las funciones N:M usan constraint triggers diferidos para permitir creación tra
 
 `schema_migrations(version, descripcion, aplicada_en)` registra hasta 035. `spatial_ref_sys`, `geometry_columns` y `geography_columns` pertenecen a PostGIS. Los default privileges del owner conceden al rol NOLOGIN sólo `SELECT/INSERT/UPDATE` en tablas futuras y `USAGE/SELECT` en secuencias; PUBLIC no recibe DML ni `CREATE` en `public`.
 
-No existen en el esquema 035 las tablas/vistas funcionales retiradas: `tramo`, `tramo_nucleo`, `afectacion_ciclo`, `usuario_tramo`, `seccion_derecho_via`, `franja_derecho_via`, `candidato_tramo_nucleo`, `carga_geoespacial` ni `carga_geoespacial_feature`. Su historia permanece únicamente en migraciones 001-030.
+No existen en el esquema 036 las tablas/vistas funcionales retiradas: `tramo`, `tramo_nucleo`, `afectacion_ciclo`, `usuario_tramo`, `seccion_derecho_via`, `franja_derecho_via`, `candidato_tramo_nucleo`, `carga_geoespacial` ni `carga_geoespacial_feature`. Su historia permanece únicamente en migraciones 001-030.
+
+## 11. Objetos introducidos por el modelo operativo 036
+
+### `catalogo_operativo` y `catalogo_operativo_alias`
+
+`catalogo_operativo` contiene PK bigint, `tipo_catalogo`, `codigo` estable e inmutable, `nombre` editable, descripción, orden, fuente, inicio/fin de vigencia y bloque auditable. UNIQUE parcial por tipo+código. No admite borrado físico; una opción inactiva conserva todas sus FK históricas. `catalogo_operativo_alias` resuelve variantes de fuente por catálogo y texto normalizado. Los códigos iniciales no limitan futuras altas por API.
+
+### `bien_afectado`
+
+`id_bien_afectado` PK; `id_afectacion`; FKs opcionales a catálogos `tipo_gestion`, `destino_superficie` y `tipo_cop_operativo`; `id_parcela` opcional; tipo de tierra; referencia alfanumérica; titularidad; detalle; superficies preliminar/afectada en ha; valor y formato originales; fuente; bloque auditable. Requiere al menos una clasificación o referencia. Una referencia de parcela no convierte por sí sola el derecho en individual.
+
+### `tramite_ran` y `tramite_ran_evento`
+
+`tramite_ran` contiene `id_proyecto_nucleo`, objetivo tipado mediante exactamente una FK no nula (`id_asamblea`, `id_convenio` o `id_orv`), propósito, estado y bloque auditable. Un trigger comprueba que el objetivo pertenece al contexto o núcleo correctos. No se usa una FK polimórfica insegura.
+
+`tramite_ran_evento` contiene trámite, ordinal, tipo catalogado, fecha, intento, número de solicitud, resultado, calificación, folio/referencia, observaciones, documento y bloque auditable. UNIQUE parcial por trámite+ordinal. Ingreso, reingreso, prevención, corrección, desistimiento, calificación e inscripción se preservan como hechos separados.
+
+### Convenio operativo
+
+`vw_convenio_tipo_cop_operativo` deriva la etiqueta de Datos Generales: `cop_original/1 -> ORIGEN`, `superficie_adicional/1 -> ADICIONAL`, `superficie_adicional/2 -> 2A ADICIONAL` y `obras_complementarias -> COMPLEMENTARIAS`. `modificatorio` continúa como tipo jurídico. El trigger de relaciones valida mismo `ProyectoNucleo`, mismo ámbito, semántica padre/hijo, ausencia de ciclos y coherencia con la asamblea autorizante.
+
+### Checklist documental
+
+`requisito_documental` define código estable, etiqueta, descripción, etapa, ámbito, obligatoriedad, orden, fuente, vigencia y auditoría. `expediente_requisito` asocia un requisito a `ProyectoNucleo`, opcionalmente a una afectación, asamblea, convenio o trámite FIFONAFE, con estado catalogado, documento, observaciones y auditoría. Un CHECK limita a un objetivo específico por registro y los triggers validan su contexto.
+
+### Importación tabular
+
+`importacion_tabular` conserva archivo, nombre original, SHA-256, fuente, fecha, estado, métricas y auditoría; UNIQUE parcial por proyecto+SHA-256. `importacion_tabular_celda` conserva hoja, fila, columna, encabezado, valor original, valor normalizado, tratamiento (`persistir`, `derivar`, `referencia`, `documentar`, `revisar`, `no_implementar`), advertencias, errores y vínculo destino. `trazabilidad_fuente.id_importacion_tabular` enlaza la entidad funcional con la cabecera de importación y conserva en la propia trazabilidad sus coordenadas y valores de celda. Este flujo no reutiliza staging GIS.
+
+## 12. Compatibilidad y deprecación
+
+Los campos planos de convocatoria y RAN en `asamblea`/`convenio`, los cuatro pares de oficio en `tramite_fifonafe`, el tipo de núcleo textual y los responsables planos son exclusivamente compatibilidad. Triggers proyectan desde los modelos canónicos; las nuevas escrituras de API crean eventos canónicos. No deben utilizarse para reportes nuevos. Su retiro se evaluará después de migrar totalmente el frontend, con objetivo documental de migración 038.

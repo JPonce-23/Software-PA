@@ -1,7 +1,7 @@
 # Requirements - Modelo funcional objetivo SOFTWARE-PA
 
-> Estado: requisitos objetivo implementados y validados en el esquema 035.
-> Fecha de actualización: 2026-08-25.  
+> Estado: requisitos objetivo implementados en el esquema 035; persisten 6 apariciones de `VALIDACIÓN PA/SICT` clasificadas como `DECISION_FUNCIONAL_REQUERIDA`.
+> Fecha de actualización: 2026-08-31.  
 > La implementación vigente se detalla en `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md`.
 
 ## Alcance
@@ -20,7 +20,7 @@ Los documentos fuente literales y la normativa institucional DEBERÁN usarse com
 
 El sistema DEBERÁ administrar proyectos y relacionarlos con núcleos agrarios mediante `ProyectoNucleo`.
 
-`ProyectoNucleo` DEBERÁ contener como mínimo proyecto, núcleo, consecutivo, residencia, responsable, contacto, referencias históricas de tramo y observaciones.
+`ProyectoNucleo` DEBERÁ contener como mínimo proyecto, núcleo, residencia, responsable, contacto y observaciones. Las referencias históricas de tramo (consecutivo, clave de tramo, número de tramo) se DEBERÁN conservar mediante `proyecto_nucleo_referencia`, no como columnas directas de `proyecto_nucleo`.
 
 El sistema NO DEBERÁ exigir `Tramo` para navegar, autorizar, crear convenio, crear afectación o calcular KPI.
 
@@ -60,15 +60,17 @@ Permuta NO DEBERÁ ser tipo ordinario de convenio; DEBERÁ conservarse como moda
 
 El sistema DEBERÁ separar RAN del Acta y RAN del Convenio. Asamblea DEBERÁ pertenecer a `ProyectoNucleo`, ser exclusivamente colectiva y no tener FK directa a una afectación. Uno o varios convenios colectivos PODRÁN referir la misma asamblea de autorización. Para acta se usará `asamblea.numero_solicitud_ran`; para convenio, `convenio.numero_solicitud_ingreso`.
 
+`tipo_asamblea` y `contexto_proceso` DEBERÁN ser conceptos independientes: el tipo clasifica el acto formal y el contexto identifica el proceso operativo que lo motiva.
+
 ### R10. FIFONAFE
 
 El sistema DEBERÁ registrar FIFONAFE por `ProyectoNucleo` y ámbito colectivo/individual. Un trámite PODRÁ cubrir varias afectaciones mediante `tramite_fifonafe_afectacion`, validando el mismo ProyectoNucleo y ámbito, sin duplicar sus oficios ni exigir un convenio propietario.
 
-El sistema DEBERÁ conservar oficio FIFONAFE a DGAOPR/Representación y fecha, oficio DGAOPR a Representación y fecha, respuesta Representación a DGAOPR y fecha, respuesta DGAOPR/Representación a FIFONAFE y fecha, resultado/no conflictos, estatus, soporte y observaciones.
+El sistema DEBERÁ conservar oficio FIFONAFE a DGAOPR/Representación y fecha, oficio DGAOPR a Representación y fecha, respuesta Representación a DGAOPR y fecha, respuesta DGAOPR/Representación a FIFONAFE y fecha, acuse FIFONAFE y fecha, resultado/no conflictos, estatus, soporte y observaciones.
 
 ### R11. Indemnización y pago
 
-El sistema DEBERÁ distinguir estatus de indemnización de pago. Indemnización DEBERÁ pertenecer directamente a una afectación, con máximo un registro activo por afectación, sin depender obligatoriamente de FIFONAFE. Pago DEBERÁ pertenecer a indemnización y registrar fecha, monto, beneficiario, referencia/evidencia y observaciones. La cadena canónica será `Pago -> Indemnizacion -> Afectacion -> ProyectoNucleo`.
+El sistema DEBERÁ distinguir estatus de indemnización de pago. Indemnización DEBERÁ pertenecer directamente a una afectación, con máximo un registro activo por afectación, sin depender obligatoriamente de FIFONAFE. Indemnización DEBERÁ conservar fecha de entrega del expediente SICT a la Procuraduría Agraria. Pago DEBERÁ pertenecer a indemnización y registrar fecha, monto, beneficiario, referencia/evidencia y observaciones. La cadena canónica será `Pago -> Indemnizacion -> Afectacion -> ProyectoNucleo`.
 
 ### R12. Dashboard y reportes
 
@@ -80,8 +82,16 @@ El sistema DEBERÁ mantener PostgreSQL/PostGIS para trazo ferroviario de proyect
 
 ### R14. Seguridad y auditoría
 
-El sistema DEBERÁ conservar roles, auditoría de cambios, integridad relacional y soporte documental. El alcance territorial objetivo DEBERÁ reauditarse por proyecto u otro alcance aprobado, no por `usuario_tramo` como requisito funcional.
+El sistema DEBERÁ conservar roles, auditoría de cambios, integridad relacional y soporte documental. La autorización vigente DEBERÁ ser por proyecto mediante `usuario_proyecto`; `usuario_tramo` fue retirado y no es requisito funcional.
+
+### R15. Documentos
+
+Los documentos DEBERÁN tener identidad lógica y versiones inmutables. DEBERÁN conservar fecha propia del documento (`fecha_documento`) y número de oficio/folio (`numero_folio`), independientes de la fecha de carga del archivo.
 
 ## Requisitos negativos explícitos
 
 El modelo objetivo NO DEBERÁ exigir Proyecto -> Tramo como jerarquía, `Tramo_Nucleo` como expediente maestro, afectación obligatoriamente vinculada a Tramo_Nucleo, geometría obligatoria de afectación, intersección espacial como gate, superficies oficiales calculadas por `ST_Area`, `afectacion_ciclo` como requisito funcional ni autorización obligatoria por `usuario_tramo`.
+
+## Decisiones funcionales pendientes
+
+La auditoría de cobertura del 2026-08-26 no reporta `FALTA_UI`, `FALTA_API`, `FALTA_BACKEND` ni `FALTA_MODELO`. Persisten 6 apariciones del encabezado `VALIDACIÓN PA/SICT` clasificadas como `DECISION_FUNCIONAL_REQUERIDA`: la fuente no define actor, resultado, catálogo ni momento del proceso. No se declaran implementadas ni se les asigna significado hasta que el área dueña lo defina.

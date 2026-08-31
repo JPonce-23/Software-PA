@@ -1,8 +1,8 @@
 # Descripción proceso - Modelo funcional objetivo
 
-> Estado: documento canónico del proceso objetivo.  
-> Fecha de actualización: 2026-08-25.  
-> Alcance: especificación funcional; no describe todavía la base de datos implementada.
+> Estado: documento canónico del proceso objetivo, alineado con el esquema 035.  
+> Fecha de actualización: 2026-08-31.  
+> Alcance: especificación funcional del proceso administrativo; la implementación técnica se describe en `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md`.
 
 ## Principio rector
 
@@ -44,10 +44,10 @@ La ruta individual es `Proyecto -> Entidad -> Municipio -> Núcleo -> Parcela ->
 3. Capturar sensibilización y caminamiento cuando existan.
 4. Crear una afectación colectiva sin exigir parcela.
 5. Registrar avalúo simple si existe en fuente.
-6. Registrar en ProyectoNucleo la asamblea colectiva y RAN del acta; una misma asamblea puede autorizar varios convenios/afectaciones.
+6. Registrar en ProyectoNucleo la asamblea colectiva y RAN del acta; una misma asamblea puede autorizar varios convenios/afectaciones. El `tipo_asamblea` clasifica el acto formal; `contexto_proceso` identifica el motivo operativo (COP, modificatorio, etc.) sin sustituir al tipo.
 7. Registrar uno o más convenios: COP original, modificatorio, superficie adicional u obras complementarias.
-8. Registrar RAN del convenio; relacionar el trámite FIFONAFE con las afectaciones cubiertas cuando corresponda.
-9. Registrar indemnización por afectación y sus pagos, sin exigir que FIFONAFE sea el padre.
+8. Registrar RAN del convenio; relacionar el trámite FIFONAFE (con fecha de acuse cuando exista) con las afectaciones cubiertas cuando corresponda.
+9. Registrar indemnización por afectación (incluyendo fecha de entrega del expediente SICT a la PA cuando aplique) y sus pagos, sin exigir que FIFONAFE sea el padre.
 
 Una ruta colectiva puede no aplicar por no afectación de uso común sin bloquear automáticamente una ruta individual.
 
@@ -58,8 +58,8 @@ Una ruta colectiva puede no aplicar por no afectación de uso común sin bloquea
 3. Registrar titulares, certificado parcelario, folio de derechos y constancia de vigencia.
 4. Crear afectación individual con superficie administrativa capturada.
 5. Registrar convenios: COP original, modificatorio, ampliación o ampliación remanente.
-6. Registrar RAN del convenio y relacionar, cuando corresponda, un trámite FIFONAFE que puede cubrir afectaciones de varias parcelas.
-7. Registrar indemnización por afectación y sus pagos, sin exigir que FIFONAFE sea el padre.
+6. Registrar RAN del convenio y relacionar, cuando corresponda, un trámite FIFONAFE (con fecha de acuse cuando exista) que puede cubrir afectaciones de varias parcelas.
+7. Registrar indemnización por afectación (incluyendo fecha de entrega del expediente SICT a la PA cuando aplique) y sus pagos, sin exigir que FIFONAFE sea el padre.
 
 La parcela puede no tener geometría. Esa ausencia no impide seguimiento, consulta ni captura documental.
 
@@ -85,7 +85,7 @@ FIFONAFE pertenece a ProyectoNucleo, distingue ámbito colectivo/individual y pu
 
 No crear módulos objetivo para análisis preliminar, revisión social, revisión jurídica, revisión registral general, acercamiento inicial, identificación preliminar u otras etapas del flujograma sin campos necesarios de captura en los Excel.
 
-`afectacion_ciclo` pertenece a la implementación vigente y no es requisito funcional objetivo. El linaje se preserva con tipo de convenio, consecutivo/version, `id_convenio_padre`, contexto de actividad, `convenio_afectacion`, la referencia opcional del convenio a su asamblea y los vínculos de FIFONAFE con afectaciones.
+`afectacion_ciclo` es un concepto histórico/legacy retirado físicamente en la migración 031; NO forma parte del modelo vigente ni del dominio funcional actual. El linaje se preserva con tipo de convenio, consecutivo/version, `id_convenio_padre`, contexto de actividad, `convenio_afectacion`, la referencia opcional del convenio a su asamblea y los vínculos de FIFONAFE con afectaciones.
 
 ## Geoespacial
 

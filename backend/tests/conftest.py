@@ -10,9 +10,14 @@ from fastapi.testclient import TestClient
 def _assert_isolated_database() -> None:
     environment = os.getenv("APP_ENV", "").strip().lower()
     database = os.getenv("DB_NAME", "").strip().lower()
-    if environment != "test" or "_test" not in database:
+    explicitly_authorized = os.getenv("TEST_ALLOW_DATABASE", "").strip().lower()
+    database_is_authorized = "_test" in database or (
+        explicitly_authorized and database == explicitly_authorized
+    )
+    if environment != "test" or not database_is_authorized:
         raise RuntimeError(
-            "pytest requires APP_ENV=test and an isolated DB_NAME containing '_test'"
+            "pytest requires APP_ENV=test and either an isolated DB_NAME containing "
+            "'_test' or an exact TEST_ALLOW_DATABASE opt-in"
         )
 
 

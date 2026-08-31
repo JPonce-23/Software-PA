@@ -1,8 +1,8 @@
 # Arquitectura actual de SOFTWARE-PA
 
 > Rama verificada: `feature/backend-logica`
-> Esquema vigente: migraciones `001` a `035`
-> Última validación: 2026-08-25
+> Esquema vigente: migraciones `001` a `036`
+> Última validación: 2026-08-31
 > Fuente de verdad: SQL aplicado, modelos SQLAlchemy, contratos Pydantic, API, frontend y pruebas del repositorio.
 
 ## 1. Estado implementado
@@ -17,12 +17,14 @@ Proyecto
 ├── TrazoProyecto (MULTILINESTRING 4326)
 └── ProyectoNucleo
     ├── Referencias históricas
+    ├── Responsables sucesivos
     ├── Actividades de campo
-    ├── Asambleas colectivas
-    ├── Afectaciones colectivas
+    ├── Asambleas -> Convocatorias -> Trámites/eventos RAN
+    ├── Afectaciones -> Bienes agrarios
     ├── Parcelas del núcleo -> Afectaciones individuales
     ├── Convenios <-> Afectaciones
-    └── FIFONAFE <-> Afectaciones
+    ├── Convenios -> Trámites/eventos RAN
+    └── FIFONAFE -> Eventos <-> Afectaciones
                          └── Indemnización -> Pagos
 ```
 
@@ -48,14 +50,16 @@ La salud se expone en `/health` y devuelve la versión efectiva del esquema. Fas
 
 - `entidad_federativa` y `municipio`: catálogo territorial reproducible de 32 entidades y 2,478 municipios/alcaldías activos, con claves naturales INEGI.
 - `proyecto`: proyecto administrativo.
-- `nucleo_agrario`: núcleo con municipio, tipo ejido/comunidad y geometría `MULTIPOLYGON(4326)` opcional.
+- `catalogo_operativo` y `catalogo_operativo_alias`: opciones administrables, códigos estables, etiquetas editables, aliases, vigencia y baja lógica. Incluyen tenencia, residencia, gestión, COP operativo, destino, estructura/estado ORV, asamblea, RAN, FIFONAFE y checklist documental.
+- `nucleo_agrario`: núcleo con municipio, tipo de tenencia catalogado, comunidad indígena trivalente (`NULL`, sí, no) y geometría `MULTIPOLYGON(4326)` opcional.
 - `proyecto_nucleo`: contexto canónico; existe como máximo uno activo por proyecto y núcleo.
 - `proyecto_nucleo_referencia`: consecutivo, clave/numero de tramo u otra referencia. Admite varias por tipo y una principal activa por tipo.
+- `proyecto_nucleo_responsable`: historial 1:N de nombre, cargo y contacto, sin obligar a que el responsable sea usuario.
 
 ### 3.2 Representación, padrón y parcelas
 
-- `persona`, `orv`, `orv_integrante`: personas y órganos de representación del núcleo.
-- `padron_historial`: cortes históricos de ejidatarios/comuneros.
+- `persona`, `orv`, `orv_integrante`: personas y órganos históricos del núcleo; órgano, cargo y calidad propietario/suplente se normalizan con catálogo.
+- `padron_historial`: cortes históricos de ejidatarios/comuneros con fuente y documento.
 - `parcela`, `parcela_titular`: unidad individual, titulares y geometría opcional `MULTIPOLYGON(4326)`.
 
 La falta de geometría de parcela no bloquea una afectación, convenio, trámite o pago.
@@ -63,10 +67,13 @@ La falta de geometría de parcela no bloquea una afectación, convenio, trámite
 ### 3.3 Hechos administrativos
 
 - `actividad_campo`: sensibilización o caminamiento de `ProyectoNucleo`, con contexto, programación y realización.
-- `afectacion`: colectiva sin parcela o individual con parcela del mismo núcleo.
-- `asamblea`: hecho colectivo de `ProyectoNucleo`; separa el tipo jurídico de su `contexto_proceso`, puede autorizar varios convenios y no depende de una afectación.
+- `afectacion`: derecho colectivo o individual. La individual exige parcela; la colectiva puede tener una referencia o FK de parcela porque el ámbito depende de la titularidad, no de `tipo_gestion`.
+- `bien_afectado`: unidades 1:N con tipo de gestión, destino, COP operativo, referencia alfanumérica, titularidad, detalle y superficie administrativa con valor/formato original.
+- `asamblea`: hecho colectivo de `ProyectoNucleo`; separa tipo jurídico y contexto mediante catálogos, puede autorizar varios convenios y referenciar un padrón del mismo núcleo.
+- `asamblea_convocatoria`: intentos 1:N, ordinales y resultados explícitos; permite celebrada, no verificativo, cancelada y reprogramada, con documento.
 - `convenio`: instrumento repetible; se asocia a afectaciones exclusivamente por `convenio_afectacion`.
-- `tramite_fifonafe`: trámite colectivo o individual de `ProyectoNucleo`, con fecha de acuse y sus cuatro pares oficio/fecha; su cobertura se expresa en `tramite_fifonafe_afectacion`.
+- `tramite_ran` y `tramite_ran_evento`: expediente registral tipado con FK fuerte a una asamblea, convenio u ORV y secuencia 1:N de ingresos, reingresos, prevenciones, correcciones, desistimientos, calificaciones e inscripciones.
+- `tramite_fifonafe` y `tramite_fifonafe_evento`: trámite y correspondencia repetible; su cobertura N:M permanece en `tramite_fifonafe_afectacion`.
 - `indemnizacion`: máximo una activa por afectación; registra la entrega del expediente SICT–PA.
 - `pago`: uno o varios pagos por indemnización.
 
@@ -77,7 +84,9 @@ Los triggers diferidos validan que las asociaciones N:M mantengan `ProyectoNucle
 - `documento`: identidad lógica del documento con fecha propia y número de oficio/folio.
 - `documento_version`: versión inmutable con SHA-256, tamaño, MIME, ruta y usuario de carga.
 - `documento_vinculo`: vínculo controlado a un tipo de entidad permitido; un trigger comprueba la existencia del objetivo.
-- `trazabilidad_fuente`: archivo, hoja, celda, valor original y tratamiento de la fuente.
+- `requisito_documental` y `expediente_requisito`: checklist administrable e histórico; el documento disponible se vincula sin sustituir el estado del requisito.
+- `importacion_tabular` e `importacion_tabular_celda`: archivo Excel, SHA-256, hoja/fila/columna, valor original/normalizado, tratamiento y mensajes. Se mantienen separados de `importacion_feature`, que continúa siendo exclusivamente GIS.
+- `trazabilidad_fuente`: vínculo del dato importado con su registro tabular, valor normalizado y mensajes.
 - `bitacora`: cambios con actor y contexto de proyecto/núcleo.
 
 Las tablas funcionales usan baja lógica (`activo`, fecha, usuario y motivo de baja), auditoría de creación/actualización y triggers que impiden `DELETE` físico.
@@ -96,6 +105,7 @@ Los únicos objetivos de confirmación son `trazo_proyecto`, `nucleo_agrario` y 
 - `vw_orv_estado`: vigencia derivada del ORV.
 - `vw_proyecto_nucleo_resumen`: jerarquía territorial y conteos del expediente.
 - `vw_dashboard_kpi`: hechos agregados por proyecto, año e indicador.
+- `vw_convenio_tipo_cop_operativo`: proyección de convenio jurídico + consecutivo a ORIGEN, ADICIONAL, 2A ADICIONAL y futuras secuencias, sin inventar tipos jurídicos.
 
 El dashboard agrega cada familia antes de combinarla. Convenios, coberturas FIFONAFE y pagos N:M no se unen en un producto cartesiano. Las superficies provienen de campos administrativos capturados.
 
@@ -149,6 +159,7 @@ Los flujos principales son:
 - `033_dashboard_modelo_objetivo.sql`: vistas objetivo y KPI.
 - `034_separacion_usuario_runtime_postgresql.sql`: separación owner/runtime, cierre de PUBLIC y default privileges no destructivos.
 - `035_completitud_seguimiento_operativo.sql`: tipo/contexto de Asamblea y metadatos operativos/documentales confirmados por Excel.
+- `036_modelo_operativo_excel_colectivo.sql`: catálogos administrables, datos generales normalizados, bienes, convocatorias, RAN/FIFONAFE repetibles, checklist y trazabilidad tabular. Conserva temporalmente campos legacy como proyección de compatibilidad; su retiro está previsto para una migración posterior a la adaptación completa del frontend (objetivo 038).
 
 031 y 032 adquieren advisory lock y abortan antes del DDL si faltan entorno autorizado, confirmación destructiva o respaldo verificado. Las migraciones 001-030 permanecen intactas.
 
@@ -158,7 +169,7 @@ El fixture territorial está separado del seed demo, ordenado de forma determini
 
 La implementación se valida mediante:
 
-- construcción limpia real `001 -> 004...030 -> 031 -> 032 -> 033 -> 034 -> 035`;
+- construcción limpia contractual `001` (línea base consolidada que ya incorpora 002/003) `-> fixture territorial -> 004...035 -> 036`, y actualización incremental `035 -> 036`;
 - migración desde un respaldo equivalente a 030;
 - pruebas de rollback inducido de los gates 031/032;
 - contrato SQL de tablas, constraints, triggers, ausencia legacy, catálogo y KPI del seed;

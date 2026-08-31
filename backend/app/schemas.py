@@ -130,6 +130,32 @@ class MunicipioResponse(ORMModel):
     activo: bool
 
 
+class CatalogoOperativoCreate(AuditInput):
+    tipo_catalogo: str = Field(min_length=1, max_length=50)
+    codigo: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$", max_length=80)
+    nombre: str = Field(min_length=1, max_length=250)
+    descripcion: str | None = None
+    orden: int = 0
+    fuente: str | None = Field(default=None, max_length=250)
+    vigencia_inicio: date | None = None
+    vigencia_fin: date | None = None
+
+
+class CatalogoOperativoUpdate(AuditInput):
+    nombre: str | None = Field(default=None, min_length=1, max_length=250)
+    descripcion: str | None = None
+    orden: int | None = None
+    fuente: str | None = Field(default=None, max_length=250)
+    vigencia_inicio: date | None = None
+    vigencia_fin: date | None = None
+    activo: bool | None = None
+    motivo_baja: str | None = Field(default=None, max_length=500)
+
+
+class CatalogoOperativoResponse(CatalogoOperativoCreate, AuditRead):
+    id_catalogo_opcion: int
+
+
 class ProyectoCreate(AuditInput):
     clave_proyecto: str = Field(min_length=1, max_length=30)
     nombre_proyecto: str = Field(min_length=1, max_length=200)
@@ -158,18 +184,26 @@ class ProyectoResponse(ProyectoCreate, AuditRead):
 class NucleoAgrarioCreate(AuditInput):
     id_municipio: int = Field(gt=0)
     nombre_nucleo: str = Field(min_length=1, max_length=300)
-    tipo_nucleo: Literal["ejido", "comunidad"]
-    comunidad_indigena: bool = False
+    id_tipo_tenencia: int | None = Field(default=None, gt=0)
+    tipo_nucleo: str | None = Field(default=None, max_length=20)
+    comunidad_indigena: bool | None = None
     fuente_datos: str | None = Field(default=None, max_length=120)
     id_entidad_fuente: str | None = Field(default=None, max_length=120)
     id_municipio_fuente: str | None = Field(default=None, max_length=120)
     id_nucleo_fuente: str | None = Field(default=None, max_length=120)
     alcance_identidad_fuente: str | None = Field(default=None, max_length=20)
 
+    @model_validator(mode="after")
+    def validar_tenencia(self):
+        if self.id_tipo_tenencia is None and not self.tipo_nucleo:
+            raise ValueError("Se requiere id_tipo_tenencia")
+        return self
+
 
 class NucleoAgrarioUpdate(AuditInput):
     nombre_nucleo: str | None = Field(default=None, min_length=1, max_length=300)
-    tipo_nucleo: Literal["ejido", "comunidad"] | None = None
+    id_tipo_tenencia: int | None = Field(default=None, gt=0)
+    tipo_nucleo: str | None = Field(default=None, max_length=20)
     comunidad_indigena: bool | None = None
     fuente_datos: str | None = Field(default=None, max_length=120)
 
@@ -203,14 +237,18 @@ class ProyectoNucleoReferenciaUpdate(AuditInput):
 
 class ProyectoNucleoCreate(AuditInput):
     id_nucleo: int = Field(gt=0)
+    id_residencia: int | None = Field(default=None, gt=0)
     residencia: str | None = Field(default=None, max_length=300)
+    total_cops_planeados: int | None = Field(default=None, ge=0)
     responsable_nombre: str | None = Field(default=None, max_length=300)
     contacto: str | None = Field(default=None, max_length=150)
     referencias: list[ProyectoNucleoReferenciaCreate] = Field(default_factory=list)
 
 
 class ProyectoNucleoUpdate(AuditInput):
+    id_residencia: int | None = Field(default=None, gt=0)
     residencia: str | None = Field(default=None, max_length=300)
+    total_cops_planeados: int | None = Field(default=None, ge=0)
     responsable_nombre: str | None = Field(default=None, max_length=300)
     contacto: str | None = Field(default=None, max_length=150)
 
@@ -235,6 +273,29 @@ class ProyectoNucleoResponse(ProyectoNucleoUpdate, AuditRead):
     parcelas: int = 0
     convenios: int = 0
     tramites_fifonafe: int = 0
+
+
+class ProyectoNucleoResponsableCreate(AuditInput):
+    nombre: str = Field(min_length=1, max_length=300)
+    cargo: str | None = Field(default=None, max_length=200)
+    contacto: str | None = Field(default=None, max_length=200)
+    vigencia_inicio: date | None = None
+    vigencia_fin: date | None = None
+    es_principal: bool = False
+
+
+class ProyectoNucleoResponsableUpdate(AuditInput):
+    nombre: str | None = Field(default=None, min_length=1, max_length=300)
+    cargo: str | None = Field(default=None, max_length=200)
+    contacto: str | None = Field(default=None, max_length=200)
+    vigencia_inicio: date | None = None
+    vigencia_fin: date | None = None
+    es_principal: bool | None = None
+
+
+class ProyectoNucleoResponsableResponse(ProyectoNucleoResponsableCreate, AuditRead):
+    id_responsable: int
+    id_proyecto_nucleo: int
 
 
 class PersonaCreate(AuditInput):
@@ -269,6 +330,7 @@ class OrvCreate(AuditInput):
     inicio_vigencia: date | None = None
     fin_vigencia: date | None = None
     estatus_fuente: str | None = Field(default=None, max_length=80)
+    id_estado_registral: int | None = Field(default=None, gt=0)
     acta_eleccion_inscrita_ran: bool | None = None
     fecha_inscripcion_acta_ran: date | None = None
 
@@ -285,9 +347,21 @@ class OrvResponse(OrvCreate, AuditRead):
 
 class OrvIntegranteCreate(AuditInput):
     id_persona: int = Field(gt=0)
-    cargo: str = Field(min_length=1, max_length=80)
+    cargo: str | None = Field(default=None, min_length=1, max_length=80)
+    id_organo: int | None = Field(default=None, gt=0)
+    id_cargo: int | None = Field(default=None, gt=0)
+    id_calidad: int | None = Field(default=None, gt=0)
     fecha_inicio: date | None = None
     fecha_fin: date | None = None
+
+    @model_validator(mode="after")
+    def validar_estructura(self):
+        ids = (self.id_organo, self.id_cargo, self.id_calidad)
+        if any(item is not None for item in ids) and not all(item is not None for item in ids):
+            raise ValueError("Órgano, cargo y calidad deben capturarse juntos")
+        if not self.cargo and not all(item is not None for item in ids):
+            raise ValueError("Se requiere estructura ORV normalizada")
+        return self
 
 
 class OrvIntegranteResponse(OrvIntegranteCreate, AuditRead):
@@ -305,6 +379,9 @@ class OrvIntegranteDetailResponse(OrvIntegranteResponse):
 
 class OrvIntegranteUpdate(AuditInput):
     cargo: str | None = Field(default=None, min_length=1, max_length=80)
+    id_organo: int | None = Field(default=None, gt=0)
+    id_cargo: int | None = Field(default=None, gt=0)
+    id_calidad: int | None = Field(default=None, gt=0)
     fecha_inicio: date | None = None
     fecha_fin: date | None = None
 
@@ -312,6 +389,8 @@ class OrvIntegranteUpdate(AuditInput):
 class PadronHistorialCreate(AuditInput):
     fecha_padron: date | None = None
     numero_ejidatarios_comuneros: int | None = Field(default=None, ge=0)
+    fuente: str | None = Field(default=None, max_length=250)
+    id_documento: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def validar_datos(self):
@@ -328,6 +407,8 @@ class PadronHistorialResponse(PadronHistorialCreate, AuditRead):
 class PadronHistorialUpdate(AuditInput):
     fecha_padron: date | None = None
     numero_ejidatarios_comuneros: int | None = Field(default=None, ge=0)
+    fuente: str | None = Field(default=None, max_length=250)
+    id_documento: int | None = Field(default=None, gt=0)
 
 
 class ParcelaCreate(AuditInput):
@@ -427,8 +508,6 @@ class AfectacionCreate(AuditInput):
 
     @model_validator(mode="after")
     def validar_ambito(self):
-        if self.tipo_afectacion == "colectivo" and self.id_parcela is not None:
-            raise ValueError("Una afectación colectiva no admite parcela")
         if self.tipo_afectacion == "individual" and self.id_parcela is None:
             raise ValueError("Una afectación individual requiere parcela")
         if self.condicion_especial == "otro" and not (
@@ -462,24 +541,71 @@ class AfectacionResponse(AfectacionCreate, AuditRead):
     id_proyecto_nucleo: int
 
 
+class BienAfectadoCreate(AuditInput):
+    id_tipo_gestion: int | None = Field(default=None, gt=0)
+    id_destino_superficie: int | None = Field(default=None, gt=0)
+    id_tipo_cop_operativo: int | None = Field(default=None, gt=0)
+    id_parcela: int | None = Field(default=None, gt=0)
+    tipo_tierra: str | None = Field(default=None, max_length=120)
+    referencia_alfanumerica: str | None = Field(default=None, max_length=150)
+    titularidad: str | None = Field(default=None, max_length=250)
+    detalle: str | None = None
+    superficie_preliminar_ha: Decimal | None = Field(default=None, ge=0)
+    superficie_afectada_ha: Decimal | None = Field(default=None, ge=0)
+    superficie_valor_original: str | None = Field(default=None, max_length=120)
+    superficie_formato_origen: str | None = Field(default=None, max_length=50)
+    fuente: str | None = Field(default=None, max_length=250)
+
+    @model_validator(mode="after")
+    def validar_identidad_bien(self):
+        if not any((self.id_tipo_gestion, self.id_destino_superficie, self.id_parcela,
+                    self.tipo_tierra, self.referencia_alfanumerica)):
+            raise ValueError("El bien requiere gestión, destino, parcela, tierra o referencia")
+        return self
+
+
+class BienAfectadoUpdate(BienAfectadoCreate):
+    @model_validator(mode="after")
+    def validar_identidad_bien(self):
+        # En PATCH la identidad puede permanecer en los campos no enviados.
+        return self
+
+
+class BienAfectadoResponse(BienAfectadoCreate, AuditRead):
+    id_bien_afectado: int
+    id_afectacion: int
+
+
+class AsambleaConvocatoriaCreate(AuditInput):
+    ordinal: int = Field(gt=0)
+    fecha_expedicion: date | None = None
+    fecha_programada: date | None = None
+    fecha_realizacion: date | None = None
+    id_resultado: int | None = Field(default=None, gt=0)
+    observaciones_resultado: str | None = None
+    id_documento: int | None = Field(default=None, gt=0)
+
+
+class AsambleaConvocatoriaUpdate(AuditInput):
+    fecha_expedicion: date | None = None
+    fecha_programada: date | None = None
+    fecha_realizacion: date | None = None
+    id_resultado: int | None = Field(default=None, gt=0)
+    observaciones_resultado: str | None = None
+    id_documento: int | None = Field(default=None, gt=0)
+
+
+class AsambleaConvocatoriaResponse(AsambleaConvocatoriaCreate, AuditRead):
+    id_convocatoria: int
+    id_asamblea: int
+
+
 class AsambleaCreate(AuditInput):
     id_padron: int | None = Field(default=None, gt=0)
-    tipo_asamblea: Literal[
-        "anuencia",
-        "modificatorio",
-        "superficie_adicional",
-        "obras_complementarias",
-        "retiro_fondos",
-        "otra",
-    ]
-    contexto_proceso: Literal[
-        "cop_original",
-        "modificatorio",
-        "superficie_adicional",
-        "obras_complementarias",
-        "retiro_fondos",
-        "otro",
-    ] | None = None
+    id_tipo_asamblea: int | None = Field(default=None, gt=0)
+    id_contexto_asamblea: int | None = Field(default=None, gt=0)
+    tipo_asamblea: str | None = Field(default=None, max_length=40)
+    contexto_proceso: str | None = Field(default=None, max_length=40)
     proposito: str | None = None
     fecha_expedicion_primera: date | None = None
     fecha_programada_primera: date | None = None
@@ -492,22 +618,32 @@ class AsambleaCreate(AuditInput):
     numero_solicitud_ran: str | None = Field(default=None, max_length=120)
     calificacion_registral_ran: str | None = None
     fecha_inscripcion_ran: date | None = None
+    convocatorias: list[AsambleaConvocatoriaCreate] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validar_tipo_catalogado(self):
+        if self.id_tipo_asamblea is None and not self.tipo_asamblea:
+            raise ValueError("Se requiere id_tipo_asamblea")
+        if len({item.ordinal for item in self.convocatorias}) != len(self.convocatorias):
+            raise ValueError("Los ordinales de convocatoria no pueden repetirse")
+        return self
 
 
 class AsambleaUpdate(AsambleaCreate):
-    tipo_asamblea: Literal[
-        "anuencia",
-        "modificatorio",
-        "superficie_adicional",
-        "obras_complementarias",
-        "retiro_fondos",
-        "otra",
-    ] | None = None
+    convocatorias: list[AsambleaConvocatoriaCreate] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validar_tipo_catalogado(self):
+        # El tipo ya existe en la entidad; sólo se valida cuando se crea.
+        if len({item.ordinal for item in self.convocatorias}) != len(self.convocatorias):
+            raise ValueError("Los ordinales de convocatoria no pueden repetirse")
+        return self
 
 
 class AsambleaResponse(AsambleaCreate, AuditRead):
     id_asamblea: int
     id_proyecto_nucleo: int
+    convocatorias: list[AsambleaConvocatoriaResponse] = Field(default_factory=list)
 
 
 class ConvenioCreate(AuditInput):
@@ -581,6 +717,70 @@ class ConvenioResponse(ConvenioCreate, AuditRead):
     afectaciones: list[ConvenioAfectacionResponse] = Field(default_factory=list)
 
 
+class TramiteRanEventoCreate(AuditInput):
+    ordinal: int = Field(gt=0)
+    id_tipo_evento: int = Field(gt=0)
+    fecha_evento: date | None = None
+    numero_solicitud: str | None = Field(default=None, max_length=150)
+    resultado: str | None = Field(default=None, max_length=250)
+    calificacion: str | None = None
+    folio_referencia: str | None = Field(default=None, max_length=200)
+    id_documento: int | None = Field(default=None, gt=0)
+
+
+class TramiteRanEventoUpdate(AuditInput):
+    id_tipo_evento: int | None = Field(default=None, gt=0)
+    fecha_evento: date | None = None
+    numero_solicitud: str | None = Field(default=None, max_length=150)
+    resultado: str | None = Field(default=None, max_length=250)
+    calificacion: str | None = None
+    folio_referencia: str | None = Field(default=None, max_length=200)
+    id_documento: int | None = Field(default=None, gt=0)
+
+
+class TramiteRanEventoResponse(TramiteRanEventoCreate, AuditRead):
+    id_evento_ran: int
+    id_tramite_ran: int
+
+
+class TramiteRanCreate(AuditInput):
+    id_asamblea: int | None = Field(default=None, gt=0)
+    id_convenio: int | None = Field(default=None, gt=0)
+    id_orv: int | None = Field(default=None, gt=0)
+    fecha_programada_ingreso: date | None = None
+    referencia_expediente: str | None = Field(default=None, max_length=150)
+    eventos: list[TramiteRanEventoCreate] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validar_objetivo(self):
+        if sum(item is not None for item in (self.id_asamblea,self.id_convenio,self.id_orv)) != 1:
+            raise ValueError("El trámite RAN requiere exactamente un objetivo tipado")
+        if len({item.ordinal for item in self.eventos}) != len(self.eventos):
+            raise ValueError("Los ordinales RAN no pueden repetirse")
+        return self
+
+
+class TramiteRanResponse(TramiteRanCreate, AuditRead):
+    id_tramite_ran: int
+    id_proyecto_nucleo: int
+    eventos: list[TramiteRanEventoResponse] = Field(default_factory=list)
+
+
+class TramiteFifonafeEventoCreate(AuditInput):
+    ordinal: int = Field(gt=0)
+    id_tipo_evento: int = Field(gt=0)
+    origen: str | None = Field(default=None, max_length=200)
+    destino: str | None = Field(default=None, max_length=200)
+    numero_oficio: str | None = Field(default=None, max_length=150)
+    fecha_oficio: date | None = None
+    id_documento: int | None = Field(default=None, gt=0)
+
+
+class TramiteFifonafeEventoResponse(TramiteFifonafeEventoCreate, AuditRead):
+    id_evento_fifonafe: int
+    id_tramite_fifonafe: int
+
+
 class TramiteFifonafeCreate(AuditInput):
     ids_afectacion: list[int] = Field(min_length=1)
     estatus: Literal["programado", "pendiente", "completo", "cancelado", "otro"] = "pendiente"
@@ -595,6 +795,7 @@ class TramiteFifonafeCreate(AuditInput):
     fecha_oficio_respuesta_dgaopr_a_fifonafe: date | None = None
     hay_conflictos: bool | None = None
     resultado_no_conflictos: str | None = None
+    eventos: list[TramiteFifonafeEventoCreate] = Field(default_factory=list)
 
     @field_validator("ids_afectacion")
     @classmethod
@@ -631,6 +832,7 @@ class TramiteFifonafeResponse(TramiteFifonafeUpdate, AuditRead):
     ambito: Ambito
     estatus: str
     afectaciones: list[TramiteFifonafeAfectacionResponse] = Field(default_factory=list)
+    eventos: list[TramiteFifonafeEventoResponse] = Field(default_factory=list)
 
 
 class IndemnizacionCreate(AuditInput):
@@ -710,19 +912,7 @@ class DocumentoUpdate(AuditInput):
 class DocumentoVinculoResponse(AuditRead):
     id_documento_vinculo: int
     id_documento: int
-    entidad_tipo: Literal[
-        "proyecto_nucleo",
-        "nucleo_agrario",
-        "orv",
-        "padron_historial",
-        "parcela",
-        "afectacion",
-        "asamblea",
-        "convenio",
-        "tramite_fifonafe",
-        "indemnizacion",
-        "pago",
-    ]
+    entidad_tipo: str
     entidad_id: int
 
 
@@ -743,6 +933,9 @@ class TrazabilidadFuenteCreate(BaseModel):
     fila: int | None = Field(default=None, gt=0)
     columna: str | None = Field(default=None, max_length=120)
     valor_original: str | None = None
+    valor_normalizado: str | None = None
+    mensajes: list[Any] = Field(default_factory=list)
+    id_importacion_tabular: int | None = Field(default=None, gt=0)
     tratamiento: Literal[
         "PERSISTIR",
         "DERIVAR",
@@ -759,6 +952,41 @@ class TrazabilidadFuenteResponse(TrazabilidadFuenteCreate, ORMModel):
     entidad_id: int
     registrado_en: datetime
     id_usuario_registro: int | None = None
+
+
+class RequisitoDocumentalCreate(AuditInput):
+    codigo: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]*$", max_length=80)
+    nombre: str = Field(min_length=1, max_length=250)
+    descripcion: str | None = None
+    contexto: str = Field(default="general", min_length=1, max_length=80)
+    obligatorio: bool = False
+    orden: int = 0
+    fuente: str | None = Field(default=None, max_length=250)
+    vigencia_inicio: date | None = None
+    vigencia_fin: date | None = None
+
+
+class RequisitoDocumentalResponse(RequisitoDocumentalCreate, AuditRead):
+    id_requisito: int
+
+
+class ExpedienteRequisitoCreate(AuditInput):
+    id_afectacion: int | None = Field(default=None, gt=0)
+    id_requisito: int = Field(gt=0)
+    id_estado: int = Field(gt=0)
+    id_documento: int | None = Field(default=None, gt=0)
+    detalle: str | None = None
+
+
+class ExpedienteRequisitoUpdate(AuditInput):
+    id_estado: int | None = Field(default=None, gt=0)
+    id_documento: int | None = Field(default=None, gt=0)
+    detalle: str | None = None
+
+
+class ExpedienteRequisitoResponse(ExpedienteRequisitoCreate, AuditRead):
+    id_expediente_requisito: int
+    id_proyecto_nucleo: int
 
 
 class UsuarioProyectoCreate(BaseModel):

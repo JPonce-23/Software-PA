@@ -32,3 +32,14 @@ backend/seed_data/
 
 # Fuentes de trabajo locales — no versionar
 fuentes_locales/
+
+# pg_dump TOC / list files
+*.list
+
+# Archivos scratch locales de BD
+backend/schema_dump.txt
+backend/schema_info.json
+backend/excel_info.json
+backend/excel.xlsx
+backend/check_schema.py
+backend/extract.py

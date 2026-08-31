@@ -26,6 +26,70 @@ from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_c
 T = TypeVar("T")
 
 
+def require_catalog_option(
+    db: Session,
+    catalog_type: str,
+    *,
+    option_id: int | None = None,
+    code: str | None = None,
+    required: bool = False,
+) -> models.CatalogoOperativo | None:
+    query = db.query(models.CatalogoOperativo).filter(
+        models.CatalogoOperativo.tipo_catalogo == catalog_type,
+        models.CatalogoOperativo.activo.is_(True),
+    )
+    if option_id is not None:
+        query = query.filter(models.CatalogoOperativo.id_catalogo_opcion == option_id)
+    elif code:
+        query = query.filter(models.CatalogoOperativo.codigo == code)
+    elif not required:
+        return None
+    else:
+        raise HTTPException(status_code=422, detail=f"Se requiere catálogo {catalog_type}")
+    option = query.first()
+    if option is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Opción activa inválida para el catálogo {catalog_type}",
+        )
+    return option
+
+
+def _catalog_id(db: Session, catalog_type: str, code: str) -> int:
+    return require_catalog_option(
+        db, catalog_type, code=code, required=True
+    ).id_catalogo_opcion
+
+
+def create_catalog_option(
+    db: Session, data: schemas.CatalogoOperativoCreate, user: models.Usuario
+) -> models.CatalogoOperativo:
+    entity = models.CatalogoOperativo(
+        **data.model_dump(exclude={"observaciones"}),
+        **_audit_values(user.id_usuario, data),
+    )
+    return _persist(db, entity, user.id_usuario, "El código de catálogo ya existe")
+
+
+def update_catalog_option(
+    db: Session,
+    entity: models.CatalogoOperativo,
+    data: schemas.CatalogoOperativoUpdate,
+    user: models.Usuario,
+) -> models.CatalogoOperativo:
+    values = data.model_dump(exclude_unset=True, exclude={"observaciones", "motivo_baja"})
+    set_audit_context(db, user.id_usuario)
+    if values.pop("activo", None) is False and entity.activo:
+        mark_inactive(entity, user.id_usuario, data.motivo_baja or "Desactivación administrativa")
+    for key, value in values.items():
+        setattr(entity, key, value)
+    entity.actualizado_en = datetime.now(timezone.utc)
+    entity.actualizado_por = user.id_usuario
+    commit_or_conflict(db, "No fue posible actualizar el catálogo")
+    db.refresh(entity)
+    return entity
+
+
 def _audit_values(user_id: int, data: schemas.BaseModel | None = None) -> dict[str, Any]:
     values = {"creado_por": user_id}
     if data is not None and hasattr(data, "observaciones"):
@@ -68,11 +132,46 @@ def create_project(
 def create_nucleus(
     db: Session, data: schemas.NucleoAgrarioCreate, user: models.Usuario
 ) -> models.NucleoAgrario:
+    option = require_catalog_option(
+        db,
+        "tipo_tenencia",
+        option_id=data.id_tipo_tenencia,
+        code=data.tipo_nucleo,
+        required=True,
+    )
+    values = data.model_dump(exclude={"observaciones", "id_tipo_tenencia", "tipo_nucleo"})
     entity = models.NucleoAgrario(
-        **data.model_dump(exclude={"observaciones"}),
+        **values,
+        id_tipo_tenencia=option.id_catalogo_opcion,
+        tipo_nucleo=option.codigo,
         **_audit_values(user.id_usuario, data),
     )
     return _persist(db, entity, user.id_usuario, "El núcleo agrario ya existe")
+
+
+def update_nucleus(
+    db: Session,
+    entity: models.NucleoAgrario,
+    data: schemas.NucleoAgrarioUpdate,
+    user: models.Usuario,
+) -> models.NucleoAgrario:
+    values = data.model_dump(exclude_unset=True, exclude={"observaciones"})
+    if "id_tipo_tenencia" in values or "tipo_nucleo" in values:
+        option = require_catalog_option(
+            db, "tipo_tenencia",
+            option_id=values.pop("id_tipo_tenencia", None),
+            code=values.pop("tipo_nucleo", None), required=True,
+        )
+        values["id_tipo_tenencia"] = option.id_catalogo_opcion
+        values["tipo_nucleo"] = option.codigo
+    set_audit_context(db, user.id_usuario)
+    for key, value in values.items():
+        setattr(entity, key, value)
+    entity.actualizado_en = datetime.now(timezone.utc)
+    entity.actualizado_por = user.id_usuario
+    commit_or_conflict(db, "El núcleo o su tenencia no son válidos")
+    db.refresh(entity)
+    return entity
 
 
 def update_nucleus_geometry(
@@ -110,10 +209,15 @@ def create_project_nucleus(
     if nucleus is None:
         raise HTTPException(status_code=404, detail="Núcleo no encontrado")
     set_audit_context(db, user.id_usuario)
+    residence = require_catalog_option(
+        db, "residencia", option_id=data.id_residencia, required=False
+    )
     record = models.ProyectoNucleo(
         id_proyecto=project_id,
         id_nucleo=data.id_nucleo,
-        residencia=data.residencia,
+        id_residencia=residence.id_catalogo_opcion if residence else None,
+        residencia=residence.nombre if residence else data.residencia,
+        total_cops_planeados=data.total_cops_planeados,
         responsable_nombre=data.responsable_nombre,
         contacto=data.contacto,
         **_audit_values(user.id_usuario, data),
@@ -138,6 +242,29 @@ def create_project_nucleus(
         ) from exc
     db.refresh(record)
     return record
+
+
+def update_project_nucleus(
+    db: Session,
+    entity: models.ProyectoNucleo,
+    data: schemas.ProyectoNucleoUpdate,
+    user: models.Usuario,
+) -> models.ProyectoNucleo:
+    values = data.model_dump(exclude_unset=True, exclude={"observaciones"})
+    if "id_residencia" in values:
+        option = require_catalog_option(
+            db, "residencia", option_id=values.pop("id_residencia"), required=False
+        )
+        values["id_residencia"] = option.id_catalogo_opcion if option else None
+        values["residencia"] = option.nombre if option else values.get("residencia")
+    set_audit_context(db, user.id_usuario)
+    for key, value in values.items():
+        setattr(entity, key, value)
+    entity.actualizado_en = datetime.now(timezone.utc)
+    entity.actualizado_por = user.id_usuario
+    commit_or_conflict(db, "El expediente o su residencia no son válidos")
+    db.refresh(entity)
+    return entity
 
 
 def add_reference(
@@ -176,6 +303,36 @@ def add_reference(
     return reference
 
 
+def create_responsible(
+    db: Session,
+    project_nucleus_id: int,
+    data: schemas.ProyectoNucleoResponsableCreate,
+    user: models.Usuario,
+) -> models.ProyectoNucleoResponsable:
+    require_project_nucleus_access(db, user, project_nucleus_id, mode="capture")
+    set_audit_context(db, user.id_usuario)
+    if data.es_principal:
+        now = datetime.now(timezone.utc)
+        db.query(models.ProyectoNucleoResponsable).filter(
+            models.ProyectoNucleoResponsable.id_proyecto_nucleo == project_nucleus_id,
+            models.ProyectoNucleoResponsable.activo.is_(True),
+            models.ProyectoNucleoResponsable.es_principal.is_(True),
+        ).update(
+            {
+                models.ProyectoNucleoResponsable.es_principal: False,
+                models.ProyectoNucleoResponsable.actualizado_en: now,
+                models.ProyectoNucleoResponsable.actualizado_por: user.id_usuario,
+            },
+            synchronize_session=False,
+        )
+    entity = models.ProyectoNucleoResponsable(
+        id_proyecto_nucleo=project_nucleus_id,
+        **data.model_dump(exclude={"observaciones"}),
+        **_audit_values(user.id_usuario, data),
+    )
+    return _persist(db, entity, user.id_usuario, "El responsable no es válido")
+
+
 def create_person(
     db: Session, data: schemas.PersonaCreate, user: models.Usuario
 ) -> models.Persona:
@@ -195,12 +352,46 @@ def create_orv(
     project_nucleus = require_project_nucleus_access(
         db, user, project_nucleus_id, mode="capture"
     )
+    state_id = data.id_estado_registral
+    if state_id is None and data.acta_eleccion_inscrita_ran is not None:
+        code = "inscrita" if data.acta_eleccion_inscrita_ran else "no_ingresada"
+        state_id = require_catalog_option(
+            db, "estado_registral_orv", code=code, required=True
+        ).id_catalogo_opcion
+    values = data.model_dump(exclude={"observaciones", "id_estado_registral"})
     entity = models.Orv(
         id_nucleo=project_nucleus.id_nucleo,
-        **data.model_dump(exclude={"observaciones"}),
+        **values,
+        id_estado_registral=state_id,
         **_audit_values(user.id_usuario, data),
     )
     return _persist(db, entity, user.id_usuario, "El ORV activo se duplica")
+
+
+def update_orv(
+    db: Session,
+    entity: models.Orv,
+    data: schemas.OrvUpdate,
+    user: models.Usuario,
+) -> models.Orv:
+    values = data.model_dump(exclude_unset=True, exclude={"observaciones"})
+    if "id_estado_registral" in values:
+        option = require_catalog_option(
+            db, "estado_registral_orv", option_id=values["id_estado_registral"], required=False
+        )
+        values["id_estado_registral"] = option.id_catalogo_opcion if option else None
+    elif "acta_eleccion_inscrita_ran" in values and values["acta_eleccion_inscrita_ran"] is not None:
+        code = "inscrita" if values["acta_eleccion_inscrita_ran"] else "no_ingresada"
+        option = require_catalog_option(db, "estado_registral_orv", code=code, required=True)
+        values["id_estado_registral"] = option.id_catalogo_opcion
+    set_audit_context(db, user.id_usuario)
+    for key, value in values.items():
+        setattr(entity, key, value)
+    entity.actualizado_en = datetime.now(timezone.utc)
+    entity.actualizado_por = user.id_usuario
+    commit_or_conflict(db, "El ORV o su estado registral no son válidos")
+    db.refresh(entity)
+    return entity
 
 
 def add_orv_member(
@@ -333,6 +524,24 @@ def create_affectation(
     )
 
 
+def create_affected_asset(
+    db: Session,
+    affectation_id: int,
+    data: schemas.BienAfectadoCreate,
+    user: models.Usuario,
+) -> models.BienAfectado:
+    require_affectation_access(db, user, affectation_id, mode="capture")
+    entity = models.BienAfectado(
+        id_afectacion=affectation_id,
+        **data.model_dump(exclude={"observaciones"}),
+        **_audit_values(user.id_usuario, data),
+    )
+    return _persist(
+        db, entity, user.id_usuario,
+        "El bien, sus catálogos o su referencia de parcela no son válidos",
+    )
+
+
 def create_assembly(
     db: Session,
     project_nucleus_id: int,
@@ -340,14 +549,199 @@ def create_assembly(
     user: models.Usuario,
 ) -> models.Asamblea:
     require_project_nucleus_access(db, user, project_nucleus_id, mode="capture")
+    type_option = require_catalog_option(
+        db,
+        "tipo_asamblea",
+        option_id=data.id_tipo_asamblea,
+        code=data.tipo_asamblea,
+        required=True,
+    )
+    context_option = require_catalog_option(
+        db,
+        "contexto_asamblea",
+        option_id=data.id_contexto_asamblea,
+        code=data.contexto_proceso,
+        required=False,
+    )
+    values = data.model_dump(
+        exclude={
+            "observaciones", "convocatorias", "id_tipo_asamblea",
+            "id_contexto_asamblea", "tipo_asamblea", "contexto_proceso",
+        }
+    )
     entity = models.Asamblea(
         id_proyecto_nucleo=project_nucleus_id,
+        **values,
+        id_tipo_asamblea=type_option.id_catalogo_opcion,
+        id_contexto_asamblea=(context_option.id_catalogo_opcion if context_option else None),
+        tipo_asamblea=type_option.codigo,
+        contexto_proceso=context_option.codigo if context_option else None,
+        **_audit_values(user.id_usuario, data),
+    )
+    set_audit_context(db, user.id_usuario)
+    db.add(entity)
+    try:
+        db.flush()
+        convocations = list(data.convocatorias)
+        if not convocations:
+            legacy = (
+                (1, data.fecha_expedicion_primera, data.fecha_programada_primera),
+                (2, data.fecha_expedicion_segunda, data.fecha_programada_segunda),
+            )
+            convocations = [
+                schemas.AsambleaConvocatoriaCreate(
+                    ordinal=ordinal,
+                    fecha_expedicion=issued,
+                    fecha_programada=scheduled,
+                    fecha_realizacion=(data.fecha_realizada if ordinal == 2 or data.fecha_programada_segunda is None else None),
+                )
+                for ordinal, issued, scheduled in legacy if issued or scheduled
+            ]
+        for convocation in convocations:
+            db.add(models.AsambleaConvocatoria(
+                id_asamblea=entity.id_asamblea,
+                **convocation.model_dump(exclude={"observaciones"}),
+                **_audit_values(user.id_usuario, convocation),
+            ))
+        if any((
+            data.fecha_programada_ingreso_ran, data.fecha_ingreso_ran,
+            data.numero_solicitud_ran, data.calificacion_registral_ran,
+            data.fecha_inscripcion_ran,
+        )):
+            ran = models.TramiteRan(
+                id_proyecto_nucleo=project_nucleus_id,
+                id_asamblea=entity.id_asamblea,
+                fecha_programada_ingreso=data.fecha_programada_ingreso_ran,
+                creado_por=user.id_usuario,
+                observaciones="Creado desde contrato RAN legacy de Asamblea.",
+            )
+            db.add(ran)
+            db.flush()
+            ordinal = 0
+            if data.fecha_ingreso_ran or data.numero_solicitud_ran:
+                ordinal += 1
+                db.add(models.TramiteRanEvento(
+                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
+                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","ingreso"),
+                    fecha_evento=data.fecha_ingreso_ran,
+                    numero_solicitud=data.numero_solicitud_ran,
+                    creado_por=user.id_usuario,
+                ))
+            if data.calificacion_registral_ran:
+                ordinal += 1
+                db.add(models.TramiteRanEvento(
+                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
+                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","calificacion"),
+                    calificacion=data.calificacion_registral_ran,
+                    creado_por=user.id_usuario,
+                ))
+            if data.fecha_inscripcion_ran:
+                ordinal += 1
+                db.add(models.TramiteRanEvento(
+                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
+                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","inscripcion"),
+                    fecha_evento=data.fecha_inscripcion_ran,
+                    creado_por=user.id_usuario,
+                ))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="La asamblea, padrón o convocatorias no son válidos") from exc
+    db.refresh(entity)
+    return entity
+
+
+def add_convocation(
+    db: Session,
+    assembly_id: int,
+    data: schemas.AsambleaConvocatoriaCreate,
+    user: models.Usuario,
+) -> models.AsambleaConvocatoria:
+    require_assembly_access(db, user, assembly_id, mode="capture")
+    entity = models.AsambleaConvocatoria(
+        id_asamblea=assembly_id,
         **data.model_dump(exclude={"observaciones"}),
         **_audit_values(user.id_usuario, data),
     )
-    return _persist(
-        db, entity, user.id_usuario, "La asamblea o su padrón no son válidos"
+    return _persist(db, entity, user.id_usuario, "La convocatoria no es válida o repite ordinal")
+
+
+def update_assembly(
+    db: Session,
+    entity: models.Asamblea,
+    data: schemas.AsambleaUpdate,
+    user: models.Usuario,
+) -> models.Asamblea:
+    values = data.model_dump(exclude_unset=True, exclude={"convocatorias", "observaciones"})
+    if "id_tipo_asamblea" in values or "tipo_asamblea" in values:
+        option = require_catalog_option(
+            db, "tipo_asamblea",
+            option_id=values.pop("id_tipo_asamblea", None),
+            code=values.pop("tipo_asamblea", None), required=True,
+        )
+        values["id_tipo_asamblea"] = option.id_catalogo_opcion
+        values["tipo_asamblea"] = option.codigo
+    if "id_contexto_asamblea" in values or "contexto_proceso" in values:
+        option = require_catalog_option(
+            db, "contexto_asamblea",
+            option_id=values.pop("id_contexto_asamblea", None),
+            code=values.pop("contexto_proceso", None), required=False,
+        )
+        values["id_contexto_asamblea"] = option.id_catalogo_opcion if option else None
+        values["contexto_proceso"] = option.codigo if option else None
+    set_audit_context(db, user.id_usuario)
+    for key, value in values.items():
+        setattr(entity, key, value)
+    entity.actualizado_en = datetime.now(timezone.utc)
+    entity.actualizado_por = user.id_usuario
+    commit_or_conflict(db, "La asamblea o su contexto no son válidos")
+    db.refresh(entity)
+    return entity
+
+
+def create_ran_procedure(
+    db: Session,
+    project_nucleus_id: int,
+    data: schemas.TramiteRanCreate,
+    user: models.Usuario,
+) -> models.TramiteRan:
+    require_project_nucleus_access(db, user, project_nucleus_id, mode="capture")
+    set_audit_context(db, user.id_usuario)
+    procedure = models.TramiteRan(
+        id_proyecto_nucleo=project_nucleus_id,
+        **data.model_dump(exclude={"eventos", "observaciones"}),
+        **_audit_values(user.id_usuario, data),
     )
+    db.add(procedure)
+    try:
+        db.flush()
+        for event in data.eventos:
+            db.add(models.TramiteRanEvento(
+                id_tramite_ran=procedure.id_tramite_ran,
+                **event.model_dump(exclude={"observaciones"}),
+                **_audit_values(user.id_usuario, event),
+            ))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="El trámite RAN o sus eventos no son válidos") from exc
+    db.refresh(procedure)
+    return procedure
+
+
+def add_ran_event(
+    db: Session,
+    procedure: models.TramiteRan,
+    data: schemas.TramiteRanEventoCreate,
+    user: models.Usuario,
+) -> models.TramiteRanEvento:
+    require_project_nucleus_access(db, user, procedure.id_proyecto_nucleo, mode="capture")
+    entity = models.TramiteRanEvento(
+        id_tramite_ran=procedure.id_tramite_ran,
+        **data.model_dump(exclude={"observaciones"}),
+        **_audit_values(user.id_usuario, data),
+    )
+    return _persist(db, entity, user.id_usuario, "El evento RAN no es válido o repite ordinal")
 
 
 def create_agreement(
@@ -377,6 +771,46 @@ def create_agreement(
                 creado_por=user.id_usuario,
             )
         )
+        if any((
+            data.fecha_programada_ingreso_ran, data.ingreso_ran_fecha,
+            data.numero_solicitud_ingreso, data.calificacion_registral,
+            data.fecha_inscripcion_ran,
+        )):
+            ran = models.TramiteRan(
+                id_proyecto_nucleo=affectation.id_proyecto_nucleo,
+                id_convenio=agreement.id_convenio,
+                fecha_programada_ingreso=data.fecha_programada_ingreso_ran,
+                creado_por=user.id_usuario,
+                observaciones="Creado desde contrato RAN legacy de Convenio.",
+            )
+            db.add(ran)
+            db.flush()
+            ordinal = 0
+            if data.ingreso_ran_fecha or data.numero_solicitud_ingreso:
+                ordinal += 1
+                db.add(models.TramiteRanEvento(
+                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
+                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","ingreso"),
+                    fecha_evento=data.ingreso_ran_fecha,
+                    numero_solicitud=data.numero_solicitud_ingreso,
+                    creado_por=user.id_usuario,
+                ))
+            if data.calificacion_registral:
+                ordinal += 1
+                db.add(models.TramiteRanEvento(
+                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
+                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","calificacion"),
+                    calificacion=data.calificacion_registral,
+                    creado_por=user.id_usuario,
+                ))
+            if data.fecha_inscripcion_ran:
+                ordinal += 1
+                db.add(models.TramiteRanEvento(
+                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
+                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","inscripcion"),
+                    fecha_evento=data.fecha_inscripcion_ran,
+                    creado_por=user.id_usuario,
+                ))
         if data.id_convenio_padre is not None:
             parent = require_agreement_access(
                 db, user, data.id_convenio_padre, mode="capture"
@@ -464,7 +898,7 @@ def create_fifonafe(
     procedure = models.TramiteFifonafe(
         id_proyecto_nucleo=project_nucleus_id,
         ambito=ambito,
-        **data.model_dump(exclude={"ids_afectacion", "observaciones"}),
+        **data.model_dump(exclude={"ids_afectacion", "eventos", "observaciones"}),
         **_audit_values(user.id_usuario, data),
     )
     db.add(procedure)
@@ -478,6 +912,28 @@ def create_fifonafe(
                     creado_por=user.id_usuario,
                 )
             )
+        events = list(data.eventos)
+        if not events:
+            legacy_events = (
+                ("oficio_fifonafe_dgaopr", "FIFONAFE", "DGAOPR/Representación", data.no_oficio_fifonafe_a_dgaopr, data.fecha_oficio_fifonafe_a_dgaopr),
+                ("oficio_dgaopr_representacion", "DGAOPR", "Representación", data.no_oficio_dgaopr_a_representacion, data.fecha_oficio_dgaopr_a_representacion),
+                ("respuesta_representacion_dgaopr", "Representación", "DGAOPR", data.no_oficio_respuesta_representacion_a_dgaopr, data.fecha_oficio_respuesta_representacion_a_dgaopr),
+                ("respuesta_dgaopr_fifonafe", "DGAOPR/Representación", "FIFONAFE", data.no_oficio_respuesta_dgaopr_a_fifonafe, data.fecha_oficio_respuesta_dgaopr_a_fifonafe),
+            )
+            events = [
+                schemas.TramiteFifonafeEventoCreate(
+                    ordinal=ordinal, id_tipo_evento=_catalog_id(db,"tipo_evento_fifonafe",code),
+                    origen=origin, destino=destination, numero_oficio=number, fecha_oficio=event_date,
+                )
+                for ordinal,(code,origin,destination,number,event_date) in enumerate(legacy_events,1)
+                if number or event_date
+            ]
+        for event in events:
+            db.add(models.TramiteFifonafeEvento(
+                id_tramite_fifonafe=procedure.id_tramite_fifonafe,
+                **event.model_dump(exclude={"observaciones"}),
+                **_audit_values(user.id_usuario, event),
+            ))
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -487,6 +943,36 @@ def create_fifonafe(
         ) from exc
     db.refresh(procedure)
     return procedure
+
+
+def add_fifonafe_event(
+    db: Session,
+    procedure: models.TramiteFifonafe,
+    data: schemas.TramiteFifonafeEventoCreate,
+    user: models.Usuario,
+) -> models.TramiteFifonafeEvento:
+    require_project_nucleus_access(db, user, procedure.id_proyecto_nucleo, mode="capture")
+    entity = models.TramiteFifonafeEvento(
+        id_tramite_fifonafe=procedure.id_tramite_fifonafe,
+        **data.model_dump(exclude={"observaciones"}),
+        **_audit_values(user.id_usuario, data),
+    )
+    return _persist(db, entity, user.id_usuario, "El evento FIFONAFE no es válido o repite ordinal")
+
+
+def create_document_requirement(
+    db: Session,
+    project_nucleus_id: int,
+    data: schemas.ExpedienteRequisitoCreate,
+    user: models.Usuario,
+) -> models.ExpedienteRequisito:
+    require_project_nucleus_access(db, user, project_nucleus_id, mode="capture")
+    entity = models.ExpedienteRequisito(
+        id_proyecto_nucleo=project_nucleus_id,
+        **data.model_dump(exclude={"observaciones"}),
+        **_audit_values(user.id_usuario, data),
+    )
+    return _persist(db, entity, user.id_usuario, "El requisito documental no es válido o está duplicado")
 
 
 def add_fifonafe_affectation(

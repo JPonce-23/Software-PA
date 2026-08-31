@@ -58,6 +58,59 @@ def list_municipalities(
     return query.order_by(models.Municipio.clave_inegi).all()
 
 
+@router.get(
+    "/catalogos/operativos/{tipo_catalogo}",
+    response_model=list[schemas.CatalogoOperativoResponse],
+)
+def list_operational_catalog(
+    tipo_catalogo: str,
+    incluir_inactivos: bool = False,
+    db: Session = Depends(get_db),
+    _: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.CatalogoOperativo).filter(
+        models.CatalogoOperativo.tipo_catalogo == tipo_catalogo
+    )
+    if not incluir_inactivos:
+        query = query.filter(models.CatalogoOperativo.activo.is_(True))
+    return query.order_by(
+        models.CatalogoOperativo.activo.desc(),
+        models.CatalogoOperativo.orden,
+        models.CatalogoOperativo.nombre,
+    ).all()
+
+
+@router.post(
+    "/catalogos/operativos",
+    response_model=schemas.CatalogoOperativoResponse,
+    status_code=201,
+)
+def create_operational_catalog_option(
+    data: schemas.CatalogoOperativoCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    return service.create_catalog_option(db, data, user)
+
+
+@router.patch(
+    "/catalogos/operativos/opciones/{id_catalogo_opcion}",
+    response_model=schemas.CatalogoOperativoResponse,
+)
+def update_operational_catalog_option(
+    id_catalogo_opcion: int,
+    data: schemas.CatalogoOperativoUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    entity = db.query(models.CatalogoOperativo).filter(
+        models.CatalogoOperativo.id_catalogo_opcion == id_catalogo_opcion
+    ).first()
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Opción de catálogo no encontrada")
+    return service.update_catalog_option(db, entity, data, user)
+
+
 @router.get("/proyectos", response_model=list[schemas.ProyectoResponse])
 def list_projects(
     skip: int = Query(0, ge=0),
@@ -167,7 +220,7 @@ def update_nucleus(
     user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
 ):
     nucleus = require_nucleus_access(db, user, id_nucleo, mode="capture")
-    return service.update_entity(db, nucleus, data, user)
+    return service.update_nucleus(db, nucleus, data, user)
 
 
 @router.patch(
@@ -259,7 +312,7 @@ def update_project_nucleus(
     record = require_project_nucleus_access(
         db, user, id_proyecto_nucleo, mode="capture"
     )
-    service.update_entity(db, record, data, user)
+    service.update_project_nucleus(db, record, data, user)
     return db.get(models.ProyectoNucleoResumen, id_proyecto_nucleo)
 
 
@@ -335,6 +388,58 @@ def update_reference(
     return service.update_entity(db, entity, data, user)
 
 
+@router.get(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/responsables",
+    response_model=list[schemas.ProyectoNucleoResponsableResponse],
+)
+def list_responsibles(
+    id_proyecto_nucleo: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    return db.query(models.ProyectoNucleoResponsable).filter(
+        models.ProyectoNucleoResponsable.id_proyecto_nucleo == id_proyecto_nucleo,
+        models.ProyectoNucleoResponsable.activo.is_(True),
+    ).order_by(
+        models.ProyectoNucleoResponsable.es_principal.desc(),
+        models.ProyectoNucleoResponsable.vigencia_inicio.desc().nullslast(),
+    ).all()
+
+
+@router.post(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/responsables",
+    response_model=schemas.ProyectoNucleoResponsableResponse,
+    status_code=201,
+)
+def create_responsible(
+    id_proyecto_nucleo: int,
+    data: schemas.ProyectoNucleoResponsableCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.create_responsible(db, id_proyecto_nucleo, data, user)
+
+
+@router.patch(
+    "/responsables/{id_responsable}",
+    response_model=schemas.ProyectoNucleoResponsableResponse,
+)
+def update_responsible(
+    id_responsable: int,
+    data: schemas.ProyectoNucleoResponsableUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.ProyectoNucleoResponsable,
+        models.ProyectoNucleoResponsable.id_responsable,
+        id_responsable, "Responsable no encontrado",
+    )
+    require_project_nucleus_access(db, user, entity.id_proyecto_nucleo, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
 @router.post(
     "/proyectos/{id_proyecto}/personas",
     response_model=schemas.PersonaResponse,
@@ -389,7 +494,7 @@ def update_orv(
 ):
     entity = _active_or_404(db, models.Orv, models.Orv.id_orv, id_orv, "ORV no encontrado")
     require_nucleus_access(db, user, entity.id_nucleo, mode="capture")
-    return service.update_entity(db, entity, data, user)
+    return service.update_orv(db, entity, data, user)
 
 
 @router.post(
@@ -755,6 +860,54 @@ def delete_affectation(
 
 
 @router.get(
+    "/afectaciones/{id_afectacion}/bienes",
+    response_model=list[schemas.BienAfectadoResponse],
+)
+def list_affected_assets(
+    id_afectacion: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_affectation_access(db, user, id_afectacion)
+    return db.query(models.BienAfectado).filter(
+        models.BienAfectado.id_afectacion == id_afectacion,
+        models.BienAfectado.activo.is_(True),
+    ).order_by(models.BienAfectado.id_bien_afectado).all()
+
+
+@router.post(
+    "/afectaciones/{id_afectacion}/bienes",
+    response_model=schemas.BienAfectadoResponse,
+    status_code=201,
+)
+def create_affected_asset(
+    id_afectacion: int,
+    data: schemas.BienAfectadoCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.create_affected_asset(db, id_afectacion, data, user)
+
+
+@router.patch(
+    "/bienes-afectados/{id_bien_afectado}",
+    response_model=schemas.BienAfectadoResponse,
+)
+def update_affected_asset(
+    id_bien_afectado: int,
+    data: schemas.BienAfectadoUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.BienAfectado, models.BienAfectado.id_bien_afectado,
+        id_bien_afectado, "Bien afectado no encontrado",
+    )
+    require_affectation_access(db, user, entity.id_afectacion, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
+@router.get(
     "/proyecto-nucleo/{id_proyecto_nucleo}/asambleas",
     response_model=list[schemas.AsambleaResponse],
 )
@@ -792,6 +945,120 @@ def update_assembly(
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
     entity = require_assembly_access(db, user, id_asamblea, mode="capture")
+    return service.update_assembly(db, entity, data, user)
+
+
+@router.get(
+    "/asambleas/{id_asamblea}/convocatorias",
+    response_model=list[schemas.AsambleaConvocatoriaResponse],
+)
+def list_convocations(
+    id_asamblea: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_assembly_access(db, user, id_asamblea)
+    return db.query(models.AsambleaConvocatoria).filter(
+        models.AsambleaConvocatoria.id_asamblea == id_asamblea,
+        models.AsambleaConvocatoria.activo.is_(True),
+    ).order_by(models.AsambleaConvocatoria.ordinal).all()
+
+
+@router.post(
+    "/asambleas/{id_asamblea}/convocatorias",
+    response_model=schemas.AsambleaConvocatoriaResponse,
+    status_code=201,
+)
+def add_convocation(
+    id_asamblea: int,
+    data: schemas.AsambleaConvocatoriaCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.add_convocation(db, id_asamblea, data, user)
+
+
+@router.patch(
+    "/convocatorias/{id_convocatoria}",
+    response_model=schemas.AsambleaConvocatoriaResponse,
+)
+def update_convocation(
+    id_convocatoria: int,
+    data: schemas.AsambleaConvocatoriaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.AsambleaConvocatoria, models.AsambleaConvocatoria.id_convocatoria,
+        id_convocatoria, "Convocatoria no encontrada",
+    )
+    require_assembly_access(db, user, entity.id_asamblea, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
+@router.get(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/tramites-ran",
+    response_model=list[schemas.TramiteRanResponse],
+)
+def list_ran_procedures(
+    id_proyecto_nucleo: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    return db.query(models.TramiteRan).filter(
+        models.TramiteRan.id_proyecto_nucleo == id_proyecto_nucleo,
+        models.TramiteRan.activo.is_(True),
+    ).order_by(models.TramiteRan.id_tramite_ran).all()
+
+
+@router.post(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/tramites-ran",
+    response_model=schemas.TramiteRanResponse,
+    status_code=201,
+)
+def create_ran_procedure(
+    id_proyecto_nucleo: int,
+    data: schemas.TramiteRanCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.create_ran_procedure(db, id_proyecto_nucleo, data, user)
+
+
+@router.post(
+    "/tramites-ran/{id_tramite_ran}/eventos",
+    response_model=schemas.TramiteRanEventoResponse,
+    status_code=201,
+)
+def add_ran_event(
+    id_tramite_ran: int,
+    data: schemas.TramiteRanEventoCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    procedure = _active_or_404(
+        db, models.TramiteRan, models.TramiteRan.id_tramite_ran,
+        id_tramite_ran, "Trámite RAN no encontrado",
+    )
+    return service.add_ran_event(db, procedure, data, user)
+
+
+@router.patch(
+    "/eventos-ran/{id_evento_ran}",
+    response_model=schemas.TramiteRanEventoResponse,
+)
+def update_ran_event(
+    id_evento_ran: int,
+    data: schemas.TramiteRanEventoUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.TramiteRanEvento, models.TramiteRanEvento.id_evento_ran,
+        id_evento_ran, "Evento RAN no encontrado",
+    )
+    require_project_nucleus_access(db, user, entity.tramite.id_proyecto_nucleo, mode="capture")
     return service.update_entity(db, entity, data, user)
 
 
@@ -922,6 +1189,101 @@ def add_fifonafe_affectation(
     return service.add_fifonafe_affectation(
         db, id_tramite_fifonafe, data.id_afectacion, user
     )
+
+
+@router.get(
+    "/fifonafe/{id_tramite_fifonafe}/eventos",
+    response_model=list[schemas.TramiteFifonafeEventoResponse],
+)
+def list_fifonafe_events(
+    id_tramite_fifonafe: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_fifonafe_access(db, user, id_tramite_fifonafe)
+    return db.query(models.TramiteFifonafeEvento).filter(
+        models.TramiteFifonafeEvento.id_tramite_fifonafe == id_tramite_fifonafe,
+        models.TramiteFifonafeEvento.activo.is_(True),
+    ).order_by(models.TramiteFifonafeEvento.ordinal).all()
+
+
+@router.post(
+    "/fifonafe/{id_tramite_fifonafe}/eventos",
+    response_model=schemas.TramiteFifonafeEventoResponse,
+    status_code=201,
+)
+def add_fifonafe_event(
+    id_tramite_fifonafe: int,
+    data: schemas.TramiteFifonafeEventoCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    procedure = require_fifonafe_access(db, user, id_tramite_fifonafe, mode="capture")
+    return service.add_fifonafe_event(db, procedure, data, user)
+
+
+@router.get(
+    "/catalogos/requisitos-documentales",
+    response_model=list[schemas.RequisitoDocumentalResponse],
+)
+def list_document_requirements(
+    incluir_inactivos: bool = False,
+    db: Session = Depends(get_db),
+    _: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.RequisitoDocumental)
+    if not incluir_inactivos:
+        query = query.filter(models.RequisitoDocumental.activo.is_(True))
+    return query.order_by(models.RequisitoDocumental.contexto, models.RequisitoDocumental.orden).all()
+
+
+@router.get(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/requisitos-documentales",
+    response_model=list[schemas.ExpedienteRequisitoResponse],
+)
+def list_project_document_requirements(
+    id_proyecto_nucleo: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    return db.query(models.ExpedienteRequisito).filter(
+        models.ExpedienteRequisito.id_proyecto_nucleo == id_proyecto_nucleo,
+        models.ExpedienteRequisito.activo.is_(True),
+    ).order_by(models.ExpedienteRequisito.id_expediente_requisito).all()
+
+
+@router.post(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/requisitos-documentales",
+    response_model=schemas.ExpedienteRequisitoResponse,
+    status_code=201,
+)
+def create_project_document_requirement(
+    id_proyecto_nucleo: int,
+    data: schemas.ExpedienteRequisitoCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.create_document_requirement(db, id_proyecto_nucleo, data, user)
+
+
+@router.patch(
+    "/requisitos-documentales/{id_expediente_requisito}",
+    response_model=schemas.ExpedienteRequisitoResponse,
+)
+def update_project_document_requirement(
+    id_expediente_requisito: int,
+    data: schemas.ExpedienteRequisitoUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.ExpedienteRequisito,
+        models.ExpedienteRequisito.id_expediente_requisito,
+        id_expediente_requisito, "Requisito de expediente no encontrado",
+    )
+    require_project_nucleus_access(db, user, entity.id_proyecto_nucleo, mode="capture")
+    return service.update_entity(db, entity, data, user)
 
 
 @router.get(

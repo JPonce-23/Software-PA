@@ -107,10 +107,11 @@ def test_affectation_scope_rules(api, target_domain):
     collective_with_parcel = api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",
-        expected=422,
+        expected=201,
         json={"tipo_afectacion": "colectivo", "id_parcela": parcel_id},
-    )
-    assert collective_with_parcel.status_code == 422
+    ).json()
+    assert collective_with_parcel["tipo_afectacion"] == "colectivo"
+    assert collective_with_parcel["id_parcela"] == parcel_id
     individual_without_parcel = api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",

@@ -61,6 +61,38 @@ class Municipio(Base):
     nucleos = relationship("NucleoAgrario", back_populates="municipio", lazy="selectin")
 
 
+class CatalogoOperativo(Base, AuditableMixin):
+    __tablename__ = "catalogo_operativo"
+
+    id_catalogo_opcion = Column(BigInteger, primary_key=True)
+    tipo_catalogo = Column(String(50), nullable=False)
+    codigo = Column(String(80), nullable=False)
+    nombre = Column(String(250), nullable=False)
+    descripcion = Column(Text)
+    orden = Column(Integer, nullable=False, default=0)
+    fuente = Column(String(250))
+    vigencia_inicio = Column(Date)
+    vigencia_fin = Column(Date)
+
+    aliases = relationship(
+        "CatalogoOperativoAlias", back_populates="opcion", lazy="selectin"
+    )
+
+
+class CatalogoOperativoAlias(Base, AuditableMixin):
+    __tablename__ = "catalogo_operativo_alias"
+
+    id_catalogo_alias = Column(BigInteger, primary_key=True)
+    id_catalogo_opcion = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False
+    )
+    alias = Column(String(300), nullable=False)
+    alias_normalizado = Column(String(300), nullable=False)
+    fuente = Column(String(250))
+
+    opcion = relationship("CatalogoOperativo", back_populates="aliases")
+
+
 class Usuario(Base):
     """Existing authentication principal retained by migration 031."""
 
@@ -177,7 +209,10 @@ class NucleoAgrario(Base, AuditableMixin):
     )
     nombre_nucleo = Column(String(300), nullable=False)
     tipo_nucleo = Column(String(20), nullable=False)
-    comunidad_indigena = Column(Boolean, nullable=False, default=False)
+    id_tipo_tenencia = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False
+    )
+    comunidad_indigena = Column(Boolean)
     geometria_poligono = Column(Geometry("MULTIPOLYGON", srid=4326))
     fuente_geometria = Column(String(250))
     fecha_fuente_geometria = Column(Date)
@@ -192,6 +227,7 @@ class NucleoAgrario(Base, AuditableMixin):
     orvs = relationship("Orv", back_populates="nucleo", lazy="selectin")
     padrones = relationship("PadronHistorial", back_populates="nucleo", lazy="selectin")
     parcelas = relationship("Parcela", back_populates="nucleo", lazy="selectin")
+    tipo_tenencia = relationship("CatalogoOperativo", foreign_keys=[id_tipo_tenencia])
 
 
 class ProyectoNucleo(Base, AuditableMixin):
@@ -203,6 +239,10 @@ class ProyectoNucleo(Base, AuditableMixin):
         Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False
     )
     residencia = Column(String(300))
+    id_residencia = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion")
+    )
+    total_cops_planeados = Column(Integer)
     responsable_nombre = Column(String(300))
     contacto = Column(String(150))
 
@@ -226,6 +266,30 @@ class ProyectoNucleo(Base, AuditableMixin):
     tramites_fifonafe = relationship(
         "TramiteFifonafe", back_populates="proyecto_nucleo", lazy="selectin"
     )
+    residencia_catalogo = relationship("CatalogoOperativo", foreign_keys=[id_residencia])
+    responsables = relationship(
+        "ProyectoNucleoResponsable", back_populates="proyecto_nucleo", lazy="selectin"
+    )
+    tramites_ran = relationship(
+        "TramiteRan", back_populates="proyecto_nucleo", lazy="selectin"
+    )
+
+
+class ProyectoNucleoResponsable(Base, AuditableMixin):
+    __tablename__ = "proyecto_nucleo_responsable"
+
+    id_responsable = Column(BigInteger, primary_key=True)
+    id_proyecto_nucleo = Column(
+        Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False
+    )
+    nombre = Column(String(300), nullable=False)
+    cargo = Column(String(200))
+    contacto = Column(String(200))
+    vigencia_inicio = Column(Date)
+    vigencia_fin = Column(Date)
+    es_principal = Column(Boolean, nullable=False, default=False)
+
+    proyecto_nucleo = relationship("ProyectoNucleo", back_populates="responsables")
 
 
 class ProyectoNucleoReferencia(Base, AuditableMixin):
@@ -277,6 +341,9 @@ class Orv(Base, AuditableMixin):
     inicio_vigencia = Column(Date)
     fin_vigencia = Column(Date)
     estatus_fuente = Column(String(80))
+    id_estado_registral = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion")
+    )
     acta_eleccion_inscrita_ran = Column(Boolean)
     fecha_inscripcion_acta_ran = Column(Date)
 
@@ -284,6 +351,8 @@ class Orv(Base, AuditableMixin):
     integrantes = relationship(
         "OrvIntegrante", back_populates="orv", lazy="selectin"
     )
+    estado_registral = relationship("CatalogoOperativo", foreign_keys=[id_estado_registral])
+    tramites_ran = relationship("TramiteRan", back_populates="orv", lazy="selectin")
 
 
 class OrvIntegrante(Base, AuditableMixin):
@@ -292,12 +361,18 @@ class OrvIntegrante(Base, AuditableMixin):
     id_orv_integrante = Column(Integer, primary_key=True)
     id_orv = Column(Integer, ForeignKey("orv.id_orv"), nullable=False)
     id_persona = Column(Integer, ForeignKey("persona.id_persona"), nullable=False)
-    cargo = Column(String(80), nullable=False)
+    cargo = Column(String(80))
+    id_organo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    id_cargo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    id_calidad = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
     fecha_inicio = Column(Date)
     fecha_fin = Column(Date)
 
     orv = relationship("Orv", back_populates="integrantes")
     persona = relationship("Persona", back_populates="participaciones_orv")
+    organo = relationship("CatalogoOperativo", foreign_keys=[id_organo])
+    cargo_catalogo = relationship("CatalogoOperativo", foreign_keys=[id_cargo])
+    calidad = relationship("CatalogoOperativo", foreign_keys=[id_calidad])
 
 
 class PadronHistorial(Base, AuditableMixin):
@@ -309,6 +384,8 @@ class PadronHistorial(Base, AuditableMixin):
     )
     fecha_padron = Column(Date)
     numero_ejidatarios_comuneros = Column(Integer)
+    fuente = Column(String(250))
+    id_documento = Column(Integer, ForeignKey("documento.id_documento"))
 
     nucleo = relationship("NucleoAgrario", back_populates="padrones")
     asambleas = relationship("Asamblea", back_populates="padron", lazy="selectin")
@@ -404,6 +481,47 @@ class Afectacion(Base, AuditableMixin):
     indemnizacion = relationship(
         "Indemnizacion", back_populates="afectacion", uselist=False, lazy="selectin"
     )
+    bienes = relationship(
+        "BienAfectado", back_populates="afectacion", lazy="selectin"
+    )
+
+
+class BienAfectado(Base, AuditableMixin):
+    __tablename__ = "bien_afectado"
+
+    id_bien_afectado = Column(BigInteger, primary_key=True)
+    id_afectacion = Column(
+        Integer, ForeignKey("afectacion.id_afectacion"), nullable=False
+    )
+    id_tipo_gestion = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion")
+    )
+    id_destino_superficie = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion")
+    )
+    id_tipo_cop_operativo = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion")
+    )
+    id_parcela = Column(Integer, ForeignKey("parcela.id_parcela"))
+    tipo_tierra = Column(String(120))
+    referencia_alfanumerica = Column(String(150))
+    titularidad = Column(String(250))
+    detalle = Column(Text)
+    superficie_preliminar_ha = Column(Numeric(14, 6))
+    superficie_afectada_ha = Column(Numeric(14, 6))
+    superficie_valor_original = Column(String(120))
+    superficie_formato_origen = Column(String(50))
+    fuente = Column(String(250))
+
+    afectacion = relationship("Afectacion", back_populates="bienes")
+    tipo_gestion = relationship("CatalogoOperativo", foreign_keys=[id_tipo_gestion])
+    destino_superficie = relationship(
+        "CatalogoOperativo", foreign_keys=[id_destino_superficie]
+    )
+    tipo_cop_operativo = relationship(
+        "CatalogoOperativo", foreign_keys=[id_tipo_cop_operativo]
+    )
+    parcela = relationship("Parcela", foreign_keys=[id_parcela])
 
 
 class Asamblea(Base, AuditableMixin):
@@ -416,6 +534,12 @@ class Asamblea(Base, AuditableMixin):
     id_padron = Column(Integer, ForeignKey("padron_historial.id_padron"))
     tipo_asamblea = Column(String(40), nullable=False)
     contexto_proceso = Column(String(40))
+    id_tipo_asamblea = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False
+    )
+    id_contexto_asamblea = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion")
+    )
     proposito = Column(Text)
     fecha_expedicion_primera = Column(Date)
     fecha_programada_primera = Column(Date)
@@ -434,6 +558,37 @@ class Asamblea(Base, AuditableMixin):
     convenios_autorizados = relationship(
         "Convenio", back_populates="asamblea_autorizacion", lazy="selectin"
     )
+    tipo_asamblea_catalogo = relationship(
+        "CatalogoOperativo", foreign_keys=[id_tipo_asamblea]
+    )
+    contexto_asamblea_catalogo = relationship(
+        "CatalogoOperativo", foreign_keys=[id_contexto_asamblea]
+    )
+    convocatorias = relationship(
+        "AsambleaConvocatoria", back_populates="asamblea", lazy="selectin"
+    )
+    tramites_ran = relationship(
+        "TramiteRan", back_populates="asamblea", lazy="selectin"
+    )
+
+
+class AsambleaConvocatoria(Base, AuditableMixin):
+    __tablename__ = "asamblea_convocatoria"
+
+    id_convocatoria = Column(BigInteger, primary_key=True)
+    id_asamblea = Column(Integer, ForeignKey("asamblea.id_asamblea"), nullable=False)
+    ordinal = Column(Integer, nullable=False)
+    fecha_expedicion = Column(Date)
+    fecha_programada = Column(Date)
+    fecha_realizacion = Column(Date)
+    id_resultado = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion")
+    )
+    observaciones_resultado = Column(Text)
+    id_documento = Column(Integer, ForeignKey("documento.id_documento"))
+
+    asamblea = relationship("Asamblea", back_populates="convocatorias")
+    resultado_catalogo = relationship("CatalogoOperativo", foreign_keys=[id_resultado])
 
 
 class Convenio(Base, AuditableMixin):
@@ -475,6 +630,9 @@ class Convenio(Base, AuditableMixin):
     afectaciones = relationship(
         "ConvenioAfectacion", back_populates="convenio", lazy="selectin"
     )
+    tramites_ran = relationship(
+        "TramiteRan", back_populates="convenio", lazy="selectin"
+    )
 
 
 class ConvenioAfectacion(Base, AuditableMixin):
@@ -489,6 +647,50 @@ class ConvenioAfectacion(Base, AuditableMixin):
 
     convenio = relationship("Convenio", back_populates="afectaciones")
     afectacion = relationship("Afectacion", back_populates="convenios")
+
+
+class TramiteRan(Base, AuditableMixin):
+    __tablename__ = "tramite_ran"
+
+    id_tramite_ran = Column(BigInteger, primary_key=True)
+    id_proyecto_nucleo = Column(
+        Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False
+    )
+    id_asamblea = Column(Integer, ForeignKey("asamblea.id_asamblea"))
+    id_convenio = Column(Integer, ForeignKey("convenio.id_convenio"))
+    id_orv = Column(Integer, ForeignKey("orv.id_orv"))
+    fecha_programada_ingreso = Column(Date)
+    referencia_expediente = Column(String(150))
+
+    proyecto_nucleo = relationship("ProyectoNucleo", back_populates="tramites_ran")
+    asamblea = relationship("Asamblea", back_populates="tramites_ran")
+    convenio = relationship("Convenio", back_populates="tramites_ran")
+    orv = relationship("Orv", back_populates="tramites_ran")
+    eventos = relationship(
+        "TramiteRanEvento", back_populates="tramite", lazy="selectin"
+    )
+
+
+class TramiteRanEvento(Base, AuditableMixin):
+    __tablename__ = "tramite_ran_evento"
+
+    id_evento_ran = Column(BigInteger, primary_key=True)
+    id_tramite_ran = Column(
+        BigInteger, ForeignKey("tramite_ran.id_tramite_ran"), nullable=False
+    )
+    ordinal = Column(Integer, nullable=False)
+    id_tipo_evento = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False
+    )
+    fecha_evento = Column(Date)
+    numero_solicitud = Column(String(150))
+    resultado = Column(String(250))
+    calificacion = Column(Text)
+    folio_referencia = Column(String(200))
+    id_documento = Column(Integer, ForeignKey("documento.id_documento"))
+
+    tramite = relationship("TramiteRan", back_populates="eventos")
+    tipo_evento = relationship("CatalogoOperativo", foreign_keys=[id_tipo_evento])
 
 
 class TramiteFifonafe(Base, AuditableMixin):
@@ -518,6 +720,30 @@ class TramiteFifonafe(Base, AuditableMixin):
     afectaciones = relationship(
         "TramiteFifonafeAfectacion", back_populates="tramite", lazy="selectin"
     )
+    eventos = relationship(
+        "TramiteFifonafeEvento", back_populates="tramite", lazy="selectin"
+    )
+
+
+class TramiteFifonafeEvento(Base, AuditableMixin):
+    __tablename__ = "tramite_fifonafe_evento"
+
+    id_evento_fifonafe = Column(BigInteger, primary_key=True)
+    id_tramite_fifonafe = Column(
+        Integer, ForeignKey("tramite_fifonafe.id_tramite_fifonafe"), nullable=False
+    )
+    ordinal = Column(Integer, nullable=False)
+    id_tipo_evento = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False
+    )
+    origen = Column(String(200))
+    destino = Column(String(200))
+    numero_oficio = Column(String(150))
+    fecha_oficio = Column(Date)
+    id_documento = Column(Integer, ForeignKey("documento.id_documento"))
+
+    tramite = relationship("TramiteFifonafe", back_populates="eventos")
+    tipo_evento = relationship("CatalogoOperativo", foreign_keys=[id_tipo_evento])
 
 
 class TramiteFifonafeAfectacion(Base, AuditableMixin):
@@ -645,11 +871,97 @@ class TrazabilidadFuente(Base):
     fila = Column(Integer)
     columna = Column(String(120))
     valor_original = Column(Text)
+    valor_normalizado = Column(Text)
     tratamiento = Column(String(30), nullable=False)
+    mensajes = Column(JSONB, nullable=False, default=list)
+    id_importacion_tabular = Column(
+        BigInteger, ForeignKey("importacion_tabular.id_importacion_tabular")
+    )
     registrado_en = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     id_usuario_registro = Column(Integer, ForeignKey("usuario.id_usuario"))
+
+
+class RequisitoDocumental(Base, AuditableMixin):
+    __tablename__ = "requisito_documental"
+
+    id_requisito = Column(BigInteger, primary_key=True)
+    codigo = Column(String(80), nullable=False, unique=True)
+    nombre = Column(String(250), nullable=False)
+    descripcion = Column(Text)
+    contexto = Column(String(80), nullable=False, default="general")
+    obligatorio = Column(Boolean, nullable=False, default=False)
+    orden = Column(Integer, nullable=False, default=0)
+    fuente = Column(String(250))
+    vigencia_inicio = Column(Date)
+    vigencia_fin = Column(Date)
+
+    expedientes = relationship(
+        "ExpedienteRequisito", back_populates="requisito", lazy="selectin"
+    )
+
+
+class ExpedienteRequisito(Base, AuditableMixin):
+    __tablename__ = "expediente_requisito"
+
+    id_expediente_requisito = Column(BigInteger, primary_key=True)
+    id_proyecto_nucleo = Column(
+        Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False
+    )
+    id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"))
+    id_requisito = Column(
+        BigInteger, ForeignKey("requisito_documental.id_requisito"), nullable=False
+    )
+    id_estado = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False
+    )
+    id_documento = Column(Integer, ForeignKey("documento.id_documento"))
+    detalle = Column(Text)
+
+    requisito = relationship("RequisitoDocumental", back_populates="expedientes")
+    estado = relationship("CatalogoOperativo", foreign_keys=[id_estado])
+
+
+class ImportacionTabular(Base, AuditableMixin):
+    __tablename__ = "importacion_tabular"
+
+    id_importacion_tabular = Column(BigInteger, primary_key=True)
+    id_proyecto = Column(Integer, ForeignKey("proyecto.id_proyecto"), nullable=False)
+    archivo = Column(String(255), nullable=False)
+    sha256 = Column(CHAR(64), nullable=False)
+    hoja = Column(String(255), nullable=False)
+    filas_detectadas = Column(Integer, nullable=False, default=0)
+    filas_procesadas = Column(Integer, nullable=False, default=0)
+    advertencias = Column(Integer, nullable=False, default=0)
+    errores = Column(Integer, nullable=False, default=0)
+    estado = Column(String(30), nullable=False, default="auditado")
+
+    celdas = relationship(
+        "ImportacionTabularCelda", back_populates="importacion", lazy="selectin"
+    )
+
+
+class ImportacionTabularCelda(Base):
+    __tablename__ = "importacion_tabular_celda"
+
+    id_importacion_celda = Column(BigInteger, primary_key=True)
+    id_importacion_tabular = Column(
+        BigInteger, ForeignKey("importacion_tabular.id_importacion_tabular"), nullable=False
+    )
+    fila = Column(Integer, nullable=False)
+    columna = Column(String(20), nullable=False)
+    encabezado = Column(String(300))
+    valor_original = Column(Text)
+    valor_normalizado = Column(Text)
+    tratamiento = Column(String(30), nullable=False)
+    mensajes = Column(JSONB, nullable=False, default=list)
+    entidad_tipo = Column(String(50))
+    entidad_id = Column(BigInteger)
+    registrado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    id_usuario_registro = Column(Integer, ForeignKey("usuario.id_usuario"))
+
+    importacion = relationship("ImportacionTabular", back_populates="celdas")
 
 
 class UsuarioProyecto(Base, AuditableMixin):
