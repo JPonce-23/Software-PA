@@ -1102,7 +1102,7 @@ def create_unidad_agraria(
 def get_unidades_agrarias_by_nucleo(
     db: Session, nucleo_id: int, user: models.Usuario
 ) -> list[models.UnidadAgraria]:
-    require_nucleus_access(db, user, nucleo_id, mode="capture")
+    require_nucleus_access(db, user, nucleo_id, mode="read")
     return (
         db.query(models.UnidadAgraria)
         .filter(
@@ -1200,7 +1200,7 @@ def associate_afectacion_unidad_agraria(
 def get_unidades_agrarias_by_afectacion(
     db: Session, afectacion_id: int, user: models.Usuario
 ) -> list[models.AfectacionUnidadAgraria]:
-    require_affectation_access(db, user, afectacion_id, mode="capture")
+    require_affectation_access(db, user, afectacion_id, mode="read")
     return (
         db.query(models.AfectacionUnidadAgraria)
         .filter(
