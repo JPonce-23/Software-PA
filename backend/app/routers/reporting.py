@@ -131,7 +131,6 @@ def project_map(
         models.Parcela.id_parcela.label("id"),
         func.coalesce(
             models.Parcela.no_parcela,
-            models.Parcela.no_parcela_ppt,
             func.concat("Parcela ", models.Parcela.id_parcela),
         ).label("nombre"),
         func.ST_AsGeoJSON(models.Parcela.geometria_poligono).label("geometry"),

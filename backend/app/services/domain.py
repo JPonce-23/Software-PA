@@ -11,6 +11,7 @@ from .. import models, schemas
 from .access import (
     require_affectation_access,
     require_agreement_access,
+    require_agricultural_unit_access,
     require_assembly_access,
     require_fifonafe_access,
     require_indemnity_access,
@@ -726,7 +727,7 @@ def create_agreement(
     agreement = models.Convenio(
         id_proyecto_nucleo=affectation.id_proyecto_nucleo,
         ambito=affectation.tipo_afectacion,
-        **data.model_dump(exclude={"observaciones"}),
+        **data.model_dump(exclude={"observaciones", "comparecientes"}),
         **_audit_values(user.id_usuario, data),
     )
     db.add(agreement)
@@ -740,6 +741,28 @@ def create_agreement(
                 creado_por=user.id_usuario,
             )
         )
+        db.flush()
+        for compareciente in data.comparecientes:
+            if compareciente.id_parcela_titular is not None:
+                parcel_holder = db.query(models.ParcelaTitular).filter(
+                    models.ParcelaTitular.id_parcela_titular == compareciente.id_parcela_titular,
+                    models.ParcelaTitular.activo.is_(True),
+                ).first()
+                if parcel_holder is None or not db.query(models.AfectacionUnidadAgraria).join(
+                    models.UnidadAgraria,
+                    models.UnidadAgraria.id_unidad_agraria == models.AfectacionUnidadAgraria.id_unidad_agraria,
+                ).join(models.Afectacion, models.Afectacion.id_afectacion == models.AfectacionUnidadAgraria.id_afectacion).filter(
+                    models.AfectacionUnidadAgraria.id_afectacion == affectation.id_afectacion,
+                    models.AfectacionUnidadAgraria.activo.is_(True),
+                    models.UnidadAgraria.activo.is_(True),
+                    models.UnidadAgraria.id_parcela == parcel_holder.id_parcela,
+                ).first():
+                    raise HTTPException(status_code=409, detail="La ParcelaTitular no corresponde a una unidad afectada por el convenio")
+            db.add(models.ConvenioCompareciente(
+                id_convenio=agreement.id_convenio,
+                **compareciente.model_dump(exclude={"observaciones"}),
+                **_audit_values(user.id_usuario, compareciente),
+            ))
         if data.id_convenio_padre is not None:
             parent = require_agreement_access(
                 db, user, data.id_convenio_padre, mode="capture"
@@ -751,21 +774,6 @@ def create_agreement(
                 raise HTTPException(
                     status_code=409,
                     detail="El convenio padre no comparte ProyectoNucleo y ámbito",
-                )
-            parent_links = db.query(models.ConvenioAfectacion).filter(
-                models.ConvenioAfectacion.id_convenio == parent.id_convenio,
-                models.ConvenioAfectacion.activo.is_(True),
-                models.ConvenioAfectacion.id_afectacion
-                != initial_affectation_id,
-            ).all()
-            for link in parent_links:
-                db.add(
-                    models.ConvenioAfectacion(
-                        id_convenio=agreement.id_convenio,
-                        id_afectacion=link.id_afectacion,
-                        rol="adicional",
-                        creado_por=user.id_usuario,
-                    )
                 )
         db.commit()
     except HTTPException:
@@ -779,6 +787,21 @@ def create_agreement(
         ) from exc
     db.refresh(agreement)
     return agreement
+
+
+def add_agreement_compareciente(
+    db: Session,
+    agreement_id: int,
+    data: schemas.ConvenioComparecienteCreate,
+    user: models.Usuario,
+) -> models.ConvenioCompareciente:
+    agreement = require_agreement_access(db, user, agreement_id, mode="capture")
+    entity = models.ConvenioCompareciente(
+        id_convenio=agreement.id_convenio,
+        **data.model_dump(exclude={"observaciones"}),
+        **_audit_values(user.id_usuario, data),
+    )
+    return _persist(db, entity, user.id_usuario, "El compareciente no es válido")
 
 
 def add_agreement_affectation(
@@ -1010,6 +1033,24 @@ def create_unidad_agraria(
         creado_por=user.id_usuario,
     )
     return _persist(db, entity, user.id_usuario, "La unidad agraria ya existe")
+
+
+def create_unidad_agraria_for_project_nucleus(db: Session, project_nucleus_id: int, data: schemas.UnidadAgrariaCreate, user: models.Usuario) -> models.UnidadAgraria:
+    pn = require_project_nucleus_access(db, user, project_nucleus_id, mode="capture")
+    return create_unidad_agraria(db, pn.id_nucleo, data, user)
+
+
+def add_unidad_agraria_titular(db: Session, unit_id: int, data: schemas.UnidadAgrariaTitularCreate, user: models.Usuario) -> models.UnidadAgrariaTitular:
+    unit = require_agricultural_unit_access(db, user, unit_id, mode="capture")
+    if data.id_parcela_titular is not None:
+        holder = db.query(models.ParcelaTitular).join(models.Parcela).filter(
+            models.ParcelaTitular.id_parcela_titular == data.id_parcela_titular,
+            models.ParcelaTitular.activo.is_(True), models.Parcela.activo.is_(True),
+        ).first()
+        if holder is None or holder.parcela.id_nucleo != unit.id_nucleo or (unit.id_parcela is not None and holder.id_parcela != unit.id_parcela):
+            raise HTTPException(status_code=409, detail="La titularidad no corresponde a la unidad agraria")
+    entity = models.UnidadAgrariaTitular(id_unidad_agraria=unit.id_unidad_agraria, **data.model_dump(exclude={"observaciones"}), **_audit_values(user.id_usuario, data))
+    return _persist(db, entity, user.id_usuario, "La titularidad de unidad no es válida")
 
 
 def get_unidades_agrarias_by_nucleo(

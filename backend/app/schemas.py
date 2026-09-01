@@ -424,7 +424,6 @@ class PadronHistorialUpdate(AuditInput):
 class ParcelaCreate(AuditInput):
     tipo_parcela: Literal["individual", "copropiedad", "otro", "no_determinado"]
     no_parcela: str | None = Field(default=None, max_length=80)
-    no_parcela_ppt: str | None = Field(default=None, max_length=80)
     certificado_parcelario: str | None = Field(default=None, max_length=120)
     folio_derechos: str | None = Field(default=None, max_length=120)
     constancia_vigencia_fecha: date | None = None
@@ -433,7 +432,6 @@ class ParcelaCreate(AuditInput):
 class ParcelaUpdate(AuditInput):
     tipo_parcela: Literal["individual", "copropiedad", "otro", "no_determinado"] | None = None
     no_parcela: str | None = Field(default=None, max_length=80)
-    no_parcela_ppt: str | None = Field(default=None, max_length=80)
     certificado_parcelario: str | None = Field(default=None, max_length=120)
     folio_derechos: str | None = Field(default=None, max_length=120)
     constancia_vigencia_fecha: date | None = None
@@ -474,6 +472,7 @@ class ParcelaTitularUpdate(AuditInput):
 
 
 class ActividadCampoCreate(AuditInput):
+    id_afectacion: int | None = Field(default=None, gt=0)
     tipo_actividad: Literal["sensibilizacion", "caminamiento"]
     contexto_actividad: Literal[
         "general", "superficie_adicional", "obras_complementarias", "otro"
@@ -503,7 +502,11 @@ class UnidadAgrariaTitularBase(BaseModel):
     es_principal: bool = False
 
 class UnidadAgrariaTitularCreate(UnidadAgrariaTitularBase, AuditInput):
-    pass
+    @model_validator(mode="after")
+    def validar_identidad(self):
+        if (self.id_persona is None) == (self.id_parcela_titular is None):
+            raise ValueError("Debe indicar exactamente id_persona o id_parcela_titular")
+        return self
 
 class UnidadAgrariaTitularUpdate(UnidadAgrariaTitularBase, AuditInput):
     pass
@@ -731,6 +734,37 @@ class AsambleaResponse(AsambleaCreate, AuditRead):
     convocatorias: list[AsambleaConvocatoriaResponse] = Field(default_factory=list)
 
 
+class ConvenioComparecienteCreate(AuditInput):
+    id_persona: int = Field(gt=0)
+    id_parcela_titular: int | None = Field(default=None, gt=0)
+    id_tipo_calidad: int = Field(gt=0)
+    id_tipo_acreditacion: int | None = Field(default=None, gt=0)
+    referencia_acreditacion: str | None = Field(default=None, max_length=200)
+    fecha_acreditacion: date | None = None
+    nombre_en_instrumento: str = Field(min_length=1, max_length=300)
+    es_firmante: bool = True
+    es_beneficiario_pago: bool = False
+    requiere_revision: bool = False
+    motivo_revision: str | None = None
+
+
+class ConvenioComparecienteUpdate(AuditInput):
+    id_tipo_calidad: int | None = Field(default=None, gt=0)
+    id_tipo_acreditacion: int | None = Field(default=None, gt=0)
+    referencia_acreditacion: str | None = Field(default=None, max_length=200)
+    fecha_acreditacion: date | None = None
+    nombre_en_instrumento: str | None = Field(default=None, min_length=1, max_length=300)
+    es_firmante: bool | None = None
+    es_beneficiario_pago: bool | None = None
+    requiere_revision: bool | None = None
+    motivo_revision: str | None = None
+
+
+class ConvenioComparecienteResponse(ConvenioComparecienteCreate, AuditRead):
+    id_compareciente: int
+    id_convenio: int
+
+
 class ConvenioCreate(AuditInput):
     tipo_instrumento: Literal["convenio", "otro"] = "convenio"
     tipo_convenio: Literal[
@@ -753,6 +787,7 @@ class ConvenioCreate(AuditInput):
     monto_100: Decimal | None = Field(default=None, ge=0)
     monto_bdt: Decimal | None = Field(default=None, ge=0)
     superficie_ha: Decimal | None = Field(default=None, ge=0)
+    comparecientes: list[ConvenioComparecienteCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validar_instrumento(self):
@@ -800,6 +835,7 @@ class ConvenioResponse(ConvenioCreate, AuditRead):
     calificacion_registral: str | None = None
     fecha_inscripcion_ran: date | None = None
     afectaciones: list[ConvenioAfectacionResponse] = Field(default_factory=list)
+    comparecientes: list[ConvenioComparecienteResponse] = Field(default_factory=list)
 
 
 class TramiteRanEventoCreate(AuditInput):
@@ -1050,6 +1086,13 @@ class RequisitoDocumentalResponse(RequisitoDocumentalCreate, AuditRead):
 
 class ExpedienteRequisitoCreate(AuditInput):
     id_afectacion: int | None = Field(default=None, gt=0)
+    entidad_tipo: Literal[
+        "proyecto_nucleo", "afectacion", "parcela", "parcela_titular",
+        "unidad_agraria", "unidad_agraria_titular", "convenio",
+        "convenio_compareciente", "tramite_ran", "tramite_ran_evento",
+        "tramite_fifonafe", "tramite_fifonafe_evento", "indemnizacion", "pago",
+    ] | None = None
+    entidad_id: int | None = Field(default=None, gt=0)
     id_requisito: int = Field(gt=0)
     id_estado: int = Field(gt=0)
     id_documento: int | None = Field(default=None, gt=0)

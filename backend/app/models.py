@@ -407,7 +407,6 @@ class Parcela(Base, AuditableMixin):
     )
     tipo_parcela = Column(String(30), nullable=False)
     no_parcela = Column(String(80))
-    no_parcela_ppt = Column(String(80))
     certificado_parcelario = Column(String(120))
     folio_derechos = Column(String(120))
     constancia_vigencia_fecha = Column(Date)
@@ -446,6 +445,7 @@ class ActividadCampo(Base, AuditableMixin):
     id_proyecto_nucleo = Column(
         Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False
     )
+    id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"))
     tipo_actividad = Column(String(30), nullable=False)
     contexto_actividad = Column(String(40), nullable=False, default="general")
     fecha_programada = Column(Date)
@@ -454,6 +454,7 @@ class ActividadCampo(Base, AuditableMixin):
     resultado = Column(Text)
 
     proyecto_nucleo = relationship("ProyectoNucleo", back_populates="actividades")
+    afectacion = relationship("Afectacion", foreign_keys=[id_afectacion])
 
 
 class Afectacion(Base, AuditableMixin):
@@ -706,6 +707,9 @@ class Convenio(Base, AuditableMixin):
     tramites_ran = relationship(
         "TramiteRan", back_populates="convenio", lazy="selectin"
     )
+    comparecientes = relationship(
+        "ConvenioCompareciente", back_populates="convenio", lazy="selectin"
+    )
 
 
 class ConvenioAfectacion(Base, AuditableMixin):
@@ -720,6 +724,28 @@ class ConvenioAfectacion(Base, AuditableMixin):
 
     convenio = relationship("Convenio", back_populates="afectaciones")
     afectacion = relationship("Afectacion", back_populates="convenios")
+
+
+class ConvenioCompareciente(Base, AuditableMixin):
+    __tablename__ = "convenio_compareciente"
+
+    id_compareciente = Column(BigInteger, primary_key=True)
+    id_convenio = Column(Integer, ForeignKey("convenio.id_convenio"), nullable=False)
+    id_persona = Column(Integer, ForeignKey("persona.id_persona"), nullable=False)
+    id_parcela_titular = Column(Integer, ForeignKey("parcela_titular.id_parcela_titular"))
+    id_tipo_calidad = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False)
+    id_tipo_acreditacion = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    referencia_acreditacion = Column(String(200))
+    fecha_acreditacion = Column(Date)
+    nombre_en_instrumento = Column(String(300), nullable=False)
+    es_firmante = Column(Boolean, nullable=False, default=True)
+    es_beneficiario_pago = Column(Boolean, nullable=False, default=False)
+    requiere_revision = Column(Boolean, nullable=False, default=False)
+    motivo_revision = Column(Text)
+
+    convenio = relationship("Convenio", back_populates="comparecientes")
+    persona = relationship("Persona", foreign_keys=[id_persona])
+    parcela_titular = relationship("ParcelaTitular", foreign_keys=[id_parcela_titular])
 
 
 class TramiteRan(Base, AuditableMixin):
@@ -985,6 +1011,8 @@ class ExpedienteRequisito(Base, AuditableMixin):
         Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False
     )
     id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"))
+    entidad_tipo = Column(String(50), nullable=False)
+    entidad_id = Column(BigInteger, nullable=False)
     id_requisito = Column(
         BigInteger, ForeignKey("requisito_documental.id_requisito"), nullable=False
     )

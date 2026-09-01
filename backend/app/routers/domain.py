@@ -1187,6 +1187,72 @@ def update_agreement(
     return service.update_entity(db, entity, data, user)
 
 
+@router.get(
+    "/convenios/{id_convenio}/comparecientes",
+    response_model=list[schemas.ConvenioComparecienteResponse],
+)
+def list_agreement_comparecientes(
+    id_convenio: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_agreement_access(db, user, id_convenio)
+    return db.query(models.ConvenioCompareciente).filter(
+        models.ConvenioCompareciente.id_convenio == id_convenio,
+        models.ConvenioCompareciente.activo.is_(True),
+    ).order_by(models.ConvenioCompareciente.id_compareciente).all()
+
+
+@router.post(
+    "/convenios/{id_convenio}/comparecientes",
+    response_model=schemas.ConvenioComparecienteResponse,
+    status_code=201,
+)
+def add_agreement_compareciente(
+    id_convenio: int,
+    data: schemas.ConvenioComparecienteCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.add_agreement_compareciente(db, id_convenio, data, user)
+
+
+@router.patch(
+    "/convenio-comparecientes/{id_compareciente}",
+    response_model=schemas.ConvenioComparecienteResponse,
+)
+def update_agreement_compareciente(
+    id_compareciente: int,
+    data: schemas.ConvenioComparecienteUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.ConvenioCompareciente,
+        models.ConvenioCompareciente.id_compareciente, id_compareciente,
+        "Compareciente no encontrado",
+    )
+    require_agreement_access(db, user, entity.id_convenio, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
+@router.delete("/convenio-comparecientes/{id_compareciente}", status_code=200)
+def delete_agreement_compareciente(
+    id_compareciente: int,
+    data: schemas.BajaRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.ConvenioCompareciente,
+        models.ConvenioCompareciente.id_compareciente, id_compareciente,
+        "Compareciente no encontrado",
+    )
+    require_agreement_access(db, user, entity.id_convenio, mode="capture")
+    service.logical_delete(db, entity, user.id_usuario, data.motivo)
+    return {"detail": "Compareciente dado de baja"}
+
+
 @router.post(
     "/convenios/{id_convenio}/afectaciones",
     response_model=schemas.ConvenioAfectacionResponse,
@@ -1533,6 +1599,17 @@ def create_unidad_agraria(
     return service.create_unidad_agraria(db, nucleo_id, data, user)
 
 
+@router.get("/proyecto-nucleo/{id_proyecto_nucleo}/unidades-agrarias", response_model=list[schemas.UnidadAgrariaResponse])
+def list_project_nucleus_units(id_proyecto_nucleo: int, db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES))):
+    pn = require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    return service.get_unidades_agrarias_by_nucleo(db, pn.id_nucleo, user)
+
+
+@router.post("/proyecto-nucleo/{id_proyecto_nucleo}/unidades-agrarias", response_model=schemas.UnidadAgrariaResponse, status_code=201)
+def create_project_nucleus_unit(id_proyecto_nucleo: int, data: schemas.UnidadAgrariaCreate, db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES))):
+    return service.create_unidad_agraria_for_project_nucleus(db, id_proyecto_nucleo, data, user)
+
+
 @router.get(
     "/nucleos/{nucleo_id}/unidades-agrarias",
     response_model=list[schemas.UnidadAgrariaResponse],
@@ -1556,6 +1633,41 @@ def update_unidad_agraria(
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
     return service.update_unidad_agraria(db, unidad_id, data, user)
+
+
+@router.get("/unidades-agrarias/{unidad_id}", response_model=schemas.UnidadAgrariaResponse)
+def get_unidad_agraria(unidad_id: int, db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES))):
+    from ..services.access import require_agricultural_unit_access
+    return require_agricultural_unit_access(db, user, unidad_id)
+
+
+@router.get("/unidades-agrarias/{unidad_id}/titulares", response_model=list[schemas.UnidadAgrariaTitularResponse])
+def list_unidad_titulares(unidad_id: int, db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES))):
+    from ..services.access import require_agricultural_unit_access
+    require_agricultural_unit_access(db, user, unidad_id)
+    return db.query(models.UnidadAgrariaTitular).filter(models.UnidadAgrariaTitular.id_unidad_agraria == unidad_id, models.UnidadAgrariaTitular.activo.is_(True)).all()
+
+
+@router.post("/unidades-agrarias/{unidad_id}/titulares", response_model=schemas.UnidadAgrariaTitularResponse, status_code=201)
+def add_unidad_titular(unidad_id: int, data: schemas.UnidadAgrariaTitularCreate, db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES))):
+    return service.add_unidad_agraria_titular(db, unidad_id, data, user)
+
+
+@router.patch("/unidad-agraria-titulares/{id_unidad_titular}", response_model=schemas.UnidadAgrariaTitularResponse)
+def update_unidad_titular(id_unidad_titular: int, data: schemas.UnidadAgrariaTitularUpdate, db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES))):
+    entity = _active_or_404(db, models.UnidadAgrariaTitular, models.UnidadAgrariaTitular.id_unidad_titular, id_unidad_titular, "Titular de unidad no encontrado")
+    from ..services.access import require_agricultural_unit_access
+    require_agricultural_unit_access(db, user, entity.id_unidad_agraria, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
+@router.delete("/unidad-agraria-titulares/{id_unidad_titular}")
+def delete_unidad_titular(id_unidad_titular: int, data: schemas.BajaRequest, db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES))):
+    entity = _active_or_404(db, models.UnidadAgrariaTitular, models.UnidadAgrariaTitular.id_unidad_titular, id_unidad_titular, "Titular de unidad no encontrado")
+    from ..services.access import require_agricultural_unit_access
+    require_agricultural_unit_access(db, user, entity.id_unidad_agraria, mode="capture")
+    service.logical_delete(db, entity, user.id_usuario, data.motivo)
+    return {"detail": "Titular de unidad dado de baja"}
 
 
 @router.post(

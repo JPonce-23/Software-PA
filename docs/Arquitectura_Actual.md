@@ -1,7 +1,7 @@
 # Arquitectura actual de SOFTWARE-PA
 
 > Rama verificada: `feature/backend-logica`
-> Esquema vigente: migraciones `001` a `038`
+> Esquema vigente: migraciones `001` a `039`
 > Última validación: 2026-09-01
 > Fuente de verdad: SQL aplicado, modelos SQLAlchemy, contratos Pydantic, API, frontend y pruebas del repositorio.
 
@@ -82,8 +82,9 @@ La falta de geometría de parcela no bloquea una afectación, convenio, trámite
 
 - `proyecto_nucleo`: contexto administrativo/operativo del seguimiento entre Proyecto y NucleoAgrario. No debe confundirse con la cartografía (`TrazoProyecto`) que no ejerce autoridad administrativa. Registra los campos TUC (`afecta_tuc`, `id_motivo_no_afecta_tuc`, `tuc_revision_pendiente`, etc.) y documenta cuando `afecta_tuc = false` sin crear afectaciones ficticias.
 - `afectacion_unidad_agraria`: entidad asociativa N:M entre `Afectacion` y `UnidadAgraria`. Una misma UnidadAgraria puede participar en múltiples afectaciones sin duplicarse.
+- `convenio_compareciente`: instantánea auditable de quien compareció o firmó cada convenio individual, incluida su acreditación; no sustituye la titularidad histórica de `parcela_titular`.
 
-- `actividad_campo`: sensibilización o caminamiento de `ProyectoNucleo`, con contexto, programación y realización.
+- `actividad_campo`: sensibilización o caminamiento de `ProyectoNucleo`, con contexto, programación y realización; puede relacionarse opcionalmente con una `Afectacion` del mismo ProyectoNucleo para seguimiento individual.
 - `afectacion`: participación de una o más unidades agrarias dentro del seguimiento de un `ProyectoNucleo`. El ámbito (colectivo/individual) se define por `tipo_afectacion`, el cual es distinto a `tipo_gestion`. Conserva los atributos operativos `id_tipo_cop_operativo`, `tipo_cop_revision_pendiente` y `tipo_cop_revision_detalle` como propios, no de la unidad agraria.
 - `bien_afectado`: unidades 1:N (COMPATIBILIDAD LEGACY / TRANSICIÓN). No es la nueva fuente canónica. La migración 037 incorpora vínculos y proyección automática hacia `unidad_agraria` y `afectacion_unidad_agraria` para lograr una migración gradual, pero la fuente canónica futura es `UnidadAgraria` y sus relaciones.
 - `asamblea`: hecho colectivo de `ProyectoNucleo`; separa tipo jurídico y contexto mediante catálogos, puede autorizar varios convenios y referenciar un padrón del mismo núcleo.
@@ -172,6 +173,15 @@ Para 038, se expusieron los endpoints de TramiteRan canónico:
 - `POST /api/tramites-ran/{id_tramite_ran}/eventos`: agregar evento a un trámite RAN.
 - `PATCH /api/eventos-ran/{id_evento_ran}`: actualizar evento RAN.
 
+Para 039, se incorporaron los endpoints del modelo operativo individual y expediente por objetivo:
+- `POST /api/convenios/{id_convenio}/comparecientes` y `GET /api/convenios/{id_convenio}/comparecientes`: gestión de comparecientes y firmantes por convenio.
+- `PATCH /api/convenio-comparecientes/{id_compareciente}` y `DELETE /api/convenio-comparecientes/{id_compareciente}`: actualización y baja lógica de comparecientes.
+- `POST /api/proyecto-nucleo/{id_proyecto_nucleo}/unidades-agrarias`: creación directa de unidad agraria dentro del contexto ProyectoNucleo.
+- `POST /api/unidades-agrarias/{id_unidad_agraria}/titulares` y `GET /api/unidades-agrarias/{id_unidad_agraria}/titulares`: vinculación de titularidades a la unidad agraria.
+- `PATCH /api/unidad-agraria-titulares/{id_unidad_titular}` y `DELETE /api/unidad-agraria-titulares/{id_unidad_titular}`: actualización y baja lógica de titularidades de unidad.
+- `POST /api/proyecto-nucleo/{id_proyecto_nucleo}/requisitos-documentales` con `entidad_tipo` y `entidad_id`: checklist documental por objetivo concreto dentro del ProyectoNucleo.
+- `POST /api/proyecto-nucleo/{id_proyecto_nucleo}/actividades` con `id_afectacion` opcional: actividades de campo general o contextualizadas a una afectación.
+
 La autorización RAN se resuelve mediante `require_ran_procedure_access`, que bifurca según el objetivo del trámite: para Asamblea y Convenio, verifica acceso al `ProyectoNucleo` correspondiente; para ORV, verifica acceso al `NucleoAgrario` del ORV mediante `require_nucleus_access` (que verifica que el usuario tenga al menos un proyecto activo sobre ese núcleo, o sea admin).
 
 Estos endpoints utilizan dependencias `Depends(auth.RoleChecker(READ_ROLES))` para lectura y `CAPTURE_ROLES` para escritura, aplicando `require_nucleus_access` o `require_affectation_access` y preservando obligatoriamente el contexto de auditoría `app.current_user_id`.
@@ -196,9 +206,10 @@ Los flujos principales son:
 - `033_dashboard_modelo_objetivo.sql`: vistas objetivo y KPI.
 - `034_separacion_usuario_runtime_postgresql.sql`: separación owner/runtime, cierre de PUBLIC y default privileges no destructivos.
 - `035_completitud_seguimiento_operativo.sql`: tipo/contexto de Asamblea y metadatos operativos/documentales confirmados por Excel.
-- `036_modelo_operativo_excel_colectivo.sql`: catálogos administrables, datos generales normalizados, bienes, convocatorias, RAN/FIFONAFE repetibles, checklist y trazabilidad tabular. Conserva temporalmente campos legacy como proyección de compatibilidad; su retiro está previsto para una migración posterior a la adaptación completa del frontend (objetivo 038).
+- `036_modelo_operativo_excel_colectivo.sql`: catálogos administrables, datos generales normalizados, bienes, convocatorias, RAN/FIFONAFE repetibles, checklist y trazabilidad tabular.
 - `037_normalizacion_unidad_agraria.sql`: normalización de unidad agraria, relación N:M `AfectacionUnidadAgraria`, alcance TUC y proyección de `BienAfectado`.
 - `038_cierre_legacy_asamblea_ran_fifonafe.sql`: cierre de escrituras legacy de Asamblea/RAN/FIFONAFE, TramiteRan 1:N con contextualización por objetivo (Asamblea/Convenio vía `id_proyecto_nucleo`, ORV vía `id_nucleo`), triggers read-only para campos legacy y validación diferida de completitud FIFONAFE.
+- `039_modelo_operativo_individual_expediente.sql`: modelo operativo individual completo: actividades contextualizadas por afectación, reconciliación y retiro de `no_parcela_ppt` en favor del canónico `no_parcela`, linaje y comparecientes de convenio individual (validación diferida de `UnidadAgraria` compartida), y expediente documental por objetivo (`entidad_tipo`/`entidad_id`).
 
 031 y 032 adquieren advisory lock y abortan antes del DDL si faltan entorno autorizado, confirmación destructiva o respaldo verificado. Las migraciones 001-030 permanecen intactas.
 
@@ -208,23 +219,21 @@ El fixture territorial está separado del seed demo, ordenado de forma determini
 
 La implementación se valida mediante:
 
-- construcción limpia contractual `001` (línea base consolidada que ya incorpora 002/003) `-> fixture territorial -> 004...035 -> 036 -> 037 -> 038`, y actualización incremental `037 -> 038`;
+- construcción limpia contractual `001` (línea base consolidada que ya incorpora 002/003) `-> fixture territorial -> 004...035 -> 036 -> 037 -> 038 -> 039`, y actualización incremental `038 -> 039`;
 - migración desde un respaldo equivalente a 030;
 - pruebas de rollback inducido de los gates 031/032;
 - contrato SQL de tablas, constraints, triggers, ausencia legacy, catálogo y KPI del seed;
 - contrato SQL 038 de cierre legacy y completitud FIFONAFE;
+- contrato SQL 039 de modelo individual, comparecientes y expediente documental por objetivo;
 - configuración completa de mappers SQLAlchemy y OpenAPI;
 - pytest de dominio, auth, RBAC, documentos, GIS, dashboard y exportación;
 - lint/build de frontend y Playwright de los flujos objetivo.
 
 La documentación histórica bajo `docs/historico/` no describe la arquitectura vigente.
 
-## 8. Deuda técnica y compatibilidad
+## 9. Deuda técnica y compatibilidad
 
 No se declaran resueltos todavía:
-- Contrato individual completo.
-- Ampliaciones y ampliaciones remanentes completos.
-- Checklist documental individual completo.
-- Importador Excel individual completo.
-- Mejoras posteriores que pertenezcan a 039.
-(Estas transiciones pertenecen a fases posteriores a la 038).
+- Importador Excel individual completo (automatización masiva / importador tabular individual).
+- Mejoras posteriores que pertenezcan a 040.
+(Estas transiciones pertenecen a fases posteriores a la 039).

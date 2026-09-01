@@ -135,6 +135,19 @@ def require_parcel_access(
     return parcel
 
 
+def require_agricultural_unit_access(
+    db: Session, user: models.Usuario, unit_id: int, *, mode: AccessMode = "read"
+) -> models.UnidadAgraria:
+    unit = db.query(models.UnidadAgraria).filter(
+        models.UnidadAgraria.id_unidad_agraria == unit_id,
+        models.UnidadAgraria.activo.is_(True),
+    ).first()
+    if unit is None:
+        raise HTTPException(status_code=404, detail="Unidad agraria no encontrada")
+    require_nucleus_access(db, user, unit.id_nucleo, mode=mode)
+    return unit
+
+
 def require_affectation_access(
     db: Session,
     user: models.Usuario,

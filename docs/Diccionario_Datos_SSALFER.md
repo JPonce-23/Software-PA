@@ -1,8 +1,8 @@
 # Diccionario de datos SSALFER
 
-> Esquema verificado: PostgreSQL/PostGIS, `schema_migrations = 038`
+> Esquema verificado: PostgreSQL/PostGIS, `schema_migrations = 039`
 > Fecha de verificación: 2026-09-01
-> Alcance: objetos propios vigentes después del reset controlado 031-033, la separación de privilegios 034, la completitud 035, el modelo operativo colectivo normalizado 036, la normalización de unidad agraria 037 y el cierre legacy Asamblea/RAN/FIFONAFE 038.
+> Alcance: objetos propios vigentes después del reset controlado 031-033, la separación de privilegios 034, la completitud 035, el modelo operativo colectivo normalizado 036, la normalización de unidad agraria 037, el cierre legacy Asamblea/RAN/FIFONAFE 038 y el modelo operativo individual y expediente por objetivo 039.
 
 ## 1. Convenciones
 
@@ -111,7 +111,7 @@ La identidad activa normalizada es única por municipio, nombre y tipo. Tiene í
 | `id_parcela` | integer | PK |
 | `id_nucleo` | integer | FK obligatoria |
 | `tipo_parcela` | varchar | `individual`, `copropiedad`, `otro`, `no_determinado` |
-| `no_parcela`, `no_parcela_ppt` | varchar | referencias únicas por núcleo cuando existen |
+| `no_parcela` | varchar | identificador canónico, único por núcleo tras normalizar espacios y mayúsculas/minúsculas |
 | `certificado_parcelario`, `folio_derechos` | varchar | referencias documentales |
 | `constancia_vigencia_fecha` | date | fecha administrativa |
 | `geometria_poligono` | geometry | `MULTIPOLYGON(4326)` opcional |
@@ -127,7 +127,7 @@ Tiene bloque auditable e índice GiST. La geometría no es requisito para la rut
 
 ### `actividad_campo`
 
-`id_actividad` PK; `id_proyecto_nucleo`; `tipo_actividad` (`sensibilizacion`, `caminamiento`); `contexto_actividad` (`general`, `superficie_adicional`, `obras_complementarias`, `otro`); `fecha_programada`; `fecha_realizada`; `responsable`; `resultado`; bloque auditable. No tiene FK a afectación, convenio ni ciclo.
+`id_actividad` PK; `id_proyecto_nucleo`; `id_afectacion` opcional del mismo ProyectoNucleo; `tipo_actividad` (`sensibilizacion`, `caminamiento`); `contexto_actividad` (`general`, `superficie_adicional`, `obras_complementarias`, `otro`); `fecha_programada`; `fecha_realizada`; `responsable`; `resultado`; bloque auditable. NULL en `id_afectacion` representa una actividad general del núcleo.
 
 
 ### `unidad_agraria`
@@ -188,9 +188,13 @@ Un trigger exige que el padrón opcional pertenezca al mismo núcleo. Asamblea n
 | Firma/montos | fechas programada/real; `monto_90`, `monto_100`, `monto_bdt`, `superficie_ha` |
 | RAN (READ-ONLY desde 038) | fecha programada, `ingreso_ran_fecha`, solicitud, calificación e inscripción; proyección del historial RAN, no fuente de escritura |
 
-Ámbito es `colectivo` o `individual`. Los tipos colectivos son `cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`; los individuales agregan `ampliacion` y `ampliacion_remanente` según las reglas del CHECK. `permuta` sólo es modalidad de `cop_original`. Montos y superficie no pueden ser negativos. Incluye bloque auditable. Crear un convenio NO genera automáticamente un `TramiteRan`. La fuente canónica RAN es `tramite_ran` + `tramite_ran_evento`.
+Ámbito es `colectivo` o `individual`. Los tipos colectivos son `cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`; los individuales son `cop_original` (sin padre) y `modificatorio`, `ampliacion`, `ampliacion_remanente` (requieren padre individual del mismo ProyectoNucleo, sin ciclos). `permuta` sólo es modalidad de `cop_original`. Montos y superficie no pueden ser negativos. Incluye bloque auditable. Crear un convenio NO genera automáticamente un `TramiteRan`. La fuente canónica RAN es `tramite_ran` + `tramite_ran_evento`.
 
-`id_asamblea_autorizacion` sólo se admite para convenio colectivo y debe apuntar a una asamblea activa del mismo contexto. Padre e hijo deben compartir contexto y ámbito.
+`id_asamblea_autorizacion` sólo se admite para convenio colectivo y debe apuntar a una asamblea activa del mismo contexto. Padre e hijo deben compartir contexto y ámbito. En el modelo individual (039), crear un convenio hijo NO copia automáticamente las afectaciones del padre; el cliente/API debe asociar las afectaciones correspondientes y un constraint trigger diferido (`fn_039_validar_linaje_unidad_individual`) valida que padre e hijo compartan al menos una `UnidadAgraria` efectivamente vinculada.
+
+### `convenio_compareciente`
+
+`id_compareciente` PK; `id_convenio` FK; `id_persona` FK; `id_parcela_titular` FK opcional; `id_tipo_calidad` e `id_tipo_acreditacion` catalogados; `referencia_acreditacion`; `nombre_en_instrumento`; `es_firmante`; bloque auditable. Un constraint trigger diferido (`fn_039_validar_convenio_compareciente_unidad`) valida que, si se especifica `id_parcela_titular`, la parcela correspondiente pertenezca a una `UnidadAgraria` efectivamente afectada por el convenio. Representa una instantánea auditable de la comparecencia y firma del instrumento sin alterar la titularidad histórica de `parcela_titular`.
 
 ### `convenio_afectacion`
 
@@ -317,11 +321,11 @@ Las funciones N:M usan constraint triggers diferidos para permitir creación tra
 
 ## 10. Objetos técnicos y objetos retirados
 
-`schema_migrations(version, descripcion, aplicada_en)` registra hasta 038. `spatial_ref_sys`, `geometry_columns` y `geography_columns` pertenecen a PostGIS. Los default privileges del owner conceden al rol NOLOGIN sólo `SELECT/INSERT/UPDATE` en tablas futuras y `USAGE/SELECT` en secuencias; PUBLIC no recibe DML ni `CREATE` en `public`.
+`schema_migrations(version, descripcion, aplicada_en)` registra hasta 039. `spatial_ref_sys`, `geometry_columns` y `geography_columns` pertenecen a PostGIS. Los default privileges del owner conceden al rol NOLOGIN sólo `SELECT/INSERT/UPDATE` en tablas futuras y `USAGE/SELECT` en secuencias; PUBLIC no recibe DML ni `CREATE` en `public`.
 
 No existen en el esquema 036 las tablas/vistas funcionales retiradas: `tramo`, `tramo_nucleo`, `afectacion_ciclo`, `usuario_tramo`, `seccion_derecho_via`, `franja_derecho_via`, `candidato_tramo_nucleo`, `carga_geoespacial` ni `carga_geoespacial_feature`. Su historia permanece únicamente en migraciones 001-030.
 
-## 11. Objetos introducidos por el modelo operativo 036
+## 11. Objetos introducidos por el modelo operativo 036 y extendidos en 039
 
 ### `catalogo_operativo` y `catalogo_operativo_alias`
 
@@ -348,7 +352,9 @@ El constraint `chk_tramite_ran_contexto_038` garantiza la integridad. Un trigger
 
 ### Checklist documental
 
-`requisito_documental` define código estable, etiqueta, descripción, etapa, ámbito, obligatoriedad, orden, fuente, vigencia y auditoría. `expediente_requisito` asocia un requisito a `ProyectoNucleo`, opcionalmente a una afectación, asamblea, convenio o trámite FIFONAFE, con estado catalogado, documento, observaciones y auditoría. Un CHECK limita a un objetivo específico por registro y los triggers validan su contexto.
+`requisito_documental` define código estable, etiqueta, descripción, etapa, ámbito, obligatoriedad, orden, fuente, vigencia y auditoría. En 039 se incorporaron requisitos documentales para el expediente individual (`ind_derecho_acreditacion`, `ind_convenio_firmado`, `ind_ran_acuse_ingreso`, `ind_ran_inscripcion`, `ind_fif_*`).
+
+`expediente_requisito` asocia un requisito a `ProyectoNucleo` y opcionalmente a un objetivo específico mediante `entidad_tipo` y `entidad_id` (admitiendo `proyecto_nucleo`, `afectacion`, `parcela`, `parcela_titular`, `unidad_agraria`, `unidad_agraria_titular`, `convenio`, `convenio_compareciente`, `tramite_ran`, `tramite_ran_evento`, `tramite_fifonafe`, `tramite_fifonafe_evento`, `indemnizacion`, `pago`), con estado catalogado, documento, observaciones y auditoría. Un trigger (`fn_039_validar_expediente_requisito_objetivo`) valida que todo objetivo documental pertenezca al `ProyectoNucleo` indicado.
 
 ### Importación tabular
 
