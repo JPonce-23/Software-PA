@@ -499,3 +499,31 @@ def test_15_ran_orv_no_selecciona_arbitrariamente_proyecto_nucleo(api, setup_dom
     # List by ORV
     orv_rans = api("GET", f"/api/orv/{orv_id}/tramites-ran").json()
     assert any(r["id_tramite_ran"] == ran["id_tramite_ran"] for r in orv_rans)
+
+
+def test_16_ran_post_canonico_y_post_legacy_retirado(api, setup_domain):
+    asamblea_id = setup_domain["asamblea"]["id_asamblea"]
+    project_nucleus_id = setup_domain["project_nucleus_id"]
+
+    ran = api(
+        "POST",
+        "/api/tramites-ran",
+        expected=201,
+        json={
+            "id_asamblea": asamblea_id,
+            "referencia_expediente": "CANONICO-POST-038",
+        },
+    ).json()
+    assert ran["id_asamblea"] == asamblea_id
+
+    api(
+        "POST",
+        f"/api/proyecto-nucleo/{project_nucleus_id}/tramites-ran",
+        expected=405,
+        json={"id_asamblea": asamblea_id, "referencia_expediente": "LEGACY-POST-038"},
+    )
+
+    compatibles = api(
+        "GET", f"/api/proyecto-nucleo/{project_nucleus_id}/tramites-ran"
+    ).json()
+    assert any(item["id_tramite_ran"] == ran["id_tramite_ran"] for item in compatibles)

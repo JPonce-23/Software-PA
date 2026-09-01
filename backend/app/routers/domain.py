@@ -1088,20 +1088,6 @@ def list_ran_procedures(
 
 
 @router.post(
-    "/proyecto-nucleo/{id_proyecto_nucleo}/tramites-ran",
-    response_model=schemas.TramiteRanResponse,
-    status_code=201,
-)
-def create_ran_procedure_legacy(
-    id_proyecto_nucleo: int,
-    data: schemas.TramiteRanCreate,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
-):
-    return service.create_ran_procedure(db, data, user)
-
-
-@router.post(
     "/tramites-ran/{id_tramite_ran}/eventos",
     response_model=schemas.TramiteRanEventoResponse,
     status_code=201,

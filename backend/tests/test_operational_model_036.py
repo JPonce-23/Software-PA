@@ -93,7 +93,7 @@ def test_assembly_three_convocations_and_full_ran_history(api, target_domain):
         ("inscripcion", "2026-08-20", "A-2", None),
     ]
     procedure = api(
-        "POST", f"/api/proyecto-nucleo/{pn_id}/tramites-ran", expected=201,
+        "POST", "/api/tramites-ran", expected=201,
         json={
             "id_asamblea": assembly["id_asamblea"],
             "eventos": [
