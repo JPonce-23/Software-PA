@@ -1,8 +1,8 @@
 # Arquitectura actual de SOFTWARE-PA
 
 > Rama verificada: `feature/backend-logica`
-> Esquema vigente: migraciones `001` a `036`
-> Última validación: 2026-08-31
+> Esquema vigente: migraciones `001` a `037`
+> Última validación: 2026-09-01
 > Fuente de verdad: SQL aplicado, modelos SQLAlchemy, contratos Pydantic, API, frontend y pruebas del repositorio.
 
 ## 1. Estado implementado
@@ -16,16 +16,25 @@ Proyecto
 ├── UsuarioProyecto (alcance RBAC)
 ├── TrazoProyecto (MULTILINESTRING 4326)
 └── ProyectoNucleo
-    ├── Referencias históricas
-    ├── Responsables sucesivos
-    ├── Actividades de campo
-    ├── Asambleas -> Convocatorias -> Trámites/eventos RAN
-    ├── Afectaciones -> Bienes agrarios
-    ├── Parcelas del núcleo -> Afectaciones individuales
-    ├── Convenios <-> Afectaciones
-    ├── Convenios -> Trámites/eventos RAN
-    └── FIFONAFE -> Eventos <-> Afectaciones
-                         └── Indemnización -> Pagos
+    ├── Referencias
+    ├── Responsables
+    ├── ActividadesCampo
+    ├── Afectaciones
+    │   └── AfectacionUnidadAgraria N:M
+    ├── Asambleas
+    ├── Convenios
+    ├── TramitesFIFONAFE
+    └── Indemnizaciones
+        └── Pagos
+
+NucleoAgrario
+├── PadronHistorial
+├── ORV
+│   └── Integrantes
+├── Parcelas
+│   └── Titulares
+└── UnidadesAgrarias
+    └── Titulares
 ```
 
 `Tramo`, `TramoNucleo`, `AfectacionCiclo`, `usuario_tramo`, candidatos espaciales y secciones de derecho de vía sólo pueden aparecer en las migraciones históricas o en comprobaciones explícitas de ausencia.
@@ -60,15 +69,19 @@ La salud se expone en `/health` y devuelve la versión efectiva del esquema. Fas
 
 - `persona`, `orv`, `orv_integrante`: personas y órganos históricos del núcleo; órgano, cargo y calidad propietario/suplente se normalizan con catálogo.
 - `padron_historial`: cortes históricos de ejidatarios/comuneros con fuente y documento.
-- `parcela`, `parcela_titular`: unidad individual, titulares y geometría opcional `MULTIPOLYGON(4326)`.
+- `parcela`, `parcela_titular`: estructura existente utilizada por procesos individuales/parcelarios; geometría opcional `MULTIPOLYGON(4326)`.
+- `unidad_agraria`, `unidad_agraria_titular`: identidad estable y generalizada del bien/unidad perteneciente al núcleo agrario (incorporada en 037). Reutiliza `Persona` / `ParcelaTitular` para la titularidad sin duplicar identidades y no debe confundirse con una `Afectacion` (que es el seguimiento administrativo). Se relaciona 1:N opcionalmente con `parcela` si hay geometría explícita o historia parcela.
 
 La falta de geometría de parcela no bloquea una afectación, convenio, trámite o pago.
 
 ### 3.3 Hechos administrativos
 
+- `proyecto_nucleo`: contexto administrativo/operativo del seguimiento entre Proyecto y NucleoAgrario. No debe confundirse con la cartografía (`TrazoProyecto`) que no ejerce autoridad administrativa. Registra los campos TUC (`afecta_tuc`, `id_motivo_no_afecta_tuc`, `tuc_revision_pendiente`, etc.) y documenta cuando `afecta_tuc = false` sin crear afectaciones ficticias.
+- `afectacion_unidad_agraria`: entidad asociativa N:M entre `Afectacion` y `UnidadAgraria`. Una misma UnidadAgraria puede participar en múltiples afectaciones sin duplicarse.
+
 - `actividad_campo`: sensibilización o caminamiento de `ProyectoNucleo`, con contexto, programación y realización.
-- `afectacion`: derecho colectivo o individual. La individual exige parcela; la colectiva puede tener una referencia o FK de parcela porque el ámbito depende de la titularidad, no de `tipo_gestion`.
-- `bien_afectado`: unidades 1:N con tipo de gestión, destino, COP operativo, referencia alfanumérica, titularidad, detalle y superficie administrativa con valor/formato original.
+- `afectacion`: participación de una o más unidades agrarias dentro del seguimiento de un `ProyectoNucleo`. El ámbito (colectivo/individual) se define por `tipo_afectacion`, el cual es distinto a `tipo_gestion`. Conserva los atributos operativos `id_tipo_cop_operativo`, `tipo_cop_revision_pendiente` y `tipo_cop_revision_detalle` como propios, no de la unidad agraria.
+- `bien_afectado`: unidades 1:N (COMPATIBILIDAD LEGACY / TRANSICIÓN). No es la nueva fuente canónica. La migración 037 incorpora vínculos y proyección automática hacia `unidad_agraria` y `afectacion_unidad_agraria` para lograr una migración gradual, pero la fuente canónica futura es `UnidadAgraria` y sus relaciones.
 - `asamblea`: hecho colectivo de `ProyectoNucleo`; separa tipo jurídico y contexto mediante catálogos, puede autorizar varios convenios y referenciar un padrón del mismo núcleo.
 - `asamblea_convocatoria`: intentos 1:N, ordinales y resultados explícitos; permite celebrada, no verificativo, cancelada y reprogramada, con documento.
 - `convenio`: instrumento repetible; se asocia a afectaciones exclusivamente por `convenio_afectacion`.
@@ -139,6 +152,13 @@ La aplicación monta seis routers activos:
 
 PostgreSQL separa identidades técnicas: el owner `pa_app` ejecuta bootstrap y migraciones; `software_pa_app` es `NOLOGIN` y contiene sólo el contrato DML; `pa_runtime` es el LOGIN de FastAPI y hereda únicamente ese rol. Runtime no posee `public` ni tablas, no tiene atributos administrativos, no puede crear en `public` y carece de `DELETE`, `TRUNCATE` y DDL. La migración 034 instala ACL actuales y default privileges para el owner real de migraciones; la contraseña runtime se provisiona fuera del SQL versionado.
 
+Las rutas de API relevantes al seguimiento agrario exigen que las entidades consultadas operen bajo un `ProyectoNucleo` autorizado para el usuario. Para 037, se expusieron los endpoints (usando prefijo `/api`):
+- `POST /api/nucleos/{nucleo_id}/unidades-agrarias` y `GET /api/nucleos/{nucleo_id}/unidades-agrarias` (identidad de los bienes por núcleo).
+- `PATCH /api/unidades-agrarias/{unidad_id}`.
+- `POST /api/afectaciones/{afectacion_id}/unidades-agrarias` y `GET /api/afectaciones/{afectacion_id}/unidades-agrarias` (relación N:M).
+
+Estos endpoints utilizan dependencias `Depends(auth.RoleChecker(READ_ROLES))` para lectura y `CAPTURE_ROLES` para escritura, aplicando `require_nucleus_access` o `require_affectation_access` y preservando obligatoriamente el contexto de auditoría `app.current_user_id`.
+
 ## 6. Frontend
 
 La navegación administrativa implementada es `Proyecto -> Entidad -> Municipio -> Núcleo`. El detalle de `ProyectoNucleo` contiene resumen, datos generales, ORV, padrón, sensibilización, caminamiento, derechos colectivos y parcelas/derechos individuales.
@@ -178,3 +198,15 @@ La implementación se valida mediante:
 - lint/build de frontend y Playwright de los flujos objetivo.
 
 La documentación histórica bajo `docs/historico/` no describe la arquitectura vigente.
+
+## 8. Deuda técnica y compatibilidad
+
+No se declaran resueltos todavía:
+- Cierre de escrituras legacy de Asamblea.
+- Cierre de escrituras legacy RAN.
+- Cierre legacy FIFONAFE.
+- Cardinalidad definitiva TramiteRAN.
+- Contrato individual completo.
+- Checklist documental individual completo.
+- Importador Excel individual completo.
+(Estas transiciones pertenecen a fases posteriores a la 037).

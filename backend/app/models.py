@@ -274,6 +274,12 @@ class ProyectoNucleo(Base, AuditableMixin):
         "TramiteRan", back_populates="proyecto_nucleo", lazy="selectin"
     )
 
+    afecta_tuc = Column(Boolean)
+    id_motivo_no_afecta_tuc = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    motivo_no_afecta_tuc_detalle = Column(Text)
+    tuc_revision_pendiente = Column(Boolean, nullable=False, default=False)
+    tuc_revision_detalle = Column(Text)
+
 
 class ProyectoNucleoResponsable(Base, AuditableMixin):
     __tablename__ = "proyecto_nucleo_responsable"
@@ -469,6 +475,9 @@ class Afectacion(Base, AuditableMixin):
     avaluo_fecha = Column(Date)
     avaluo_referencia = Column(String(150))
     avaluo_institucion = Column(String(150))
+    id_tipo_cop_operativo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    tipo_cop_revision_pendiente = Column(Boolean, nullable=False, default=False)
+    tipo_cop_revision_detalle = Column(Text)
 
     proyecto_nucleo = relationship("ProyectoNucleo", back_populates="afectaciones")
     parcela = relationship("Parcela", back_populates="afectaciones")
@@ -484,6 +493,67 @@ class Afectacion(Base, AuditableMixin):
     bienes = relationship(
         "BienAfectado", back_populates="afectacion", lazy="selectin"
     )
+
+    unidades_agrarias = relationship(
+        "AfectacionUnidadAgraria", back_populates="afectacion", lazy="selectin"
+    )
+
+class UnidadAgraria(Base, AuditableMixin):
+    __tablename__ = "unidad_agraria"
+
+    id_unidad_agraria = Column(BigInteger, primary_key=True)
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"), nullable=False)
+    id_tipo_tierra = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False)
+    id_tipo_gestion = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    id_destino_superficie = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    id_tipo_titularidad = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False)
+    id_parcela = Column(Integer, ForeignKey("parcela.id_parcela"))
+    referencia_alfanumerica = Column(String(150))
+    referencia_normalizada = Column(String(150))
+    detalle = Column(Text)
+    fuente = Column(String(250))
+    requiere_revision = Column(Boolean, nullable=False, default=False)
+    motivo_revision = Column(Text)
+
+    nucleo_agrario = relationship("NucleoAgrario", foreign_keys=[id_nucleo])
+    tipo_tierra = relationship("CatalogoOperativo", foreign_keys=[id_tipo_tierra])
+    tipo_gestion = relationship("CatalogoOperativo", foreign_keys=[id_tipo_gestion])
+    destino_superficie = relationship("CatalogoOperativo", foreign_keys=[id_destino_superficie])
+    tipo_titularidad = relationship("CatalogoOperativo", foreign_keys=[id_tipo_titularidad])
+    parcela = relationship("Parcela", foreign_keys=[id_parcela])
+    titulares = relationship("UnidadAgrariaTitular", back_populates="unidad_agraria", lazy="selectin")
+    afectaciones = relationship("AfectacionUnidadAgraria", back_populates="unidad_agraria")
+
+
+class UnidadAgrariaTitular(Base, AuditableMixin):
+    __tablename__ = "unidad_agraria_titular"
+
+    id_unidad_titular = Column(BigInteger, primary_key=True)
+    id_unidad_agraria = Column(BigInteger, ForeignKey("unidad_agraria.id_unidad_agraria"), nullable=False)
+    id_persona = Column(Integer, ForeignKey("persona.id_persona"))
+    id_parcela_titular = Column(Integer, ForeignKey("parcela_titular.id_parcela_titular"))
+    porcentaje_participacion = Column(Numeric(7, 4))
+    es_principal = Column(Boolean, nullable=False, default=False)
+
+    unidad_agraria = relationship("UnidadAgraria", back_populates="titulares")
+    persona = relationship("Persona", foreign_keys=[id_persona])
+    parcela_titular = relationship("ParcelaTitular", foreign_keys=[id_parcela_titular])
+
+
+class AfectacionUnidadAgraria(Base, AuditableMixin):
+    __tablename__ = "afectacion_unidad_agraria"
+
+    id_afectacion_unidad = Column(BigInteger, primary_key=True)
+    id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"), nullable=False)
+    id_unidad_agraria = Column(BigInteger, ForeignKey("unidad_agraria.id_unidad_agraria"), nullable=False)
+    superficie_preliminar_ha = Column(Numeric(14, 6))
+    superficie_afectada_ha = Column(Numeric(14, 6))
+    superficie_valor_original = Column(String(120))
+    superficie_formato_origen = Column(String(50))
+    fuente = Column(String(250))
+
+    afectacion = relationship("Afectacion", back_populates="unidades_agrarias")
+    unidad_agraria = relationship("UnidadAgraria", back_populates="afectaciones", lazy="selectin")
 
 
 class BienAfectado(Base, AuditableMixin):
@@ -512,6 +582,7 @@ class BienAfectado(Base, AuditableMixin):
     superficie_valor_original = Column(String(120))
     superficie_formato_origen = Column(String(50))
     fuente = Column(String(250))
+    id_unidad_agraria = Column(BigInteger, ForeignKey("unidad_agraria.id_unidad_agraria"))
 
     afectacion = relationship("Afectacion", back_populates="bienes")
     tipo_gestion = relationship("CatalogoOperativo", foreign_keys=[id_tipo_gestion])
@@ -523,6 +594,7 @@ class BienAfectado(Base, AuditableMixin):
     )
     parcela = relationship("Parcela", foreign_keys=[id_parcela])
 
+    unidad_agraria = relationship("UnidadAgraria", foreign_keys=[id_unidad_agraria])
 
 class Asamblea(Base, AuditableMixin):
     __tablename__ = "asamblea"

@@ -1443,3 +1443,68 @@ def assign_project_user(
     user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
 ):
     return service.assign_user_to_project(db, id_proyecto, data, user)
+
+
+@router.post(
+    "/nucleos/{nucleo_id}/unidades-agrarias",
+    response_model=schemas.UnidadAgrariaResponse,
+    status_code=201,
+)
+def create_unidad_agraria(
+    nucleo_id: int,
+    data: schemas.UnidadAgrariaCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.create_unidad_agraria(db, nucleo_id, data, user)
+
+
+@router.get(
+    "/nucleos/{nucleo_id}/unidades-agrarias",
+    response_model=list[schemas.UnidadAgrariaResponse],
+)
+def get_unidades_agrarias_by_nucleo(
+    nucleo_id: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    return service.get_unidades_agrarias_by_nucleo(db, nucleo_id, user)
+
+
+@router.patch(
+    "/unidades-agrarias/{unidad_id}",
+    response_model=schemas.UnidadAgrariaResponse,
+)
+def update_unidad_agraria(
+    unidad_id: int,
+    data: schemas.UnidadAgrariaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.update_unidad_agraria(db, unidad_id, data, user)
+
+
+@router.post(
+    "/afectaciones/{afectacion_id}/unidades-agrarias",
+    response_model=schemas.AfectacionUnidadAgrariaResponse,
+    status_code=201,
+)
+def associate_afectacion_unidad_agraria(
+    afectacion_id: int,
+    data: schemas.AfectacionUnidadAgrariaCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.associate_afectacion_unidad_agraria(db, afectacion_id, data, user)
+
+
+@router.get(
+    "/afectaciones/{afectacion_id}/unidades-agrarias",
+    response_model=list[schemas.AfectacionUnidadAgrariaResponse],
+)
+def get_unidades_agrarias_by_afectacion(
+    afectacion_id: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    return service.get_unidades_agrarias_by_afectacion(db, afectacion_id, user)

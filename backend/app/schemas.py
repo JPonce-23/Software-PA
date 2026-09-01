@@ -243,6 +243,11 @@ class ProyectoNucleoCreate(AuditInput):
     responsable_nombre: str | None = Field(default=None, max_length=300)
     contacto: str | None = Field(default=None, max_length=150)
     referencias: list[ProyectoNucleoReferenciaCreate] = Field(default_factory=list)
+    afecta_tuc: bool | None = None
+    id_motivo_no_afecta_tuc: int | None = Field(default=None, gt=0)
+    motivo_no_afecta_tuc_detalle: str | None = None
+    tuc_revision_pendiente: bool = False
+    tuc_revision_detalle: str | None = None
 
 
 class ProyectoNucleoUpdate(AuditInput):
@@ -251,6 +256,11 @@ class ProyectoNucleoUpdate(AuditInput):
     total_cops_planeados: int | None = Field(default=None, ge=0)
     responsable_nombre: str | None = Field(default=None, max_length=300)
     contacto: str | None = Field(default=None, max_length=150)
+    afecta_tuc: bool | None = None
+    id_motivo_no_afecta_tuc: int | None = Field(default=None, gt=0)
+    motivo_no_afecta_tuc_detalle: str | None = None
+    tuc_revision_pendiente: bool | None = None
+    tuc_revision_detalle: str | None = None
 
 
 class ProyectoNucleoResponse(ProyectoNucleoUpdate, AuditRead):
@@ -486,6 +496,72 @@ class ActividadCampoResponse(ActividadCampoCreate, AuditRead):
     id_proyecto_nucleo: int
 
 
+class UnidadAgrariaTitularBase(BaseModel):
+    id_persona: int | None = Field(default=None, gt=0)
+    id_parcela_titular: int | None = Field(default=None, gt=0)
+    porcentaje_participacion: Decimal | None = Field(default=None, ge=0, le=100)
+    es_principal: bool = False
+
+class UnidadAgrariaTitularCreate(UnidadAgrariaTitularBase, AuditInput):
+    pass
+
+class UnidadAgrariaTitularUpdate(UnidadAgrariaTitularBase, AuditInput):
+    pass
+
+class UnidadAgrariaTitularResponse(UnidadAgrariaTitularBase, AuditRead):
+    id_unidad_titular: int
+    id_unidad_agraria: int
+
+class UnidadAgrariaBase(BaseModel):
+    id_tipo_tierra: int = Field(gt=0)
+    id_tipo_gestion: int | None = Field(default=None, gt=0)
+    id_destino_superficie: int | None = Field(default=None, gt=0)
+    id_tipo_titularidad: int = Field(gt=0)
+    id_parcela: int | None = Field(default=None, gt=0)
+    referencia_alfanumerica: str | None = Field(default=None, max_length=150)
+    detalle: str | None = None
+    fuente: str | None = Field(default=None, max_length=250)
+    requiere_revision: bool = False
+    motivo_revision: str | None = None
+
+class UnidadAgrariaCreate(UnidadAgrariaBase, AuditInput):
+    pass
+
+class UnidadAgrariaUpdate(BaseModel):
+    id_tipo_tierra: int | None = Field(default=None, gt=0)
+    id_tipo_gestion: int | None = Field(default=None, gt=0)
+    id_destino_superficie: int | None = Field(default=None, gt=0)
+    id_tipo_titularidad: int | None = Field(default=None, gt=0)
+    id_parcela: int | None = Field(default=None, gt=0)
+    referencia_alfanumerica: str | None = Field(default=None, max_length=150)
+    detalle: str | None = None
+    fuente: str | None = Field(default=None, max_length=250)
+    requiere_revision: bool | None = None
+    motivo_revision: str | None = None
+    actualizado_por: int | None = Field(default=None, gt=0)
+
+class UnidadAgrariaResponse(UnidadAgrariaBase, AuditRead):
+    id_unidad_agraria: int
+    id_nucleo: int
+    referencia_normalizada: str | None = None
+    titulares: list[UnidadAgrariaTitularResponse] = []
+
+class AfectacionUnidadAgrariaBase(BaseModel):
+    id_unidad_agraria: int = Field(gt=0)
+    superficie_preliminar_ha: Decimal | None = Field(default=None, ge=0)
+    superficie_afectada_ha: Decimal | None = Field(default=None, ge=0)
+    superficie_valor_original: str | None = Field(default=None, max_length=120)
+    superficie_formato_origen: str | None = Field(default=None, max_length=50)
+    fuente: str | None = Field(default=None, max_length=250)
+
+class AfectacionUnidadAgrariaCreate(AfectacionUnidadAgrariaBase, AuditInput):
+    pass
+
+class AfectacionUnidadAgrariaResponse(AfectacionUnidadAgrariaBase, AuditRead):
+    id_afectacion_unidad: int
+    id_afectacion: int
+    unidad_agraria: UnidadAgrariaResponse | None = None
+
 class AfectacionCreate(AuditInput):
     tipo_afectacion: Ambito
     id_parcela: int | None = Field(default=None, gt=0)
@@ -506,6 +582,9 @@ class AfectacionCreate(AuditInput):
     avaluo_referencia: str | None = Field(default=None, max_length=150)
     avaluo_institucion: str | None = Field(default=None, max_length=150)
 
+    id_tipo_cop_operativo: int | None = Field(default=None, gt=0)
+    tipo_cop_revision_pendiente: bool = False
+    tipo_cop_revision_detalle: str | None = None
     @model_validator(mode="after")
     def validar_ambito(self):
         if self.tipo_afectacion == "individual" and self.id_parcela is None:
@@ -534,17 +613,23 @@ class AfectacionUpdate(AuditInput):
     avaluo_fecha: date | None = None
     avaluo_referencia: str | None = Field(default=None, max_length=150)
     avaluo_institucion: str | None = Field(default=None, max_length=150)
+    id_tipo_cop_operativo: int | None = Field(default=None, gt=0)
+    tipo_cop_revision_pendiente: bool | None = None
+    tipo_cop_revision_detalle: str | None = None
 
 
 class AfectacionResponse(AfectacionCreate, AuditRead):
     id_afectacion: int
     id_proyecto_nucleo: int
+    id_tipo_cop_operativo: int | None = None
+    tipo_cop_revision_pendiente: bool = False
+    tipo_cop_revision_detalle: str | None = None
+    unidades_agrarias: list[AfectacionUnidadAgrariaResponse] = Field(default_factory=list)
 
 
 class BienAfectadoCreate(AuditInput):
     id_tipo_gestion: int | None = Field(default=None, gt=0)
     id_destino_superficie: int | None = Field(default=None, gt=0)
-    id_tipo_cop_operativo: int | None = Field(default=None, gt=0)
     id_parcela: int | None = Field(default=None, gt=0)
     tipo_tierra: str | None = Field(default=None, max_length=120)
     referencia_alfanumerica: str | None = Field(default=None, max_length=150)

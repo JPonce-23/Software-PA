@@ -1082,3 +1082,130 @@ def update_entity(
     user: models.Usuario,
 ) -> T:
     return _update(db, entity, data, user.id_usuario)
+
+
+def create_unidad_agraria(
+    db: Session,
+    nucleo_id: int,
+    data: schemas.UnidadAgrariaCreate,
+    user: models.Usuario,
+) -> models.UnidadAgraria:
+    require_nucleus_access(db, user, nucleo_id, mode="capture")
+    entity = models.UnidadAgraria(
+        id_nucleo=nucleo_id,
+        **data.model_dump(exclude_unset=True),
+        creado_por=user.id_usuario,
+    )
+    return _persist(db, entity, user.id_usuario, "La unidad agraria ya existe")
+
+
+def get_unidades_agrarias_by_nucleo(
+    db: Session, nucleo_id: int, user: models.Usuario
+) -> list[models.UnidadAgraria]:
+    require_nucleus_access(db, user, nucleo_id, mode="capture")
+    return (
+        db.query(models.UnidadAgraria)
+        .filter(
+            models.UnidadAgraria.id_nucleo == nucleo_id,
+            models.UnidadAgraria.activo.is_(True),
+        )
+        .all()
+    )
+
+
+def update_unidad_agraria(
+    db: Session, unidad_id: int, data: schemas.UnidadAgrariaUpdate, user: models.Usuario
+) -> models.UnidadAgraria:
+    entity = (
+        db.query(models.UnidadAgraria)
+        .filter(
+            models.UnidadAgraria.id_unidad_agraria == unidad_id,
+            models.UnidadAgraria.activo.is_(True),
+        )
+        .first()
+    )
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Unidad agraria no encontrada")
+    require_nucleus_access(db, user, entity.id_nucleo, mode="capture")
+    return _update(db, entity, data, user.id_usuario)
+
+
+def associate_afectacion_unidad_agraria(
+    db: Session,
+    afectacion_id: int,
+    data: schemas.AfectacionUnidadAgrariaCreate,
+    user: models.Usuario,
+) -> models.AfectacionUnidadAgraria:
+    require_affectation_access(db, user, afectacion_id, mode="capture")
+
+    afectacion = (
+        db.query(models.Afectacion)
+        .filter(
+            models.Afectacion.id_afectacion == afectacion_id,
+            models.Afectacion.activo.is_(True),
+        )
+        .first()
+    )
+    if not afectacion:
+        raise HTTPException(status_code=404, detail="Afectación no encontrada")
+
+    unidad = (
+        db.query(models.UnidadAgraria)
+        .filter(
+            models.UnidadAgraria.id_unidad_agraria == data.id_unidad_agraria,
+            models.UnidadAgraria.activo.is_(True),
+        )
+        .first()
+    )
+    if not unidad:
+        raise HTTPException(status_code=404, detail="Unidad agraria no encontrada")
+
+    # Validate nucleus match
+    proyecto_nucleo = (
+        db.query(models.ProyectoNucleo)
+        .filter(models.ProyectoNucleo.id_proyecto_nucleo == afectacion.id_proyecto_nucleo)
+        .first()
+    )
+    if proyecto_nucleo.id_nucleo != unidad.id_nucleo:
+        raise HTTPException(
+            status_code=409,
+            detail="La unidad agraria pertenece a un núcleo diferente al de la afectación",
+        )
+
+    # Check for duplicate association
+    existing = (
+        db.query(models.AfectacionUnidadAgraria)
+        .filter(
+            models.AfectacionUnidadAgraria.id_afectacion == afectacion_id,
+            models.AfectacionUnidadAgraria.id_unidad_agraria == data.id_unidad_agraria,
+            models.AfectacionUnidadAgraria.activo.is_(True),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="La asociación ya existe")
+
+    entity = models.AfectacionUnidadAgraria(
+        id_afectacion=afectacion_id,
+        **data.model_dump(exclude_unset=True),
+        creado_por=user.id_usuario,
+    )
+    set_audit_context(db, user.id_usuario)
+    db.add(entity)
+    commit_or_conflict(db, "Conflicto de integridad")
+    db.refresh(entity)
+    return entity
+
+
+def get_unidades_agrarias_by_afectacion(
+    db: Session, afectacion_id: int, user: models.Usuario
+) -> list[models.AfectacionUnidadAgraria]:
+    require_affectation_access(db, user, afectacion_id, mode="capture")
+    return (
+        db.query(models.AfectacionUnidadAgraria)
+        .filter(
+            models.AfectacionUnidadAgraria.id_afectacion == afectacion_id,
+            models.AfectacionUnidadAgraria.activo.is_(True),
+        )
+        .all()
+    )
