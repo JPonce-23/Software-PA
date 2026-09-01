@@ -362,3 +362,46 @@ def require_document_access(
         except HTTPException:
             continue
     raise _forbidden()
+
+
+def require_ran_procedure_access(
+    db: Session,
+    user: models.Usuario,
+    procedure_id: int,
+    *,
+    mode: AccessMode = "read",
+) -> models.TramiteRan:
+    procedure = db.query(models.TramiteRan).filter(
+        models.TramiteRan.id_tramite_ran == procedure_id,
+        models.TramiteRan.activo.is_(True),
+    ).first()
+    if procedure is None:
+        raise HTTPException(status_code=404, detail="Trámite RAN no encontrado")
+    if procedure.id_asamblea is not None:
+        if procedure.id_proyecto_nucleo is not None:
+            require_project_nucleus_access(db, user, procedure.id_proyecto_nucleo, mode=mode)
+        else:
+            require_assembly_access(db, user, procedure.id_asamblea, mode=mode)
+    elif procedure.id_convenio is not None:
+        if procedure.id_proyecto_nucleo is not None:
+            require_project_nucleus_access(db, user, procedure.id_proyecto_nucleo, mode=mode)
+        else:
+            require_agreement_access(db, user, procedure.id_convenio, mode=mode)
+    elif procedure.id_orv is not None:
+        if procedure.id_nucleo is not None:
+            require_nucleus_access(db, user, procedure.id_nucleo, mode=mode)
+        else:
+            orv = db.query(models.Orv).filter(
+                models.Orv.id_orv == procedure.id_orv,
+                models.Orv.activo.is_(True),
+            ).first()
+            if orv is None:
+                raise HTTPException(status_code=404, detail="ORV no encontrado")
+            require_nucleus_access(db, user, orv.id_nucleo, mode=mode)
+    elif procedure.id_proyecto_nucleo is not None:
+        require_project_nucleus_access(db, user, procedure.id_proyecto_nucleo, mode=mode)
+    elif procedure.id_nucleo is not None:
+        require_nucleus_access(db, user, procedure.id_nucleo, mode=mode)
+    else:
+        raise _forbidden()
+    return procedure

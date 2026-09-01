@@ -1,7 +1,7 @@
 # Arquitectura actual de SOFTWARE-PA
 
 > Rama verificada: `feature/backend-logica`
-> Esquema vigente: migraciones `001` a `037`
+> Esquema vigente: migraciones `001` a `038`
 > Última validación: 2026-09-01
 > Fuente de verdad: SQL aplicado, modelos SQLAlchemy, contratos Pydantic, API, frontend y pruebas del repositorio.
 
@@ -22,15 +22,19 @@ Proyecto
     ├── Afectaciones
     │   └── AfectacionUnidadAgraria N:M
     ├── Asambleas
+    │   └── TramiteRan 1:N (→ TramiteRanEvento 1:N)
     ├── Convenios
+    │   └── TramiteRan 1:N (→ TramiteRanEvento 1:N)
     ├── TramitesFIFONAFE
+    │   └── TramiteFifonafeEvento 1:N
     └── Indemnizaciones
         └── Pagos
 
 NucleoAgrario
 ├── PadronHistorial
 ├── ORV
-│   └── Integrantes
+│   ├── Integrantes
+│   └── TramiteRan 1:N (→ TramiteRanEvento 1:N)
 ├── Parcelas
 │   └── Titulares
 └── UnidadesAgrarias
@@ -83,10 +87,10 @@ La falta de geometría de parcela no bloquea una afectación, convenio, trámite
 - `afectacion`: participación de una o más unidades agrarias dentro del seguimiento de un `ProyectoNucleo`. El ámbito (colectivo/individual) se define por `tipo_afectacion`, el cual es distinto a `tipo_gestion`. Conserva los atributos operativos `id_tipo_cop_operativo`, `tipo_cop_revision_pendiente` y `tipo_cop_revision_detalle` como propios, no de la unidad agraria.
 - `bien_afectado`: unidades 1:N (COMPATIBILIDAD LEGACY / TRANSICIÓN). No es la nueva fuente canónica. La migración 037 incorpora vínculos y proyección automática hacia `unidad_agraria` y `afectacion_unidad_agraria` para lograr una migración gradual, pero la fuente canónica futura es `UnidadAgraria` y sus relaciones.
 - `asamblea`: hecho colectivo de `ProyectoNucleo`; separa tipo jurídico y contexto mediante catálogos, puede autorizar varios convenios y referenciar un padrón del mismo núcleo.
-- `asamblea_convocatoria`: intentos 1:N, ordinales y resultados explícitos; permite celebrada, no verificativo, cancelada y reprogramada, con documento.
-- `convenio`: instrumento repetible; se asocia a afectaciones exclusivamente por `convenio_afectacion`.
-- `tramite_ran` y `tramite_ran_evento`: expediente registral tipado con FK fuerte a una asamblea, convenio u ORV y secuencia 1:N de ingresos, reingresos, prevenciones, correcciones, desistimientos, calificaciones e inscripciones.
-- `tramite_fifonafe` y `tramite_fifonafe_evento`: trámite y correspondencia repetible; su cobertura N:M permanece en `tramite_fifonafe_afectacion`.
+- `asamblea_convocatoria`: intentos 1:N, ordinales y resultados explícitos; permite celebrada, no verificativo, cancelada y reprogramada, con documento. Los campos legacy de convocatoria en `asamblea` (`fecha_expedicion_primera`, `fecha_programada_primera`, `fecha_expedicion_segunda`, `fecha_programada_segunda`, `fecha_realizada`) y los campos legacy RAN (`fecha_programada_ingreso_ran`, `fecha_ingreso_ran`, `numero_solicitud_ran`, `calificacion_registral_ran`, `fecha_inscripcion_ran`) son READ-ONLY desde 038; los triggers de la migración 038 bloquean escritura directa. La fuente canónica de convocatorias es `asamblea_convocatoria` y la fuente canónica RAN es `tramite_ran` + `tramite_ran_evento`.
+- `convenio`: instrumento repetible; se asocia a afectaciones exclusivamente por `convenio_afectacion`. Los campos RAN legacy (`fecha_programada_ingreso_ran`, `ingreso_ran_fecha`, `numero_solicitud_ingreso`, `calificacion_registral`, `fecha_inscripcion_ran`) son READ-ONLY desde 038. Crear un convenio NO genera automáticamente un `TramiteRan`. La fuente canónica RAN es `tramite_ran` + `tramite_ran_evento`.
+- `tramite_ran` y `tramite_ran_evento`: expediente registral tipado con FK fuerte a una asamblea, convenio u ORV y secuencia 1:N de ingresos, reingresos, prevenciones, correcciones, desistimientos, calificaciones e inscripciones. Desde 038, la cardinalidad es **1:N por objetivo** (ya no existe restricción 1:1). El contexto se bifurca: para Asamblea y Convenio, `id_proyecto_nucleo` NOT NULL e `id_nucleo` NULL; para ORV, `id_nucleo` NOT NULL e `id_proyecto_nucleo` NULL. El constraint `chk_tramite_ran_contexto_038` garantiza la integridad.
+- `tramite_fifonafe` y `tramite_fifonafe_evento`: trámite y correspondencia repetible; su cobertura N:M permanece en `tramite_fifonafe_afectacion`. Los ocho campos legacy de oficios son READ-ONLY desde 038; la fuente canónica es `tramite_fifonafe_evento`. El estatus `completo` requiere los cuatro eventos canónicos con `numero_oficio` y `fecha_oficio` no vacíos, validados por constraint trigger diferido `ctr_038_fifonafe_completo_*`.
 - `indemnizacion`: máximo una activa por afectación; registra la entrega del expediente SICT–PA.
 - `pago`: uno o varios pagos por indemnización.
 
@@ -157,6 +161,19 @@ Las rutas de API relevantes al seguimiento agrario exigen que las entidades cons
 - `PATCH /api/unidades-agrarias/{unidad_id}`.
 - `POST /api/afectaciones/{afectacion_id}/unidades-agrarias` y `GET /api/afectaciones/{afectacion_id}/unidades-agrarias` (relación N:M).
 
+Para 038, se expusieron los endpoints de TramiteRan canónico:
+- `POST /api/tramites-ran`: creación de trámite RAN con objetivo tipado en el payload (`id_asamblea`, `id_convenio` o `id_orv`). El contexto (`id_proyecto_nucleo` o `id_nucleo`) se deriva del objetivo; el cliente no elige un ProyectoNucleo arbitrario para ORV.
+- `GET /api/tramites-ran/{id_tramite_ran}`: detalle de un trámite RAN.
+- `GET /api/asambleas/{id_asamblea}/tramites-ran`: trámites RAN 1:N de una asamblea.
+- `GET /api/convenios/{id_convenio}/tramites-ran`: trámites RAN 1:N de un convenio.
+- `GET /api/orv/{id_orv}/tramites-ran`: trámites RAN 1:N de un ORV.
+- `GET /api/proyecto-nucleo/{id}/tramites-ran`: trámites RAN del ProyectoNucleo (mantiene compatibilidad).
+- `GET /api/tramites-ran/{id_tramite_ran}/eventos`: eventos de un trámite RAN.
+- `POST /api/tramites-ran/{id_tramite_ran}/eventos`: agregar evento a un trámite RAN.
+- `PATCH /api/eventos-ran/{id_evento_ran}`: actualizar evento RAN.
+
+La autorización RAN se resuelve mediante `require_ran_procedure_access`, que bifurca según el objetivo del trámite: para Asamblea y Convenio, verifica acceso al `ProyectoNucleo` correspondiente; para ORV, verifica acceso al `NucleoAgrario` del ORV mediante `require_nucleus_access` (que verifica que el usuario tenga al menos un proyecto activo sobre ese núcleo, o sea admin).
+
 Estos endpoints utilizan dependencias `Depends(auth.RoleChecker(READ_ROLES))` para lectura y `CAPTURE_ROLES` para escritura, aplicando `require_nucleus_access` o `require_affectation_access` y preservando obligatoriamente el contexto de auditoría `app.current_user_id`.
 
 ## 6. Frontend
@@ -180,6 +197,8 @@ Los flujos principales son:
 - `034_separacion_usuario_runtime_postgresql.sql`: separación owner/runtime, cierre de PUBLIC y default privileges no destructivos.
 - `035_completitud_seguimiento_operativo.sql`: tipo/contexto de Asamblea y metadatos operativos/documentales confirmados por Excel.
 - `036_modelo_operativo_excel_colectivo.sql`: catálogos administrables, datos generales normalizados, bienes, convocatorias, RAN/FIFONAFE repetibles, checklist y trazabilidad tabular. Conserva temporalmente campos legacy como proyección de compatibilidad; su retiro está previsto para una migración posterior a la adaptación completa del frontend (objetivo 038).
+- `037_normalizacion_unidad_agraria.sql`: normalización de unidad agraria, relación N:M `AfectacionUnidadAgraria`, alcance TUC y proyección de `BienAfectado`.
+- `038_cierre_legacy_asamblea_ran_fifonafe.sql`: cierre de escrituras legacy de Asamblea/RAN/FIFONAFE, TramiteRan 1:N con contextualización por objetivo (Asamblea/Convenio vía `id_proyecto_nucleo`, ORV vía `id_nucleo`), triggers read-only para campos legacy y validación diferida de completitud FIFONAFE.
 
 031 y 032 adquieren advisory lock y abortan antes del DDL si faltan entorno autorizado, confirmación destructiva o respaldo verificado. Las migraciones 001-030 permanecen intactas.
 
@@ -189,10 +208,11 @@ El fixture territorial está separado del seed demo, ordenado de forma determini
 
 La implementación se valida mediante:
 
-- construcción limpia contractual `001` (línea base consolidada que ya incorpora 002/003) `-> fixture territorial -> 004...035 -> 036`, y actualización incremental `035 -> 036`;
+- construcción limpia contractual `001` (línea base consolidada que ya incorpora 002/003) `-> fixture territorial -> 004...035 -> 036 -> 037 -> 038`, y actualización incremental `037 -> 038`;
 - migración desde un respaldo equivalente a 030;
 - pruebas de rollback inducido de los gates 031/032;
 - contrato SQL de tablas, constraints, triggers, ausencia legacy, catálogo y KPI del seed;
+- contrato SQL 038 de cierre legacy y completitud FIFONAFE;
 - configuración completa de mappers SQLAlchemy y OpenAPI;
 - pytest de dominio, auth, RBAC, documentos, GIS, dashboard y exportación;
 - lint/build de frontend y Playwright de los flujos objetivo.
@@ -202,11 +222,9 @@ La documentación histórica bajo `docs/historico/` no describe la arquitectura 
 ## 8. Deuda técnica y compatibilidad
 
 No se declaran resueltos todavía:
-- Cierre de escrituras legacy de Asamblea.
-- Cierre de escrituras legacy RAN.
-- Cierre legacy FIFONAFE.
-- Cardinalidad definitiva TramiteRAN.
 - Contrato individual completo.
+- Ampliaciones y ampliaciones remanentes completos.
 - Checklist documental individual completo.
 - Importador Excel individual completo.
-(Estas transiciones pertenecen a fases posteriores a la 037).
+- Mejoras posteriores que pertenezcan a 039.
+(Estas transiciones pertenecen a fases posteriores a la 038).

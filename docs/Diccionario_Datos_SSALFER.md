@@ -1,8 +1,8 @@
 # Diccionario de datos SSALFER
 
-> Esquema verificado: PostgreSQL/PostGIS, `schema_migrations = 036`
-> Fecha de verificación: 2026-08-31
-> Alcance: objetos propios vigentes después del reset controlado 031-033, la separación de privilegios 034, la completitud 035 y el modelo operativo colectivo normalizado 036.
+> Esquema verificado: PostgreSQL/PostGIS, `schema_migrations = 038`
+> Fecha de verificación: 2026-09-01
+> Alcance: objetos propios vigentes después del reset controlado 031-033, la separación de privilegios 034, la completitud 035, el modelo operativo colectivo normalizado 036, la normalización de unidad agraria 037 y el cierre legacy Asamblea/RAN/FIFONAFE 038.
 
 ## 1. Convenciones
 
@@ -94,7 +94,7 @@ La identidad activa normalizada es única por municipio, nombre y tipo. Tiene í
 
 ### `orv`
 
-`id_orv` PK; `id_nucleo` FK; `numero_orv`; `inicio_vigencia`; `fin_vigencia`; `estatus_fuente`; `id_estado_registral` catalogado (`no_ingresada`, `en_proceso`, `prevenida`, `inscrita`, `otro`); campos boolean/fecha legacy como proyección; bloque auditable. La fecha final no puede preceder a la inicial.
+`id_orv` PK; `id_nucleo` FK; `numero_orv`; `inicio_vigencia`; `fin_vigencia`; `estatus_fuente`; `id_estado_registral` catalogado (`no_ingresada`, `en_proceso`, `prevenida`, `inscrita`, `otro`); campos boolean/fecha legacy como proyección; bloque auditable. La fecha final no puede preceder a la inicial. `fecha_inscripcion_acta_ran` y cualquier resumen registral conservado en ORV son proyecciones READ-ONLY del historial RAN desde 038; la fuente registral canónica es `tramite_ran` + `tramite_ran_evento`. ORV pertenece al `NucleoAgrario`; no se selecciona ni inventa un `ProyectoNucleo` para contextualizar un trámite registral del ORV.
 
 ### `orv_integrante`
 
@@ -170,13 +170,13 @@ Incluye bloque auditable. CHECK exige parcela sólo para la afectación individu
 
 ### `asamblea`
 
-`id_asamblea` PK; `id_proyecto_nucleo`; `id_padron` opcional; `id_tipo_asamblea` e `id_contexto_asamblea` catalogados; propósito; fecha/resultado de cierre; bloque auditable. Los campos de primera/segunda convocatoria y RAN permanecen temporalmente como proyección legacy, no como fuente canónica.
+`id_asamblea` PK; `id_proyecto_nucleo`; `id_padron` opcional; `id_tipo_asamblea` e `id_contexto_asamblea` catalogados; propósito; fecha/resultado de cierre; bloque auditable. Los campos legacy de convocatoria (`fecha_expedicion_primera`, `fecha_programada_primera`, `fecha_expedicion_segunda`, `fecha_programada_segunda`, `fecha_realizada`) y los campos legacy RAN (`fecha_programada_ingreso_ran`, `fecha_ingreso_ran`, `numero_solicitud_ran`, `calificacion_registral_ran`, `fecha_inscripcion_ran`) son READ-ONLY desde 038: triggers de la migración 038 bloquean escritura directa. La fuente canónica de convocatorias es `asamblea_convocatoria` y la fuente canónica RAN es `tramite_ran` + `tramite_ran_evento`.
 
 ### `asamblea_convocatoria`
 
 `id_convocatoria` PK; `id_asamblea`; `ordinal > 0`; fechas de expedición, programación y realización; `id_resultado` catalogado; observaciones; `id_documento`; bloque auditable. UNIQUE parcial por asamblea+ordinal. Es la fuente canónica repetible para convocatorias y actas de no verificativo.
 
-Un trigger exige que el padrón opcional pertenezca al mismo núcleo. Asamblea no tiene FK a afectación.
+Un trigger exige que el padrón opcional pertenezca al mismo núcleo. Asamblea no tiene FK a afectación. Crear una asamblea NO genera automáticamente un `TramiteRan`.
 
 ### `convenio`
 
@@ -186,9 +186,9 @@ Un trigger exige que el padrón opcional pertenezca al mismo núcleo. Asamblea n
 | Variante | `modalidad_especial`, `descripcion_modalidad`, `descripcion_instrumento` |
 | Relación | `id_convenio_padre`, `id_asamblea_autorizacion` |
 | Firma/montos | fechas programada/real; `monto_90`, `monto_100`, `monto_bdt`, `superficie_ha` |
-| RAN | fecha programada, `ingreso_ran_fecha`, solicitud, calificación e inscripción |
+| RAN (READ-ONLY desde 038) | fecha programada, `ingreso_ran_fecha`, solicitud, calificación e inscripción; proyección del historial RAN, no fuente de escritura |
 
-Ámbito es `colectivo` o `individual`. Los tipos colectivos son `cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`; los individuales agregan `ampliacion` y `ampliacion_remanente` según las reglas del CHECK. `permuta` sólo es modalidad de `cop_original`. Montos y superficie no pueden ser negativos. Incluye bloque auditable.
+Ámbito es `colectivo` o `individual`. Los tipos colectivos son `cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`; los individuales agregan `ampliacion` y `ampliacion_remanente` según las reglas del CHECK. `permuta` sólo es modalidad de `cop_original`. Montos y superficie no pueden ser negativos. Incluye bloque auditable. Crear un convenio NO genera automáticamente un `TramiteRan`. La fuente canónica RAN es `tramite_ran` + `tramite_ran_evento`.
 
 `id_asamblea_autorizacion` sólo se admite para convenio colectivo y debe apuntar a una asamblea activa del mismo contexto. Padre e hijo deben compartir contexto y ámbito.
 
@@ -200,14 +200,14 @@ Triggers normales y diferidos validan contexto, ámbito, entidades activas y que
 
 ### `tramite_fifonafe`
 
-`id_tramite_fifonafe` PK; `id_proyecto_nucleo`; `ambito` colectivo/individual; estatus, acuse, conflictos y bloque auditable. Los cuatro pares históricos siguientes se conservan temporalmente como proyección de compatibilidad:
+`id_tramite_fifonafe` PK; `id_proyecto_nucleo`; `ambito` colectivo/individual; estatus, acuse, conflictos y bloque auditable. Los siguientes campos propios del trámite continúan siendo canónicos: `estatus`, `acuse_fifonafe_fecha`, `hay_conflictos`, `resultado_no_conflictos`. Los cuatro pares históricos de oficios siguientes son READ-ONLY/proyección desde 038; la fuente canónica es `tramite_fifonafe_evento`:
 
 1. `no_oficio_fifonafe_a_dgaopr` / `fecha_oficio_fifonafe_a_dgaopr`;
 2. `no_oficio_dgaopr_a_representacion` / `fecha_oficio_dgaopr_a_representacion`;
 3. `no_oficio_respuesta_representacion_a_dgaopr` / `fecha_oficio_respuesta_representacion_a_dgaopr`;
 4. `no_oficio_respuesta_dgaopr_a_fifonafe` / `fecha_oficio_respuesta_dgaopr_a_fifonafe`.
 
-Además: `hay_conflictos`, `resultado_no_conflictos` y bloque auditable. El estado completo requiere los cuatro pares oficio/fecha y resultado coherente.
+Los triggers de la migración 038 (`trg_038_fifonafe_legacy_readonly`) bloquean escritura directa a estos campos. Además, el estatus `completo` requiere los cuatro eventos canónicos definidos por 038, cada uno con `numero_oficio` y `fecha_oficio` no vacíos, validados por los constraint triggers diferidos `ctr_038_fifonafe_completo_insert` y `ctr_038_fifonafe_completo_update`.
 
 ### `tramite_fifonafe_evento`
 
@@ -317,7 +317,7 @@ Las funciones N:M usan constraint triggers diferidos para permitir creación tra
 
 ## 10. Objetos técnicos y objetos retirados
 
-`schema_migrations(version, descripcion, aplicada_en)` registra hasta 035. `spatial_ref_sys`, `geometry_columns` y `geography_columns` pertenecen a PostGIS. Los default privileges del owner conceden al rol NOLOGIN sólo `SELECT/INSERT/UPDATE` en tablas futuras y `USAGE/SELECT` en secuencias; PUBLIC no recibe DML ni `CREATE` en `public`.
+`schema_migrations(version, descripcion, aplicada_en)` registra hasta 038. `spatial_ref_sys`, `geometry_columns` y `geography_columns` pertenecen a PostGIS. Los default privileges del owner conceden al rol NOLOGIN sólo `SELECT/INSERT/UPDATE` en tablas futuras y `USAGE/SELECT` en secuencias; PUBLIC no recibe DML ni `CREATE` en `public`.
 
 No existen en el esquema 036 las tablas/vistas funcionales retiradas: `tramo`, `tramo_nucleo`, `afectacion_ciclo`, `usuario_tramo`, `seccion_derecho_via`, `franja_derecho_via`, `candidato_tramo_nucleo`, `carga_geoespacial` ni `carga_geoespacial_feature`. Su historia permanece únicamente en migraciones 001-030.
 
@@ -333,7 +333,12 @@ No existen en el esquema 036 las tablas/vistas funcionales retiradas: `tramo`, `
 
 ### `tramite_ran` y `tramite_ran_evento`
 
-`tramite_ran` contiene `id_proyecto_nucleo`, objetivo tipado mediante exactamente una FK no nula (`id_asamblea`, `id_convenio` o `id_orv`), propósito, estado y bloque auditable. Un trigger comprueba que el objetivo pertenece al contexto o núcleo correctos. No se usa una FK polimórfica insegura.
+`tramite_ran` contiene objetivo tipado mediante exactamente una FK no nula (`id_asamblea`, `id_convenio` o `id_orv`), propósito, estado y bloque auditable. Desde 038, la cardinalidad es **1:N por objetivo** (ya no existe restricción 1:1 por unique index). El contexto se bifurca en dos columnas:
+
+- Para Asamblea y Convenio: `id_proyecto_nucleo` NOT NULL, `id_nucleo` NULL.
+- Para ORV: `id_nucleo` NOT NULL, `id_proyecto_nucleo` NULL.
+
+El constraint `chk_tramite_ran_contexto_038` garantiza la integridad. Un trigger (`fn_038_validar_tramite_ran_contexto`) comprueba que el objetivo pertenece al ProyectoNucleo o NucleoAgrario correctos. No se usa una FK polimórfica insegura.
 
 `tramite_ran_evento` contiene trámite, ordinal, tipo catalogado, fecha, intento, número de solicitud, resultado, calificación, folio/referencia, observaciones, documento y bloque auditable. UNIQUE parcial por trámite+ordinal. Ingreso, reingreso, prevención, corrección, desistimiento, calificación e inscripción se preservan como hechos separados.
 
@@ -351,4 +356,4 @@ No existen en el esquema 036 las tablas/vistas funcionales retiradas: `tramo`, `
 
 ## 12. Compatibilidad y deprecación
 
-Los campos planos de convocatoria y RAN en `asamblea`/`convenio`, los cuatro pares de oficio en `tramite_fifonafe`, el tipo de núcleo textual y los responsables planos son exclusivamente compatibilidad. Triggers proyectan desde los modelos canónicos; las nuevas escrituras de API crean eventos canónicos. No deben utilizarse para reportes nuevos. Su retiro se evaluará después de migrar totalmente el frontend, con objetivo documental de migración 038.
+Los campos planos de convocatoria y RAN en `asamblea`/`convenio`, los cuatro pares de oficio en `tramite_fifonafe`, `fecha_inscripcion_acta_ran` en `orv`, el tipo de núcleo textual y los responsables planos son exclusivamente compatibilidad. Desde 038, triggers read-only bloquean escritura directa a estos campos legacy; las funciones de resumen (`fn_038_refrescar_resumen_ran`) proyectan desde los modelos canónicos. Las escrituras de API crean eventos canónicos y no escriben campos legacy. No deben utilizarse para reportes nuevos. Su retiro se evaluará después de migrar totalmente el frontend.

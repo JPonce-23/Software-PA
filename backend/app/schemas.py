@@ -342,7 +342,6 @@ class OrvCreate(AuditInput):
     estatus_fuente: str | None = Field(default=None, max_length=80)
     id_estado_registral: int | None = Field(default=None, gt=0)
     acta_eleccion_inscrita_ran: bool | None = None
-    fecha_inscripcion_acta_ran: date | None = None
 
 
 class OrvUpdate(OrvCreate):
@@ -352,6 +351,7 @@ class OrvUpdate(OrvCreate):
 class OrvResponse(OrvCreate, AuditRead):
     id_orv: int
     id_nucleo: int
+    fecha_inscripcion_acta_ran: date | None = None
     estado_derivado: str | None = None
 
 
@@ -692,17 +692,7 @@ class AsambleaCreate(AuditInput):
     tipo_asamblea: str | None = Field(default=None, max_length=40)
     contexto_proceso: str | None = Field(default=None, max_length=40)
     proposito: str | None = None
-    fecha_expedicion_primera: date | None = None
-    fecha_programada_primera: date | None = None
-    fecha_expedicion_segunda: date | None = None
-    fecha_programada_segunda: date | None = None
-    fecha_realizada: date | None = None
     resultado: str | None = Field(default=None, max_length=50)
-    fecha_programada_ingreso_ran: date | None = None
-    fecha_ingreso_ran: date | None = None
-    numero_solicitud_ran: str | None = Field(default=None, max_length=120)
-    calificacion_registral_ran: str | None = None
-    fecha_inscripcion_ran: date | None = None
     convocatorias: list[AsambleaConvocatoriaCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -728,6 +718,16 @@ class AsambleaUpdate(AsambleaCreate):
 class AsambleaResponse(AsambleaCreate, AuditRead):
     id_asamblea: int
     id_proyecto_nucleo: int
+    fecha_expedicion_primera: date | None = None
+    fecha_programada_primera: date | None = None
+    fecha_expedicion_segunda: date | None = None
+    fecha_programada_segunda: date | None = None
+    fecha_realizada: date | None = None
+    fecha_programada_ingreso_ran: date | None = None
+    fecha_ingreso_ran: date | None = None
+    numero_solicitud_ran: str | None = None
+    calificacion_registral_ran: str | None = None
+    fecha_inscripcion_ran: date | None = None
     convocatorias: list[AsambleaConvocatoriaResponse] = Field(default_factory=list)
 
 
@@ -753,11 +753,6 @@ class ConvenioCreate(AuditInput):
     monto_100: Decimal | None = Field(default=None, ge=0)
     monto_bdt: Decimal | None = Field(default=None, ge=0)
     superficie_ha: Decimal | None = Field(default=None, ge=0)
-    fecha_programada_ingreso_ran: date | None = None
-    ingreso_ran_fecha: date | None = None
-    numero_solicitud_ingreso: str | None = Field(default=None, max_length=120)
-    calificacion_registral: str | None = None
-    fecha_inscripcion_ran: date | None = None
 
     @model_validator(mode="after")
     def validar_instrumento(self):
@@ -799,6 +794,11 @@ class ConvenioResponse(ConvenioCreate, AuditRead):
     id_convenio: int
     id_proyecto_nucleo: int
     ambito: Ambito
+    fecha_programada_ingreso_ran: date | None = None
+    ingreso_ran_fecha: date | None = None
+    numero_solicitud_ingreso: str | None = None
+    calificacion_registral: str | None = None
+    fecha_inscripcion_ran: date | None = None
     afectaciones: list[ConvenioAfectacionResponse] = Field(default_factory=list)
 
 
@@ -847,7 +847,8 @@ class TramiteRanCreate(AuditInput):
 
 class TramiteRanResponse(TramiteRanCreate, AuditRead):
     id_tramite_ran: int
-    id_proyecto_nucleo: int
+    id_proyecto_nucleo: int | None = None
+    id_nucleo: int | None = None
     eventos: list[TramiteRanEventoResponse] = Field(default_factory=list)
 
 
@@ -870,14 +871,6 @@ class TramiteFifonafeCreate(AuditInput):
     ids_afectacion: list[int] = Field(min_length=1)
     estatus: Literal["programado", "pendiente", "completo", "cancelado", "otro"] = "pendiente"
     acuse_fifonafe_fecha: date | None = None
-    no_oficio_fifonafe_a_dgaopr: str | None = Field(default=None, max_length=100)
-    fecha_oficio_fifonafe_a_dgaopr: date | None = None
-    no_oficio_dgaopr_a_representacion: str | None = Field(default=None, max_length=100)
-    fecha_oficio_dgaopr_a_representacion: date | None = None
-    no_oficio_respuesta_representacion_a_dgaopr: str | None = Field(default=None, max_length=100)
-    fecha_oficio_respuesta_representacion_a_dgaopr: date | None = None
-    no_oficio_respuesta_dgaopr_a_fifonafe: str | None = Field(default=None, max_length=100)
-    fecha_oficio_respuesta_dgaopr_a_fifonafe: date | None = None
     hay_conflictos: bool | None = None
     resultado_no_conflictos: str | None = None
     eventos: list[TramiteFifonafeEventoCreate] = Field(default_factory=list)
@@ -893,14 +886,6 @@ class TramiteFifonafeCreate(AuditInput):
 class TramiteFifonafeUpdate(AuditInput):
     estatus: Literal["programado", "pendiente", "completo", "cancelado", "otro"] | None = None
     acuse_fifonafe_fecha: date | None = None
-    no_oficio_fifonafe_a_dgaopr: str | None = Field(default=None, max_length=100)
-    fecha_oficio_fifonafe_a_dgaopr: date | None = None
-    no_oficio_dgaopr_a_representacion: str | None = Field(default=None, max_length=100)
-    fecha_oficio_dgaopr_a_representacion: date | None = None
-    no_oficio_respuesta_representacion_a_dgaopr: str | None = Field(default=None, max_length=100)
-    fecha_oficio_respuesta_representacion_a_dgaopr: date | None = None
-    no_oficio_respuesta_dgaopr_a_fifonafe: str | None = Field(default=None, max_length=100)
-    fecha_oficio_respuesta_dgaopr_a_fifonafe: date | None = None
     hay_conflictos: bool | None = None
     resultado_no_conflictos: str | None = None
 
@@ -916,6 +901,14 @@ class TramiteFifonafeResponse(TramiteFifonafeUpdate, AuditRead):
     id_proyecto_nucleo: int
     ambito: Ambito
     estatus: str
+    no_oficio_fifonafe_a_dgaopr: str | None = None
+    fecha_oficio_fifonafe_a_dgaopr: date | None = None
+    no_oficio_dgaopr_a_representacion: str | None = None
+    fecha_oficio_dgaopr_a_representacion: date | None = None
+    no_oficio_respuesta_representacion_a_dgaopr: str | None = None
+    fecha_oficio_respuesta_representacion_a_dgaopr: date | None = None
+    no_oficio_respuesta_dgaopr_a_fifonafe: str | None = None
+    fecha_oficio_respuesta_dgaopr_a_fifonafe: date | None = None
     afectaciones: list[TramiteFifonafeAfectacionResponse] = Field(default_factory=list)
     eventos: list[TramiteFifonafeEventoResponse] = Field(default_factory=list)
 

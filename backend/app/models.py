@@ -227,6 +227,7 @@ class NucleoAgrario(Base, AuditableMixin):
     orvs = relationship("Orv", back_populates="nucleo", lazy="selectin")
     padrones = relationship("PadronHistorial", back_populates="nucleo", lazy="selectin")
     parcelas = relationship("Parcela", back_populates="nucleo", lazy="selectin")
+    tramites_ran = relationship("TramiteRan", back_populates="nucleo", lazy="selectin")
     tipo_tenencia = relationship("CatalogoOperativo", foreign_keys=[id_tipo_tenencia])
 
 
@@ -726,8 +727,9 @@ class TramiteRan(Base, AuditableMixin):
 
     id_tramite_ran = Column(BigInteger, primary_key=True)
     id_proyecto_nucleo = Column(
-        Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False
+        Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo")
     )
+    id_nucleo = Column(Integer, ForeignKey("nucleo_agrario.id_nucleo"))
     id_asamblea = Column(Integer, ForeignKey("asamblea.id_asamblea"))
     id_convenio = Column(Integer, ForeignKey("convenio.id_convenio"))
     id_orv = Column(Integer, ForeignKey("orv.id_orv"))
@@ -735,6 +737,7 @@ class TramiteRan(Base, AuditableMixin):
     referencia_expediente = Column(String(150))
 
     proyecto_nucleo = relationship("ProyectoNucleo", back_populates="tramites_ran")
+    nucleo = relationship("NucleoAgrario", back_populates="tramites_ran")
     asamblea = relationship("Asamblea", back_populates="tramites_ran")
     convenio = relationship("Convenio", back_populates="tramites_ran")
     orv = relationship("Orv", back_populates="tramites_ran")

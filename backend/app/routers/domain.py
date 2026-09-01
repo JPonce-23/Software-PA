@@ -20,6 +20,7 @@ from ..services.access import (
     require_payment_access,
     require_project_access,
     require_project_nucleus_access,
+    require_ran_procedure_access,
 )
 
 
@@ -996,6 +997,80 @@ def update_convocation(
     return service.update_entity(db, entity, data, user)
 
 
+@router.post(
+    "/tramites-ran",
+    response_model=schemas.TramiteRanResponse,
+    status_code=201,
+)
+def create_ran_procedure(
+    data: schemas.TramiteRanCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.create_ran_procedure(db, data, user)
+
+
+@router.get(
+    "/tramites-ran/{id_tramite_ran}",
+    response_model=schemas.TramiteRanResponse,
+)
+def get_ran_procedure(
+    id_tramite_ran: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    return require_ran_procedure_access(db, user, id_tramite_ran, mode="read")
+
+
+@router.get(
+    "/asambleas/{id_asamblea}/tramites-ran",
+    response_model=list[schemas.TramiteRanResponse],
+)
+def list_assembly_ran_procedures(
+    id_asamblea: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_assembly_access(db, user, id_asamblea, mode="read")
+    return db.query(models.TramiteRan).filter(
+        models.TramiteRan.id_asamblea == id_asamblea,
+        models.TramiteRan.activo.is_(True),
+    ).order_by(models.TramiteRan.creado_en.desc(), models.TramiteRan.id_tramite_ran.desc()).all()
+
+
+@router.get(
+    "/convenios/{id_convenio}/tramites-ran",
+    response_model=list[schemas.TramiteRanResponse],
+)
+def list_agreement_ran_procedures(
+    id_convenio: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_agreement_access(db, user, id_convenio, mode="read")
+    return db.query(models.TramiteRan).filter(
+        models.TramiteRan.id_convenio == id_convenio,
+        models.TramiteRan.activo.is_(True),
+    ).order_by(models.TramiteRan.creado_en.desc(), models.TramiteRan.id_tramite_ran.desc()).all()
+
+
+@router.get(
+    "/orv/{id_orv}/tramites-ran",
+    response_model=list[schemas.TramiteRanResponse],
+)
+def list_orv_ran_procedures(
+    id_orv: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    orv = _active_or_404(db, models.Orv, models.Orv.id_orv, id_orv, "ORV no encontrado")
+    require_nucleus_access(db, user, orv.id_nucleo, mode="read")
+    return db.query(models.TramiteRan).filter(
+        models.TramiteRan.id_orv == id_orv,
+        models.TramiteRan.activo.is_(True),
+    ).order_by(models.TramiteRan.creado_en.desc(), models.TramiteRan.id_tramite_ran.desc()).all()
+
+
 @router.get(
     "/proyecto-nucleo/{id_proyecto_nucleo}/tramites-ran",
     response_model=list[schemas.TramiteRanResponse],
@@ -1005,7 +1080,7 @@ def list_ran_procedures(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, mode="read")
     return db.query(models.TramiteRan).filter(
         models.TramiteRan.id_proyecto_nucleo == id_proyecto_nucleo,
         models.TramiteRan.activo.is_(True),
@@ -1017,13 +1092,13 @@ def list_ran_procedures(
     response_model=schemas.TramiteRanResponse,
     status_code=201,
 )
-def create_ran_procedure(
+def create_ran_procedure_legacy(
     id_proyecto_nucleo: int,
     data: schemas.TramiteRanCreate,
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
-    return service.create_ran_procedure(db, id_proyecto_nucleo, data, user)
+    return service.create_ran_procedure(db, data, user)
 
 
 @router.post(
@@ -1037,11 +1112,24 @@ def add_ran_event(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
-    procedure = _active_or_404(
-        db, models.TramiteRan, models.TramiteRan.id_tramite_ran,
-        id_tramite_ran, "Trámite RAN no encontrado",
-    )
+    procedure = require_ran_procedure_access(db, user, id_tramite_ran, mode="capture")
     return service.add_ran_event(db, procedure, data, user)
+
+
+@router.get(
+    "/tramites-ran/{id_tramite_ran}/eventos",
+    response_model=list[schemas.TramiteRanEventoResponse],
+)
+def list_ran_events(
+    id_tramite_ran: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_ran_procedure_access(db, user, id_tramite_ran, mode="read")
+    return db.query(models.TramiteRanEvento).filter(
+        models.TramiteRanEvento.id_tramite_ran == id_tramite_ran,
+        models.TramiteRanEvento.activo.is_(True),
+    ).order_by(models.TramiteRanEvento.ordinal).all()
 
 
 @router.patch(
@@ -1058,7 +1146,7 @@ def update_ran_event(
         db, models.TramiteRanEvento, models.TramiteRanEvento.id_evento_ran,
         id_evento_ran, "Evento RAN no encontrado",
     )
-    require_project_nucleus_access(db, user, entity.tramite.id_proyecto_nucleo, mode="capture")
+    require_ran_procedure_access(db, user, entity.id_tramite_ran, mode="capture")
     return service.update_entity(db, entity, data, user)
 
 

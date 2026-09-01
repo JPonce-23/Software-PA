@@ -19,6 +19,7 @@ from .access import (
     require_payment_access,
     require_project_access,
     require_project_nucleus_access,
+    require_ran_procedure_access,
 )
 from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_context
 
@@ -582,67 +583,12 @@ def create_assembly(
     db.add(entity)
     try:
         db.flush()
-        convocations = list(data.convocatorias)
-        if not convocations:
-            legacy = (
-                (1, data.fecha_expedicion_primera, data.fecha_programada_primera),
-                (2, data.fecha_expedicion_segunda, data.fecha_programada_segunda),
-            )
-            convocations = [
-                schemas.AsambleaConvocatoriaCreate(
-                    ordinal=ordinal,
-                    fecha_expedicion=issued,
-                    fecha_programada=scheduled,
-                    fecha_realizacion=(data.fecha_realizada if ordinal == 2 or data.fecha_programada_segunda is None else None),
-                )
-                for ordinal, issued, scheduled in legacy if issued or scheduled
-            ]
-        for convocation in convocations:
+        for convocation in data.convocatorias:
             db.add(models.AsambleaConvocatoria(
                 id_asamblea=entity.id_asamblea,
                 **convocation.model_dump(exclude={"observaciones"}),
                 **_audit_values(user.id_usuario, convocation),
             ))
-        if any((
-            data.fecha_programada_ingreso_ran, data.fecha_ingreso_ran,
-            data.numero_solicitud_ran, data.calificacion_registral_ran,
-            data.fecha_inscripcion_ran,
-        )):
-            ran = models.TramiteRan(
-                id_proyecto_nucleo=project_nucleus_id,
-                id_asamblea=entity.id_asamblea,
-                fecha_programada_ingreso=data.fecha_programada_ingreso_ran,
-                creado_por=user.id_usuario,
-                observaciones="Creado desde contrato RAN legacy de Asamblea.",
-            )
-            db.add(ran)
-            db.flush()
-            ordinal = 0
-            if data.fecha_ingreso_ran or data.numero_solicitud_ran:
-                ordinal += 1
-                db.add(models.TramiteRanEvento(
-                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
-                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","ingreso"),
-                    fecha_evento=data.fecha_ingreso_ran,
-                    numero_solicitud=data.numero_solicitud_ran,
-                    creado_por=user.id_usuario,
-                ))
-            if data.calificacion_registral_ran:
-                ordinal += 1
-                db.add(models.TramiteRanEvento(
-                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
-                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","calificacion"),
-                    calificacion=data.calificacion_registral_ran,
-                    creado_por=user.id_usuario,
-                ))
-            if data.fecha_inscripcion_ran:
-                ordinal += 1
-                db.add(models.TramiteRanEvento(
-                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
-                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","inscripcion"),
-                    fecha_evento=data.fecha_inscripcion_ran,
-                    creado_por=user.id_usuario,
-                ))
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -701,14 +647,37 @@ def update_assembly(
 
 def create_ran_procedure(
     db: Session,
-    project_nucleus_id: int,
     data: schemas.TramiteRanCreate,
     user: models.Usuario,
 ) -> models.TramiteRan:
-    require_project_nucleus_access(db, user, project_nucleus_id, mode="capture")
+    id_pn: int | None = None
+    id_nuc: int | None = None
+
+    if data.id_asamblea is not None:
+        asamblea = require_assembly_access(db, user, data.id_asamblea, mode="capture")
+        id_pn = asamblea.id_proyecto_nucleo
+        id_nuc = None
+    elif data.id_convenio is not None:
+        convenio = require_agreement_access(db, user, data.id_convenio, mode="capture")
+        id_pn = convenio.id_proyecto_nucleo
+        id_nuc = None
+    elif data.id_orv is not None:
+        orv = db.query(models.Orv).filter(
+            models.Orv.id_orv == data.id_orv,
+            models.Orv.activo.is_(True),
+        ).first()
+        if orv is None:
+            raise HTTPException(status_code=404, detail="ORV no encontrado")
+        require_nucleus_access(db, user, orv.id_nucleo, mode="capture")
+        id_nuc = orv.id_nucleo
+        id_pn = None
+    else:
+        raise HTTPException(status_code=422, detail="Se requiere un objetivo para el trámite RAN")
+
     set_audit_context(db, user.id_usuario)
     procedure = models.TramiteRan(
-        id_proyecto_nucleo=project_nucleus_id,
+        id_proyecto_nucleo=id_pn,
+        id_nucleo=id_nuc,
         **data.model_dump(exclude={"eventos", "observaciones"}),
         **_audit_values(user.id_usuario, data),
     )
@@ -735,7 +704,7 @@ def add_ran_event(
     data: schemas.TramiteRanEventoCreate,
     user: models.Usuario,
 ) -> models.TramiteRanEvento:
-    require_project_nucleus_access(db, user, procedure.id_proyecto_nucleo, mode="capture")
+    require_ran_procedure_access(db, user, procedure.id_tramite_ran, mode="capture")
     entity = models.TramiteRanEvento(
         id_tramite_ran=procedure.id_tramite_ran,
         **data.model_dump(exclude={"observaciones"}),
@@ -771,46 +740,6 @@ def create_agreement(
                 creado_por=user.id_usuario,
             )
         )
-        if any((
-            data.fecha_programada_ingreso_ran, data.ingreso_ran_fecha,
-            data.numero_solicitud_ingreso, data.calificacion_registral,
-            data.fecha_inscripcion_ran,
-        )):
-            ran = models.TramiteRan(
-                id_proyecto_nucleo=affectation.id_proyecto_nucleo,
-                id_convenio=agreement.id_convenio,
-                fecha_programada_ingreso=data.fecha_programada_ingreso_ran,
-                creado_por=user.id_usuario,
-                observaciones="Creado desde contrato RAN legacy de Convenio.",
-            )
-            db.add(ran)
-            db.flush()
-            ordinal = 0
-            if data.ingreso_ran_fecha or data.numero_solicitud_ingreso:
-                ordinal += 1
-                db.add(models.TramiteRanEvento(
-                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
-                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","ingreso"),
-                    fecha_evento=data.ingreso_ran_fecha,
-                    numero_solicitud=data.numero_solicitud_ingreso,
-                    creado_por=user.id_usuario,
-                ))
-            if data.calificacion_registral:
-                ordinal += 1
-                db.add(models.TramiteRanEvento(
-                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
-                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","calificacion"),
-                    calificacion=data.calificacion_registral,
-                    creado_por=user.id_usuario,
-                ))
-            if data.fecha_inscripcion_ran:
-                ordinal += 1
-                db.add(models.TramiteRanEvento(
-                    id_tramite_ran=ran.id_tramite_ran, ordinal=ordinal,
-                    id_tipo_evento=_catalog_id(db,"tipo_evento_ran","inscripcion"),
-                    fecha_evento=data.fecha_inscripcion_ran,
-                    creado_por=user.id_usuario,
-                ))
         if data.id_convenio_padre is not None:
             parent = require_agreement_access(
                 db, user, data.id_convenio_padre, mode="capture"
@@ -912,23 +841,7 @@ def create_fifonafe(
                     creado_por=user.id_usuario,
                 )
             )
-        events = list(data.eventos)
-        if not events:
-            legacy_events = (
-                ("oficio_fifonafe_dgaopr", "FIFONAFE", "DGAOPR/Representación", data.no_oficio_fifonafe_a_dgaopr, data.fecha_oficio_fifonafe_a_dgaopr),
-                ("oficio_dgaopr_representacion", "DGAOPR", "Representación", data.no_oficio_dgaopr_a_representacion, data.fecha_oficio_dgaopr_a_representacion),
-                ("respuesta_representacion_dgaopr", "Representación", "DGAOPR", data.no_oficio_respuesta_representacion_a_dgaopr, data.fecha_oficio_respuesta_representacion_a_dgaopr),
-                ("respuesta_dgaopr_fifonafe", "DGAOPR/Representación", "FIFONAFE", data.no_oficio_respuesta_dgaopr_a_fifonafe, data.fecha_oficio_respuesta_dgaopr_a_fifonafe),
-            )
-            events = [
-                schemas.TramiteFifonafeEventoCreate(
-                    ordinal=ordinal, id_tipo_evento=_catalog_id(db,"tipo_evento_fifonafe",code),
-                    origen=origin, destino=destination, numero_oficio=number, fecha_oficio=event_date,
-                )
-                for ordinal,(code,origin,destination,number,event_date) in enumerate(legacy_events,1)
-                if number or event_date
-            ]
-        for event in events:
+        for event in data.eventos:
             db.add(models.TramiteFifonafeEvento(
                 id_tramite_fifonafe=procedure.id_tramite_fifonafe,
                 **event.model_dump(exclude={"observaciones"}),
