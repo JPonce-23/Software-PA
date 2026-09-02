@@ -1,4 +1,4 @@
-# Software para la procuraduría agraria (PA)
+# SSALFER (Sistema de Seguimiento de Actividades de Liberación Ferroviaria (PA)
 
 ## Objetivo
 Repositorio para organizar el desarrollo y pruebas del proyecto 
