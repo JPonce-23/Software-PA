@@ -560,6 +560,13 @@ class AfectacionUnidadAgrariaBase(BaseModel):
 class AfectacionUnidadAgrariaCreate(AfectacionUnidadAgrariaBase, AuditInput):
     pass
 
+class AfectacionUnidadAgrariaUpdate(AuditInput):
+    superficie_preliminar_ha: Decimal | None = Field(default=None, ge=0)
+    superficie_afectada_ha: Decimal | None = Field(default=None, ge=0)
+    superficie_valor_original: str | None = Field(default=None, max_length=120)
+    superficie_formato_origen: str | None = Field(default=None, max_length=50)
+    fuente: str | None = Field(default=None, max_length=250)
+
 class AfectacionUnidadAgrariaResponse(AfectacionUnidadAgrariaBase, AuditRead):
     id_afectacion_unidad: int
     id_afectacion: int

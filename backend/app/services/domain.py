@@ -1084,6 +1084,57 @@ def update_unidad_agraria(
     return _update(db, entity, data, user.id_usuario)
 
 
+def delete_unidad_agraria(
+    db: Session, unidad_id: int, motivo: str, user: models.Usuario
+) -> None:
+    entity = require_agricultural_unit_access(db, user, unidad_id, mode="capture")
+
+    has_titular = (
+        db.query(models.UnidadAgrariaTitular.id_unidad_titular)
+        .filter(
+            models.UnidadAgrariaTitular.id_unidad_agraria == unidad_id,
+            models.UnidadAgrariaTitular.activo.is_(True),
+        )
+        .first()
+    )
+    if has_titular:
+        raise HTTPException(
+            status_code=409,
+            detail="La unidad agraria tiene relaciones activas y no puede darse de baja",
+        )
+
+    has_afectacion_unidad = (
+        db.query(models.AfectacionUnidadAgraria.id_afectacion_unidad)
+        .filter(
+            models.AfectacionUnidadAgraria.id_unidad_agraria == unidad_id,
+            models.AfectacionUnidadAgraria.activo.is_(True),
+        )
+        .first()
+    )
+    if has_afectacion_unidad:
+        raise HTTPException(
+            status_code=409,
+            detail="La unidad agraria tiene relaciones activas y no puede darse de baja",
+        )
+
+    if hasattr(models.BienAfectado, "id_unidad_agraria"):
+        has_bien = (
+            db.query(models.BienAfectado.id_bien_afectado)
+            .filter(
+                models.BienAfectado.id_unidad_agraria == unidad_id,
+                models.BienAfectado.activo.is_(True),
+            )
+            .first()
+        )
+        if has_bien:
+            raise HTTPException(
+                status_code=409,
+                detail="La unidad agraria tiene relaciones activas y no puede darse de baja",
+            )
+
+    logical_delete(db, entity, user.id_usuario, motivo)
+
+
 def associate_afectacion_unidad_agraria(
     db: Session,
     afectacion_id: int,

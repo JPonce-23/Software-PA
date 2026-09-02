@@ -1641,6 +1641,17 @@ def get_unidad_agraria(unidad_id: int, db: Session = Depends(get_db), user: mode
     return require_agricultural_unit_access(db, user, unidad_id)
 
 
+@router.delete("/unidades-agrarias/{unidad_id}", response_model=schemas.AuthOperationResponse)
+def delete_unidad_agraria(
+    unidad_id: int,
+    data: schemas.BajaRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    service.delete_unidad_agraria(db, unidad_id, data.motivo, user)
+    return {"detail": "Unidad agraria dada de baja"}
+
+
 @router.get("/unidades-agrarias/{unidad_id}/titulares", response_model=list[schemas.UnidadAgrariaTitularResponse])
 def list_unidad_titulares(unidad_id: int, db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES))):
     from ..services.access import require_agricultural_unit_access
@@ -1694,3 +1705,46 @@ def get_unidades_agrarias_by_afectacion(
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     return service.get_unidades_agrarias_by_afectacion(db, afectacion_id, user)
+
+
+@router.patch(
+    "/afectacion-unidades-agrarias/{id_afectacion_unidad}",
+    response_model=schemas.AfectacionUnidadAgrariaResponse,
+)
+def update_afectacion_unidad_agraria(
+    id_afectacion_unidad: int,
+    data: schemas.AfectacionUnidadAgrariaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db,
+        models.AfectacionUnidadAgraria,
+        models.AfectacionUnidadAgraria.id_afectacion_unidad,
+        id_afectacion_unidad,
+        "Asociación de unidad agraria no encontrada",
+    )
+    require_affectation_access(db, user, entity.id_afectacion, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
+@router.delete(
+    "/afectacion-unidades-agrarias/{id_afectacion_unidad}",
+    response_model=schemas.AuthOperationResponse,
+)
+def delete_afectacion_unidad_agraria(
+    id_afectacion_unidad: int,
+    data: schemas.BajaRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db,
+        models.AfectacionUnidadAgraria,
+        models.AfectacionUnidadAgraria.id_afectacion_unidad,
+        id_afectacion_unidad,
+        "Asociación de unidad agraria no encontrada",
+    )
+    require_affectation_access(db, user, entity.id_afectacion, mode="capture")
+    service.logical_delete(db, entity, user.id_usuario, data.motivo)
+    return {"detail": "Asociación de unidad agraria dada de baja"}

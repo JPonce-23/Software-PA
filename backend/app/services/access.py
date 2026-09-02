@@ -252,6 +252,27 @@ def require_payment_access(
     return payment
 
 
+def _project_ids_for_ran(
+    db: Session,
+    ran: models.TramiteRan | None,
+) -> list[int]:
+    if ran is None or not ran.activo:
+        return []
+    if ran.id_proyecto_nucleo is not None:
+        query = db.query(models.ProyectoNucleo.id_proyecto).filter(
+            models.ProyectoNucleo.id_proyecto_nucleo == ran.id_proyecto_nucleo,
+            models.ProyectoNucleo.activo.is_(True),
+        )
+    elif ran.id_nucleo is not None:
+        query = db.query(models.ProyectoNucleo.id_proyecto).filter(
+            models.ProyectoNucleo.id_nucleo == ran.id_nucleo,
+            models.ProyectoNucleo.activo.is_(True),
+        )
+    else:
+        return []
+    return [row[0] for row in query.distinct().all()]
+
+
 def project_ids_for_document_target(
     db: Session,
     entity_type: str,
@@ -262,29 +283,87 @@ def project_ids_for_document_target(
             models.ProyectoNucleo.id_proyecto_nucleo == entity_id,
             models.ProyectoNucleo.activo.is_(True),
         )
-    elif entity_type in {"nucleo_agrario", "orv", "padron_historial", "parcela"}:
-        nucleus_column = {
-            "nucleo_agrario": models.NucleoAgrario.id_nucleo,
-            "orv": models.Orv.id_nucleo,
-            "padron_historial": models.PadronHistorial.id_nucleo,
-            "parcela": models.Parcela.id_nucleo,
-        }[entity_type]
-        model = {
-            "nucleo_agrario": models.NucleoAgrario,
-            "orv": models.Orv,
-            "padron_historial": models.PadronHistorial,
-            "parcela": models.Parcela,
-        }[entity_type]
-        pk = {
-            "nucleo_agrario": models.NucleoAgrario.id_nucleo,
-            "orv": models.Orv.id_orv,
-            "padron_historial": models.PadronHistorial.id_padron,
-            "parcela": models.Parcela.id_parcela,
+    elif entity_type in {
+        "nucleo_agrario",
+        "orv",
+        "padron_historial",
+        "parcela",
+        "unidad_agraria",
+    }:
+        nucleus_column, model, pk = {
+            "nucleo_agrario": (
+                models.NucleoAgrario.id_nucleo,
+                models.NucleoAgrario,
+                models.NucleoAgrario.id_nucleo,
+            ),
+            "orv": (models.Orv.id_nucleo, models.Orv, models.Orv.id_orv),
+            "padron_historial": (
+                models.PadronHistorial.id_nucleo,
+                models.PadronHistorial,
+                models.PadronHistorial.id_padron,
+            ),
+            "parcela": (
+                models.Parcela.id_nucleo,
+                models.Parcela,
+                models.Parcela.id_parcela,
+            ),
+            "unidad_agraria": (
+                models.UnidadAgraria.id_nucleo,
+                models.UnidadAgraria,
+                models.UnidadAgraria.id_unidad_agraria,
+            ),
         }[entity_type]
         query = db.query(models.ProyectoNucleo.id_proyecto).join(
             model, nucleus_column == models.ProyectoNucleo.id_nucleo
-        ).filter(pk == entity_id, models.ProyectoNucleo.activo.is_(True))
-    elif entity_type in {"afectacion", "asamblea", "convenio", "tramite_fifonafe"}:
+        ).filter(
+            pk == entity_id,
+            model.activo.is_(True),
+            models.ProyectoNucleo.activo.is_(True),
+        )
+    elif entity_type == "parcela_titular":
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.Parcela,
+                models.Parcela.id_nucleo == models.ProyectoNucleo.id_nucleo,
+            )
+            .join(
+                models.ParcelaTitular,
+                models.ParcelaTitular.id_parcela == models.Parcela.id_parcela,
+            )
+            .filter(
+                models.ParcelaTitular.id_parcela_titular == entity_id,
+                models.ParcelaTitular.activo.is_(True),
+                models.Parcela.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
+        )
+    elif entity_type == "unidad_agraria_titular":
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.UnidadAgraria,
+                models.UnidadAgraria.id_nucleo == models.ProyectoNucleo.id_nucleo,
+            )
+            .join(
+                models.UnidadAgrariaTitular,
+                models.UnidadAgrariaTitular.id_unidad_agraria
+                == models.UnidadAgraria.id_unidad_agraria,
+            )
+            .filter(
+                models.UnidadAgrariaTitular.id_unidad_titular == entity_id,
+                models.UnidadAgrariaTitular.activo.is_(True),
+                models.UnidadAgraria.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
+        )
+    elif entity_type in {
+        "afectacion",
+        "asamblea",
+        "convenio",
+        "tramite_fifonafe",
+        "expediente_requisito",
+    }:
         model, pk = {
             "afectacion": (models.Afectacion, models.Afectacion.id_afectacion),
             "asamblea": (models.Asamblea, models.Asamblea.id_asamblea),
@@ -293,35 +372,179 @@ def project_ids_for_document_target(
                 models.TramiteFifonafe,
                 models.TramiteFifonafe.id_tramite_fifonafe,
             ),
+            "expediente_requisito": (
+                models.ExpedienteRequisito,
+                models.ExpedienteRequisito.id_expediente_requisito,
+            ),
         }[entity_type]
         query = db.query(models.ProyectoNucleo.id_proyecto).join(
             model,
             model.id_proyecto_nucleo == models.ProyectoNucleo.id_proyecto_nucleo,
-        ).filter(pk == entity_id, model.activo.is_(True))
-    elif entity_type == "indemnizacion":
-        query = db.query(models.ProyectoNucleo.id_proyecto).join(
-            models.Afectacion,
-            models.Afectacion.id_proyecto_nucleo
-            == models.ProyectoNucleo.id_proyecto_nucleo,
-        ).join(
-            models.Indemnizacion,
-            models.Indemnizacion.id_afectacion == models.Afectacion.id_afectacion,
         ).filter(
-            models.Indemnizacion.id_indemnizacion == entity_id,
-            models.Indemnizacion.activo.is_(True),
+            pk == entity_id,
+            model.activo.is_(True),
+            models.ProyectoNucleo.activo.is_(True),
+        )
+    elif entity_type == "bien_afectado":
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.Afectacion,
+                models.Afectacion.id_proyecto_nucleo
+                == models.ProyectoNucleo.id_proyecto_nucleo,
+            )
+            .join(
+                models.BienAfectado,
+                models.BienAfectado.id_afectacion == models.Afectacion.id_afectacion,
+            )
+            .filter(
+                models.BienAfectado.id_bien_afectado == entity_id,
+                models.BienAfectado.activo.is_(True),
+                models.Afectacion.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
+        )
+    elif entity_type == "afectacion_unidad_agraria":
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.Afectacion,
+                models.Afectacion.id_proyecto_nucleo
+                == models.ProyectoNucleo.id_proyecto_nucleo,
+            )
+            .join(
+                models.AfectacionUnidadAgraria,
+                models.AfectacionUnidadAgraria.id_afectacion
+                == models.Afectacion.id_afectacion,
+            )
+            .filter(
+                models.AfectacionUnidadAgraria.id_afectacion_unidad == entity_id,
+                models.AfectacionUnidadAgraria.activo.is_(True),
+                models.Afectacion.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
+        )
+    elif entity_type == "asamblea_convocatoria":
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.Asamblea,
+                models.Asamblea.id_proyecto_nucleo
+                == models.ProyectoNucleo.id_proyecto_nucleo,
+            )
+            .join(
+                models.AsambleaConvocatoria,
+                models.AsambleaConvocatoria.id_asamblea
+                == models.Asamblea.id_asamblea,
+            )
+            .filter(
+                models.AsambleaConvocatoria.id_convocatoria == entity_id,
+                models.AsambleaConvocatoria.activo.is_(True),
+                models.Asamblea.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
+        )
+    elif entity_type == "convenio_compareciente":
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.Convenio,
+                models.Convenio.id_proyecto_nucleo
+                == models.ProyectoNucleo.id_proyecto_nucleo,
+            )
+            .join(
+                models.ConvenioCompareciente,
+                models.ConvenioCompareciente.id_convenio
+                == models.Convenio.id_convenio,
+            )
+            .filter(
+                models.ConvenioCompareciente.id_compareciente == entity_id,
+                models.ConvenioCompareciente.activo.is_(True),
+                models.Convenio.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
+        )
+    elif entity_type == "tramite_ran":
+        ran = db.query(models.TramiteRan).filter(
+            models.TramiteRan.id_tramite_ran == entity_id,
+            models.TramiteRan.activo.is_(True),
+        ).first()
+        return _project_ids_for_ran(db, ran)
+    elif entity_type == "tramite_ran_evento":
+        event = db.query(models.TramiteRanEvento).join(
+            models.TramiteRan,
+            models.TramiteRan.id_tramite_ran == models.TramiteRanEvento.id_tramite_ran,
+        ).filter(
+            models.TramiteRanEvento.id_evento_ran == entity_id,
+            models.TramiteRanEvento.activo.is_(True),
+            models.TramiteRan.activo.is_(True),
+        ).first()
+        if event is None:
+            return []
+        return _project_ids_for_ran(db, event.tramite)
+    elif entity_type == "tramite_fifonafe_evento":
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.TramiteFifonafe,
+                models.TramiteFifonafe.id_proyecto_nucleo
+                == models.ProyectoNucleo.id_proyecto_nucleo,
+            )
+            .join(
+                models.TramiteFifonafeEvento,
+                models.TramiteFifonafeEvento.id_tramite_fifonafe
+                == models.TramiteFifonafe.id_tramite_fifonafe,
+            )
+            .filter(
+                models.TramiteFifonafeEvento.id_evento_fifonafe == entity_id,
+                models.TramiteFifonafeEvento.activo.is_(True),
+                models.TramiteFifonafe.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
+        )
+    elif entity_type == "indemnizacion":
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.Afectacion,
+                models.Afectacion.id_proyecto_nucleo
+                == models.ProyectoNucleo.id_proyecto_nucleo,
+            )
+            .join(
+                models.Indemnizacion,
+                models.Indemnizacion.id_afectacion == models.Afectacion.id_afectacion,
+            )
+            .filter(
+                models.Indemnizacion.id_indemnizacion == entity_id,
+                models.Indemnizacion.activo.is_(True),
+                models.Afectacion.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
         )
     elif entity_type == "pago":
-        query = db.query(models.ProyectoNucleo.id_proyecto).join(
-            models.Afectacion,
-            models.Afectacion.id_proyecto_nucleo
-            == models.ProyectoNucleo.id_proyecto_nucleo,
-        ).join(
-            models.Indemnizacion,
-            models.Indemnizacion.id_afectacion == models.Afectacion.id_afectacion,
-        ).join(
-            models.Pago,
-            models.Pago.id_indemnizacion == models.Indemnizacion.id_indemnizacion,
-        ).filter(models.Pago.id_pago == entity_id, models.Pago.activo.is_(True))
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.Afectacion,
+                models.Afectacion.id_proyecto_nucleo
+                == models.ProyectoNucleo.id_proyecto_nucleo,
+            )
+            .join(
+                models.Indemnizacion,
+                models.Indemnizacion.id_afectacion == models.Afectacion.id_afectacion,
+            )
+            .join(
+                models.Pago,
+                models.Pago.id_indemnizacion == models.Indemnizacion.id_indemnizacion,
+            )
+            .filter(
+                models.Pago.id_pago == entity_id,
+                models.Pago.activo.is_(True),
+                models.Indemnizacion.activo.is_(True),
+                models.Afectacion.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
+        )
     else:
         raise HTTPException(status_code=422, detail="Tipo documental no permitido")
     return [row[0] for row in query.distinct().all()]
