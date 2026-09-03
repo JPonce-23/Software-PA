@@ -39,6 +39,10 @@ def test_document_version_is_immutable_and_downloadable(
 
 def test_dashboard_does_not_multiply_many_to_many(api, target_domain):
     municipality = target_domain["municipality"]
+    tenancy = {
+        row["codigo"]: row["id_catalogo_opcion"]
+        for row in api("GET", "/api/catalogos/operativos/tipo_tenencia").json()
+    }
     project = api(
         "POST",
         "/api/proyectos",
@@ -55,7 +59,7 @@ def test_dashboard_does_not_multiply_many_to_many(api, target_domain):
         json={
             "id_municipio": municipality["id_municipio"],
             "nombre_nucleo": f"EJIDO KPI {uuid.uuid4().hex[:8]}",
-            "tipo_nucleo": "ejido",
+            "id_tipo_tenencia": tenancy["ejido"],
         },
     ).json()
     pn = api(
@@ -73,7 +77,6 @@ def test_dashboard_does_not_multiply_many_to_many(api, target_domain):
                 expected=201,
                 json={
                     "tipo_afectacion": "colectivo",
-                    "destino_superficie": f"destino_{number}",
                     "superficie_preliminar_ha": surface,
                     "superficie_afectada_ha": surface,
                 },

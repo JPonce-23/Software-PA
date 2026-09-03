@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Uso para un volumen existente, después de aplicar 034:
+# Uso para una base existente, después de aplicar el baseline 001:
 #   set -a; source .env; set +a
 #   docker compose up -d --force-recreate db
 #   backend/scripts/utils/set_runtime_credentials.sh
@@ -46,11 +46,11 @@ docker compose exec -T db psql -X -v ON_ERROR_STOP=1 \
 DO $preflight$
 BEGIN
     IF to_regclass('public.schema_migrations') IS NULL
-       OR NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = '034') THEN
-        RAISE EXCEPTION 'La provisión runtime requiere el esquema 034';
+       OR NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = '001') THEN
+        RAISE EXCEPTION 'La provisión runtime requiere el baseline 001';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'software_pa_app') THEN
-        RAISE EXCEPTION 'Falta el rol NOLOGIN software_pa_app creado por 034';
+        RAISE EXCEPTION 'Falta el rol NOLOGIN software_pa_app creado por bootstrap';
     END IF;
 END
 $preflight$;

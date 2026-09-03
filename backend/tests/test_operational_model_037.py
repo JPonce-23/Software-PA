@@ -11,6 +11,7 @@ def catalogs(api):
     titularidades = api("GET", "/api/catalogos/operativos/tipo_titularidad_unidad").json()
     motivos_tuc = api("GET", "/api/catalogos/operativos/motivo_no_afecta_tuc").json()
     tipos_cop = api("GET", "/api/catalogos/operativos/tipo_cop_operativo").json()
+    tipos_tenencia = api("GET", "/api/catalogos/operativos/tipo_tenencia").json()
 
     return {
         "tipo_tierra": tipo_tierras[0]["id_catalogo_opcion"],
@@ -18,7 +19,8 @@ def catalogs(api):
         "destino_parcela_escolar": next(c["id_catalogo_opcion"] for c in destinos if c["codigo"] == "parcela_escolar"),
         "titularidad": titularidades[0]["id_catalogo_opcion"],
         "motivo_tuc": motivos_tuc[0]["id_catalogo_opcion"] if motivos_tuc else None,
-        "tipo_cop_origen": next(c["id_catalogo_opcion"] for c in tipos_cop if c["codigo"] == "ORIGEN")
+        "tipo_cop_origen": next(c["id_catalogo_opcion"] for c in tipos_cop if c["codigo"] == "ORIGEN"),
+        "tipo_tenencia_ejido": next(c["id_catalogo_opcion"] for c in tipos_tenencia if c["codigo"] == "ejido"),
     }
 
 def test_01_crear_unidad_agraria(api, target_domain, catalogs):
@@ -78,11 +80,12 @@ def test_05_rechazar_asociacion_otro_nucleo(api, target_domain, catalogs):
 
     uid = uuid.uuid4().hex[:6]
     nuc2 = api("POST", "/api/nucleos", json={
-        "id_municipio": mun_id, "nombre_nucleo": f"NUC-2-{uid}", "tipo_nucleo": "ejido", "fuente_datos": "qa"
+        "id_municipio": mun_id, "nombre_nucleo": f"NUC-2-{uid}",
+        "id_tipo_tenencia": catalogs["tipo_tenencia_ejido"], "fuente_datos": "qa"
     }, expected=201).json()
 
     api("POST", f"/api/proyectos/{proj_id}/nucleos", json={
-        "id_nucleo": nuc2["id_nucleo"], "residencia": "RES2", "referencias": []
+        "id_nucleo": nuc2["id_nucleo"], "referencias": []
     }, expected=201)
 
     ua2 = api("POST", f"/api/nucleos/{nuc2['id_nucleo']}/unidades-agrarias", json={
@@ -137,8 +140,7 @@ def test_08_individual_con_parcela_valido(api, target_domain, catalogs):
     }, expected=201).json()
 
     af = api("POST", f"/api/proyecto-nucleo/{pn_id}/afectaciones", json={
-        "tipo_afectacion": "individual",
-        "id_parcela": parcel["id_parcela"]
+        "tipo_afectacion": "individual"
     }, expected=201).json()
 
     ua = api("POST", f"/api/nucleos/{target_domain['nucleus']['id_nucleo']}/unidades-agrarias", json={

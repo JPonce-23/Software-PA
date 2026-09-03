@@ -62,7 +62,6 @@ def test_afectacion_unidad_agraria_lifecycle_and_patch(api, target_domain, catal
         expected=201,
         json={
             "tipo_afectacion": "individual",
-            "id_parcela": parcela["id_parcela"],
             "superficie_preliminar_ha": "1.000000",
             "superficie_afectada_ha": "1.000000",
         },
@@ -123,20 +122,17 @@ def test_afectacion_unidad_agraria_lifecycle_and_patch(api, target_domain, catal
     assert Decimal(str(matched["superficie_afectada_ha"])) == Decimal("3.250000")
     assert matched["fuente"] == "Levantamiento topográfico 2026"
 
-    # 6. Verify identity cannot be changed via PATCH payload
-    tampered = api(
+    # 6. Identity fields are rejected by the canonical PATCH contract.
+    api(
         "PATCH",
         f"/api/afectacion-unidades-agrarias/{assoc_id}",
-        expected=200,
+        expected=422,
         json={
             "id_afectacion": 99999,
             "id_unidad_agraria": 99999,
             "fuente": "Intento de cambio de identidad",
         },
-    ).json()
-    assert tampered["id_afectacion"] == af_id
-    assert tampered["id_unidad_agraria"] == ua_id
-    assert tampered["fuente"] == "Intento de cambio de identidad"
+    )
 
     # 7. Logical delete
     del_res = api(
@@ -178,7 +174,7 @@ def test_document_target_lifecycle_with_affectation_unit(api, target_domain, cat
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",
         expected=201,
-        json={"tipo_afectacion": "individual", "id_parcela": parcela["id_parcela"]},
+        json={"tipo_afectacion": "individual"},
     ).json()
     assoc = api(
         "POST",
@@ -260,7 +256,7 @@ def test_negatives_afectacion_unidad_agraria(api, target_domain, catalogs):
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",
         expected=201,
-        json={"tipo_afectacion": "individual", "id_parcela": parcela["id_parcela"]},
+        json={"tipo_afectacion": "individual"},
     ).json()
     assoc = api(
         "POST",
@@ -306,7 +302,10 @@ def test_negatives_afectacion_unidad_agraria(api, target_domain, catalogs):
         json={
             "id_municipio": municipality["id_municipio"],
             "nombre_nucleo": f"OTRO NUCLEO {uuid.uuid4().hex[:8]}",
-            "tipo_nucleo": "ejido",
+            "id_tipo_tenencia": {
+                x["codigo"]: x["id_catalogo_opcion"]
+                for x in api("GET", "/api/catalogos/operativos/tipo_tenencia").json()
+            }["ejido"],
         },
     ).json()
     other_unit = api(

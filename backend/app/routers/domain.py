@@ -531,7 +531,11 @@ def list_orv_members(
         models.OrvIntegrante.id_orv == id_orv,
         models.OrvIntegrante.activo.is_(True),
         models.Persona.activo.is_(True),
-    ).order_by(models.OrvIntegrante.cargo, models.Persona.nombre).all()
+    ).order_by(
+        models.OrvIntegrante.id_organo,
+        models.OrvIntegrante.id_cargo,
+        models.Persona.nombre,
+    ).all()
     return [
         {
             **schemas.OrvIntegranteResponse.model_validate(link).model_dump(),
@@ -861,54 +865,6 @@ def delete_affectation(
 
 
 @router.get(
-    "/afectaciones/{id_afectacion}/bienes",
-    response_model=list[schemas.BienAfectadoResponse],
-)
-def list_affected_assets(
-    id_afectacion: int,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
-):
-    require_affectation_access(db, user, id_afectacion)
-    return db.query(models.BienAfectado).filter(
-        models.BienAfectado.id_afectacion == id_afectacion,
-        models.BienAfectado.activo.is_(True),
-    ).order_by(models.BienAfectado.id_bien_afectado).all()
-
-
-@router.post(
-    "/afectaciones/{id_afectacion}/bienes",
-    response_model=schemas.BienAfectadoResponse,
-    status_code=201,
-)
-def create_affected_asset(
-    id_afectacion: int,
-    data: schemas.BienAfectadoCreate,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
-):
-    return service.create_affected_asset(db, id_afectacion, data, user)
-
-
-@router.patch(
-    "/bienes-afectados/{id_bien_afectado}",
-    response_model=schemas.BienAfectadoResponse,
-)
-def update_affected_asset(
-    id_bien_afectado: int,
-    data: schemas.BienAfectadoUpdate,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
-):
-    entity = _active_or_404(
-        db, models.BienAfectado, models.BienAfectado.id_bien_afectado,
-        id_bien_afectado, "Bien afectado no encontrado",
-    )
-    require_affectation_access(db, user, entity.id_afectacion, mode="capture")
-    return service.update_entity(db, entity, data, user)
-
-
-@router.get(
     "/proyecto-nucleo/{id_proyecto_nucleo}/asambleas",
     response_model=list[schemas.AsambleaResponse],
 )
@@ -921,7 +877,7 @@ def list_assemblies(
     return db.query(models.Asamblea).filter(
         models.Asamblea.id_proyecto_nucleo == id_proyecto_nucleo,
         models.Asamblea.activo.is_(True),
-    ).order_by(models.Asamblea.fecha_realizada.desc().nullslast()).all()
+    ).order_by(models.Asamblea.id_asamblea.desc()).all()
 
 
 @router.post(

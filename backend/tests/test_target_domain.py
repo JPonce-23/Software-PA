@@ -1,6 +1,13 @@
 import uuid
 
 
+def _catalog(api, name: str) -> dict[str, int]:
+    return {
+        row["codigo"]: row["id_catalogo_opcion"]
+        for row in api("GET", f"/api/catalogos/operativos/{name}").json()
+    }
+
+
 def test_territorial_fixture_contract(api):
     states = api("GET", "/api/catalogos/entidades").json()
     municipalities = api("GET", "/api/catalogos/municipios").json()
@@ -46,6 +53,10 @@ def test_project_nucleus_unique_and_multiple_references(api, target_domain):
 def test_orv_register_holders_and_geometry_optional(api, target_domain):
     project_id = target_domain["project"]["id_proyecto"]
     pn_id = target_domain["project_nucleus"]["id_proyecto_nucleo"]
+    states = _catalog(api, "estado_registral_orv")
+    organs = _catalog(api, "organo_orv")
+    positions = _catalog(api, "cargo_orv")
+    qualities = _catalog(api, "calidad_integrante_orv")
     person = api(
         "POST",
         f"/api/proyectos/{project_id}/personas",
@@ -57,7 +68,8 @@ def test_orv_register_holders_and_geometry_optional(api, target_domain):
             "origen_registro": "qa",
         },
     ).json()
-    orv = api(
+    existing_orv = api("GET", f"/api/proyecto-nucleo/{pn_id}/orv").json()
+    orv = existing_orv[0] if existing_orv else api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/orv",
         expected=201,
@@ -65,14 +77,19 @@ def test_orv_register_holders_and_geometry_optional(api, target_domain):
             "numero_orv": f"ORV-{uuid.uuid4().hex[:8]}",
             "inicio_vigencia": "2026-01-01",
             "fin_vigencia": "2028-12-31",
-            "acta_eleccion_inscrita_ran": True,
+            "id_estado_registral": states["inscrita"],
         },
     ).json()
     member = api(
         "POST",
         f"/api/orv/{orv['id_orv']}/integrantes",
         expected=201,
-        json={"id_persona": person["id_persona"], "cargo": "Presidencia"},
+        json={
+            "id_persona": person["id_persona"],
+            "id_organo": organs["comisariado"],
+            "id_cargo": positions["presidente"],
+            "id_calidad": qualities["propietario"],
+        },
     ).json()
     assert member["id_persona"] == person["id_persona"]
     register = api(
@@ -103,22 +120,19 @@ def test_orv_register_holders_and_geometry_optional(api, target_domain):
 
 def test_affectation_scope_rules(api, target_domain):
     pn_id = target_domain["project_nucleus"]["id_proyecto_nucleo"]
-    parcel_id = target_domain["parcels"][0]["id_parcela"]
-    collective_with_parcel = api(
+    collective = api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",
         expected=201,
-        json={"tipo_afectacion": "colectivo", "id_parcela": parcel_id},
+        json={"tipo_afectacion": "colectivo"},
     ).json()
-    assert collective_with_parcel["tipo_afectacion"] == "colectivo"
-    assert collective_with_parcel["id_parcela"] == parcel_id
-    individual_without_parcel = api(
+    assert collective["tipo_afectacion"] == "colectivo"
+    individual = api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",
-        expected=422,
+        expected=201,
         json={"tipo_afectacion": "individual"},
-    )
-    assert individual_without_parcel.status_code == 422
+    ).json()
 
     municipality_id = target_domain["municipality"]["id_municipio"]
     other_nucleus = api(
@@ -128,7 +142,7 @@ def test_affectation_scope_rules(api, target_domain):
         json={
             "id_municipio": municipality_id,
             "nombre_nucleo": f"OTRO EJIDO QA {uuid.uuid4().hex[:8]}",
-            "tipo_nucleo": "ejido",
+            "id_tipo_tenencia": _catalog(api, "tipo_tenencia")["ejido"],
         },
     ).json()
     other_pn = api(
@@ -143,30 +157,45 @@ def test_affectation_scope_rules(api, target_domain):
         expected=201,
         json={"tipo_parcela": "individual", "no_parcela": "CRUZADA-QA"},
     ).json()
-    crossed = api(
+    other_unit = api(
         "POST",
-        f"/api/proyecto-nucleo/{pn_id}/afectaciones",
-        expected=409,
+        f"/api/proyecto-nucleo/{other_pn['id_proyecto_nucleo']}/unidades-agrarias",
+        expected=201,
         json={
-            "tipo_afectacion": "individual",
+            "id_tipo_tierra": _catalog(api, "tipo_tierra")["parcelada"],
+            "id_tipo_titularidad": _catalog(api, "tipo_titularidad_unidad")["persona"],
             "id_parcela": other_parcel["id_parcela"],
         },
+    ).json()
+    crossed = api(
+        "POST",
+        f"/api/afectaciones/{individual['id_afectacion']}/unidades-agrarias",
+        expected=409,
+        json={"id_unidad_agraria": other_unit["id_unidad_agraria"]},
     )
-    assert "parcela" in crossed.json()["detail"].lower()
+    assert "nucleo" in crossed.json()["detail"].lower().replace("ú", "u")
 
 
 def test_shared_assembly_agreement_many_to_many_and_permuta(api, target_domain):
     pn_id = target_domain["project_nucleus"]["id_proyecto_nucleo"]
+    assembly_types = _catalog(api, "tipo_asamblea")
+    assembly_contexts = _catalog(api, "contexto_asamblea")
+    convocation_results = _catalog(api, "resultado_convocatoria")
     assembly = api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/asambleas",
         expected=201,
         json={
-            "tipo_asamblea": "anuencia",
-            "fecha_realizada": "2026-05-10",
-            "fecha_ingreso_ran": "2026-05-12",
-            "numero_solicitud_ran": f"RAN-ACTA-{uuid.uuid4().hex[:8]}",
-            "fecha_inscripcion_ran": "2026-06-01",
+            "id_tipo_asamblea": assembly_types["anuencia"],
+            "id_contexto_asamblea": assembly_contexts["cop_original"],
+            "convocatorias": [
+                {
+                    "ordinal": 1,
+                    "fecha_programada": "2026-05-10",
+                    "fecha_realizacion": "2026-05-10",
+                    "id_resultado": convocation_results["celebrada"],
+                }
+            ],
         },
     ).json()
     first, second = target_domain["collective"]
@@ -188,17 +217,6 @@ def test_shared_assembly_agreement_many_to_many_and_permuta(api, target_domain):
         json={"id_afectacion": second["id_afectacion"]},
     ).json()
     assert additional["rol"] == "adicional"
-    second_agreement = api(
-        "POST",
-        f"/api/afectaciones/{second['id_afectacion']}/convenios",
-        expected=201,
-        json={
-            "tipo_convenio": "modificatorio",
-            "id_asamblea_autorizacion": assembly["id_asamblea"],
-        },
-    ).json()
-    assert second_agreement["id_asamblea_autorizacion"] == assembly["id_asamblea"]
-
     individual = target_domain["individual"][0]
     permuta = api(
         "POST",
@@ -225,6 +243,7 @@ def test_shared_assembly_agreement_many_to_many_and_permuta(api, target_domain):
 def test_shared_fifonafe_indemnity_and_multiple_payments(api, target_domain):
     pn_id = target_domain["project_nucleus"]["id_proyecto_nucleo"]
     individuals = target_domain["individual"]
+    event_types = _catalog(api, "tipo_evento_fifonafe")
     procedure = api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/fifonafe",
@@ -232,14 +251,23 @@ def test_shared_fifonafe_indemnity_and_multiple_payments(api, target_domain):
         json={
             "ids_afectacion": [item["id_afectacion"] for item in individuals],
             "estatus": "completo",
-            "no_oficio_fifonafe_a_dgaopr": "QA-OF-1",
-            "fecha_oficio_fifonafe_a_dgaopr": "2026-01-01",
-            "no_oficio_dgaopr_a_representacion": "QA-OF-2",
-            "fecha_oficio_dgaopr_a_representacion": "2026-01-02",
-            "no_oficio_respuesta_representacion_a_dgaopr": "QA-OF-3",
-            "fecha_oficio_respuesta_representacion_a_dgaopr": "2026-01-03",
-            "no_oficio_respuesta_dgaopr_a_fifonafe": "QA-OF-4",
-            "fecha_oficio_respuesta_dgaopr_a_fifonafe": "2026-01-04",
+            "eventos": [
+                {
+                    "ordinal": ordinal,
+                    "id_tipo_evento": event_types[code],
+                    "numero_oficio": f"QA-OF-{ordinal}",
+                    "fecha_oficio": f"2026-01-0{ordinal}",
+                }
+                for ordinal, code in enumerate(
+                    (
+                        "oficio_fifonafe_dgaopr",
+                        "oficio_dgaopr_representacion",
+                        "respuesta_representacion_dgaopr",
+                        "respuesta_dgaopr_fifonafe",
+                    ),
+                    start=1,
+                )
+            ],
             "hay_conflictos": False,
             "resultado_no_conflictos": "Sin conflictos QA",
         },
@@ -295,7 +323,7 @@ def test_logical_deletion(api, target_domain):
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",
         expected=201,
-        json={"tipo_afectacion": "colectivo", "destino_superficie": "solar_qa"},
+        json={"tipo_afectacion": "colectivo"},
     ).json()
     api(
         "DELETE",

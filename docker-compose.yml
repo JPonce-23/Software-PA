@@ -40,8 +40,10 @@ services:
       - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/db/migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql:ro
-      - ./backend/db/init/002_create_runtime.sh:/docker-entrypoint-initdb.d/002_create_runtime.sh:ro
+      - ./backend/db/init/001_bootstrap_roles.sh:/docker-entrypoint-initdb.d/001_bootstrap_roles.sh:ro
+      - ./backend/db/init/002_apply_migrations.sh:/docker-entrypoint-initdb.d/002_apply_migrations.sh:ro
+      - ./backend/db/migrations:/opt/software-pa/migrations:ro
+      - ./backend/scripts/run_migrations.sh:/opt/software-pa/scripts/run_migrations.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s

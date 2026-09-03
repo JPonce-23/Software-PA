@@ -1,5 +1,11 @@
 # ESTADO DEL PROYECTO — SOFTWARE-PA
 
+> **ARCHIVO HISTÓRICO.** Desde Baseline V1 este documento no es una guía de
+> instalación ni la fuente del esquema vigente. Para el estado actual consulte
+> `docs/Arquitectura_Actual.md`, `docs/Diccionario_Datos_SSALFER.md` y
+> `docs/migraciones.md`. Las rutas y versiones 001–039 que siguen abajo se
+> conservan únicamente como trazabilidad en Git.
+>
 > **Documento de continuidad para personas y agentes de IA.**
 > Leer completo antes de proponer o modificar código. No asumir que la
 > numeración de las fases operativas, los cortes principales y los subcortes de

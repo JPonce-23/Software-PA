@@ -138,14 +138,12 @@ def create_nucleus(
         db,
         "tipo_tenencia",
         option_id=data.id_tipo_tenencia,
-        code=data.tipo_nucleo,
         required=True,
     )
-    values = data.model_dump(exclude={"observaciones", "id_tipo_tenencia", "tipo_nucleo"})
+    values = data.model_dump(exclude={"observaciones", "id_tipo_tenencia"})
     entity = models.NucleoAgrario(
         **values,
         id_tipo_tenencia=option.id_catalogo_opcion,
-        tipo_nucleo=option.codigo,
         **_audit_values(user.id_usuario, data),
     )
     return _persist(db, entity, user.id_usuario, "El núcleo agrario ya existe")
@@ -158,14 +156,13 @@ def update_nucleus(
     user: models.Usuario,
 ) -> models.NucleoAgrario:
     values = data.model_dump(exclude_unset=True, exclude={"observaciones"})
-    if "id_tipo_tenencia" in values or "tipo_nucleo" in values:
+    if "id_tipo_tenencia" in values:
         option = require_catalog_option(
             db, "tipo_tenencia",
             option_id=values.pop("id_tipo_tenencia", None),
-            code=values.pop("tipo_nucleo", None), required=True,
+            required=True,
         )
         values["id_tipo_tenencia"] = option.id_catalogo_opcion
-        values["tipo_nucleo"] = option.codigo
     set_audit_context(db, user.id_usuario)
     for key, value in values.items():
         setattr(entity, key, value)
@@ -218,10 +215,7 @@ def create_project_nucleus(
         id_proyecto=project_id,
         id_nucleo=data.id_nucleo,
         id_residencia=residence.id_catalogo_opcion if residence else None,
-        residencia=residence.nombre if residence else data.residencia,
         total_cops_planeados=data.total_cops_planeados,
-        responsable_nombre=data.responsable_nombre,
-        contacto=data.contacto,
         **_audit_values(user.id_usuario, data),
     )
     db.add(record)
@@ -258,7 +252,6 @@ def update_project_nucleus(
             db, "residencia", option_id=values.pop("id_residencia"), required=False
         )
         values["id_residencia"] = option.id_catalogo_opcion if option else None
-        values["residencia"] = option.nombre if option else values.get("residencia")
     set_audit_context(db, user.id_usuario)
     for key, value in values.items():
         setattr(entity, key, value)
@@ -355,10 +348,9 @@ def create_orv(
         db, user, project_nucleus_id, mode="capture"
     )
     state_id = data.id_estado_registral
-    if state_id is None and data.acta_eleccion_inscrita_ran is not None:
-        code = "inscrita" if data.acta_eleccion_inscrita_ran else "no_ingresada"
+    if state_id is not None:
         state_id = require_catalog_option(
-            db, "estado_registral_orv", code=code, required=True
+            db, "estado_registral_orv", option_id=state_id, required=True
         ).id_catalogo_opcion
     values = data.model_dump(exclude={"observaciones", "id_estado_registral"})
     entity = models.Orv(
@@ -382,10 +374,6 @@ def update_orv(
             db, "estado_registral_orv", option_id=values["id_estado_registral"], required=False
         )
         values["id_estado_registral"] = option.id_catalogo_opcion if option else None
-    elif "acta_eleccion_inscrita_ran" in values and values["acta_eleccion_inscrita_ran"] is not None:
-        code = "inscrita" if values["acta_eleccion_inscrita_ran"] else "no_ingresada"
-        option = require_catalog_option(db, "estado_registral_orv", code=code, required=True)
-        values["id_estado_registral"] = option.id_catalogo_opcion
     set_audit_context(db, user.id_usuario)
     for key, value in values.items():
         setattr(entity, key, value)
@@ -526,24 +514,6 @@ def create_affectation(
     )
 
 
-def create_affected_asset(
-    db: Session,
-    affectation_id: int,
-    data: schemas.BienAfectadoCreate,
-    user: models.Usuario,
-) -> models.BienAfectado:
-    require_affectation_access(db, user, affectation_id, mode="capture")
-    entity = models.BienAfectado(
-        id_afectacion=affectation_id,
-        **data.model_dump(exclude={"observaciones"}),
-        **_audit_values(user.id_usuario, data),
-    )
-    return _persist(
-        db, entity, user.id_usuario,
-        "El bien, sus catálogos o su referencia de parcela no son válidos",
-    )
-
-
 def create_assembly(
     db: Session,
     project_nucleus_id: int,
@@ -555,20 +525,18 @@ def create_assembly(
         db,
         "tipo_asamblea",
         option_id=data.id_tipo_asamblea,
-        code=data.tipo_asamblea,
         required=True,
     )
     context_option = require_catalog_option(
         db,
         "contexto_asamblea",
         option_id=data.id_contexto_asamblea,
-        code=data.contexto_proceso,
         required=False,
     )
     values = data.model_dump(
         exclude={
             "observaciones", "convocatorias", "id_tipo_asamblea",
-            "id_contexto_asamblea", "tipo_asamblea", "contexto_proceso",
+            "id_contexto_asamblea",
         }
     )
     entity = models.Asamblea(
@@ -576,8 +544,6 @@ def create_assembly(
         **values,
         id_tipo_asamblea=type_option.id_catalogo_opcion,
         id_contexto_asamblea=(context_option.id_catalogo_opcion if context_option else None),
-        tipo_asamblea=type_option.codigo,
-        contexto_proceso=context_option.codigo if context_option else None,
         **_audit_values(user.id_usuario, data),
     )
     set_audit_context(db, user.id_usuario)
@@ -620,22 +586,20 @@ def update_assembly(
     user: models.Usuario,
 ) -> models.Asamblea:
     values = data.model_dump(exclude_unset=True, exclude={"convocatorias", "observaciones"})
-    if "id_tipo_asamblea" in values or "tipo_asamblea" in values:
+    if "id_tipo_asamblea" in values:
         option = require_catalog_option(
             db, "tipo_asamblea",
             option_id=values.pop("id_tipo_asamblea", None),
-            code=values.pop("tipo_asamblea", None), required=True,
+            required=True,
         )
         values["id_tipo_asamblea"] = option.id_catalogo_opcion
-        values["tipo_asamblea"] = option.codigo
-    if "id_contexto_asamblea" in values or "contexto_proceso" in values:
+    if "id_contexto_asamblea" in values:
         option = require_catalog_option(
             db, "contexto_asamblea",
             option_id=values.pop("id_contexto_asamblea", None),
-            code=values.pop("contexto_proceso", None), required=False,
+            required=False,
         )
         values["id_contexto_asamblea"] = option.id_catalogo_opcion if option else None
-        values["contexto_proceso"] = option.codigo if option else None
     set_audit_context(db, user.id_usuario)
     for key, value in values.items():
         setattr(entity, key, value)
@@ -1116,21 +1080,6 @@ def delete_unidad_agraria(
             status_code=409,
             detail="La unidad agraria tiene relaciones activas y no puede darse de baja",
         )
-
-    if hasattr(models.BienAfectado, "id_unidad_agraria"):
-        has_bien = (
-            db.query(models.BienAfectado.id_bien_afectado)
-            .filter(
-                models.BienAfectado.id_unidad_agraria == unidad_id,
-                models.BienAfectado.activo.is_(True),
-            )
-            .first()
-        )
-        if has_bien:
-            raise HTTPException(
-                status_code=409,
-                detail="La unidad agraria tiene relaciones activas y no puede darse de baja",
-            )
 
     logical_delete(db, entity, user.id_usuario, motivo)
 

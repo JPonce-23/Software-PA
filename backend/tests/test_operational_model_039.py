@@ -49,7 +49,7 @@ def test_01_individual_identity(api, target_domain, individual):
 @pytest.fixture(scope="module")
 def original(api, individual):
     calidad = _catalog(api, "calidad_compareciente_convenio"); acreditacion = _catalog(api, "tipo_acreditacion_derecho_individual")
-    a = api("POST", f"/api/proyecto-nucleo/{individual['pn']['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual","id_parcela":individual["parcela"]["id_parcela"]}).json()
+    a = api("POST", f"/api/proyecto-nucleo/{individual['pn']['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual"}).json()
     api("POST", f"/api/afectaciones/{a['id_afectacion']}/unidades-agrarias", expected=201, json={"id_unidad_agraria":individual["unidad"]["id_unidad_agraria"]})
     c = api("POST", f"/api/afectaciones/{a['id_afectacion']}/convenios", expected=201, json={"tipo_instrumento":"convenio","tipo_convenio":"cop_original","fecha_firma":"2026-09-01","comparecientes":[{"id_persona":individual["persona"]["id_persona"],"id_parcela_titular":individual["pt"]["id_parcela_titular"],"id_tipo_calidad":calidad["titular_parcelario"],"id_tipo_acreditacion":acreditacion["certificado_parcelario"],"referencia_acreditacion":"CERT-039","nombre_en_instrumento":"Titular histórico","es_firmante":True}]}).json()
     return {**individual,"afectacion":a,"convenio":c}
@@ -86,10 +86,10 @@ def test_09_specific_activity(api, original):
 
 def test_10_cross_project_activity_rejected(api, original, target_domain):
     other = api("POST", "/api/proyectos", expected=201, json={"clave_proyecto":f"P039-{uuid.uuid4().hex[:8]}","nombre_proyecto":"P039 B","fecha_inicio":"2026-01-01"}).json()
-    nucleus = api("POST", "/api/nucleos", expected=201, json={"id_municipio":target_domain["municipality"]["id_municipio"],"nombre_nucleo":f"N039-{uuid.uuid4().hex[:8]}","tipo_nucleo":"ejido","fuente_datos":"qa"}).json()
-    pn_b = api("POST", f"/api/proyectos/{other['id_proyecto']}/nucleos", expected=201, json={"id_nucleo":nucleus["id_nucleo"],"residencia":"QA","referencias":[]}).json()
+    nucleus = api("POST", "/api/nucleos", expected=201, json={"id_municipio":target_domain["municipality"]["id_municipio"],"nombre_nucleo":f"N039-{uuid.uuid4().hex[:8]}","id_tipo_tenencia":_catalog(api,"tipo_tenencia")["ejido"],"fuente_datos":"qa"}).json()
+    pn_b = api("POST", f"/api/proyectos/{other['id_proyecto']}/nucleos", expected=201, json={"id_nucleo":nucleus["id_nucleo"],"referencias":[]}).json()
     parcel = api("POST", f"/api/proyecto-nucleo/{pn_b['id_proyecto_nucleo']}/parcelas", expected=201, json={"tipo_parcela":"individual","no_parcela":f"PX-{uuid.uuid4().hex[:8]}"}).json()
-    affectation = api("POST", f"/api/proyecto-nucleo/{pn_b['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual","id_parcela":parcel["id_parcela"]}).json()
+    affectation = api("POST", f"/api/proyecto-nucleo/{pn_b['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual"}).json()
     api("POST", f"/api/proyecto-nucleo/{original['pn']['id_proyecto_nucleo']}/actividades", expected=409, json={"tipo_actividad":"caminamiento","id_afectacion":affectation["id_afectacion"]})
 
 
@@ -187,7 +187,7 @@ def test_neg_10_cross_project_activity(api, original, target_domain):
 
 
 def _second_affectation(api, row):
-    a = api("POST", f"/api/proyecto-nucleo/{row['pn']['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual", "id_parcela":row["parcela"]["id_parcela"]}).json()
+    a = api("POST", f"/api/proyecto-nucleo/{row['pn']['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual"}).json()
     api("POST", f"/api/afectaciones/{a['id_afectacion']}/unidades-agrarias", expected=201, json={"id_unidad_agraria":row["unidad"]["id_unidad_agraria"]})
     return a
 
@@ -256,10 +256,10 @@ def test_neg_03_remanente_without_parent(api, original):
 
 def test_neg_04_parent_other_project_nucleus(api, original, target_domain):
     project = api("POST", "/api/proyectos", expected=201, json={"clave_proyecto":f"P039-{uuid.uuid4().hex[:8]}","nombre_proyecto":"Proyecto 039 alterno","fecha_inicio":"2026-01-01"}).json()
-    nucleus = api("POST", "/api/nucleos", expected=201, json={"id_municipio":target_domain["municipality"]["id_municipio"],"nombre_nucleo":f"N039-{uuid.uuid4().hex[:8]}","tipo_nucleo":"ejido","fuente_datos":"qa"}).json()
-    pn = api("POST", f"/api/proyectos/{project['id_proyecto']}/nucleos", expected=201, json={"id_nucleo":nucleus["id_nucleo"],"residencia":"QA","referencias":[]}).json()
+    nucleus = api("POST", "/api/nucleos", expected=201, json={"id_municipio":target_domain["municipality"]["id_municipio"],"nombre_nucleo":f"N039-{uuid.uuid4().hex[:8]}","id_tipo_tenencia":_catalog(api,"tipo_tenencia")["ejido"],"fuente_datos":"qa"}).json()
+    pn = api("POST", f"/api/proyectos/{project['id_proyecto']}/nucleos", expected=201, json={"id_nucleo":nucleus["id_nucleo"],"referencias":[]}).json()
     other = api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/parcelas", expected=201, json={"tipo_parcela":"individual","no_parcela":f"P039-{uuid.uuid4().hex[:8]}"}).json()
-    a = api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual","id_parcela":other["id_parcela"]}).json()
+    a = api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual"}).json()
     tierra = next(iter(_catalog(api, "tipo_tierra").values()))
     titularidad = _catalog(api, "tipo_titularidad_unidad")["persona"]
     unit = api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/unidades-agrarias", expected=201, json={"id_tipo_tierra":tierra,"id_tipo_titularidad":titularidad,"id_parcela":other["id_parcela"],"referencia_alfanumerica":f"UA039-{uuid.uuid4().hex[:8]}"}).json()
@@ -277,7 +277,7 @@ def test_neg_05_collective_parent_for_individual(api, original, target_domain):
 def test_neg_06_parent_without_shared_unit(api, original):
     # The parent uses the original unit; the child uses a distinct parcel/unit.
     other = api("POST", f"/api/proyecto-nucleo/{original['pn']['id_proyecto_nucleo']}/parcelas", expected=201, json={"tipo_parcela":"individual","no_parcela":f"P039-X-{uuid.uuid4().hex[:8]}"}).json()
-    child_a = api("POST", f"/api/proyecto-nucleo/{original['pn']['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual","id_parcela":other["id_parcela"]}).json()
+    child_a = api("POST", f"/api/proyecto-nucleo/{original['pn']['id_proyecto_nucleo']}/afectaciones", expected=201, json={"tipo_afectacion":"individual"}).json()
     tierra = next(iter(_catalog(api, "tipo_tierra").values()))
     titularidad = _catalog(api, "tipo_titularidad_unidad")["persona"]
     other_unit = api("POST", f"/api/proyecto-nucleo/{original['pn']['id_proyecto_nucleo']}/unidades-agrarias", expected=201, json={"id_tipo_tierra":tierra,"id_tipo_titularidad":titularidad,"id_parcela":other["id_parcela"],"referencia_alfanumerica":f"UA039-X-{uuid.uuid4().hex[:8]}"}).json()

@@ -16,6 +16,8 @@ class ORMModel(BaseModel):
 
 
 class AuditInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     observaciones: str | None = None
 
 
@@ -184,8 +186,7 @@ class ProyectoResponse(ProyectoCreate, AuditRead):
 class NucleoAgrarioCreate(AuditInput):
     id_municipio: int = Field(gt=0)
     nombre_nucleo: str = Field(min_length=1, max_length=300)
-    id_tipo_tenencia: int | None = Field(default=None, gt=0)
-    tipo_nucleo: str | None = Field(default=None, max_length=20)
+    id_tipo_tenencia: int = Field(gt=0)
     comunidad_indigena: bool | None = None
     fuente_datos: str | None = Field(default=None, max_length=120)
     id_entidad_fuente: str | None = Field(default=None, max_length=120)
@@ -193,17 +194,9 @@ class NucleoAgrarioCreate(AuditInput):
     id_nucleo_fuente: str | None = Field(default=None, max_length=120)
     alcance_identidad_fuente: str | None = Field(default=None, max_length=20)
 
-    @model_validator(mode="after")
-    def validar_tenencia(self):
-        if self.id_tipo_tenencia is None and not self.tipo_nucleo:
-            raise ValueError("Se requiere id_tipo_tenencia")
-        return self
-
-
 class NucleoAgrarioUpdate(AuditInput):
     nombre_nucleo: str | None = Field(default=None, min_length=1, max_length=300)
     id_tipo_tenencia: int | None = Field(default=None, gt=0)
-    tipo_nucleo: str | None = Field(default=None, max_length=20)
     comunidad_indigena: bool | None = None
     fuente_datos: str | None = Field(default=None, max_length=120)
 
@@ -238,10 +231,7 @@ class ProyectoNucleoReferenciaUpdate(AuditInput):
 class ProyectoNucleoCreate(AuditInput):
     id_nucleo: int = Field(gt=0)
     id_residencia: int | None = Field(default=None, gt=0)
-    residencia: str | None = Field(default=None, max_length=300)
     total_cops_planeados: int | None = Field(default=None, ge=0)
-    responsable_nombre: str | None = Field(default=None, max_length=300)
-    contacto: str | None = Field(default=None, max_length=150)
     referencias: list[ProyectoNucleoReferenciaCreate] = Field(default_factory=list)
     afecta_tuc: bool | None = None
     id_motivo_no_afecta_tuc: int | None = Field(default=None, gt=0)
@@ -252,10 +242,7 @@ class ProyectoNucleoCreate(AuditInput):
 
 class ProyectoNucleoUpdate(AuditInput):
     id_residencia: int | None = Field(default=None, gt=0)
-    residencia: str | None = Field(default=None, max_length=300)
     total_cops_planeados: int | None = Field(default=None, ge=0)
-    responsable_nombre: str | None = Field(default=None, max_length=300)
-    contacto: str | None = Field(default=None, max_length=150)
     afecta_tuc: bool | None = None
     id_motivo_no_afecta_tuc: int | None = Field(default=None, gt=0)
     motivo_no_afecta_tuc_detalle: str | None = None
@@ -267,22 +254,31 @@ class ProyectoNucleoResponse(ProyectoNucleoUpdate, AuditRead):
     id_proyecto_nucleo: int
     id_proyecto: int
     id_nucleo: int
-    clave_proyecto: str | None = None
     nombre_proyecto: str | None = None
     nombre_nucleo: str | None = None
-    tipo_nucleo: str | None = None
+    id_tipo_tenencia: int
+    tipo_tenencia_codigo: str
+    tipo_tenencia_nombre: str
+    residencia_codigo: str | None = None
+    residencia_nombre: str | None = None
     id_entidad: int | None = None
     entidad: str | None = None
     id_municipio: int | None = None
     municipio: str | None = None
-    consecutivo_principal: str | None = None
-    actividades: int = 0
-    asambleas: int = 0
+    responsable_nombre: str | None = None
+    responsable_cargo: str | None = None
+    responsable_contacto: str | None = None
+    tipo_referencia: str | None = None
+    referencia_principal: str | None = None
+    total_parcelas: int = 0
+    total_afectaciones: int = 0
     afectaciones_colectivas: int = 0
     afectaciones_individuales: int = 0
-    parcelas: int = 0
-    convenios: int = 0
-    tramites_fifonafe: int = 0
+    superficie_preliminar_ha: Decimal = Decimal("0")
+    superficie_afectada_ha: Decimal = Decimal("0")
+    total_asambleas: int = 0
+    total_convenios: int = 0
+    total_unidades_afectadas: int = 0
 
 
 class ProyectoNucleoResponsableCreate(AuditInput):
@@ -341,7 +337,6 @@ class OrvCreate(AuditInput):
     fin_vigencia: date | None = None
     estatus_fuente: str | None = Field(default=None, max_length=80)
     id_estado_registral: int | None = Field(default=None, gt=0)
-    acta_eleccion_inscrita_ran: bool | None = None
 
 
 class OrvUpdate(OrvCreate):
@@ -351,28 +346,15 @@ class OrvUpdate(OrvCreate):
 class OrvResponse(OrvCreate, AuditRead):
     id_orv: int
     id_nucleo: int
-    fecha_inscripcion_acta_ran: date | None = None
-    estado_derivado: str | None = None
 
 
 class OrvIntegranteCreate(AuditInput):
     id_persona: int = Field(gt=0)
-    cargo: str | None = Field(default=None, min_length=1, max_length=80)
-    id_organo: int | None = Field(default=None, gt=0)
-    id_cargo: int | None = Field(default=None, gt=0)
-    id_calidad: int | None = Field(default=None, gt=0)
+    id_organo: int = Field(gt=0)
+    id_cargo: int = Field(gt=0)
+    id_calidad: int = Field(gt=0)
     fecha_inicio: date | None = None
     fecha_fin: date | None = None
-
-    @model_validator(mode="after")
-    def validar_estructura(self):
-        ids = (self.id_organo, self.id_cargo, self.id_calidad)
-        if any(item is not None for item in ids) and not all(item is not None for item in ids):
-            raise ValueError("Órgano, cargo y calidad deben capturarse juntos")
-        if not self.cargo and not all(item is not None for item in ids):
-            raise ValueError("Se requiere estructura ORV normalizada")
-        return self
-
 
 class OrvIntegranteResponse(OrvIntegranteCreate, AuditRead):
     id_orv_integrante: int
@@ -388,7 +370,6 @@ class OrvIntegranteDetailResponse(OrvIntegranteResponse):
 
 
 class OrvIntegranteUpdate(AuditInput):
-    cargo: str | None = Field(default=None, min_length=1, max_length=80)
     id_organo: int | None = Field(default=None, gt=0)
     id_cargo: int | None = Field(default=None, gt=0)
     id_calidad: int | None = Field(default=None, gt=0)
@@ -574,16 +555,12 @@ class AfectacionUnidadAgrariaResponse(AfectacionUnidadAgrariaBase, AuditRead):
 
 class AfectacionCreate(AuditInput):
     tipo_afectacion: Ambito
-    id_parcela: int | None = Field(default=None, gt=0)
-    destino_superficie: str | None = Field(default=None, max_length=100)
-    no_parcela_solar: str | None = Field(default=None, max_length=100)
     superficie_preliminar_ha: Decimal | None = Field(default=None, ge=0)
     superficie_afectada_ha: Decimal | None = Field(default=None, ge=0)
     situacion: str | None = Field(default=None, max_length=100)
     condicion_especial: Literal[
         "expropiacion_directa",
         "comunidad_indigena",
-        "no_afectacion_uso_comun",
         "otro",
     ] | None = None
     descripcion_condicion: str | None = None
@@ -597,8 +574,6 @@ class AfectacionCreate(AuditInput):
     tipo_cop_revision_detalle: str | None = None
     @model_validator(mode="after")
     def validar_ambito(self):
-        if self.tipo_afectacion == "individual" and self.id_parcela is None:
-            raise ValueError("Una afectación individual requiere parcela")
         if self.condicion_especial == "otro" and not (
             self.descripcion_condicion and self.descripcion_condicion.strip()
         ):
@@ -607,15 +582,12 @@ class AfectacionCreate(AuditInput):
 
 
 class AfectacionUpdate(AuditInput):
-    destino_superficie: str | None = Field(default=None, max_length=100)
-    no_parcela_solar: str | None = Field(default=None, max_length=100)
     superficie_preliminar_ha: Decimal | None = Field(default=None, ge=0)
     superficie_afectada_ha: Decimal | None = Field(default=None, ge=0)
     situacion: str | None = Field(default=None, max_length=100)
     condicion_especial: Literal[
         "expropiacion_directa",
         "comunidad_indigena",
-        "no_afectacion_uso_comun",
         "otro",
     ] | None = None
     descripcion_condicion: str | None = None
@@ -635,40 +607,6 @@ class AfectacionResponse(AfectacionCreate, AuditRead):
     tipo_cop_revision_pendiente: bool = False
     tipo_cop_revision_detalle: str | None = None
     unidades_agrarias: list[AfectacionUnidadAgrariaResponse] = Field(default_factory=list)
-
-
-class BienAfectadoCreate(AuditInput):
-    id_tipo_gestion: int | None = Field(default=None, gt=0)
-    id_destino_superficie: int | None = Field(default=None, gt=0)
-    id_parcela: int | None = Field(default=None, gt=0)
-    tipo_tierra: str | None = Field(default=None, max_length=120)
-    referencia_alfanumerica: str | None = Field(default=None, max_length=150)
-    titularidad: str | None = Field(default=None, max_length=250)
-    detalle: str | None = None
-    superficie_preliminar_ha: Decimal | None = Field(default=None, ge=0)
-    superficie_afectada_ha: Decimal | None = Field(default=None, ge=0)
-    superficie_valor_original: str | None = Field(default=None, max_length=120)
-    superficie_formato_origen: str | None = Field(default=None, max_length=50)
-    fuente: str | None = Field(default=None, max_length=250)
-
-    @model_validator(mode="after")
-    def validar_identidad_bien(self):
-        if not any((self.id_tipo_gestion, self.id_destino_superficie, self.id_parcela,
-                    self.tipo_tierra, self.referencia_alfanumerica)):
-            raise ValueError("El bien requiere gestión, destino, parcela, tierra o referencia")
-        return self
-
-
-class BienAfectadoUpdate(BienAfectadoCreate):
-    @model_validator(mode="after")
-    def validar_identidad_bien(self):
-        # En PATCH la identidad puede permanecer en los campos no enviados.
-        return self
-
-
-class BienAfectadoResponse(BienAfectadoCreate, AuditRead):
-    id_bien_afectado: int
-    id_afectacion: int
 
 
 class AsambleaConvocatoriaCreate(AuditInput):
@@ -697,24 +635,21 @@ class AsambleaConvocatoriaResponse(AsambleaConvocatoriaCreate, AuditRead):
 
 class AsambleaCreate(AuditInput):
     id_padron: int | None = Field(default=None, gt=0)
-    id_tipo_asamblea: int | None = Field(default=None, gt=0)
+    id_tipo_asamblea: int = Field(gt=0)
     id_contexto_asamblea: int | None = Field(default=None, gt=0)
-    tipo_asamblea: str | None = Field(default=None, max_length=40)
-    contexto_proceso: str | None = Field(default=None, max_length=40)
     proposito: str | None = None
     resultado: str | None = Field(default=None, max_length=50)
     convocatorias: list[AsambleaConvocatoriaCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validar_tipo_catalogado(self):
-        if self.id_tipo_asamblea is None and not self.tipo_asamblea:
-            raise ValueError("Se requiere id_tipo_asamblea")
         if len({item.ordinal for item in self.convocatorias}) != len(self.convocatorias):
             raise ValueError("Los ordinales de convocatoria no pueden repetirse")
         return self
 
 
 class AsambleaUpdate(AsambleaCreate):
+    id_tipo_asamblea: int | None = Field(default=None, gt=0)
     convocatorias: list[AsambleaConvocatoriaCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -728,16 +663,6 @@ class AsambleaUpdate(AsambleaCreate):
 class AsambleaResponse(AsambleaCreate, AuditRead):
     id_asamblea: int
     id_proyecto_nucleo: int
-    fecha_expedicion_primera: date | None = None
-    fecha_programada_primera: date | None = None
-    fecha_expedicion_segunda: date | None = None
-    fecha_programada_segunda: date | None = None
-    fecha_realizada: date | None = None
-    fecha_programada_ingreso_ran: date | None = None
-    fecha_ingreso_ran: date | None = None
-    numero_solicitud_ran: str | None = None
-    calificacion_registral_ran: str | None = None
-    fecha_inscripcion_ran: date | None = None
     convocatorias: list[AsambleaConvocatoriaResponse] = Field(default_factory=list)
 
 
@@ -836,11 +761,6 @@ class ConvenioResponse(ConvenioCreate, AuditRead):
     id_convenio: int
     id_proyecto_nucleo: int
     ambito: Ambito
-    fecha_programada_ingreso_ran: date | None = None
-    ingreso_ran_fecha: date | None = None
-    numero_solicitud_ingreso: str | None = None
-    calificacion_registral: str | None = None
-    fecha_inscripcion_ran: date | None = None
     afectaciones: list[ConvenioAfectacionResponse] = Field(default_factory=list)
     comparecientes: list[ConvenioComparecienteResponse] = Field(default_factory=list)
 
@@ -944,14 +864,6 @@ class TramiteFifonafeResponse(TramiteFifonafeUpdate, AuditRead):
     id_proyecto_nucleo: int
     ambito: Ambito
     estatus: str
-    no_oficio_fifonafe_a_dgaopr: str | None = None
-    fecha_oficio_fifonafe_a_dgaopr: date | None = None
-    no_oficio_dgaopr_a_representacion: str | None = None
-    fecha_oficio_dgaopr_a_representacion: date | None = None
-    no_oficio_respuesta_representacion_a_dgaopr: str | None = None
-    fecha_oficio_respuesta_representacion_a_dgaopr: date | None = None
-    no_oficio_respuesta_dgaopr_a_fifonafe: str | None = None
-    fecha_oficio_respuesta_dgaopr_a_fifonafe: date | None = None
     afectaciones: list[TramiteFifonafeAfectacionResponse] = Field(default_factory=list)
     eventos: list[TramiteFifonafeEventoResponse] = Field(default_factory=list)
 
@@ -1092,14 +1004,13 @@ class RequisitoDocumentalResponse(RequisitoDocumentalCreate, AuditRead):
 
 
 class ExpedienteRequisitoCreate(AuditInput):
-    id_afectacion: int | None = Field(default=None, gt=0)
     entidad_tipo: Literal[
         "proyecto_nucleo", "afectacion", "parcela", "parcela_titular",
         "unidad_agraria", "unidad_agraria_titular", "convenio",
         "convenio_compareciente", "tramite_ran", "tramite_ran_evento",
         "tramite_fifonafe", "tramite_fifonafe_evento", "indemnizacion", "pago",
-    ] | None = None
-    entidad_id: int | None = Field(default=None, gt=0)
+    ]
+    entidad_id: int = Field(gt=0)
     id_requisito: int = Field(gt=0)
     id_estado: int = Field(gt=0)
     id_documento: int | None = Field(default=None, gt=0)

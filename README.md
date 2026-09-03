@@ -95,7 +95,7 @@ Configura por separado `POSTGRES_ADMIN_USER`/`POSTGRES_ADMIN_PASSWORD` para
 bootstrap y migraciones, y `DB_RUNTIME_USER`/`DB_RUNTIME_PASSWORD` para
 FastAPI. El backend no recibe las credenciales owner. En un volumen existente,
 recrear el contenedor sólo actualiza su entorno: no vuelve a ejecutar
-`docker-entrypoint-initdb.d`. La secuencia 033→034 y la provisión posterior se
+`docker-entrypoint-initdb.d`. El Baseline V1 y la provisión posterior se
 documentan en [docs/migraciones.md](docs/migraciones.md).
 
 ### Bootstrap del primer administrador
@@ -177,10 +177,16 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 ## Base de datos, migraciones y datos iniciales
 
-La migración `001_init_schema.sql` y
-`backend/db/init/002_create_runtime.sh` se ejecutan automáticamente **sólo
-cuando el volumen de PostgreSQL está vacío**. El segundo script provisiona el
-LOGIN del entorno sin imprimir su contraseña; no concede ownership.
+Una instalación vacía aplica directamente
+`backend/db/migrations/001_baseline_v1.sql`. El baseline crea PostGIS, 51
+tablas funcionales, constraints, funciones, triggers, índices, cuatro vistas
+de SOFTWARE-PA y catálogos estructurales. No contiene `bien_afectado` ni
+columnas o sincronizaciones exclusivamente legacy.
+
+`backend/db/init/001_bootstrap_roles.sh` provisiona por variables de entorno
+el rol `software_pa_app` y el LOGIN runtime. Después,
+`backend/db/init/002_apply_migrations.sh` invoca el runner con checksum. Las
+contraseñas no forman parte del SQL.
 
 La secuencia exacta, las comprobaciones para bases existentes y los comandos de
 respaldo están documentados en [docs/migraciones.md](docs/migraciones.md).
@@ -189,13 +195,20 @@ Resumen para una instalación nueva:
 
 ```bash
 docker compose up -d --build db
-# Crea el primer administrador con el bootstrap owner explícito anterior.
-# Aplica la historia real 004-030, fixture territorial y 031-034.
 set -a; source .env; set +a
+# Cargar el catálogo territorial reproducible.
+docker compose exec -T db sh -lc \
+  'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f -' \
+  < backend/db/fixtures/001_catalogo_territorial_inegi.sql
+# Crear el primer administrador con el bootstrap owner explícito anterior.
 backend/scripts/utils/set_runtime_credentials.sh
 docker compose up -d backend
 curl --fail http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/health
 ```
+
+`schema_migrations` registra `001`, el nombre `baseline_v1` y el SHA-256
+del archivo. Las migraciones nuevas comienzan en `002`; el runner rechaza una
+migración aplicada si su archivo fue modificado.
 
 Los datos de prueba son opcionales y deben cargarse después del administrador:
 
@@ -210,11 +223,10 @@ usuarios; requiere que exista un administrador activo para registrar la
 auditoría de los datos semilla.
 
 La autenticación web usa una sesión opaca en cookie HttpOnly y protección
-CSRF; el frontend no guarda credenciales en `localStorage` y el backend ya no
+CSRF; el frontend no guarda credenciales en `localStorage` y el backend no
 acepta bearer/JWT como mecanismo de aplicación. En producción define
 `APP_ENV=production`, `AUTH_COOKIE_SECURE=true` y un `CORS_ORIGINS` HTTPS
-exacto del ambiente. Consulta el despliegue de 008/009 y la recuperación administrativa en
-[docs/migraciones.md](docs/migraciones.md#migraciones-008-y-009-y-operación-de-autenticación).
+exacto del ambiente.
 
 ### Pruebas backend autenticadas
 

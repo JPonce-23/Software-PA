@@ -1,62 +1,124 @@
-# Operación de migraciones y credenciales PostgreSQL
+# Migraciones y credenciales PostgreSQL
 
-> Esquema vigente: 035. Las migraciones 001-034 permanecen inmutables.
+> Flujo vigente: Baseline V1, versión `001`. Las migraciones futuras comienzan en `002`.
 
-## Identidades
+## Identidades PostgreSQL
 
-- `POSTGRES_ADMIN_USER`/`POSTGRES_ADMIN_PASSWORD`: owner/bootstrap. Se usan sólo en inicialización, migraciones, respaldo y operaciones administrativas explícitas.
-- `software_pa_app`: rol `NOLOGIN` que contiene el contrato DML de la aplicación.
-- `DB_RUNTIME_USER`/`DB_RUNTIME_PASSWORD`: LOGIN usado exclusivamente por FastAPI; por defecto `pa_runtime`. Hereda sólo `software_pa_app` y no posee schema ni tablas.
+- `POSTGRES_ADMIN_USER`/`POSTGRES_ADMIN_PASSWORD`: owner usado sólo para bootstrap, migraciones y tareas administrativas.
+- `software_pa_app`: rol `NOLOGIN` con el contrato DML de la aplicación.
+- `DB_RUNTIME_USER`/`DB_RUNTIME_PASSWORD`: LOGIN de FastAPI; por defecto `pa_runtime`, miembro únicamente de `software_pa_app`.
 
-El servicio `backend` recibe únicamente `DB_RUNTIME_*`. El servicio `db` recibe las credenciales bootstrap como `POSTGRES_*` y las credenciales runtime para que los scripts de provisión las lean sin incluirlas en SQL ni argumentos de `psql`.
-
-## Volumen existente en 033
-
-`docker-entrypoint-initdb.d` no se vuelve a ejecutar. El orden obligatorio es:
-
-```bash
-set -a; source .env; set +a
-docker compose stop backend
-docker compose up -d --force-recreate db
-
-# Genera y verifica aquí el respaldo restorable de la base 033.
-docker compose exec -T db sh -lc \
-  'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f -' \
-  < backend/db/migrations/034_separacion_usuario_runtime_postgresql.sql
-
-backend/scripts/utils/set_runtime_credentials.sh
-docker compose up -d --force-recreate backend
-curl --fail http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/health
-```
-
-`set_runtime_credentials.sh` se ejecuta después de 034. Valida que 034 esté registrada, crea o ajusta el LOGIN indicado por `DB_RUNTIME_USER`, fuerza atributos no administrativos, elimina membresías/privilegios directos, concede sólo `software_pa_app` y prueba autenticación TCP. No imprime la contraseña.
+Las contraseñas llegan por variables de entorno y no se incluyen en SQL. El baseline crea objetos funcionales y ACL para roles ya provisionados; `backend/db/init/001_bootstrap_roles.sh` administra los roles por separado.
 
 ## Instalación limpia
 
-1. `docker compose up -d db` crea PGDATA y ejecuta 001 más `002_create_runtime.sh`.
-2. Crear el primer administrador mediante `scripts/create_admin.py` con `ADMIN_DATABASE_MODE=owner` y credenciales owner inyectadas sólo al contenedor one-off.
-3. Aplicar la secuencia real 004-030 con el owner.
-4. Cargar `backend/db/fixtures/001_catalogo_territorial_inegi.sql`.
-5. Generar y verificar el respaldo pre-031.
-6. Aplicar 031, 032, 033, 034 y 035 con el owner y los gates destructivos requeridos por 031/032.
-7. Ejecutar `backend/scripts/utils/set_runtime_credentials.sh`.
-8. Arrancar backend y verificar `/health` y `SELECT current_user` desde `app.database.engine`.
+Con un PGDATA vacío:
 
-No se deben ejecutar 002/003 ni reordenar 004-030: `001` es la baseline real del entrypoint y la historia posterior comienza en 004.
+```bash
+cp .env.example .env
+# Sustituir localmente todos los placeholders y cargar el entorno.
+set -a; source .env; set +a
+docker compose up -d db
+```
 
-## Migraciones futuras
+El entrypoint ejecuta, en orden:
 
-Las migraciones se ejecutan como el owner configurado en `POSTGRES_ADMIN_USER`. La 034 instala para ese `current_user` default privileges que conceden a `software_pa_app` sólo `SELECT`, `INSERT`, `UPDATE` en tablas y `USAGE`, `SELECT` en secuencias. No concede `DELETE`, `TRUNCATE`, DDL, ownership ni `GRANT ALL`.
+1. `backend/db/init/001_bootstrap_roles.sh`;
+2. `backend/db/init/002_apply_migrations.sh`;
+3. `backend/scripts/run_migrations.sh` sobre `backend/db/migrations/001_baseline_v1.sql`.
 
-Antes de arrancar FastAPI, ejecutar:
+Después se carga el catálogo territorial y se crea el administrador inicial:
+
+```bash
+docker compose exec -T db sh -lc \
+  'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f -' \
+  < backend/db/fixtures/001_catalogo_territorial_inegi.sql
+
+docker compose run --rm --no-deps \
+  -e ADMIN_DATABASE_MODE=owner \
+  -e POSTGRES_ADMIN_USER \
+  -e POSTGRES_ADMIN_PASSWORD \
+  -e ADMIN_EMAIL \
+  -e ADMIN_NOMBRE \
+  -e ADMIN_APELLIDO_PATERNO \
+  -e ADMIN_APELLIDO_MATERNO \
+  backend python scripts/create_admin.py
+```
+
+El seed funcional es opcional y exige un administrador activo:
+
+```bash
+SEED_OBJECTIVE_CONFIRM=1 docker compose run --rm --no-deps \
+  -e SEED_OBJECTIVE_CONFIRM backend python scripts/seed_objective_demo.py
+```
+
+## Runner y checksums
+
+`backend/scripts/run_migrations.sh`:
+
+1. selecciona archivos `NNN_nombre.sql`;
+2. calcula SHA-256;
+3. aplica cada archivo con `psql --single-transaction`;
+4. registra `version`, `nombre`, `checksum_sha256` y `aplicada_en`;
+5. rechaza un archivo ya aplicado cuyo checksum haya cambiado.
+
+La tabla de control es:
+
+```text
+schema_migrations(
+  version varchar(3) primary key,
+  nombre varchar(200) not null,
+  checksum_sha256 char(64) not null,
+  aplicada_en timestamptz not null default now()
+)
+```
+
+No se modifica una migración aplicada. El siguiente cambio de esquema debe ser `002_nombre.sql`.
+
+Ejecución manual como owner:
 
 ```bash
 set -a; source .env; set +a
-backend/db/tests/034_runtime_privileges.sh
+POSTGRES_DB="$DB_NAME" POSTGRES_USER="$POSTGRES_ADMIN_USER" \
+  DB_HOST=127.0.0.1 DB_PORT="${DB_HOST_PORT:-5433}" \
+  PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" \
+  backend/scripts/run_migrations.sh
 ```
 
-El contrato crea como owner una tabla probe futura, verifica sus default privileges, se conecta por TCP como runtime, prueba DML permitido, exige SQLSTATE `42501` para operaciones destructivas y elimina el probe como owner.
+## Base existente y credenciales runtime
 
-## Completitud operativa 035
+El entrypoint de PostgreSQL sólo corre sobre PGDATA vacío. Para una base que ya contiene Baseline V1:
 
-`035_completitud_seguimiento_operativo.sql` es aditiva y registra únicamente datos de seguimiento inequívocos: contexto del proceso de Asamblea, acuse FIFONAFE, entrega del expediente SICT–PA y fecha/folio documental. Se ejecuta como owner después de un respaldo verificable y conserva sin cambios el contrato restringido de `pa_runtime`.
+```bash
+set -a; source .env; set +a
+docker compose up -d --force-recreate db
+backend/scripts/utils/set_runtime_credentials.sh
+```
+
+El script exige `schema_migrations.version='001'`, fuerza atributos no administrativos, elimina membresías y privilegios directos del LOGIN, concede únicamente `software_pa_app` y comprueba autenticación TCP sin imprimir la contraseña.
+
+## Validación
+
+Usar siempre una base aislada y explícita, nunca una base con datos que deban preservarse:
+
+```bash
+docker compose exec -T db sh -lc \
+  'psql -U "$POSTGRES_USER" -d software_pa_baseline_test -X -v ON_ERROR_STOP=1' \
+  < backend/db/tests/001_baseline_v1_contract.sql
+
+DB_NAME=software_pa_baseline_test backend/db/tests/001_runtime_privileges.sh
+
+docker compose run --rm --no-deps \
+  -e APP_ENV=test \
+  -e DB_NAME=software_pa_baseline_test \
+  -e TEST_ALLOW_DATABASE=software_pa_baseline_test \
+  -e TEST_ADMIN_EMAIL \
+  -e TEST_ADMIN_PASSWORD \
+  backend pytest -q
+```
+
+El contrato runtime exige `SELECT/INSERT/UPDATE`, prohíbe owner, DDL, `DELETE`, `TRUNCATE` y escritura en `schema_migrations`.
+
+## Historia anterior
+
+Las migraciones incrementales 001–039 dejaron de ser el mecanismo de instalación al adoptar Baseline V1. Git conserva esa historia; no se reaplica ni se concatena sobre una base nueva. Los documentos bajo `docs/historico/`, `docs/propuestas/` y `docs/evaluaciones/` son evidencia histórica, no instrucciones operativas.

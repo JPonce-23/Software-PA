@@ -1,4 +1,4 @@
-"""Integration tests for document target access on all 22 supported entity types in 039."""
+"""Integration tests for canonical document target access."""
 import uuid
 from decimal import Decimal
 import pytest
@@ -84,12 +84,12 @@ def domain_fixture(api, target_domain, catalogs):
         json={"id_parcela_titular": parcela_titular["id_parcela_titular"], "es_principal": True},
     ).json()
 
-    # 3. Afectacion, AfectacionUnidadAgraria, and BienAfectado
+    # 3. Afectacion and its canonical agricultural-unit association
     afectacion = api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",
         expected=201,
-        json={"tipo_afectacion": "individual", "id_parcela": parcela["id_parcela"]},
+        json={"tipo_afectacion": "individual"},
     ).json()
     afectacion_unidad = api(
         "POST",
@@ -97,13 +97,6 @@ def domain_fixture(api, target_domain, catalogs):
         expected=201,
         json={"id_unidad_agraria": unidad_agraria["id_unidad_agraria"]},
     ).json()
-    bien_afectado = api(
-        "POST",
-        f"/api/afectaciones/{afectacion['id_afectacion']}/bienes",
-        expected=201,
-        json={"tipo_tierra": "parcelada", "referencia_alfanumerica": f"BIEN-DOC-{token}"},
-    ).json()
-
     # 4. Asamblea and AsambleaConvocatoria
     asamblea = api(
         "POST",
@@ -167,7 +160,8 @@ def domain_fixture(api, target_domain, catalogs):
     ran_pn_evento = ran_pn["eventos"][0]
 
     # 7. ORV & TramiteRan (ORV context with id_nucleo) & Evento
-    orv = api(
+    existing_orv = api("GET", f"/api/proyecto-nucleo/{pn_id}/orv").json()
+    orv = existing_orv[0] if existing_orv else api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/orv",
         expected=201,
@@ -230,7 +224,6 @@ def domain_fixture(api, target_domain, catalogs):
         "project": target_domain["project"],
         "project_nucleus": pn,
         "parcela_titular": parcela_titular,
-        "bien_afectado": bien_afectado,
         "unidad_agraria": unidad_agraria,
         "unidad_agraria_titular": unidad_titular,
         "afectacion_unidad_agraria": afectacion_unidad,
@@ -266,10 +259,6 @@ def _upload_and_verify_doc(api, entity_type: str, entity_id: int):
 
 def test_target_parcela_titular(api, domain_fixture):
     _upload_and_verify_doc(api, "parcela_titular", domain_fixture["parcela_titular"]["id_parcela_titular"])
-
-
-def test_target_bien_afectado(api, domain_fixture):
-    _upload_and_verify_doc(api, "bien_afectado", domain_fixture["bien_afectado"]["id_bien_afectado"])
 
 
 def test_target_unidad_agraria(api, domain_fixture):

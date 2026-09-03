@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-# docker-entrypoint-initdb.d sólo ejecuta este archivo con PGDATA vacío.
-# La actualización de un volumen existente usa set_runtime_credentials.sh.
+# PostgreSQL ejecuta este bootstrap sólo al inicializar un PGDATA vacío.
+# Las credenciales siempre llegan por variables de entorno.
 : "${POSTGRES_USER:?POSTGRES_USER es obligatorio}"
 : "${POSTGRES_DB:?POSTGRES_DB es obligatorio}"
 : "${DB_RUNTIME_USER:?DB_RUNTIME_USER es obligatorio}"
@@ -44,4 +44,4 @@ SELECT format('GRANT software_pa_app TO %I', :'runtime_user')
 \unset runtime_password
 EOSQL
 
-echo "Rol runtime provisionado para la instalación limpia (contraseña no mostrada)."
+echo "Roles de SOFTWARE-PA provisionados sin versionar contraseñas."

@@ -385,25 +385,6 @@ def project_ids_for_document_target(
             model.activo.is_(True),
             models.ProyectoNucleo.activo.is_(True),
         )
-    elif entity_type == "bien_afectado":
-        query = (
-            db.query(models.ProyectoNucleo.id_proyecto)
-            .join(
-                models.Afectacion,
-                models.Afectacion.id_proyecto_nucleo
-                == models.ProyectoNucleo.id_proyecto_nucleo,
-            )
-            .join(
-                models.BienAfectado,
-                models.BienAfectado.id_afectacion == models.Afectacion.id_afectacion,
-            )
-            .filter(
-                models.BienAfectado.id_bien_afectado == entity_id,
-                models.BienAfectado.activo.is_(True),
-                models.Afectacion.activo.is_(True),
-                models.ProyectoNucleo.activo.is_(True),
-            )
-        )
     elif entity_type == "afectacion_unidad_agraria":
         query = (
             db.query(models.ProyectoNucleo.id_proyecto)

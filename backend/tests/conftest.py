@@ -67,6 +67,18 @@ def api(client: TestClient, admin_headers: dict[str, str]):
 
 @pytest.fixture(scope="session")
 def target_domain(api):
+    def catalog(name: str) -> dict[str, int]:
+        return {
+            row["codigo"]: row["id_catalogo_opcion"]
+            for row in api("GET", f"/api/catalogos/operativos/{name}").json()
+        }
+
+    tenencia = catalog("tipo_tenencia")
+    residencia = catalog("residencia")
+    tipo_tierra = catalog("tipo_tierra")
+    tipo_gestion = catalog("tipo_gestion")
+    destino = catalog("destino_superficie")
+    titularidad = catalog("tipo_titularidad_unidad")
     state = api("GET", "/api/catalogos/entidades").json()[0]
     municipality = api(
         "GET", f"/api/catalogos/municipios?id_entidad={state['id_entidad']}"
@@ -88,7 +100,7 @@ def target_domain(api):
         json={
             "id_municipio": municipality["id_municipio"],
             "nombre_nucleo": unique("EJIDO QA"),
-            "tipo_nucleo": "ejido",
+            "id_tipo_tenencia": tenencia["ejido"],
             "fuente_datos": "qa",
         },
     ).json()
@@ -98,7 +110,7 @@ def target_domain(api):
         expected=201,
         json={
             "id_nucleo": nucleus["id_nucleo"],
-            "residencia": "Residencia QA",
+            "id_residencia": residencia["queretaro"],
             "referencias": [
                 {
                     "tipo_referencia": "consecutivo",
@@ -131,7 +143,6 @@ def target_domain(api):
         expected=201,
         json={
             "tipo_afectacion": "colectivo",
-            "destino_superficie": "tierras_uso_comun",
             "superficie_preliminar_ha": "3.500000",
             "superficie_afectada_ha": "3.250000",
         },
@@ -142,7 +153,6 @@ def target_domain(api):
         expected=201,
         json={
             "tipo_afectacion": "colectivo",
-            "destino_superficie": "parcela_escolar",
             "superficie_preliminar_ha": "1.000000",
             "superficie_afectada_ha": "0.900000",
         },
@@ -153,7 +163,6 @@ def target_domain(api):
         expected=201,
         json={
             "tipo_afectacion": "individual",
-            "id_parcela": parcel_one["id_parcela"],
             "superficie_preliminar_ha": "0.500000",
             "superficie_afectada_ha": "0.450000",
         },
@@ -164,11 +173,45 @@ def target_domain(api):
         expected=201,
         json={
             "tipo_afectacion": "individual",
-            "id_parcela": parcel_two["id_parcela"],
             "superficie_preliminar_ha": "0.750000",
             "superficie_afectada_ha": "0.700000",
         },
     ).json()
+    unit_specs = [
+        (collective_one, None, tipo_tierra["uso_comun"], tipo_gestion["TUC"], destino["tuc"], titularidad["nucleo_agrario"]),
+        (collective_two, None, tipo_tierra["uso_comun"], tipo_gestion["PARCELA"], destino["parcela_escolar"], titularidad["nucleo_agrario"]),
+        (individual_one, parcel_one["id_parcela"], tipo_tierra["parcelada"], tipo_gestion["PARCELA"], destino["parcela_ejidal"], titularidad["persona"]),
+        (individual_two, parcel_two["id_parcela"], tipo_tierra["parcelada"], tipo_gestion["PARCELA"], destino["parcela_ejidal"], titularidad["persona"]),
+    ]
+    units = []
+    links = []
+    for affectation, parcel_id, land_type, management, destination, ownership in unit_specs:
+        unit = api(
+            "POST",
+            f"/api/proyecto-nucleo/{pn_id}/unidades-agrarias",
+            expected=201,
+            json={
+                "id_tipo_tierra": land_type,
+                "id_tipo_gestion": management,
+                "id_destino_superficie": destination,
+                "id_tipo_titularidad": ownership,
+                "id_parcela": parcel_id,
+                "referencia_alfanumerica": unique("UA"),
+            },
+        ).json()
+        link = api(
+            "POST",
+            f"/api/afectaciones/{affectation['id_afectacion']}/unidades-agrarias",
+            expected=201,
+            json={
+                "id_unidad_agraria": unit["id_unidad_agraria"],
+                "superficie_preliminar_ha": affectation["superficie_preliminar_ha"],
+                "superficie_afectada_ha": affectation["superficie_afectada_ha"],
+            },
+        ).json()
+        units.append(unit)
+        links.append(link)
+
     return {
         "state": state,
         "municipality": municipality,
@@ -178,4 +221,6 @@ def target_domain(api):
         "parcels": [parcel_one, parcel_two],
         "collective": [collective_one, collective_two],
         "individual": [individual_one, individual_two],
+        "units": units,
+        "affectation_units": links,
     }

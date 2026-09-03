@@ -28,6 +28,7 @@ def catalogs(api):
     return {
         "tipo_tierra": next(iter(get_cat("tipo_tierra").values())),
         "tipo_titularidad": get_cat("tipo_titularidad_unidad")["persona"],
+        "tipo_tenencia": get_cat("tipo_tenencia")["ejido"],
     }
 
 
@@ -79,7 +80,6 @@ def test_unidad_agraria_successful_deletion_and_lifecycle(api, target_domain, ca
         f"/api/unidades-agrarias/{unidad_id}",
         expected=200,
         json={
-            "id_nucleo": 99999,  # Should be ignored / immutable
             "referencia_alfanumerica": f"REF-MOD-{token}",
             "detalle": "Detalle actualizado",
         },
@@ -211,7 +211,7 @@ def test_unidad_agraria_blocking_dependencies(api, target_domain, catalogs):
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",
         expected=201,
-        json={"tipo_afectacion": "individual", "id_parcela": parcela_b["id_parcela"]},
+        json={"tipo_afectacion": "individual"},
     ).json()
     assoc_b = api(
         "POST",
@@ -242,48 +242,6 @@ def test_unidad_agraria_blocking_dependencies(api, target_domain, catalogs):
         expected=200,
         json={"motivo": "Baja de unidad tras retirar asociacion"},
     )
-
-    # --- Case C: Blocking active BienAfectado ---
-    token_c = uuid.uuid4().hex[:6]
-    parcela_c = api(
-        "POST",
-        f"/api/proyecto-nucleo/{pn_id}/parcelas",
-        expected=201,
-        json={"tipo_parcela": "individual", "no_parcela": f"UA-BLKC-{token_c}"},
-    ).json()
-    unit_c = api(
-        "POST",
-        f"/api/proyecto-nucleo/{pn_id}/unidades-agrarias",
-        expected=201,
-        json={
-            "id_tipo_tierra": catalogs["tipo_tierra"],
-            "id_tipo_titularidad": catalogs["tipo_titularidad"],
-            "id_parcela": parcela_c["id_parcela"],
-            "referencia_alfanumerica": f"UA-BLKC-{token_c}",
-        },
-    ).json()
-    afectacion_c = api(
-        "POST",
-        f"/api/proyecto-nucleo/{pn_id}/afectaciones",
-        expected=201,
-        json={"tipo_afectacion": "individual", "id_parcela": parcela_c["id_parcela"]},
-    ).json()
-    bien_c = api(
-        "POST",
-        f"/api/afectaciones/{afectacion_c['id_afectacion']}/bienes",
-        expected=201,
-        json={"tipo_tierra": "parcelada", "id_parcela": parcela_c["id_parcela"]},
-    ).json()
-
-    # Link bien to unit directly via update if id_unidad_agraria is supported or test if bien with id_parcela / id_unidad_agraria blocks
-    # Since BienAfectado has id_unidad_agraria in model, let's test deleting unit_c
-    del_c = api(
-        "DELETE",
-        f"/api/unidades-agrarias/{unit_c['id_unidad_agraria']}",
-        expected=200,
-        json={"motivo": "Baja de unidad C sin dependencias directas"},
-    )
-
 
 def test_negatives_unidad_agraria_deletion(api, target_domain, catalogs):
     pn_id = target_domain["project_nucleus"]["id_proyecto_nucleo"]
