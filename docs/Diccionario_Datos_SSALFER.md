@@ -1,6 +1,6 @@
 # Diccionario de datos vigente
 
-Fuente: migraciones 001, 002, 003 y 004. Siguiente migración: 005.
+Fuente: migraciones 001, 002, 003, 004 y 005. Siguiente migración: 006. El Modelo Excel V1 queda funcionalmente congelado en 005; 006+ sólo se justifica por requerimientos nuevos o defectos reales, no por campos ya presentes en las fuentes auditadas.
 
 - `seguimiento_evento`: entidad de historia funcional operativa con PK `id_seguimiento_evento`, FK `id_proyecto_nucleo`, objetivo opcional (`entidad_tipo`, `entidad_id`), `ambito` (general, colectivo, individual), `id_tipo_evento` (FK catalogo_operativo), `id_motivo` (FK catalogo_operativo nullable), `fecha_evento`, `detalle`, `id_documento`, `fuente`, auditoría y baja lógica.
 - `catalogo_operativo.tipo_evento_seguimiento`: inicio, suspension, reapertura, cierre, cambio_alcance, reunion, negociacion, consulta_indigena, continuacion_asamblea, medicion_bdt, otro.
@@ -15,4 +15,6 @@ Fuente: migraciones 001, 002, 003 y 004. Siguiente migración: 005.
 - `expediente_requisito.entidad_tipo`: incluye orv, padron_historial, actividad_campo, asamblea, asamblea_convocatoria.
 - `parcela.no_parcela`: único número funcional; no existe número PPT paralelo.
 - `tramite_ran.fecha_programada_ingreso` y `tramite_ran_evento`: fechas, solicitudes, calificación e inscripción canónicas.
-- `vw_dashboard_kpi`: resumen compatible. `vw_reporte_avance_periodo`: proyecto, entidad, año, mes, trimestre e indicadores derivados.
+- `vw_hito_seguimiento`: vista hito canónica en capa base que normaliza `clave_hito`, `indicador`, fechas canónicas (`fecha_programada`, `fecha_realizada`), dimensiones de segmentación (`ambito`, `tipo_cop_operativo`, `tipo_convenio`, `destino_superficie`), `cantidad`, `superficie_ha` y `monto`. Deduplica antes de proyectar a periodos temporales.
+- `vw_reporte_avance_periodo`: desglose temporal de 15 columnas (`id_proyecto`, `id_entidad`, `ambito`, `tipo_cop_operativo`, `tipo_convenio`, `destino_superficie`, `anio`, `mes`, `trimestre`, `indicador`, `programado`, `realizado`, `cantidad`, `superficie_ha`, `monto`). Proyecta `fecha_programada` y `fecha_realizada` en sus periodos respectivos sin inventar periodos ni duplicar cantidades.
+- `vw_dashboard_kpi`: agregación de alto nivel compatible por `id_proyecto, anio, indicador`, deduplicada a nivel anual.

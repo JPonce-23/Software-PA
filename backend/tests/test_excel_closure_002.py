@@ -116,4 +116,4 @@ def test_002_convenio_ran_parcela_and_paid_indemnity(api, target_domain):
     kpi = _dashboard(api, project["id_proyecto"])
     assert kpi["cop_colectivos"]["realizado"] == 1
     assert kpi["ingreso_ran_convenio"]["realizado"] == 1
-    assert kpi["parcelas_afectadas"]["cantidad"] == 1
+    assert "parcelas_afectadas" not in kpi

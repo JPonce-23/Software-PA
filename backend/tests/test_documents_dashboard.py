@@ -111,10 +111,12 @@ def test_dashboard_does_not_multiply_many_to_many(api, target_domain):
         "GET", f"/api/dashboard/kpi?id_proyecto={project['id_proyecto']}"
     ).json()
     by_indicator = {row["indicador"]: row for row in rows}
-    assert by_indicator["nucleos"]["cantidad"] == 1
+    # Núcleos, FIFONAFE pendiente y superficie administrativa son snapshots:
+    # ninguno usa la fecha técnica de alta para aparecer en un KPI anual.
+    assert "nucleos" not in by_indicator
     assert by_indicator["cop_colectivos"]["cantidad"] == 1
-    assert by_indicator["fifonafe"]["cantidad"] == 1
-    assert by_indicator["superficie_afectada_administrativa"]["superficie_ha"] == "3.000000"
+    assert "fifonafe" not in by_indicator
+    assert "superficie_afectada_administrativa" not in by_indicator
 
 
 def test_project_map_is_visual_support(api, target_domain):

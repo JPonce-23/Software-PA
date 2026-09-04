@@ -1162,6 +1162,10 @@ class DashboardKpiResponse(ORMModel):
 
 class ReporteAvancePeriodoResponse(DashboardKpiResponse):
     id_entidad: int
+    ambito: str | None = None
+    tipo_cop_operativo: str | None = None
+    tipo_convenio: str | None = None
+    destino_superficie: str | None = None
     mes: int
     trimestre: int
 

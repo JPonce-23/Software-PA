@@ -61,7 +61,12 @@ def reporte_avance_periodo(
     mes: int | None = Query(default=None, ge=1, le=12),
     trimestre: int | None = Query(default=None, ge=1, le=4),
     indicador: str | None = None,
-    db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+    ambito: str | None = None,
+    tipo_cop_operativo: str | None = None,
+    tipo_convenio: str | None = None,
+    destino_superficie: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     query = db.query(models.ReporteAvancePeriodo)
     if id_proyecto is not None:
@@ -69,12 +74,30 @@ def reporte_avance_periodo(
         query = query.filter(models.ReporteAvancePeriodo.id_proyecto == id_proyecto)
     else:
         query = query.filter(models.ReporteAvancePeriodo.id_proyecto.in_(authorized_project_ids(db, user)))
-    if id_entidad is not None: query = query.filter(models.ReporteAvancePeriodo.id_entidad == id_entidad)
-    if anio is not None: query = query.filter(models.ReporteAvancePeriodo.anio == anio)
-    if mes is not None: query = query.filter(models.ReporteAvancePeriodo.mes == mes)
-    if trimestre is not None: query = query.filter(models.ReporteAvancePeriodo.trimestre == trimestre)
-    if indicador is not None: query = query.filter(models.ReporteAvancePeriodo.indicador == indicador)
-    return query.order_by(models.ReporteAvancePeriodo.id_proyecto, models.ReporteAvancePeriodo.anio, models.ReporteAvancePeriodo.mes, models.ReporteAvancePeriodo.indicador).all()
+    if id_entidad is not None:
+        query = query.filter(models.ReporteAvancePeriodo.id_entidad == id_entidad)
+    if anio is not None:
+        query = query.filter(models.ReporteAvancePeriodo.anio == anio)
+    if mes is not None:
+        query = query.filter(models.ReporteAvancePeriodo.mes == mes)
+    if trimestre is not None:
+        query = query.filter(models.ReporteAvancePeriodo.trimestre == trimestre)
+    if indicador is not None:
+        query = query.filter(models.ReporteAvancePeriodo.indicador == indicador)
+    if ambito is not None:
+        query = query.filter(models.ReporteAvancePeriodo.ambito == ambito)
+    if tipo_cop_operativo is not None:
+        query = query.filter(models.ReporteAvancePeriodo.tipo_cop_operativo == tipo_cop_operativo)
+    if tipo_convenio is not None:
+        query = query.filter(models.ReporteAvancePeriodo.tipo_convenio == tipo_convenio)
+    if destino_superficie is not None:
+        query = query.filter(models.ReporteAvancePeriodo.destino_superficie == destino_superficie)
+    return query.order_by(
+        models.ReporteAvancePeriodo.id_proyecto,
+        models.ReporteAvancePeriodo.anio,
+        models.ReporteAvancePeriodo.mes,
+        models.ReporteAvancePeriodo.indicador,
+    ).all()
 
 
 @router.get("/exportaciones/dashboard.csv")

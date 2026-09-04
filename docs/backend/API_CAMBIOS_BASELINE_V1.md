@@ -34,4 +34,18 @@
 
 **Impacto frontend:** aditivo. No modifica endpoints existentes ni fuerza estados ficticios de persona. Preserva la independencia entre la afectación física (`afecta_tuc`), las características territoriales (`comunidad_indigena`) y las suspensiones operativas temporales.
 
-Vigentes: 001, 002, 003, 004. Siguiente migración: 005.
+## 005_reporting_cierre_excel
+
+**Antes:** el reporte periódico y dashboard presentaban riesgo de multiplicación o desalineación al no separar la deduplicación de hitos de la expansión temporal, carecían de desglose dimensional por ámbito, ciclo COP, subtipo de convenio y destino de superficie, y no integraban el historial funcional de seguimiento 004 ni los cierres específicos de FIFONAFE e indemnizaciones.
+
+**Ahora:**
+- Se implementa el read-model canónico en dos capas:
+  1. `vw_hito_seguimiento`: consolida cada hito operativo (`clave_hito`) con sus fechas canónicas programada y realizada, su indicador, y sus dimensiones (`ambito`, `tipo_cop_operativo`, `tipo_convenio`, `destino_superficie`), deduplicando a nivel de hito antes de expandir periodos.
+  2. `vw_reporte_avance_periodo`: desglose temporal de 15 columnas con filtros dimensionales completos (`ambito`, `tipo_cop_operativo`, `tipo_convenio`, `destino_superficie`), asignando `programado` y `realizado` a sus fechas respectivas sin inventar periodos ni duplicar cantidades.
+  3. `vw_dashboard_kpi`: agregación de alto nivel por `id_proyecto, anio, indicador`, deduplicada anualmente.
+- Se actualizan los schemas y routers del backend (`ReporteAvancePeriodoResponse`, `/api/reportes/avance-periodo`) manteniendo total compatibilidad hacia atrás con los clientes que consumían la versión previa.
+
+**Impacto frontend:** aditivo y retrocompatible. Expone las 4 nuevas dimensiones en el reporte periódico y permite filtros avanzados en UI.
+
+Vigentes: 001, 002, 003, 004, 005. Siguiente migración: 006.
+El Modelo Excel V1 queda funcionalmente congelado en 005; 006+ sólo se justifica por requerimientos nuevos o defectos reales, no por campos ya presentes en las fuentes auditadas.

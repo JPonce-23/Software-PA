@@ -1,6 +1,6 @@
-# Contrato API Frontend V1 — esquema 004
+# Contrato API Frontend V1 — esquema 005
 
-Fuente de verdad: rutas FastAPI, `schemas.py`, OpenAPI y migraciones vigentes 001–004. La siguiente migración es 005. Los catálogos se consultan en `GET /api/catalogos/operativos/{tipo_catalogo}`; nunca se asumen IDs.
+Fuente de verdad: rutas FastAPI, `schemas.py`, OpenAPI y migraciones vigentes 001–005. La siguiente migración es 006. El Modelo Excel V1 queda funcionalmente congelado en 005; 006+ sólo se justifica por requerimientos nuevos o defectos reales, no por campos ya presentes en las fuentes auditadas. Los catálogos se consultan en `GET /api/catalogos/operativos/{tipo_catalogo}`; nunca se asumen IDs.
 
 ## Dominio
 
@@ -37,8 +37,21 @@ Catálogos:
 
 Indemnización admite `pendiente`, `programado`, `en_proceso`, `completo`, `pagado`, `cancelado`, `otro`; `pagado` no inventa Pago. Checklist admite, además de objetivos previos, `orv`, `padron_historial`, `actividad_campo`, `asamblea`, `asamblea_convocatoria`.
 
-## Reporting
+## Reporting (005)
 
-`GET /api/dashboard/kpi` conserva el resumen compatible. `GET /api/reportes/avance-periodo` filtra por `id_proyecto`, `id_entidad`, `anio`, `mes`, `trimestre`, `indicador` y responde esas dimensiones más `programado`, `realizado`, `cantidad`, `superficie_ha`, `monto`.
+- `GET /api/dashboard/kpi`: resumen compatible agregado por `id_proyecto, anio, indicador`, deduplicado a nivel anual sin multiplicar registros.
+- `GET /api/reportes/avance-periodo`: endpoint de reporte periódico desagregado. Admite los filtros:
+  - `id_proyecto` (int)
+  - `id_entidad` (int)
+  - `ambito` (`colectivo`, `individual`)
+  - `tipo_cop_operativo` (`ORIGEN`, `ADICIONAL`, `2A_ADICIONAL`, `COMPLEMENTARIAS`, `TRANSVERSALES`)
+  - `tipo_convenio` (`cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`, `ampliacion`, `ampliacion_remanente`)
+  - `destino_superficie` (`tuc`, `camino`, `canal`, etc.)
+  - `anio` (int)
+  - `mes` (int 1..12)
+  - `trimestre` (int 1..4)
+  - `indicador` (str)
+- Respuesta de `GET /api/reportes/avance-periodo`: lista de objetos con 15 columnas:
+  `id_proyecto`, `id_entidad`, `ambito`, `tipo_cop_operativo`, `tipo_convenio`, `destino_superficie`, `anio`, `mes`, `trimestre`, `indicador`, `programado`, `realizado`, `cantidad`, `superficie_ha`, `monto`.
 
-Las X Excel no son campos API ni BD. Se deduplica actividad por ProyectoNucleo+ciclo, Asamblea por Asamblea y RAN por TramiteRan; ingreso+reingreso cuenta una vez e inscripción se reporta aparte. Programado y realizado usan fechas propias; mes/trimestre se derivan.
+Las X Excel no son campos API ni BD. Se deduplica a nivel de hito canónico (`vw_hito_seguimiento`) antes de proyectar a periodos temporales; ingreso y reingreso del mismo trámite RAN cuentan una sola vez como hito, e inscripción se reporta de forma independiente. Programado y realizado usan fechas propias sin inventar periodos; mes y trimestre se derivan de la fecha.

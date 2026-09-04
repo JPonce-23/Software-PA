@@ -1,6 +1,6 @@
 # Arquitectura actual
 
-El esquema vigente se instala mediante 001 baseline, 002 cierre Excel, 003 reporting y 004 seguimiento funcional. Las migraciones vigentes son 001, 002, 003 y 004; la siguiente migración es 005.
+El esquema vigente se instala mediante 001 baseline, 002 cierre Excel, 003 reporting, 004 seguimiento funcional y 005 reporting cierre Excel. Las migraciones vigentes son 001, 002, 003, 004 y 005; la siguiente migración es 006. El Modelo Excel V1 queda funcionalmente congelado en 005; 006+ sólo se justifica por requerimientos nuevos o defectos reales, no por campos ya presentes en las fuentes auditadas.
 
 El dominio conserva eventos reales: actividades 1:N, Asamblea→Convocatorias 1:N, TramiteRan→Eventos 1:N y TramiteFifonafe→Eventos 1:N. `TRANSVERSALES` es clasificación operativa, no figura jurídica adicional de convenio.
 
@@ -8,4 +8,7 @@ El dominio conserva eventos reales: actividades 1:N, Asamblea→Convocatorias 1:
 `vw_seguimiento_estado_actual` deriva deterministamente el estado actual (`activo`, `suspendido`, `cerrado`) desde los eventos de transición sin mutar la historia ni alterar automáticamente atributos del núcleo (`comunidad_indigena`) o del proyecto-núcleo (`afecta_tuc`).
 El subsistema documental incorpora los estados `parcial` y `pendiente_validacion` junto con los requisitos `validacion_pa_sict`, `oficio_ran_parcelas_afectacion` y `acta_complementaria`.
 
-`vw_convenio_tipo_cop_operativo` deriva la clasificación desde afectaciones y deja revisión cuando es contradictoria. `vw_dashboard_kpi` es el resumen compatible. `vw_reporte_avance_periodo` deriva proyecto, entidad, año, mes, trimestre e indicadores desde fechas canónicas. La deduplicación es por PN/ciclo para actividades, Asamblea para asambleas y TramiteRan para RAN; no almacena X ni trimestres.
+En reporting (005), la arquitectura de lectura opera en dos capas estrictas:
+1. `vw_hito_seguimiento`: consolida cada hito operativo/jurídico único (`clave_hito`) antes de su proyección a periodos temporales, asignando sus fechas canónicas programada y realizada, su indicador, ámbito, ciclo COP, tipo de convenio, destino de superficie, cantidad, superficie y monto.
+2. `vw_reporte_avance_periodo`: proyecta los hitos en periodos independientes (año, mes, trimestre) diferenciando programado y realizado, y exponiendo 15 columnas con filtros dimensionales completos (`ambito`, `tipo_cop_operativo`, `tipo_convenio`, `destino_superficie`).
+3. `vw_dashboard_kpi`: agregación de alto nivel por `id_proyecto, anio, indicador`, deduplicada anualmente sin multiplicar registros ni superficies por relaciones 1:N o N:M. No almacena marcas X ni periodos auxiliares Excel.
