@@ -477,6 +477,46 @@ class ActividadCampoResponse(ActividadCampoCreate, AuditRead):
     id_proyecto_nucleo: int
 
 
+SeguimientoObjetivo = Literal[
+    "proyecto_nucleo", "afectacion", "parcela", "parcela_titular",
+    "unidad_agraria", "asamblea", "asamblea_convocatoria", "convenio",
+    "tramite_ran", "tramite_ran_evento", "tramite_fifonafe",
+    "tramite_fifonafe_evento", "orv", "padron_historial", "indemnizacion",
+]
+
+
+class SeguimientoEventoCreate(AuditInput):
+    entidad_tipo: SeguimientoObjetivo | None = None
+    entidad_id: int | None = Field(default=None, gt=0)
+    ambito: Literal["general", "colectivo", "individual"]
+    id_tipo_evento: int = Field(gt=0)
+    id_motivo: int | None = Field(default=None, gt=0)
+    fecha_evento: date | None = None
+    detalle: str | None = None
+    id_documento: int | None = Field(default=None, gt=0)
+    fuente: str | None = Field(default=None, max_length=250)
+
+    @model_validator(mode="after")
+    def validar_objetivo_y_reglas(self):
+        if (self.entidad_tipo is None) != (self.entidad_id is None):
+            raise ValueError("entidad_tipo y entidad_id deben indicarse juntos")
+        # Las reglas que dependen de códigos de catálogo se validan en PostgreSQL.
+        return self
+
+
+class SeguimientoEventoUpdate(AuditInput):
+    model_config = ConfigDict(extra="forbid")
+    fecha_evento: date | None = None
+    detalle: str | None = None
+    id_documento: int | None = Field(default=None, gt=0)
+    fuente: str | None = Field(default=None, max_length=250)
+
+
+class SeguimientoEventoResponse(SeguimientoEventoCreate, AuditRead):
+    id_seguimiento_evento: int
+    id_proyecto_nucleo: int
+
+
 class UnidadAgrariaTitularBase(BaseModel):
     id_persona: int | None = Field(default=None, gt=0)
     id_parcela_titular: int | None = Field(default=None, gt=0)

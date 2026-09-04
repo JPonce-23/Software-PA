@@ -270,6 +270,9 @@ class ProyectoNucleo(Base, AuditableMixin):
     tramites_ran = relationship(
         "TramiteRan", back_populates="proyecto_nucleo", lazy="selectin"
     )
+    seguimiento_eventos = relationship(
+        "SeguimientoEvento", back_populates="proyecto_nucleo", lazy="selectin"
+    )
 
     afecta_tuc = Column(Boolean)
     id_motivo_no_afecta_tuc = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
@@ -880,6 +883,33 @@ class DocumentoVinculo(Base, AuditableMixin):
     entidad_id = Column(Integer, nullable=False)
 
     documento = relationship("Documento", back_populates="vinculos")
+
+
+class SeguimientoEvento(Base, AuditableMixin):
+    """Evento histórico funcional; nunca sustituye el estado físico del dominio."""
+
+    __tablename__ = "seguimiento_evento"
+
+    id_seguimiento_evento = Column(BigInteger, primary_key=True)
+    id_proyecto_nucleo = Column(
+        Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False
+    )
+    entidad_tipo = Column(String(50))
+    entidad_id = Column(BigInteger)
+    ambito = Column(String(20), nullable=False)
+    id_tipo_evento = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False
+    )
+    id_motivo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    fecha_evento = Column(Date)
+    detalle = Column(Text)
+    id_documento = Column(Integer, ForeignKey("documento.id_documento"))
+    fuente = Column(String(250))
+
+    proyecto_nucleo = relationship("ProyectoNucleo", back_populates="seguimiento_eventos")
+    tipo_evento = relationship("CatalogoOperativo", foreign_keys=[id_tipo_evento])
+    motivo = relationship("CatalogoOperativo", foreign_keys=[id_motivo])
+    documento = relationship("Documento", foreign_keys=[id_documento])
 
 
 class TrazabilidadFuente(Base):

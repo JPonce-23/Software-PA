@@ -496,6 +496,29 @@ def create_activity(
     return _persist(db, entity, user.id_usuario, "Actividad inválida")
 
 
+def create_seguimiento_evento(
+    db: Session,
+    project_nucleus_id: int,
+    data: schemas.SeguimientoEventoCreate,
+    user: models.Usuario,
+) -> models.SeguimientoEvento:
+    """Append a functional history event; it does not overwrite prior events."""
+    require_project_nucleus_access(db, user, project_nucleus_id, mode="capture")
+    require_catalog_option(
+        db, "tipo_evento_seguimiento", option_id=data.id_tipo_evento, required=True
+    )
+    if data.id_motivo is not None:
+        require_catalog_option(
+            db, "motivo_seguimiento", option_id=data.id_motivo, required=True
+        )
+    entity = models.SeguimientoEvento(
+        id_proyecto_nucleo=project_nucleus_id,
+        **data.model_dump(exclude={"observaciones"}),
+        **_audit_values(user.id_usuario, data),
+    )
+    return _persist(db, entity, user.id_usuario, "Evento de seguimiento inválido")
+
+
 def create_affectation(
     db: Session,
     project_nucleus_id: int,

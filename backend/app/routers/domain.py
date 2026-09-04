@@ -865,6 +865,84 @@ def delete_affectation(
 
 
 @router.get(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/seguimiento",
+    response_model=list[schemas.SeguimientoEventoResponse],
+)
+def list_seguimiento_eventos(
+    id_proyecto_nucleo: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    return db.query(models.SeguimientoEvento).filter(
+        models.SeguimientoEvento.id_proyecto_nucleo == id_proyecto_nucleo,
+        models.SeguimientoEvento.activo.is_(True),
+    ).order_by(
+        models.SeguimientoEvento.fecha_evento.asc().nulls_last(),
+        models.SeguimientoEvento.id_seguimiento_evento.asc(),
+    ).all()
+
+
+@router.post(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/seguimiento",
+    response_model=schemas.SeguimientoEventoResponse,
+    status_code=201,
+)
+def create_seguimiento_evento(
+    id_proyecto_nucleo: int,
+    data: schemas.SeguimientoEventoCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.create_seguimiento_evento(db, id_proyecto_nucleo, data, user)
+
+
+@router.get("/seguimiento/{id_seguimiento_evento}", response_model=schemas.SeguimientoEventoResponse)
+def get_seguimiento_evento(
+    id_seguimiento_evento: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.SeguimientoEvento, models.SeguimientoEvento.id_seguimiento_evento,
+        id_seguimiento_evento, "Evento de seguimiento no encontrado",
+    )
+    require_project_nucleus_access(db, user, entity.id_proyecto_nucleo)
+    return entity
+
+
+@router.patch("/seguimiento/{id_seguimiento_evento}", response_model=schemas.SeguimientoEventoResponse)
+def update_seguimiento_evento(
+    id_seguimiento_evento: int,
+    data: schemas.SeguimientoEventoUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.SeguimientoEvento, models.SeguimientoEvento.id_seguimiento_evento,
+        id_seguimiento_evento, "Evento de seguimiento no encontrado",
+    )
+    require_project_nucleus_access(db, user, entity.id_proyecto_nucleo, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
+@router.delete("/seguimiento/{id_seguimiento_evento}", response_model=schemas.AuthOperationResponse)
+def delete_seguimiento_evento(
+    id_seguimiento_evento: int,
+    data: schemas.BajaRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.SeguimientoEvento, models.SeguimientoEvento.id_seguimiento_evento,
+        id_seguimiento_evento, "Evento de seguimiento no encontrado",
+    )
+    require_project_nucleus_access(db, user, entity.id_proyecto_nucleo, mode="capture")
+    service.logical_delete(db, entity, user.id_usuario, data.motivo)
+    return {"detail": "Evento de seguimiento dado de baja"}
+
+
+@router.get(
     "/proyecto-nucleo/{id_proyecto_nucleo}/asambleas",
     response_model=list[schemas.AsambleaResponse],
 )

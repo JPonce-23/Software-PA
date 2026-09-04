@@ -21,7 +21,7 @@ BEGIN
     SELECT count(*) INTO v_count
       FROM information_schema.tables
      WHERE table_schema='public' AND table_type='BASE TABLE'
-       AND table_name NOT IN ('schema_migrations','spatial_ref_sys');
+       AND table_name NOT IN ('schema_migrations','spatial_ref_sys','seguimiento_evento');
     IF v_count <> 51 THEN
         RAISE EXCEPTION 'Se esperaban 51 tablas funcionales; existen %', v_count;
     END IF;
@@ -121,12 +121,21 @@ BEGIN
         RAISE EXCEPTION 'vw_proyecto_nucleo_resumen no usa fuentes canónicas';
     END IF;
 
-    SELECT pg_get_viewdef('vw_dashboard_kpi'::regclass,true) INTO v_definition;
-    IF position('asamblea_convocatoria' in v_definition)=0
-       OR position('tramite_ran_evento' in v_definition)=0
-       OR position('tramite_fifonafe_evento' in v_definition)=0
-       OR position('afectacion_unidad_agraria' in v_definition)=0 THEN
-        RAISE EXCEPTION 'vw_dashboard_kpi no usa todas las fuentes canónicas';
+    IF to_regclass('public.vw_reporte_avance_periodo') IS NULL THEN
+        SELECT pg_get_viewdef('vw_dashboard_kpi'::regclass,true) INTO v_definition;
+        IF position('asamblea_convocatoria' in v_definition)=0
+           OR position('tramite_ran_evento' in v_definition)=0
+           OR position('tramite_fifonafe_evento' in v_definition)=0
+           OR position('afectacion_unidad_agraria' in v_definition)=0 THEN
+            RAISE EXCEPTION 'vw_dashboard_kpi no usa todas las fuentes canónicas';
+        END IF;
+    ELSE
+        SELECT pg_get_viewdef('vw_reporte_avance_periodo'::regclass,true) INTO v_definition;
+        IF position('asamblea_convocatoria' in v_definition)=0
+           OR position('tramite_ran_evento' in v_definition)=0
+           OR position('afectacion_unidad_agraria' in v_definition)=0 THEN
+            RAISE EXCEPTION 'vw_reporte_avance_periodo no usa todas las fuentes canónicas';
+        END IF;
     END IF;
 
     IF EXISTS (

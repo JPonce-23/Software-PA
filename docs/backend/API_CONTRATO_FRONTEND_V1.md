@@ -1,6 +1,6 @@
-# Contrato API Frontend V1 — esquema 003
+# Contrato API Frontend V1 — esquema 004
 
-Fuente de verdad: rutas FastAPI, `schemas.py`, OpenAPI y migraciones 001–003. Los catálogos se consultan en `GET /api/catalogos/operativos/{tipo_catalogo}`; nunca se asumen IDs.
+Fuente de verdad: rutas FastAPI, `schemas.py`, OpenAPI y migraciones vigentes 001–004. La siguiente migración es 005. Los catálogos se consultan en `GET /api/catalogos/operativos/{tipo_catalogo}`; nunca se asumen IDs.
 
 ## Dominio
 
@@ -11,6 +11,23 @@ ORV usa `numero_orv`, `inicio_vigencia`, `fin_vigencia`, `estatus_fuente`, `id_e
 Actividad: `tipo_actividad` es sólo `sensibilizacion` o `caminamiento`; además `id_afectacion`, `id_tipo_cop_operativo`, `contexto_actividad`, `fecha_programada`, `fecha_realizada`, `responsable`, `resultado`. Se conservan todos los eventos reales.
 
 Asamblea recibe `id_padron`, `id_tipo_asamblea`, `id_contexto_asamblea`, `id_tipo_cop_operativo`, `proposito`, `resultado`, `convocatorias`. Convocatoria: `ordinal`, `fecha_expedicion`, `fecha_programada`, `fecha_realizacion`, `id_resultado`, `observaciones_resultado`, `id_documento`.
+
+## Seguimiento funcional (004)
+
+Historial funcional operativo append-oriented asociado a un `ProyectoNucleo` y opcionalmente a un objetivo tipado (`proyecto_nucleo`, `afectacion`, `parcela`, `parcela_titular`, `unidad_agraria`, `asamblea`, `asamblea_convocatoria`, `convenio`, `tramite_ran`, `tramite_ran_evento`, `tramite_fifonafe`, `tramite_fifonafe_evento`, `orv`, `padron_historial`, `indemnizacion`).
+
+Endpoints:
+- `GET /api/proyecto-nucleo/{id_proyecto_nucleo}/seguimiento`: lista ordenada de eventos activos.
+- `POST /api/proyecto-nucleo/{id_proyecto_nucleo}/seguimiento`: crea evento con `ambito` (`general`, `colectivo`, `individual`), `id_tipo_evento`, `id_motivo` opcional, objetivo opcional (`entidad_tipo`, `entidad_id`), `fecha_evento`, `detalle`, `id_documento`, `fuente`.
+- `GET /api/seguimiento/{id_seguimiento_evento}`: obtiene detalle del evento.
+- `PATCH /api/seguimiento/{id_seguimiento_evento}`: actualiza metadatos (`fecha_evento`, `detalle`, `id_documento`, `fuente`) sin reescribir la historia.
+- `DELETE /api/seguimiento/{id_seguimiento_evento}`: baja lógica obligatoria con `{"motivo": "..."}`.
+
+Catálogos:
+- `tipo_evento_seguimiento`: `inicio`, `suspension`, `reapertura`, `cierre`, `cambio_alcance`, `reunion`, `negociacion`, `consulta_indigena`, `continuacion_asamblea`, `medicion_bdt`, `otro`.
+- `motivo_seguimiento`: `expropiacion_directa`, `no_afectacion`, `comunidad_indigena`, `dominio_pleno`, `juicio_agrario`, `conflicto_titularidad`, `rechazo`, `cambio_trazo`, `nueva_informacion`, `calificacion_negativa`, `falta_pago`, `otro`.
+- `estado_requisito_documental`: incorpora `parcial` y `pendiente_validacion`.
+- Requisitos documentales opcionales: `validacion_pa_sict`, `oficio_ran_parcelas_afectacion`, `acta_complementaria`.
 
 ## Catálogos y RAN
 
