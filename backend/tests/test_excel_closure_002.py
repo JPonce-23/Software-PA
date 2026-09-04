@@ -50,6 +50,19 @@ def test_002_all_operational_cop_codes_are_available(api):
     assert {"ORIGEN", "ADICIONAL", "2A_ADICIONAL", "COMPLEMENTARIAS", "TRANSVERSALES"} <= set(codes)
 
 
+def test_003_periodic_reporting_separates_canonical_dates(api, target_domain):
+    project, pn = _isolated_pn(api, target_domain)
+    cop = _catalog(api, "tipo_cop_operativo")
+    api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/actividades", expected=201, json={
+        "tipo_actividad": "sensibilizacion", "id_tipo_cop_operativo": cop["ORIGEN"],
+        "fecha_programada": "2025-12-20", "fecha_realizada": "2026-01-10",
+    })
+    dec = api("GET", f"/api/reportes/avance-periodo?id_proyecto={project['id_proyecto']}&anio=2025&mes=12").json()
+    jan = api("GET", f"/api/reportes/avance-periodo?id_proyecto={project['id_proyecto']}&anio=2026&mes=1&trimestre=1").json()
+    assert dec[0]["indicador"] == "sensibilizacion_ORIGEN" and dec[0]["programado"] == 1 and dec[0]["realizado"] == 0
+    assert jan[0]["indicador"] == "sensibilizacion_ORIGEN" and jan[0]["realizado"] == 1 and jan[0]["programado"] == 0 and jan[0]["trimestre"] == 1
+
+
 def test_002_assemblies_and_ran_are_counted_by_entity(api, target_domain):
     project, pn = _isolated_pn(api, target_domain)
     types = _catalog(api, "tipo_asamblea"); contexts = _catalog(api, "contexto_asamblea")

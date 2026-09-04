@@ -53,6 +53,30 @@ def dashboard(
     ).offset(skip).limit(limit).all()
 
 
+@router.get("/reportes/avance-periodo", response_model=list[schemas.ReporteAvancePeriodoResponse])
+def reporte_avance_periodo(
+    id_proyecto: int | None = None,
+    id_entidad: int | None = Query(default=None, gt=0),
+    anio: int | None = Query(default=None, ge=2000, le=2200),
+    mes: int | None = Query(default=None, ge=1, le=12),
+    trimestre: int | None = Query(default=None, ge=1, le=4),
+    indicador: str | None = None,
+    db: Session = Depends(get_db), user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.ReporteAvancePeriodo)
+    if id_proyecto is not None:
+        require_project_access(db, user, id_proyecto)
+        query = query.filter(models.ReporteAvancePeriodo.id_proyecto == id_proyecto)
+    else:
+        query = query.filter(models.ReporteAvancePeriodo.id_proyecto.in_(authorized_project_ids(db, user)))
+    if id_entidad is not None: query = query.filter(models.ReporteAvancePeriodo.id_entidad == id_entidad)
+    if anio is not None: query = query.filter(models.ReporteAvancePeriodo.anio == anio)
+    if mes is not None: query = query.filter(models.ReporteAvancePeriodo.mes == mes)
+    if trimestre is not None: query = query.filter(models.ReporteAvancePeriodo.trimestre == trimestre)
+    if indicador is not None: query = query.filter(models.ReporteAvancePeriodo.indicador == indicador)
+    return query.order_by(models.ReporteAvancePeriodo.id_proyecto, models.ReporteAvancePeriodo.anio, models.ReporteAvancePeriodo.mes, models.ReporteAvancePeriodo.indicador).all()
+
+
 @router.get("/exportaciones/dashboard.csv")
 def export_dashboard(
     id_proyecto: int | None = None,

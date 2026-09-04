@@ -1253,3 +1253,18 @@ class DashboardKpi(Base):
     cantidad = Column(BigInteger)
     superficie_ha = Column(Numeric)
     monto = Column(Numeric)
+
+
+class ReporteAvancePeriodo(Base):
+    __tablename__ = "vw_reporte_avance_periodo"
+    id_proyecto = Column(Integer, primary_key=True)
+    id_entidad = Column(Integer, primary_key=True)
+    anio = Column(Integer, primary_key=True)
+    mes = Column(Integer, primary_key=True)
+    trimestre = Column(Integer)
+    indicador = Column(Text, primary_key=True)
+    programado = Column(BigInteger)
+    realizado = Column(BigInteger)
+    cantidad = Column(BigInteger)
+    superficie_ha = Column(Numeric)
+    monto = Column(Numeric)

@@ -1120,6 +1120,12 @@ class DashboardKpiResponse(ORMModel):
     monto: Decimal | None = None
 
 
+class ReporteAvancePeriodoResponse(DashboardKpiResponse):
+    id_entidad: int
+    mes: int
+    trimestre: int
+
+
 class BitacoraResponse(ORMModel):
     id_bitacora: int
     id_usuario: int | None = None
