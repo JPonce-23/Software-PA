@@ -57,3 +57,7 @@ Indemnización admite `pendiente`, `programado`, `en_proceso`, `completo`, `paga
 Las X Excel no son campos API ni BD. Se deduplica a nivel de hito canónico (`vw_hito_seguimiento`) antes de proyectar a periodos temporales; ingreso y reingreso del mismo trámite RAN cuentan una sola vez como hito, e inscripción se reporta de forma independiente. Programado y realizado usan fechas propias sin inventar periodos; mes y trimestre se derivan de la fecha.
 
 Núcleos, parcelas y superficies por destino son snapshots cuando no existe fecha de negocio: no aparecerán artificialmente en este endpoint ni en `/api/dashboard/kpi` por la fecha de creación/importación. Para superficie por destino, el valor canónico es `AfectacionUnidadAgraria.superficie_afectada_ha`; no se replica la superficie total de afectación.
+
+## Snapshot actual (006)
+
+`GET /api/reportes/resumen-actual` representa estado actual, no avance temporal. Filtros: `id_proyecto`, `id_entidad`, `ambito`, `indicador`, `tipo_cop_operativo`, `destino_superficie`; no acepta año, mes ni trimestre. Expone núcleos, parcelas afectadas, superficies administrativas y por destino, no afecta TUC, comunidad indígena y COP planeados.

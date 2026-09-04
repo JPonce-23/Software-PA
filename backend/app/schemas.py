@@ -1170,6 +1170,18 @@ class ReporteAvancePeriodoResponse(DashboardKpiResponse):
     trimestre: int
 
 
+class ReporteSnapshotActualResponse(ORMModel):
+    id_proyecto: int
+    id_entidad: int
+    ambito: str
+    indicador: str
+    tipo_cop_operativo: str | None = None
+    destino_superficie: str | None = None
+    cantidad: int
+    superficie_ha: Decimal | None = None
+    monto: Decimal | None = None
+
+
 class BitacoraResponse(ORMModel):
     id_bitacora: int
     id_usuario: int | None = None

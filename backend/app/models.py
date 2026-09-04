@@ -1302,3 +1302,17 @@ class ReporteAvancePeriodo(Base):
     cantidad = Column(BigInteger)
     superficie_ha = Column(Numeric)
     monto = Column(Numeric)
+
+
+class ReporteSnapshotActual(Base):
+    __tablename__ = "vw_reporte_snapshot_actual"
+
+    id_proyecto = Column(Integer, primary_key=True)
+    id_entidad = Column(Integer, primary_key=True)
+    ambito = Column(Text, primary_key=True)
+    indicador = Column(Text, primary_key=True)
+    tipo_cop_operativo = Column(Text, primary_key=True)
+    destino_superficie = Column(Text, primary_key=True)
+    cantidad = Column(BigInteger)
+    superficie_ha = Column(Numeric)
+    monto = Column(Numeric)

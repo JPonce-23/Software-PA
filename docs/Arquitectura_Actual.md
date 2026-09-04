@@ -1,6 +1,6 @@
 # Arquitectura actual
 
-El esquema vigente se instala mediante 001 baseline, 002 cierre Excel, 003 reporting, 004 seguimiento funcional y 005 reporting cierre Excel. Las migraciones vigentes son 001, 002, 003, 004 y 005; la siguiente migración es 006. El Modelo Excel V1 queda funcionalmente congelado en 005; 006+ sólo se justifica por requerimientos nuevos o defectos reales, no por campos ya presentes en las fuentes auditadas.
+El esquema vigente se instala mediante 001–006. La 006 es forward-only y corrige la semántica de reporting detectada durante auditoría sin remodelar el dominio.
 
 El dominio conserva eventos reales: actividades 1:N, Asamblea→Convocatorias 1:N, TramiteRan→Eventos 1:N y TramiteFifonafe→Eventos 1:N. `TRANSVERSALES` es clasificación operativa, no figura jurídica adicional de convenio.
 
@@ -14,3 +14,5 @@ En reporting (005), la arquitectura de lectura opera en dos capas estrictas:
 3. `vw_dashboard_kpi`: agregación de alto nivel por `id_proyecto, anio, indicador`, deduplicada anualmente sin multiplicar registros ni superficies por relaciones 1:N o N:M. No almacena marcas X ni periodos auxiliares Excel.
 
 Núcleos, parcelas y superficies sin fecha de negocio son snapshots: sus altas técnicas no se proyectan a avance temporal ni al dashboard anual. La inscripción RAN procede sólo de `tramite_ran_evento` de tipo `inscripcion`; la calificación no la reemplaza. FIFONAFE colectivo usa los cuatro oficios fechados y su máximo; no conflictos (`hay_conflictos=false`) conserva una semántica independiente.
+
+006 expone `vw_reporte_snapshot_actual` y `GET /api/reportes/resumen-actual`: estado actual sin año/mes/trimestre. Asamblea ordinaria usa su COP propio; retiro de fondos y su RAN son indicadores exclusivos.

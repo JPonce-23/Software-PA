@@ -1,6 +1,8 @@
 # Matriz de cobertura Excel V1
 
-Fuente de verdad: migraciones 001–005, modelos ORM, rutas API y vistas de reporting. `X` no es dato de dominio; trimestre, m² y km² son derivados. Las fechas de alta técnica nunca se convierten en hechos históricos. Los snapshots sin fecha canónica se conservan en el dominio y en `vw_hito_seguimiento`, pero no entran a `/api/reportes/avance-periodo` ni a KPI anual.
+Fuente de verdad: migraciones 001–006, modelos ORM, rutas API y vistas de reporting. `X` no es dato de dominio; trimestre, m² y km² son derivados. Las fechas de alta técnica nunca se convierten en hechos históricos. Los estados sin fecha canónica se consultan mediante `vw_reporte_snapshot_actual`; sólo los hitos con fecha canónica entran a `/api/reportes/avance-periodo` y al KPI anual.
+
+Archivos/hojas declarados por la auditoría: `PROYECTOS VÍAS SEGUIMIENTO GENERAL.xlsx`, `SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS-INDIVIDUALES-MQ.xlsx`, `Copia de SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS (REV) MQ.xlsx` y `Copia SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS MQ_COLECTIVOS MEET 27082026.xlsx`; familias relevantes: RESUMEN, INFORME M-Q, PROPUESTA, INFORME GENERAL y ASAMBLEAS PENDIENTES. Cuando una columna literal no está disponible en fuentes del repositorio, esta matriz conserva la regla funcional sin inventar encabezados.
 
 | ARCHIVO | HOJA | COLUMNA / BLOQUE | AMBITO | SIGNIFICADO FUNCIONAL | ENTIDAD CANONICA | CAMPO / RELACION | API | TRATAMIENTO | REPORTABLE | REGLA | ETIQUETA UX | OBSERVACIONES / EXCEPCIONES |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -11,7 +13,7 @@ Fuente de verdad: migraciones 001–005, modelos ORM, rutas API y vistas de repo
 | Colectivo | Datos generales | RESPONSABLE, CONTACTO | colectivo | responsable vigente | ProyectoNucleoResponsable | relación con vigencia | proyectos/núcleos | PERSISTIR | no | principal único vigente | Responsable | historial conservado |
 | Colectivo/Individual | Datos generales | DESTINO | ambos | uso/superficie | UnidadAgraria | `id_destino_superficie` | unidades agrarias | PERSISTIR | snapshot/destino | FK catálogo | Destino | desglose usa asociación específica |
 | Individual | Datos generales | NO PARCELA/SOLAR, TIPO PARCELA | individual | identidad parcelaria | Parcela | `no_parcela`, `tipo_parcela` | parcelas | PERSISTIR | snapshot | número funcional único | No. parcela | NO PARCELA PPT no es segundo dominio |
-| Individual | Datos generales | NO PARCELA PPT | individual | auxiliar de fuente | Parcela | `no_parcela` | parcelas | NO_PERSISTIR_AUXILIAR | no | deriva/normaliza al número funcional | No. parcela | nunca se duplica como campo |
+| Individual | Datos generales | NO PARCELA PPT | individual | auxiliar de fuente | Parcela | `no_parcela` | parcelas | REFERENCIA | no | si coincide, referencia el mismo número funcional; si contradice, REVISAR | No. parcela | nunca se duplica como campo |
 | Colectivo/Individual | Datos generales | TIPO GESTIÓN, TIPO COP | ambos | clasificación operativa | Afectacion/Actividad/Asamblea | `id_tipo_cop_operativo` | afectaciones, actividades, asambleas | PERSISTIR | sí | ORIGEN, ADICIONAL, 2A_ADICIONAL, COMPLEMENTARIAS, TRANSVERSALES | Tipo COP | no colapsa tipo convenio |
 | Colectivo | Datos generales | PADRÓN, ORV | colectivo | evidencia registral | PadronHistorial/Orv | relaciones PN | padrones, orvs | PERSISTIR | no | fecha/documento propios | Padrón / ORV | inscripción RAN no pertenece a ORV |
 | Colectivo | Datos generales | COMUNIDAD INDÍGENA | colectivo | característica territorial | NucleoAgrario | `comunidad_indigena` | núcleos | PERSISTIR | no | no muta por seguimiento | Comunidad indígena | distinta de suspensión |
@@ -42,15 +44,37 @@ Fuente de verdad: migraciones 001–005, modelos ORM, rutas API y vistas de repo
 | Individual | Titularidad | TITULAR, CONSTANCIA, CERTIFICADO, FOLIO, DOMINIO PLENO | individual | derecho y evidencia | UnidadAgrariaTitular/Documento | relaciones y requisitos | titulares, documentos | PERSISTIR | no | vigencia/documento propios | Titularidad | no crea convenio |
 | Individual | Titularidad | CONFLICTO, JUICIO, SIN INFORMACIÓN, INVESTIGACIÓN | individual | situación/revisión | SeguimientoEvento/ExpedienteRequisito | motivo + requisito | seguimiento, requisitos | REVISAR | historial | trazabilidad con fecha/documento | Revisión titularidad | texto ambiguo requiere revisión humana |
 | Ambos | Superficies | VALOR ORIGINAL, HA CANÓNICAS | ambos | valor de origen y unidad canónica | Afectacion/Convenio/AfectacionUnidadAgraria | campos `*_ha` | afectaciones, convenios | PERSISTIR | snapshot/realizado | asociación específica por destino | Hectáreas | no repetir total por destino |
-| Ambos | Superficies | M2 DERIVADOS, KM2 DERIVADOS | ambos | unidades de presentación | vistas/UI | ha×10,000; ha÷100 | API/UI | NO_PERSISTIR_AUXILIAR | derivado | aritmética desde ha | m² / km² | no fuente independiente |
+| Ambos | Superficies | M2 DERIVADOS, KM2 DERIVADOS | ambos | unidades de presentación | vistas/UI | ha×10,000; ha÷100 | API/UI | DERIVAR | derivado | aritmética desde ha | m² / km² | no fuente independiente |
 | Ambos | Superficies | FORMATO INVÁLIDO | ambos | dato no normalizable | trazabilidad/revisión | fuente, detalle/documento | seguimiento/requisitos | REVISAR | no | conservar original, solicitar canonización | Revisar formato | no asignar fecha ficticia |
 | Ambos | Observaciones | OBSERVACIONES, ACUERDOS, TEXTO HISTÓRICO | ambos | contexto no estructurado | detalle/observaciones/Documento | campos texto + documento | recursos de dominio | DOCUMENTAR | no salvo hecho fechado | texto no sustituye evento | Observaciones / acuerdos | ambiguo = REVISAR |
 | Ambos | Trazabilidad | X, SIN DATO, MARZO | ambos | marca incompleta de fuente | Documento/ExpedienteRequisito | fuente, estado, observación | documentos/requisitos | REVISAR | no | no crear 1/último día del mes | Dato por revisar | fecha sólo cuando sea canónica |
 
 ## Validación de la matriz contra el código
 
+## Referencias contractuales de fuente
+
+| Archivo | Hoja | Columna/bloque real | Encabezado/fórmula auditada | Unidad/dimensiones | Modelo y tratamiento |
+|---|---|---|---|---|---|
+| Copia SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS MQ_COLECTIVOS MEET 27082026.xlsx | Datos A:CL | A:V | NUM., ENTIDAD, MUNICIPIO, RESIDENCIA, CONSECUTIVO, NÚCLEO AGRARIO, E/C, RESPONSABLE, CONTACTO, DESTINO, NO PARCELA/SOLAR, TIPO_GESTION, TIPO COP, PADRÓN, ORV, ACTA ORV INSCRITA RAN, COMUNIDAD INDÍGENA, TOTAL COP, CLAVE/NÚMERO TRAMO | PN, núcleo, parcela; no duplicación | entidades canónicas; PERSISTIR/REFERENCIA |
+| Mismo colectivo | Datos A:CL | W:AH | Sensibilización y caminamiento programada/realizada, X, periodo | PN+COP; COUNTIFS por COP+periodo+X | ActividadCampo; X→DERIVAR, periodo→fecha |
+| Mismo colectivo | Datos A:CL / RESUMEN | AI:AO | Asamblea 1a/2a, X, periodo; COUNTIFS programada/realizada | id_asamblea; COP+periodo | Asamblea/Convocatoria; 006 COP propio |
+| Mismo colectivo | Datos A:CL / RESUMEN | AP:AX | RAN Acta: programación, ingreso, solicitud, X, periodo, calificación, inscripción | id_tramite_ran; COP+periodo | TramiteRanEvento; inscripción no calificación |
+| Mismo colectivo | Datos A:CL | AY:BK, BQ:BW | Convenio/RAN y retiro fondos/RAN | convenio; asamblea retiro | Convenio y Asamblea; retiro separado |
+| Mismo colectivo | Datos A:CL | BL:CL | superficies, indemnización, SICT/PA, expropiación, no afecta TUC, CC:CF oficios, soporte | asociación ha; cuatro oficios | snapshot/documentos/FIFONAFE |
+| SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS-INDIVIDUALES-MQ.xlsx | PROPUESTA | A:I | Datos generales | proyecto, PN y núcleo | entidades canónicas; PERSISTIR/REFERENCIA |
+| SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS-INDIVIDUALES-MQ.xlsx | PROPUESTA | J:R | J tipo parcela; K no parcela; L no parcela PPT; M titular; N constancia; O certificado; P folio; Q:R tramo | parcela, titularidad y documento | L coincide con K→REFERENCIA/DERIVAR; contradicción→REVISAR; `EN TRÁMITE`, `SIN INFORMACIÓN`, `EN INVESTIGACIÓN`, `SIN ASIGNAR` y `EN CONFLICTO` no crean Persona ficticia |
+| SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS-INDIVIDUALES-MQ.xlsx | PROPUESTA | S:AD | S:V COP original; W periodo; X:Y RAN; Z periodo; AA calificación; AB inscripción; AC periodo; AD superficie | convenio/trámite; periodo derivado | Convenio/TramiteRanEvento; PERSISTIR/DERIVAR |
+| SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS-INDIVIDUALES-MQ.xlsx | PROPUESTA | AE:AH | Modificatorio y periodo | id_convenio; tipo+periodo | Convenio; PERSISTIR/DERIVAR |
+| SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS-INDIVIDUALES-MQ.xlsx | PROPUESTA | AI:AT | Ampliación: firma, 90, 100, BDT, periodo, RAN, solicitud, calificación, inscripción y superficie | convenio/trámite | Convenio/TramiteRan; PERSISTIR/DERIVAR |
+| SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS-INDIVIDUALES-MQ.xlsx | PROPUESTA | AU:BF | Ampliación/remanente con la misma semántica | convenio/trámite | Convenio/TramiteRan; PERSISTIR/DERIVAR |
+| SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS-INDIVIDUALES-MQ.xlsx | PROPUESTA | BG:BQ | BG indemnización; BH entrega; BI:BL cuatro oficios FIFONAFE; BM observaciones/acuerdos; BN validación PA/SICT; BO oficio RAN parcelas; BP observaciones; BQ soporte | indemnización, FIFONAFE y expediente | PERSISTIR/DOCUMENTAR/REVISAR según dato; bloque total individual A:BQ |
+| Copia de SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS (REV) MQ.xlsx | bloques históricos | acta complementaria, acuse FIFONAFE, avalúo maestro INDAABIN, original/modificatorio/adicional/obras/retiro | evidencia y valores existentes | Documento/Requisito, acuse y Afectacion; no nuevos campos |
+| PROYECTOS VÍAS SEGUIMIENTO GENERAL.xlsx | INFORME GENERAL / RESUMEN | totales colectivo e individual | reporte agregado, no filas fuente | vistas de reporte | sólo DERIVAR/read-model |
+
+La fórmula exacta no está incorporada como celda en el repositorio; se conserva la familia COUNTIFS auditada (X+periodo+TIPO COP), sustituida por hitos canónicos y fechas de negocio.
+
 - Cada fila `PERSISTIR` apunta a tabla/campo o relación existente en 001–004 y a su ruta de escritura.
 - Cada `DERIVAR` identifica la vista/regla: `vw_hito_seguimiento`, `vw_reporte_avance_periodo`, `vw_dashboard_kpi` o cálculo de unidades.
 - Cada `DOCUMENTAR` usa `Documento`, `ExpedienteRequisito` o `RequisitoDocumental`.
 - Cada `REVISAR` conserva fuente, observación y/o documento en el expediente o `seguimiento_evento`; no convierte texto ambiguo en dato canónico.
-- Cada `NO_PERSISTIR_AUXILIAR` identifica el dato canónico del que procede. No hay marcadores incompletos ni reglas sin mecanismo.
+- Los auxiliares no persistidos se traducen a tratamientos reales de `TrazabilidadFuente`: `X` con fecha canónica→`DERIVAR`; `X` sin fecha→`REVISAR`; NO PARCELA PPT coincidente→`REFERENCIA`/`DERIVAR`; contradictorio→`REVISAR`.

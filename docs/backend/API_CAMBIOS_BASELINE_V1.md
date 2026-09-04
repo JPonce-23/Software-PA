@@ -47,5 +47,9 @@
 
 **Impacto frontend:** aditivo y retrocompatible. Expone las 4 nuevas dimensiones en el reporte periódico y permite filtros avanzados en UI.
 
+## 006_ajustes_reporting_post_auditoria
+
+**Ahora:** Asamblea y RAN de acta conservan `tipo_cop_operativo`; retiro de fondos y su RAN se separan de Asamblea ordinaria. Se incorpora `GET /api/reportes/resumen-actual` para snapshots actuales sin fechas ficticias. FIFONAFE colectivo exige número y fecha en cada oficio canónico; no conflictos no genera periodo sin fecha propia.
+
 Vigentes: 001, 002, 003, 004, 005. Siguiente migración: 006.
 El Modelo Excel V1 queda funcionalmente congelado en 005; 006+ sólo se justifica por requerimientos nuevos o defectos reales, no por campos ya presentes en las fuentes auditadas.

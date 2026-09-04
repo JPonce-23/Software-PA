@@ -100,6 +100,29 @@ def reporte_avance_periodo(
     ).all()
 
 
+@router.get("/reportes/resumen-actual", response_model=list[schemas.ReporteSnapshotActualResponse])
+def reporte_resumen_actual(
+    id_proyecto: int | None = None,
+    id_entidad: int | None = Query(default=None, gt=0),
+    ambito: str | None = None,
+    indicador: str | None = None,
+    tipo_cop_operativo: str | None = None,
+    destino_superficie: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.ReporteSnapshotActual)
+    if id_proyecto is not None:
+        require_project_access(db, user, id_proyecto)
+        query = query.filter(models.ReporteSnapshotActual.id_proyecto == id_proyecto)
+    else:
+        query = query.filter(models.ReporteSnapshotActual.id_proyecto.in_(authorized_project_ids(db, user)))
+    for field, value in ((models.ReporteSnapshotActual.id_entidad, id_entidad), (models.ReporteSnapshotActual.ambito, ambito), (models.ReporteSnapshotActual.indicador, indicador), (models.ReporteSnapshotActual.tipo_cop_operativo, tipo_cop_operativo), (models.ReporteSnapshotActual.destino_superficie, destino_superficie)):
+        if value is not None:
+            query = query.filter(field == value)
+    return query.order_by(models.ReporteSnapshotActual.id_proyecto, models.ReporteSnapshotActual.indicador).all()
+
+
 @router.get("/exportaciones/dashboard.csv")
 def export_dashboard(
     id_proyecto: int | None = None,

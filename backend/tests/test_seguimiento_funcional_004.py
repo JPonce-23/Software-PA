@@ -173,15 +173,15 @@ def test_004_derived_state_determinism_scenarios(api, target_domain):
         assert row_g.estado_actual == "activo"
         assert row_g.tipo_ultimo_evento == "reapertura"
 
-        # CASO H: fecha_evento NULL -> orden determinista (NULLS LAST, desempate por id)
+        # CASO H: 006 exige fecha canónica en toda transición funcional.
         _event(api, pn_id, {
             "ambito": "general", "id_tipo_evento": event["suspension"],
             "id_motivo": reason["calificacion_negativa"], "fecha_evento": None,
             "detalle": "Suspensión sin fecha registrada originalmente",
-        })
-        # Como tiene fecha NULL, va después de fechas explícitas anteriores o se desempata deterministamente
+        }, expected=409)
+        # El rechazo preserva el último estado canónico con fecha.
         row_h = _get_current_state()
-        assert row_h is not None
+        assert row_h is not None and row_h.estado_actual == "activo"
 
     finally:
         db.close()
@@ -287,13 +287,13 @@ def test_004_typed_target_rules_and_validations(api, target_domain):
     _event(api, pn_id, {
         "ambito": "individual", "entidad_tipo": "parcela", "entidad_id": my_parcel["id_parcela"],
         "id_tipo_evento": event["cierre"], "id_motivo": reason["dominio_pleno"],
-        "detalle": "Salida por adopción de dominio pleno",
+        "fecha_evento": "2026-04-01", "detalle": "Salida por adopción de dominio pleno",
     }, expected=201)
     # - Individual + afectación individual -> ACEPTA (201)
     _event(api, pn_id, {
         "ambito": "individual", "entidad_tipo": "afectacion", "entidad_id": my_affectation["id_afectacion"],
         "id_tipo_evento": event["cierre"], "id_motivo": reason["dominio_pleno"],
-        "detalle": "Dominio pleno en afectación individual",
+        "fecha_evento": "2026-04-02", "detalle": "Dominio pleno en afectación individual",
     }, expected=201)
     # - Colectivo -> RECHAZO (409)
     _event(api, pn_id, {
@@ -460,7 +460,7 @@ def test_004_document_states_and_logical_delete(api, target_domain):
     }, expected=409)
     _event(api, pn_id, {
         "ambito": "general", "id_tipo_evento": event["suspension"], "id_motivo": reason["otro"],
-        "detalle": "Causa justificada detallada",
+        "fecha_evento": "2026-05-01", "detalle": "Causa justificada detallada",
     }, expected=201)
 
     # Suspensión sin motivo -> 409
