@@ -115,3 +115,8 @@ Este documento enumera únicamente incompatibilidades de backend que debe adapta
 - RESPONSE ANTERIOR: incluía `id_afectacion`.
 - RESPONSE NUEVA: incluye `entidad_tipo` y `entidad_id`.
 - ACCIÓN FRONTEND: enviar siempre el objetivo tipado.
+# Cambios 002: cierre contra Excel
+
+Se añaden los campos nullable `id_tipo_cop_operativo` a actividades y asambleas, el contexto `transversal` de asamblea, y `pagado` como estado de indemnización. Los eventos RAN y FIFONAFE permanecen normalizados; las X se derivan en `vw_dashboard_kpi`.
+
+La 002 agrega `TRANSVERSALES` al catálogo operativo sin convertirlo en una figura jurídica de `convenio.tipo_convenio`. El dashboard deja de reproducir las X como datos: sensibilizaciones y caminamientos se deduplican por ProyectoNucleo/ciclo, asambleas por entidad Asamblea y RAN por TramiteRan. Un ingreso seguido de reingreso no duplica el KPI. Se ampliaron los targets de `expediente_requisito` y la validación FIFONAFE diferencia el flujo colectivo completo del individual.

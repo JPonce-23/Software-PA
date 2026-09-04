@@ -122,3 +122,6 @@ El contrato runtime exige `SELECT/INSERT/UPDATE`, prohíbe owner, DDL, `DELETE`,
 ## Historia anterior
 
 Las migraciones incrementales 001–039 dejaron de ser el mecanismo de instalación al adoptar Baseline V1. Git conserva esa historia; no se reaplica ni se concatena sobre una base nueva. Los documentos bajo `docs/historico/`, `docs/propuestas/` y `docs/evaluaciones/` son evidencia histórica, no instrucciones operativas.
+# 002_cierre_fuentes_excel
+
+La migración 002 es aditiva sobre la línea base 001 (que no se modifica). Añade la clasificación COP operativa a actividades y asambleas, `TRANSVERSALES`, el contexto transversal, estados de indemnización incluyendo `pagado`, objetivos documentales adicionales y las vistas de KPI deduplicadas.

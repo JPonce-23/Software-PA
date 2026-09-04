@@ -10,12 +10,12 @@ DECLARE
     v_celebrated bigint;
 BEGIN
     SELECT count(*) INTO v_count FROM schema_migrations;
-    IF v_count <> 1 OR NOT EXISTS (
+    IF v_count < 1 OR NOT EXISTS (
         SELECT 1 FROM schema_migrations
          WHERE version='001' AND nombre='baseline_v1'
            AND checksum_sha256 ~ '^[0-9a-f]{64}$'
     ) THEN
-        RAISE EXCEPTION 'schema_migrations debe contener únicamente baseline 001 con SHA-256';
+        RAISE EXCEPTION 'schema_migrations debe conservar baseline 001 con SHA-256';
     END IF;
 
     SELECT count(*) INTO v_count

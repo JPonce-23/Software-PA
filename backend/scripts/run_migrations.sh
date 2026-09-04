@@ -30,6 +30,7 @@ if ((${#files[@]} == 0)); then
 fi
 
 for file in "${files[@]}"; do
+    [[ -f "$file" ]] || continue
     filename="$(basename "$file")"
     if [[ ! "$filename" =~ ^([0-9]{3})_([a-z0-9_]+)\.sql$ ]]; then
         echo "Nombre de migración inválido: $filename" >&2

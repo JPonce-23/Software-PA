@@ -173,3 +173,6 @@ PostGIS aporta `spatial_ref_sys`, `geometry_columns` y `geography_columns`.
 - pares planos de oficio/fecha en `tramite_fifonafe`;
 - `expediente_requisito.id_afectacion`;
 - funciones y triggers de sincronización de esos campos.
+# Cierre V1 / Excel auditado
+
+`actividad_campo.id_tipo_cop_operativo` y `asamblea.id_tipo_cop_operativo` clasifican ORIGEN, ADICIONAL, 2A_ADICIONAL, COMPLEMENTARIAS y TRANSVERSALES. `indemnizacion.estatus` incluye pendiente, programado, en_proceso, completo, pagado, cancelado y otro. No hay segundo número de parcela ni columnas de marca `X`.

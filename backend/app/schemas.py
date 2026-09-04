@@ -454,9 +454,10 @@ class ParcelaTitularUpdate(AuditInput):
 
 class ActividadCampoCreate(AuditInput):
     id_afectacion: int | None = Field(default=None, gt=0)
+    id_tipo_cop_operativo: int | None = Field(default=None, gt=0)
     tipo_actividad: Literal["sensibilizacion", "caminamiento"]
     contexto_actividad: Literal[
-        "general", "superficie_adicional", "obras_complementarias", "otro"
+        "general", "superficie_adicional", "obras_complementarias", "transversal", "otro"
     ] = "general"
     fecha_programada: date | None = None
     fecha_realizada: date | None = None
@@ -467,7 +468,7 @@ class ActividadCampoCreate(AuditInput):
 class ActividadCampoUpdate(ActividadCampoCreate):
     tipo_actividad: Literal["sensibilizacion", "caminamiento"] | None = None
     contexto_actividad: Literal[
-        "general", "superficie_adicional", "obras_complementarias", "otro"
+        "general", "superficie_adicional", "obras_complementarias", "transversal", "otro"
     ] | None = None
 
 
@@ -637,6 +638,7 @@ class AsambleaCreate(AuditInput):
     id_padron: int | None = Field(default=None, gt=0)
     id_tipo_asamblea: int = Field(gt=0)
     id_contexto_asamblea: int | None = Field(default=None, gt=0)
+    id_tipo_cop_operativo: int | None = Field(default=None, gt=0)
     proposito: str | None = None
     resultado: str | None = Field(default=None, max_length=50)
     convocatorias: list[AsambleaConvocatoriaCreate] = Field(default_factory=list)
@@ -869,7 +871,7 @@ class TramiteFifonafeResponse(TramiteFifonafeUpdate, AuditRead):
 
 
 class IndemnizacionCreate(AuditInput):
-    estatus: Literal["pendiente", "programado", "completo", "otro"] = "pendiente"
+    estatus: Literal["pendiente", "programado", "en_proceso", "completo", "pagado", "cancelado", "otro"] = "pendiente"
     descripcion_estatus: str | None = None
     fecha_programada: date | None = None
     fecha_resolucion: date | None = None
@@ -885,7 +887,7 @@ class IndemnizacionCreate(AuditInput):
 
 
 class IndemnizacionUpdate(IndemnizacionCreate):
-    estatus: Literal["pendiente", "programado", "completo", "otro"] | None = None
+    estatus: Literal["pendiente", "programado", "en_proceso", "completo", "pagado", "cancelado", "otro"] | None = None
 
 
 class IndemnizacionResponse(IndemnizacionCreate, AuditRead):
@@ -1009,6 +1011,7 @@ class ExpedienteRequisitoCreate(AuditInput):
         "unidad_agraria", "unidad_agraria_titular", "convenio",
         "convenio_compareciente", "tramite_ran", "tramite_ran_evento",
         "tramite_fifonafe", "tramite_fifonafe_evento", "indemnizacion", "pago",
+        "orv", "padron_historial", "actividad_campo", "asamblea", "asamblea_convocatoria",
     ]
     entidad_id: int = Field(gt=0)
     id_requisito: int = Field(gt=0)

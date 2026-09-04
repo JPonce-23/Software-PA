@@ -113,3 +113,6 @@ Las migraciones incrementales anteriores 001–039 permanecen sólo en Git. Los 
 ## 9. API y frontend
 
 FastAPI usa modelos SQLAlchemy alineados con el baseline y Pydantic rechaza campos desconocidos. Las incompatibilidades que debe adaptar el frontend se enumeran en [API_CAMBIOS_BASELINE_V1.md](backend/API_CAMBIOS_BASELINE_V1.md). Ningún archivo de `frontend/` fue modificado por este cambio.
+# Cierre de fuentes Excel (002)
+
+Los eventos de campo y las convocatorias son relaciones 1:N reales. Las marcas `X` de las hojas son reglas de deduplicación del reporting, no atributos del dominio. RAN se conserva como `tramite_ran` con eventos y las parcelas usan un único `parcela.no_parcela`.

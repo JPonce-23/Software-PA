@@ -438,6 +438,7 @@ class ActividadCampo(Base, AuditableMixin):
     id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"))
     tipo_actividad = Column(String(30), nullable=False)
     contexto_actividad = Column(String(40), nullable=False, default="general")
+    id_tipo_cop_operativo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
     fecha_programada = Column(Date)
     fecha_realizada = Column(Date)
     responsable = Column(String(300))
@@ -445,6 +446,7 @@ class ActividadCampo(Base, AuditableMixin):
 
     proyecto_nucleo = relationship("ProyectoNucleo", back_populates="actividades")
     afectacion = relationship("Afectacion", foreign_keys=[id_afectacion])
+    tipo_cop_operativo = relationship("CatalogoOperativo", foreign_keys=[id_tipo_cop_operativo])
 
 
 class Afectacion(Base, AuditableMixin):
@@ -554,6 +556,7 @@ class Asamblea(Base, AuditableMixin):
     id_contexto_asamblea = Column(
         BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion")
     )
+    id_tipo_cop_operativo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
     proposito = Column(Text)
     resultado = Column(String(50))
 
@@ -568,6 +571,7 @@ class Asamblea(Base, AuditableMixin):
     contexto_asamblea_catalogo = relationship(
         "CatalogoOperativo", foreign_keys=[id_contexto_asamblea]
     )
+    tipo_cop_operativo = relationship("CatalogoOperativo", foreign_keys=[id_tipo_cop_operativo])
     convocatorias = relationship(
         "AsambleaConvocatoria", back_populates="asamblea", lazy="selectin"
     )

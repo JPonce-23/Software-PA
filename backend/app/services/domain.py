@@ -486,6 +486,8 @@ def create_activity(
     user: models.Usuario,
 ) -> models.ActividadCampo:
     require_project_nucleus_access(db, user, project_nucleus_id, mode="capture")
+    if data.id_tipo_cop_operativo is not None:
+        require_catalog_option(db, "tipo_cop_operativo", option_id=data.id_tipo_cop_operativo, required=True)
     entity = models.ActividadCampo(
         id_proyecto_nucleo=project_nucleus_id,
         **data.model_dump(exclude={"observaciones"}),
@@ -533,10 +535,13 @@ def create_assembly(
         option_id=data.id_contexto_asamblea,
         required=False,
     )
+    cop_option = require_catalog_option(
+        db, "tipo_cop_operativo", option_id=data.id_tipo_cop_operativo, required=False
+    )
     values = data.model_dump(
         exclude={
             "observaciones", "convocatorias", "id_tipo_asamblea",
-            "id_contexto_asamblea",
+            "id_contexto_asamblea", "id_tipo_cop_operativo",
         }
     )
     entity = models.Asamblea(
@@ -544,6 +549,7 @@ def create_assembly(
         **values,
         id_tipo_asamblea=type_option.id_catalogo_opcion,
         id_contexto_asamblea=(context_option.id_catalogo_opcion if context_option else None),
+        id_tipo_cop_operativo=(cop_option.id_catalogo_opcion if cop_option else None),
         **_audit_values(user.id_usuario, data),
     )
     set_audit_context(db, user.id_usuario)
@@ -600,6 +606,9 @@ def update_assembly(
             required=False,
         )
         values["id_contexto_asamblea"] = option.id_catalogo_opcion if option else None
+    if "id_tipo_cop_operativo" in values:
+        option = require_catalog_option(db, "tipo_cop_operativo", option_id=values.pop("id_tipo_cop_operativo", None), required=False)
+        values["id_tipo_cop_operativo"] = option.id_catalogo_opcion if option else None
     set_audit_context(db, user.id_usuario)
     for key, value in values.items():
         setattr(entity, key, value)

@@ -764,3 +764,14 @@ Lista de los 20 tipos de catálogo disponibles:
    - Los trámites RAN y FIFONAFE gestionan sus oficios y estados mediante sus tablas de eventos 1:N (`TramiteRanEvento`, `TramiteFifonafeEvento`).
 4. **Validación Estricta de Campos:**
    - Todos los esquemas de entrada usan `extra='forbid'`. Enviar campos no reconocidos producirá un error `422 Unprocessable Entity`.
+# Cierre Excel V1
+
+Las marcas `X` de las hojas auditadas son auxiliares de conteo: no son campos de API ni columnas operativas. El dashboard deduplica sensibilización y caminamiento por `id_proyecto_nucleo + id_tipo_cop_operativo`, y RAN por trámite. `ActividadCampo` y `Asamblea` aceptan `id_tipo_cop_operativo` nullable; los códigos reportables son `ORIGEN`, `ADICIONAL`, `2A_ADICIONAL`, `COMPLEMENTARIAS` y `TRANSVERSALES`. Las parcelas conservan exclusivamente `no_parcela`.
+
+`ActividadCampo` conserva cada evento real (`tipo_actividad`, `fecha_programada`, `fecha_realizada`, `responsable`, `resultado`, observaciones) y admite varios eventos de un mismo núcleo/ciclo. El KPI cuenta una sola vez cada combinación núcleo/ciclo que tenga el hito correspondiente. `Asamblea` es una entidad independiente: su arreglo `convocatorias` conserva todas las convocatorias, y el KPI cuenta asambleas, no núcleos ni convocatorias.
+
+Un trámite RAN se crea con exactamente uno de `id_asamblea`, `id_convenio` o `id_orv`, `fecha_programada_ingreso`, `referencia_expediente` y el arreglo `eventos`. Cada evento conserva `id_tipo_evento`, `fecha_evento`, `numero_solicitud`, `resultado`, `calificacion`, `folio_referencia` e `id_documento`. Por tanto, ingreso, prevención, reingreso, calificación e inscripción son eventos distintos; ingreso y reingreso juntos siguen contando un solo trámite ingresado en KPI.
+
+`Indemnizacion.estatus` admite `pendiente`, `programado`, `en_proceso`, `completo`, `pagado`, `cancelado` y `otro`. `pagado` no inventa un pago: los datos monetarios y fecha sólo se capturan como registros reales `Pago`. Los requisitos documentales pueden apuntar, además de los objetivos previos, a `orv`, `padron_historial`, `actividad_campo`, `asamblea` y `asamblea_convocatoria`.
+
+`NO. DE PARCELA` y `NO. DE PARCELA PPT` se normalizan al único campo `parcela.no_parcela`; no hay `no_parcela_ppt`. FIFONAFE conserva eventos: el flujo colectivo completo requiere sus cuatro oficios colectivos, mientras que un trámite individual válido no queda sujeto artificialmente a ese conjunto.
