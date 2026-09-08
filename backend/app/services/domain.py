@@ -216,6 +216,11 @@ def create_project_nucleus(
         id_nucleo=data.id_nucleo,
         id_residencia=residence.id_catalogo_opcion if residence else None,
         total_cops_planeados=data.total_cops_planeados,
+        afecta_tuc=data.afecta_tuc,
+        id_motivo_no_afecta_tuc=data.id_motivo_no_afecta_tuc,
+        motivo_no_afecta_tuc_detalle=data.motivo_no_afecta_tuc_detalle,
+        tuc_revision_pendiente=data.tuc_revision_pendiente,
+        tuc_revision_detalle=data.tuc_revision_detalle,
         **_audit_values(user.id_usuario, data),
     )
     db.add(record)

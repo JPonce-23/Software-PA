@@ -694,16 +694,13 @@ class AsambleaCreate(AuditInput):
         return self
 
 
-class AsambleaUpdate(AsambleaCreate):
+class AsambleaUpdate(AuditInput):
+    id_padron: int | None = Field(default=None, gt=0)
     id_tipo_asamblea: int | None = Field(default=None, gt=0)
-    convocatorias: list[AsambleaConvocatoriaCreate] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def validar_tipo_catalogado(self):
-        # El tipo ya existe en la entidad; sólo se valida cuando se crea.
-        if len({item.ordinal for item in self.convocatorias}) != len(self.convocatorias):
-            raise ValueError("Los ordinales de convocatoria no pueden repetirse")
-        return self
+    id_contexto_asamblea: int | None = Field(default=None, gt=0)
+    id_tipo_cop_operativo: int | None = Field(default=None, gt=0)
+    proposito: str | None = None
+    resultado: str | None = Field(default=None, max_length=50)
 
 
 class AsambleaResponse(AsambleaCreate, AuditRead):

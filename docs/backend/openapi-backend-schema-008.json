@@ -2066,13 +2066,6 @@
       "AsambleaUpdate": {
         "additionalProperties": false,
         "properties": {
-          "convocatorias": {
-            "items": {
-              "$ref": "#/components/schemas/AsambleaConvocatoriaCreate"
-            },
-            "title": "Convocatorias",
-            "type": "array"
-          },
           "id_contexto_asamblea": {
             "anyOf": [
               {
