@@ -1,6 +1,9 @@
-# Contrato API Frontend V1 — esquema 005
+# Contrato API Frontend V1 — esquema 008
 
-Fuente de verdad: rutas FastAPI, `schemas.py`, OpenAPI y migraciones vigentes 001–005. La siguiente migración es 006. El Modelo Excel V1 queda funcionalmente congelado en 005; 006+ sólo se justifica por requerimientos nuevos o defectos reales, no por campos ya presentes en las fuentes auditadas. Los catálogos se consultan en `GET /api/catalogos/operativos/{tipo_catalogo}`; nunca se asumen IDs.
+Fuente de verdad: rutas FastAPI, `schemas.py`, el archivo generado
+`docs/backend/openapi-backend-schema-008.json` y migraciones vigentes 001–008.
+Los catálogos se consultan en
+`GET /api/catalogos/operativos/{tipo_catalogo}`; nunca se asumen IDs.
 
 ## Dominio
 
@@ -61,3 +64,84 @@ Núcleos, parcelas y superficies por destino son snapshots cuando no existe fech
 ## Snapshot actual (006)
 
 `GET /api/reportes/resumen-actual` representa estado actual, no avance temporal. Filtros: `id_proyecto`, `id_entidad`, `ambito`, `indicador`, `tipo_cop_operativo`, `destino_superficie`; no acepta año, mes ni trimestre. Expone núcleos, parcelas afectadas, superficies administrativas y por destino, no afecta TUC, comunidad indígena y COP planeados.
+
+## Convenios e impactos (007)
+
+Las superficies administrativas, de unidad agraria, declaradas e impactos usan
+decimales de hasta siete posiciones; el cliente debe enviarlas como número JSON
+decimal y no debe redondearlas a seis posiciones. `ConvenioUpdate` rechaza
+colecciones relacionadas: comparecientes y afectaciones se administran mediante
+sus endpoints hijos.
+
+- `GET/POST /api/convenios/{id_convenio}/afectaciones` y
+  `PATCH /api/convenio-afectaciones/{id_convenio_afectacion}` separan el efecto
+  superficial (`adicion`, `sustitucion`, `correccion`, `sin_cambio`, `pendiente`)
+  de la clase del convenio.
+- `GET/POST /api/convenios/{id_convenio}/comparecientes` y
+  `DELETE /api/convenio-comparecientes/{id_compareciente}` mantienen la
+  comparecencia separada de beneficiarios y pagos.
+- El valor declarado y el impacto económico son conceptos distintos; un impacto
+  pendiente se expresa con `null`, nunca con cero implícito.
+- Reporting: `/api/reportes/convenios/valores-declarados`, `/impactos`,
+  `/impactos-periodo` y `/cobertura-impactos`. Los montos se contabilizan por
+  instrumento y no por cada relación N:M con afectaciones.
+
+## FIFONAFE (008)
+
+`id_tramite_fifonafe` identifica la solicitud y admite varias afectaciones. Los
+registros históricos conservan `version_flujo=1`; las nuevas solicitudes nacen
+en versión 2. `version_flujo` es de lectura y no puede modificarse por API.
+`referencia_expediente` es opcional y no constituye por sí sola una clave de
+deduplicación.
+
+- La solicitud admite `id_asamblea_retiro` sólo cuando corresponde a una
+  Asamblea colectiva de retiro compatible con el mismo ProyectoNucleo.
+- Los eventos exponen `ciclo_consulta`, `fecha_evento`, `fecha_oficio` y
+  `conflicto_impide_retiro`. Ronda, ordinal e identidad no deben mezclarse ni
+  reescribirse.
+- `PATCH` y baja lógica están en
+  `/api/eventos-fifonafe/{id_evento_fifonafe}`.
+- Intervinientes: `GET/POST /api/fifonafe/{id_tramite_fifonafe}/intervinientes`
+  y baja lógica en
+  `/api/intervinientes-fifonafe/{id_interviniente_fifonafe}`. Registrar
+  solicitante, representante, titular, beneficiario o receptor no crea un Pago.
+- `hay_conflictos` y `conflicto_impide_retiro` son triestados independientes.
+  Consulta, resolución, entrega y comprobación son hitos distintos. Cuatro
+  oficios no completan automáticamente un flujo v2.
+- Reporting: `/api/reportes/fifonafe/cobertura` e
+  `/api/reportes/fifonafe/indicador-institucional`. El indicador legado
+  `fifonafe` conserva exclusivamente la semántica v1.
+
+## Integración y permisos
+
+La aplicación utiliza un esquema de sesión opaca basado en cookies HttpOnly y
+protección contra CSRF. El OpenAPI generado no publica todavía
+`securitySchemes`; la integración debe seguir estrictamente los endpoints de
+sesión y el encabezado CSRF documentados aquí, sin inferir cabeceras Bearer/JWT.
+
+- **Inicio de sesión**: `POST /api/auth/sesiones` (form-urlencoded con `username`
+  y `password`). Establece la cookie de sesión HttpOnly (`software_pa_session`)
+  y la cookie accesible para el cliente (`software_pa_csrf`). Retorna los datos
+  del usuario autenticado y su expiración.
+- **Sesión activa**: `GET /api/auth/sesion`. Retorna el usuario y la vigencia de
+  la sesión autenticada actual.
+- **Cierre de sesión**: `POST /api/auth/logout`. Invalida la sesión actual en el
+  servidor y limpia las cookies del cliente. Cierre global: `POST /api/auth/logout-todas`.
+- **Protección CSRF**: Todas las mutaciones de estado (`POST`, `PUT`, `PATCH`,
+  `DELETE`) requieren incluir el encabezado HTTP `X-CSRF-Token` con el valor
+  obtenido de la cookie `software_pa_csrf`. Las peticiones `GET` y `HEAD` no lo
+  requieren.
+- **Verificación de estado**: `GET /health` reporta `{ "status": "ok", "schema": 8 }`.
+- **Autorización por proyecto**: Todas las consultas y mutaciones se filtran de
+  forma estricta por los proyectos autorizados del usuario autenticado.
+- **Aislamiento en QA / Demostración**: El frontend debe seleccionar un
+  `id_proyecto` explícito para demostraciones en QA; los agregados sin filtro
+  pueden incluir fixtures sintéticas históricas.
+- **Respuestas de error**:
+  - `401 Unauthorized`: Sesión ausente, expirada o inválida.
+  - `403 Forbidden`: Token CSRF inválido o falta de permisos sobre el recurso.
+  - `404 Not Found`: Recurso inexistente o perteneciente a un proyecto no asignado.
+  - `409 Conflict`: Reglas de negocio e invariantes de dominio (ej. duplicidad,
+    dependencias faltantes, transiciones prohibidas).
+  - `422 Unprocessable Entity`: Errores de validación estructural y formato de
+    esquema Pydantic.
