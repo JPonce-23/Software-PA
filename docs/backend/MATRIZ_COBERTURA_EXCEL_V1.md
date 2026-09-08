@@ -1,6 +1,6 @@
 # Matriz de cobertura Excel V1
 
-Fuente de verdad: migraciones 001–006, modelos ORM, rutas API y vistas de reporting. `X` no es dato de dominio; trimestre, m² y km² son derivados. Las fechas de alta técnica nunca se convierten en hechos históricos. Los estados sin fecha canónica se consultan mediante `vw_reporte_snapshot_actual`; sólo los hitos con fecha canónica entran a `/api/reportes/avance-periodo` y al KPI anual.
+Fuente de verdad para el handoff frontend: migraciones 001–008, modelos ORM, rutas API y vistas de reporting. `X` no es dato de dominio; trimestre, m² y km² son derivados. Las fechas de alta técnica nunca se convierten en hechos históricos. Los estados sin fecha canónica se consultan mediante `vw_reporte_snapshot_actual` vía `GET /api/reportes/resumen-actual`; sólo los hitos con fecha canónica entran a `/api/reportes/avance-periodo` y al KPI anual.
 
 Archivos/hojas declarados por la auditoría: `PROYECTOS VÍAS SEGUIMIENTO GENERAL.xlsx`, `SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS-INDIVIDUALES-MQ.xlsx`, `Copia de SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS (REV) MQ.xlsx` y `Copia SEGUIMIENTO DE ACTIVIDADES LIBERACIÓN DE VIAS MQ_COLECTIVOS MEET 27082026.xlsx`; familias relevantes: RESUMEN, INFORME M-Q, PROPUESTA, INFORME GENERAL y ASAMBLEAS PENDIENTES. Cuando una columna literal no está disponible en fuentes del repositorio, esta matriz conserva la regla funcional sin inventar encabezados.
 

@@ -1,14 +1,16 @@
 # Preparación controlada 008 — FIFONAFE
 
-Estado: candidato no ejecutado. Base autorizada para una validación posterior: `software_pa_test`.
+Estado actual para handoff: 008 fue aplicada y validada en QA; la migración es
+inmutable y quedó publicada en `feature/backend-logica`. La base compatible de
+pruebas es `software_pa_test` con ledger exacto 001–008.
 
 Checksum candidato 008 validado: `95bf328f18112933481488c59763df6a6467d8fd3db354bb7e5465c727c8f012`.
 
-Checksum contrato SQL: `4dd46688e692226bfd0d269bac903f214c5334f1b5595b6000bc09ec9742695b`.
+Checksum contrato SQL vigente: `dde6024a049435041ad6005f07f5c87a202350cfcb203f04ae07c66bade63228`.
 
-## Preflight real (2026-09-07)
+## Preflight de preparación (2026-09-07)
 
-- Rama `feature/backend-logica`; HEAD local y publicado: `53a7920507faf608d11234608c9cfc5d731ac154`.
+- Rama `feature/backend-logica`; HEAD de preparación: `53a7920507faf608d11234608c9cfc5d731ac154`. La referencia publicada para frontend es posterior y está documentada en `RELEASE_BACKEND_SCHEMA_008.md`.
 - El worktree ya contenía cierres locales 006/007 y cambios en modelos, schemas, routers, servicios y pruebas. Se conservaron; no se hizo pull, reset, commit, push ni merge.
 - `software_pa_test`, consultada como `pa_app`, contiene exactamente 001–007. 007 registra `adabd7775fb8165a1db8be04a93e7971fe207e745b410c57eb6fc76cc3a7e4f7`.
 - No existen `tramite_fifonafe_interviniente`, `version_flujo` ni ledger 008.

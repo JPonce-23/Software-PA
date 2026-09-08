@@ -1,8 +1,9 @@
-# Candidato de release backend — esquema 008
+# Handoff frontend backend — esquema 008
 
-## Referencia candidata
+## Referencia de integración
 
-- Rama de preparación: `feature/backend-logica`.
+- Rama publicada: `feature/backend-logica`.
+- Commit publicado: `d9c74d18607bfd9ecb771d1d82e65f167d09e5ad`.
 - Base compatible: ledger exacto 001–008.
 - API: SOFTWARE-PA `2.0.0`.
 - Contrato generado: `docs/backend/openapi-backend-schema-008.json`.
@@ -21,9 +22,34 @@
 | `007` | `convenios_impactos_precision` | `adabd7775fb8165a1db8be04a93e7971fe207e745b410c57eb6fc76cc3a7e4f7` |
 | `008` | `fifonafe_evolucion_forward_only` | `95bf328f18112933481488c59763df6a6467d8fd3db354bb7e5465c727c8f012` |
 
-La referencia estable será el commit resultante de la publicación autorizada;
-el HEAD publicado anterior no incluye los cierres locales y no debe usarse como
-referencia de integración.
+Esta referencia incluye el post-fix schema008: `POST ProyectoNucleo` persiste
+los campos TUC aceptados por el schema y `PATCH Asamblea` rechaza
+`convocatorias`; las convocatorias se administran por endpoints hijos.
+
+## Guía breve para frontend
+
+La instancia que consuma frontend debe responder `GET /health` con
+`{"status":"ok","schema":8}`. El backend persistente local en
+`http://127.0.0.1:8000` actualmente puede apuntar a una base schema6; no debe
+usarse como backend schema008 sin verificación explícita.
+
+Configuración mínima de cliente:
+
+- Base URL de integración: la URL autorizada del backend schema008, por ejemplo
+  `http://127.0.0.1:8018` si se levanta una instancia aislada.
+- CORS: el origen exacto del frontend debe estar en `CORS_ORIGINS`; para Vite
+  local normalmente `http://localhost:5173` y, si aplica,
+  `http://127.0.0.1:5173`.
+- Auth: `POST /api/auth/sesiones` usa form data `username`/`password` y sesión
+  por cookie HttpOnly. En desarrollo/test las cookies son `pa_session_dev` y
+  `pa_csrf_dev`; en producción segura son `__Host-pa_session` y
+  `__Host-pa_csrf`.
+- Mutaciones: enviar `credentials: "include"` y `X-CSRF-Token` con el valor de
+  la cookie CSRF correspondiente.
+- Catálogos: consultar siempre `GET /api/catalogos/operativos/{tipo_catalogo}`;
+  no codificar IDs.
+- Demostración QA: filtrar por `id_proyecto` explícito; los totales globales de
+  QA pueden incluir fixtures sintéticas históricas.
 
 ## Alcance funcional disponible
 
@@ -111,25 +137,27 @@ paquete local duplicado; sus fuentes vigentes ya están en `backend/tests` y
 
 ## Evidencia del gate de release (2026-09-08)
 
-- Selección transversal: 78 aprobadas.
-- Suite backend: 203 aprobadas; una advertencia de deprecación Starlette/httpx.
+- Suite backend final: 205 aprobadas; una advertencia de deprecación
+  Starlette/httpx.
+- Regresión post-fix schema008: 2 aprobadas.
 - Contratos SQL 002–008 y regresiones SQL 007/008: aprobados.
 - QA: ledger 001–008 coincidente, runtime `pa_runtime`, propietarios `pa_app`,
   permisos de lectura runtime y triggers de integridad/auditoría habilitados.
 - OpenAPI generado: 106 paths, 161 operaciones, 134 schemas; SHA-256
-  `d7d14a7a05323bf63a51724cf36d738cf7f963df828bc1de0c2d23b6b1a0aa2f`.
+  `3c991059338e19928363905302cb60d0d699492f7826fd1d2ecb50bdcd9d8c81`.
 
 El contenedor de desarrollo persistente continúa apuntando a la principal con
 esquema 6. No es el endpoint de integración del candidato 008. La integración
 debe levantar el backend con configuración explícita hacia una base compatible
 001–008, sin cambiar ni reutilizar secretos de producción.
 
-## Publicación propuesta
+## Publicación
 
-Se recomiendan dos commits: primero código/esquema/pruebas, después contrato y
-documentación. Deben excluirse expresamente `cierre_006_ran_preparado*` y todos
-los archivos ignorados. Tras repetir el gate sobre los commits resultantes, la
-referencia candidata es el tag anotado `backend-v2.0.0-schema008-rc1`.
+El código de backend schema008 está publicado en
+`d9c74d18607bfd9ecb771d1d82e65f167d09e5ad`. No se reutilizó ni movió el tag
+RC1. Cualquier nuevo tag de integración requiere autorización expresa y debe
+excluir `cierre_006_ran_preparado*`, `.env`, credenciales, backups, uploads,
+fuentes Excel y archivos ignorados.
 
 La publicación del código no autoriza actualizar `db_pruebas_alfredo`. Esa
 promoción tiene un gate separado: conciliación auditada de 006, respaldo nuevo y

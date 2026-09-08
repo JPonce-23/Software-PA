@@ -120,18 +120,22 @@ protección contra CSRF. El OpenAPI generado no publica todavía
 sesión y el encabezado CSRF documentados aquí, sin inferir cabeceras Bearer/JWT.
 
 - **Inicio de sesión**: `POST /api/auth/sesiones` (form-urlencoded con `username`
-  y `password`). Establece la cookie de sesión HttpOnly (`software_pa_session`)
-  y la cookie accesible para el cliente (`software_pa_csrf`). Retorna los datos
-  del usuario autenticado y su expiración.
+  y `password`). En desarrollo/test establece la cookie de sesión HttpOnly
+  `pa_session_dev` y la cookie accesible para el cliente `pa_csrf_dev`; en
+  producción con `AUTH_COOKIE_SECURE=true` usa `__Host-pa_session` y
+  `__Host-pa_csrf`. Retorna los datos del usuario autenticado y su expiración.
 - **Sesión activa**: `GET /api/auth/sesion`. Retorna el usuario y la vigencia de
   la sesión autenticada actual.
 - **Cierre de sesión**: `POST /api/auth/logout`. Invalida la sesión actual en el
   servidor y limpia las cookies del cliente. Cierre global: `POST /api/auth/logout-todas`.
 - **Protección CSRF**: Todas las mutaciones de estado (`POST`, `PUT`, `PATCH`,
   `DELETE`) requieren incluir el encabezado HTTP `X-CSRF-Token` con el valor
-  obtenido de la cookie `software_pa_csrf`. Las peticiones `GET` y `HEAD` no lo
-  requieren.
-- **Verificación de estado**: `GET /health` reporta `{ "status": "ok", "schema": 8 }`.
+  obtenido de la cookie CSRF del ambiente (`pa_csrf_dev` o `__Host-pa_csrf`).
+  Las peticiones `GET` y `HEAD` no lo requieren.
+- **Verificación de estado**: `GET /health` debe reportar
+  `{ "status": "ok", "schema": 8 }` en la instancia de integración. El backend
+  local persistente en `127.0.0.1:8000` puede apuntar a otra base y no debe
+  asumirse como schema008 sin verificar `/health`.
 - **Autorización por proyecto**: Todas las consultas y mutaciones se filtran de
   forma estricta por los proyectos autorizados del usuario autenticado.
 - **Aislamiento en QA / Demostración**: El frontend debe seleccionar un

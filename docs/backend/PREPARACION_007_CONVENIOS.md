@@ -1,8 +1,9 @@
 # Preparación 007 — convenios
 
-Estado: candidato no ejecutado. La única modificación efectiva del backend en
-este bloque es el cierre de `PATCH /api/convenios/{id}`; los campos 007 no deben
-publicarse en ORM/OpenAPI hasta que la migración sea autorizada y validada.
+Estado actual para handoff: 007 fue aplicada y validada en QA; la migración es
+inmutable y quedó publicada en `feature/backend-logica`. Este documento conserva
+las decisiones de preparación y las reglas funcionales de Convenios. Los campos
+007 ya forman parte del ORM/API/OpenAPI del esquema 008.
 
 ## Decisiones cerradas
 
@@ -56,24 +57,24 @@ Las contradicciones permanecen en `trazabilidad_fuente` con tratamiento de
 revisión. Los datos literales, normalizados y su archivo/hoja/fila/columna se
 conservan ahí; no se duplican columnas de procedencia en las tablas de negocio.
 
-## Activación posterior a la validación de 007
+## Activación validada y compatibilidad
 
-1. Aplicar la migración únicamente mediante el runner en `software_pa_test`
-   después del respaldo verificable y comprobar el checksum registrado.
-2. Ejecutar `backend/db/tests/007_convenios_impactos_precision_contract.sql`.
-3. El typmod ORM de las cinco superficies queda preparado como `Numeric(15,7)`.
-   Agregar los campos propios de 007 al ORM/API sólo después de aplicar la BD;
-   mantener `Decimal` en schemas y serialización JSON como cadena decimal exacta,
-   nunca `float`.
-4. Exponer efectos por endpoints escalares y por el endpoint hijo de
-   `convenio_afectacion`; mantener comparecientes sólo en endpoints hijos. Un
+1. La migración se aplica únicamente mediante el runner y queda registrada con
+   checksum `adabd7775fb8165a1db8be04a93e7971fe207e745b410c57eb6fc76cc3a7e4f7`.
+2. El contrato `backend/db/tests/007_convenios_impactos_precision_contract.sql`
+   y la regresión `backend/db/tests/007_convenios_impactos_regression.sql` son
+   la verificación canónica.
+3. El typmod ORM de las superficies usa `Numeric(15,7)`; los schemas mantienen
+   `Decimal` y serializan valores exactos, nunca `float`.
+4. Los efectos se exponen por endpoints escalares y por el endpoint hijo de
+   `convenio_afectacion`; los comparecientes se administran sólo en endpoints
+   hijos. Un
    representante externo se crea en revisión, se vincula su Documento disponible
    y sólo entonces puede cerrarse la revisión; no se le exige pertenecer a ORV.
-5. Regresar OpenAPI y clientes antes de habilitar captura. El frontend actual no
-   cambia en esta preparación; consumidores históricos continúan usando vistas
-   006 hasta migrar explícitamente a las vistas 007.
+5. El contrato frontend vigente está en `API_CONTRATO_FRONTEND_V1.md` y el
+   contrato mecánico en `openapi-backend-schema-008.json`.
 
-Antes de aprobar producción son indispensables cuatro regresiones QA adicionales:
+Regresiones QA de cobertura:
 
 - comparar esquema, filas y agregados de las seis vistas históricas antes/después
   de 007, permitiendo sólo el aumento de escala decimal;
