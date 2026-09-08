@@ -803,15 +803,17 @@ def add_agreement_compareciente(
 def add_agreement_affectation(
     db: Session,
     agreement_id: int,
-    affectation_id: int,
+    data: schemas.ConvenioAfectacionCreate,
     user: models.Usuario,
 ) -> models.ConvenioAfectacion:
     agreement = require_agreement_access(db, user, agreement_id, mode="capture")
-    require_affectation_access(db, user, affectation_id, mode="capture")
+    require_affectation_access(db, user, data.id_afectacion, mode="capture")
     entity = models.ConvenioAfectacion(
         id_convenio=agreement.id_convenio,
-        id_afectacion=affectation_id,
+        id_afectacion=data.id_afectacion,
         rol="adicional",
+        efecto_superficie=data.efecto_superficie,
+        superficie_impacto_ha=data.superficie_impacto_ha,
         creado_por=user.id_usuario,
     )
     return _persist(
@@ -925,6 +927,26 @@ def add_fifonafe_affectation(
         entity,
         user.id_usuario,
         "La afectación no comparte ProyectoNucleo/ámbito o ya está asociada",
+    )
+
+
+def add_fifonafe_interviniente(
+    db: Session,
+    procedure_id: int,
+    data: schemas.TramiteFifonafeIntervinienteCreate,
+    user: models.Usuario,
+) -> models.TramiteFifonafeInterviniente:
+    procedure = require_fifonafe_access(db, user, procedure_id, mode="capture")
+    entity = models.TramiteFifonafeInterviniente(
+        id_tramite_fifonafe=procedure.id_tramite_fifonafe,
+        **data.model_dump(exclude={"observaciones"}),
+        **_audit_values(user.id_usuario, data),
+    )
+    return _persist(
+        db,
+        entity,
+        user.id_usuario,
+        "El interviniente, acto o acreditación histórica FIFONAFE no son válidos",
     )
 
 

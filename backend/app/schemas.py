@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 Role = Literal["admin", "operador", "visualizador", "geografo"]
 Ambito = Literal["colectivo", "individual"]
+EfectoMonto = Literal["adicion", "sustitucion", "correccion", "sin_cambio", "pendiente"]
+EfectoSuperficie = Literal["adicion", "sustitucion", "correccion", "sin_cambio", "pendiente"]
+EstadoAntecedente = Literal["no_aplica", "vinculado", "referido_sin_soporte", "pendiente_identificar"]
 
 
 class ORMModel(BaseModel):
@@ -481,7 +484,8 @@ SeguimientoObjetivo = Literal[
     "proyecto_nucleo", "afectacion", "parcela", "parcela_titular",
     "unidad_agraria", "asamblea", "asamblea_convocatoria", "convenio",
     "tramite_ran", "tramite_ran_evento", "tramite_fifonafe",
-    "tramite_fifonafe_evento", "orv", "padron_historial", "indemnizacion",
+    "tramite_fifonafe_evento", "tramite_fifonafe_interviniente",
+    "orv", "padron_historial", "indemnizacion",
 ]
 
 
@@ -761,6 +765,11 @@ class ConvenioCreate(AuditInput):
     monto_100: Decimal | None = Field(default=None, ge=0)
     monto_bdt: Decimal | None = Field(default=None, ge=0)
     superficie_ha: Decimal | None = Field(default=None, ge=0)
+    efecto_monto: EfectoMonto = "pendiente"
+    monto_90_impacto: Decimal | None = None
+    monto_100_impacto: Decimal | None = None
+    monto_bdt_impacto: Decimal | None = None
+    estado_antecedente: EstadoAntecedente | None = None
     comparecientes: list[ConvenioComparecienteCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -780,16 +789,127 @@ class ConvenioCreate(AuditInput):
         if self.monto_90 is not None and self.monto_100 is not None:
             if self.monto_90 > self.monto_100:
                 raise ValueError("monto_90 no puede exceder monto_100")
+        if self.tipo_convenio == "cop_original":
+            if self.id_convenio_padre is not None:
+                raise ValueError("cop_original no puede tener convenio padre")
+            if self.estado_antecedente not in (None, "no_aplica"):
+                raise ValueError("cop_original sólo admite estado_antecedente no_aplica")
+        if self.estado_antecedente == "vinculado" and self.id_convenio_padre is None:
+            raise ValueError("estado_antecedente 'vinculado' requiere id_convenio_padre")
+        if self.id_convenio_padre is not None and self.estado_antecedente not in (None, "vinculado"):
+            raise ValueError("Un instrumento con padre requiere antecedente vinculado")
+
+        impactos = (self.monto_90_impacto, self.monto_100_impacto, self.monto_bdt_impacto)
+        if self.efecto_monto == "pendiente":
+            if any(v is not None for v in impactos):
+                raise ValueError("Efecto monto 'pendiente' requiere impactos NULL")
+        elif self.efecto_monto == "sin_cambio":
+            if not any(v is not None for v in impactos):
+                raise ValueError("Efecto monto 'sin_cambio' requiere al menos un impacto definido")
+            if any(v != Decimal("0") for v in impactos if v is not None):
+                raise ValueError("Efecto monto 'sin_cambio' requiere impactos iguales a 0")
+        elif self.efecto_monto == "adicion":
+            if not any(v is not None for v in impactos):
+                raise ValueError("Efecto monto 'adicion' requiere al menos un impacto definido")
+            if any(v < Decimal("0") for v in impactos if v is not None):
+                raise ValueError("Efecto monto 'adicion' no admite impactos negativos")
+            if not any(v > Decimal("0") for v in impactos if v is not None):
+                raise ValueError("Efecto monto 'adicion' requiere al menos un impacto mayor a 0")
+        elif self.efecto_monto in ("sustitucion", "correccion"):
+            if not any(v is not None for v in impactos):
+                raise ValueError(f"Efecto monto '{self.efecto_monto}' requiere al menos un impacto definido")
         return self
 
 
-class ConvenioUpdate(ConvenioCreate):
+class ConvenioUpdate(AuditInput):
     tipo_instrumento: Literal["convenio", "otro"] | None = None
+    tipo_convenio: Literal[
+        "cop_original",
+        "modificatorio",
+        "superficie_adicional",
+        "obras_complementarias",
+        "ampliacion",
+        "ampliacion_remanente",
+    ] | None = None
+    modalidad_especial: Literal["permuta", "otra"] | None = None
+    descripcion_modalidad: str | None = None
+    descripcion_instrumento: str | None = None
     consecutivo: int | None = Field(default=None, gt=0)
+    id_convenio_padre: int | None = Field(default=None, gt=0)
+    id_asamblea_autorizacion: int | None = Field(default=None, gt=0)
+    fecha_programada_firma: date | None = None
+    fecha_firma: date | None = None
+    monto_90: Decimal | None = Field(default=None, ge=0)
+    monto_100: Decimal | None = Field(default=None, ge=0)
+    monto_bdt: Decimal | None = Field(default=None, ge=0)
+    superficie_ha: Decimal | None = Field(default=None, ge=0)
+    efecto_monto: EfectoMonto | None = None
+    monto_90_impacto: Decimal | None = None
+    monto_100_impacto: Decimal | None = None
+    monto_bdt_impacto: Decimal | None = None
+    estado_antecedente: EstadoAntecedente | None = None
+
+    @model_validator(mode="after")
+    def validar_instrumento(self):
+        if self.modalidad_especial == "permuta" and self.tipo_convenio not in (
+            None,
+            "cop_original",
+        ):
+            raise ValueError("Permuta sólo es modalidad de cop_original")
+        if self.modalidad_especial == "otra" and self.descripcion_modalidad is not None:
+            if not self.descripcion_modalidad.strip():
+                raise ValueError("La descripción de modalidad no puede estar vacía")
+        if self.tipo_instrumento == "otro" and self.descripcion_instrumento is not None:
+            if not self.descripcion_instrumento.strip():
+                raise ValueError("La descripción del instrumento no puede estar vacía")
+        if self.monto_90 is not None and self.monto_100 is not None:
+            if self.monto_90 > self.monto_100:
+                raise ValueError("monto_90 no puede exceder monto_100")
+        if self.tipo_convenio == "cop_original":
+            if self.id_convenio_padre is not None:
+                raise ValueError("cop_original no puede tener convenio padre")
+            if self.estado_antecedente not in (None, "no_aplica"):
+                raise ValueError("cop_original sólo admite estado_antecedente no_aplica")
+        if self.estado_antecedente == "vinculado" and self.id_convenio_padre is None:
+            raise ValueError("estado_antecedente 'vinculado' requiere id_convenio_padre")
+        if self.id_convenio_padre is not None and self.estado_antecedente not in (None, "vinculado"):
+            raise ValueError("Un instrumento con padre requiere antecedente vinculado")
+        return self
 
 
 class ConvenioAfectacionCreate(BaseModel):
     id_afectacion: int = Field(gt=0)
+    efecto_superficie: EfectoSuperficie = "pendiente"
+    superficie_impacto_ha: Decimal | None = None
+
+    @model_validator(mode="after")
+    def validar_impacto(self):
+        if self.efecto_superficie == "pendiente" and self.superficie_impacto_ha is not None:
+            raise ValueError("Efecto pendiente requiere superficie_impacto_ha NULL")
+        elif self.efecto_superficie == "sin_cambio" and self.superficie_impacto_ha != Decimal("0"):
+            raise ValueError("Efecto sin_cambio requiere superficie_impacto_ha igual a 0")
+        elif self.efecto_superficie == "adicion" and (self.superficie_impacto_ha is None or self.superficie_impacto_ha <= Decimal("0")):
+            raise ValueError("Efecto adicion requiere superficie_impacto_ha mayor a 0")
+        elif self.efecto_superficie in ("sustitucion", "correccion") and self.superficie_impacto_ha is None:
+            raise ValueError(f"Efecto {self.efecto_superficie} requiere superficie_impacto_ha no nulo")
+        return self
+
+
+class ConvenioAfectacionUpdate(AuditInput):
+    efecto_superficie: EfectoSuperficie | None = None
+    superficie_impacto_ha: Decimal | None = None
+
+    @model_validator(mode="after")
+    def validar_impacto(self):
+        if self.efecto_superficie == "pendiente" and self.superficie_impacto_ha is not None:
+            raise ValueError("Efecto pendiente requiere superficie_impacto_ha NULL")
+        elif self.efecto_superficie == "sin_cambio" and self.superficie_impacto_ha is not None and self.superficie_impacto_ha != Decimal("0"):
+            raise ValueError("Efecto sin_cambio requiere superficie_impacto_ha igual a 0")
+        elif self.efecto_superficie == "adicion" and self.superficie_impacto_ha is not None and self.superficie_impacto_ha <= Decimal("0"):
+            raise ValueError("Efecto adicion requiere superficie_impacto_ha mayor a 0")
+        elif self.efecto_superficie in ("sustitucion", "correccion") and self.superficie_impacto_ha is None:
+            raise ValueError(f"Efecto {self.efecto_superficie} requiere superficie_impacto_ha no nulo")
+        return self
 
 
 class ConvenioAfectacionResponse(AuditRead):
@@ -797,12 +917,19 @@ class ConvenioAfectacionResponse(AuditRead):
     id_convenio: int
     id_afectacion: int
     rol: Literal["principal", "adicional"]
+    efecto_superficie: EfectoSuperficie = "pendiente"
+    superficie_impacto_ha: Decimal | None = None
 
 
 class ConvenioResponse(ConvenioCreate, AuditRead):
     id_convenio: int
     id_proyecto_nucleo: int
     ambito: Ambito
+    efecto_monto: EfectoMonto = "pendiente"
+    monto_90_impacto: Decimal | None = None
+    monto_100_impacto: Decimal | None = None
+    monto_bdt_impacto: Decimal | None = None
+    estado_antecedente: EstadoAntecedente | None = None
     afectaciones: list[ConvenioAfectacionResponse] = Field(default_factory=list)
     comparecientes: list[ConvenioComparecienteResponse] = Field(default_factory=list)
 
@@ -865,6 +992,21 @@ class TramiteFifonafeEventoCreate(AuditInput):
     numero_oficio: str | None = Field(default=None, max_length=150)
     fecha_oficio: date | None = None
     id_documento: int | None = Field(default=None, gt=0)
+    ciclo_consulta: int | None = Field(default=None, gt=0)
+    fecha_evento: date | None = None
+    conflicto_impide_retiro: bool | None = None
+
+
+class TramiteFifonafeEventoUpdate(AuditInput):
+    id_tipo_evento: int | None = Field(default=None, gt=0)
+    origen: str | None = Field(default=None, max_length=200)
+    destino: str | None = Field(default=None, max_length=200)
+    numero_oficio: str | None = Field(default=None, max_length=150)
+    fecha_oficio: date | None = None
+    id_documento: int | None = Field(default=None, gt=0)
+    ciclo_consulta: int | None = Field(default=None, gt=0)
+    fecha_evento: date | None = None
+    conflicto_impide_retiro: bool | None = None
 
 
 class TramiteFifonafeEventoResponse(TramiteFifonafeEventoCreate, AuditRead):
@@ -878,6 +1020,8 @@ class TramiteFifonafeCreate(AuditInput):
     acuse_fifonafe_fecha: date | None = None
     hay_conflictos: bool | None = None
     resultado_no_conflictos: str | None = None
+    referencia_expediente: str | None = Field(default=None, max_length=200)
+    id_asamblea_retiro: int | None = Field(default=None, gt=0)
     eventos: list[TramiteFifonafeEventoCreate] = Field(default_factory=list)
 
     @field_validator("ids_afectacion")
@@ -893,6 +1037,8 @@ class TramiteFifonafeUpdate(AuditInput):
     acuse_fifonafe_fecha: date | None = None
     hay_conflictos: bool | None = None
     resultado_no_conflictos: str | None = None
+    referencia_expediente: str | None = Field(default=None, max_length=200)
+    id_asamblea_retiro: int | None = Field(default=None, gt=0)
 
 
 class TramiteFifonafeAfectacionResponse(AuditRead):
@@ -901,13 +1047,40 @@ class TramiteFifonafeAfectacionResponse(AuditRead):
     id_afectacion: int
 
 
+class TramiteFifonafeAfectacionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id_afectacion: int = Field(gt=0)
+
+
+RolIntervinienteFifonafe = Literal[
+    "solicitante", "representante", "titular", "beneficiario", "receptor_designado"
+]
+
+
+class TramiteFifonafeIntervinienteCreate(AuditInput):
+    id_persona: int = Field(gt=0)
+    rol: RolIntervinienteFifonafe
+    id_evento_fifonafe: int | None = Field(default=None, gt=0)
+    id_orv_integrante: int | None = Field(default=None, gt=0)
+
+
+class TramiteFifonafeIntervinienteResponse(
+    TramiteFifonafeIntervinienteCreate, AuditRead
+):
+    id_interviniente_fifonafe: int
+    id_tramite_fifonafe: int
+
+
 class TramiteFifonafeResponse(TramiteFifonafeUpdate, AuditRead):
     id_tramite_fifonafe: int
     id_proyecto_nucleo: int
     ambito: Ambito
     estatus: str
+    version_flujo: int
     afectaciones: list[TramiteFifonafeAfectacionResponse] = Field(default_factory=list)
     eventos: list[TramiteFifonafeEventoResponse] = Field(default_factory=list)
+    intervinientes: list[TramiteFifonafeIntervinienteResponse] = Field(default_factory=list)
 
 
 class IndemnizacionCreate(AuditInput):
@@ -1050,7 +1223,8 @@ class ExpedienteRequisitoCreate(AuditInput):
         "proyecto_nucleo", "afectacion", "parcela", "parcela_titular",
         "unidad_agraria", "unidad_agraria_titular", "convenio",
         "convenio_compareciente", "tramite_ran", "tramite_ran_evento",
-        "tramite_fifonafe", "tramite_fifonafe_evento", "indemnizacion", "pago",
+        "tramite_fifonafe", "tramite_fifonafe_evento",
+        "tramite_fifonafe_interviniente", "indemnizacion", "pago",
         "orv", "padron_historial", "actividad_campo", "asamblea", "asamblea_convocatoria",
     ]
     entidad_id: int = Field(gt=0)
@@ -1180,6 +1354,89 @@ class ReporteSnapshotActualResponse(ORMModel):
     cantidad: int
     superficie_ha: Decimal | None = None
     monto: Decimal | None = None
+
+
+class FifonafeCoberturaResponse(ORMModel):
+    id_proyecto: int
+    ambito: Ambito
+    universo_solicitudes: int
+    solicitudes_recibidas_acreditadas: int
+    eventos_consulta_sin_ciclo: int
+    respuestas_sin_soporte: int
+    actuaciones_sin_soporte: int
+    completos_integrales: int
+    pendientes_integrales: int
+
+
+class FifonafeIndicadorInstitucionalResponse(ORMModel):
+    id_proyecto: int
+    anio: int
+    solicitudes_recibidas: int
+    solicitudes_resueltas_positivas: int
+    porcentaje: Decimal | None = None
+
+
+class ConvenioValorDeclaradoResponse(ORMModel):
+    id_convenio: int
+    concepto: str
+    id_proyecto: int | None = None
+    id_entidad: int | None = None
+    id_proyecto_nucleo: int | None = None
+    ambito: str | None = None
+    tipo_cop_operativo: str | None = None
+    tipo_convenio: str | None = None
+    unidad: str | None = None
+    valor_declarado: Decimal | None = None
+    fecha_instrumento_reportada: date | None = None
+    firma_acreditada: bool | None = None
+
+
+class ConvenioImpactoResponse(ORMModel):
+    clave_impacto: str
+    id_proyecto: int | None = None
+    id_entidad: int | None = None
+    id_proyecto_nucleo: int | None = None
+    id_convenio: int | None = None
+    id_convenio_afectacion: int | None = None
+    id_afectacion: int | None = None
+    ambito: str | None = None
+    tipo_cop_operativo: str | None = None
+    tipo_convenio: str | None = None
+    concepto: str | None = None
+    unidad: str | None = None
+    efecto: str | None = None
+    fecha_efecto: date | None = None
+    valor_impacto: Decimal | None = None
+    pendiente: bool | None = None
+    firma_acreditada: bool | None = None
+
+
+class ReporteConvenioImpactoPeriodoResponse(ORMModel):
+    id_proyecto: int
+    id_entidad: int
+    ambito: str
+    tipo_cop_operativo: str | None = None
+    tipo_convenio: str | None = None
+    concepto: str
+    unidad: str
+    efecto: str
+    anio: int
+    mes: int
+    trimestre: int | None = None
+    cantidad: int
+    valor_impacto: Decimal | None = None
+
+
+class ConvenioCoberturaImpactoResponse(ORMModel):
+    id_proyecto: int
+    id_entidad: int
+    ambito: str
+    concepto: str
+    unidad: str
+    universo: int
+    clasificados: int
+    pendientes: int
+    sin_firma_acreditada: int
 
 
 class BitacoraResponse(ORMModel):

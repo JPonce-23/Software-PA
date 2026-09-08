@@ -235,23 +235,39 @@ def test_07_historical_signer_survives_title_change(api, original, target_domain
     assert after["nombre_en_instrumento"] == before["nombre_en_instrumento"]
 
 
-def _expect_child_rejected(api, row, tipo, **extra):
+def _expect_child_without_parent_admitted(api, row, tipo, **extra):
+    # 007: Derivados sin padre ya no se rechazan para evitar padres ficticios;
+    # se crean con estado antecedente pendiente_identificar.
     a = _second_affectation(api, row)
-    payload = {"tipo_instrumento":"convenio", "tipo_convenio":tipo, **extra}
-    response = api("POST", f"/api/afectaciones/{a['id_afectacion']}/convenios", expected=409, json=payload)
+    payload = {"tipo_instrumento": "convenio", "tipo_convenio": tipo, **extra}
+    response = api("POST", f"/api/afectaciones/{a['id_afectacion']}/convenios", expected=201, json=payload)
+    data = response.json()
+    assert data["tipo_convenio"] == tipo
+    assert data["id_convenio_padre"] is None
     return response
 
 
-def test_neg_01_modificatorio_without_parent(api, original):
-    _expect_child_rejected(api, original, "modificatorio")
+def test_007_modificatorio_without_parent_admitted(api, original):
+    _expect_child_without_parent_admitted(api, original, "modificatorio")
 
 
-def test_neg_02_ampliacion_without_parent(api, original):
-    _expect_child_rejected(api, original, "ampliacion")
+def test_007_ampliacion_without_parent_admitted(api, original):
+    _expect_child_without_parent_admitted(api, original, "ampliacion")
 
 
-def test_neg_03_remanente_without_parent(api, original):
-    _expect_child_rejected(api, original, "ampliacion_remanente")
+def test_007_remanente_without_parent_admitted(api, original):
+    _expect_child_without_parent_admitted(api, original, "ampliacion_remanente")
+
+
+def test_neg_cop_original_with_parent(api, original):
+    # Regla 007/039: Un cop_original no debe tener convenio padre
+    a = _second_affectation(api, original)
+    payload = {
+        "tipo_instrumento": "convenio",
+        "tipo_convenio": "cop_original",
+        "id_convenio_padre": original["convenio"]["id_convenio"],
+    }
+    api("POST", f"/api/afectaciones/{a['id_afectacion']}/convenios", expected=422, json=payload)
 
 
 def test_neg_04_parent_other_project_nucleus(api, original, target_domain):

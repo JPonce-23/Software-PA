@@ -1287,6 +1287,22 @@ def delete_agreement_compareciente(
     return {"detail": "Compareciente dado de baja"}
 
 
+@router.get(
+    "/convenios/{id_convenio}/afectaciones",
+    response_model=list[schemas.ConvenioAfectacionResponse],
+)
+def list_agreement_affectations(
+    id_convenio: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_agreement_access(db, user, id_convenio)
+    return db.query(models.ConvenioAfectacion).filter(
+        models.ConvenioAfectacion.id_convenio == id_convenio,
+        models.ConvenioAfectacion.activo.is_(True),
+    ).order_by(models.ConvenioAfectacion.id_convenio_afectacion).all()
+
+
 @router.post(
     "/convenios/{id_convenio}/afectaciones",
     response_model=schemas.ConvenioAfectacionResponse,
@@ -1299,8 +1315,27 @@ def add_agreement_affectation(
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
     return service.add_agreement_affectation(
-        db, id_convenio, data.id_afectacion, user
+        db, id_convenio, data, user
     )
+
+
+@router.patch(
+    "/convenio-afectaciones/{id_convenio_afectacion}",
+    response_model=schemas.ConvenioAfectacionResponse,
+)
+def update_agreement_affectation(
+    id_convenio_afectacion: int,
+    data: schemas.ConvenioAfectacionUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db, models.ConvenioAfectacion,
+        models.ConvenioAfectacion.id_convenio_afectacion, id_convenio_afectacion,
+        "Afectación de convenio no encontrada",
+    )
+    require_agreement_access(db, user, entity.id_convenio, mode="capture")
+    return service.update_entity(db, entity, data, user)
 
 
 @router.get(
@@ -1356,7 +1391,7 @@ def update_fifonafe(
 )
 def add_fifonafe_affectation(
     id_tramite_fifonafe: int,
-    data: schemas.ConvenioAfectacionCreate,
+    data: schemas.TramiteFifonafeAfectacionCreate,
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
@@ -1394,6 +1429,100 @@ def add_fifonafe_event(
 ):
     procedure = require_fifonafe_access(db, user, id_tramite_fifonafe, mode="capture")
     return service.add_fifonafe_event(db, procedure, data, user)
+
+
+@router.patch(
+    "/eventos-fifonafe/{id_evento_fifonafe}",
+    response_model=schemas.TramiteFifonafeEventoResponse,
+)
+def update_fifonafe_event(
+    id_evento_fifonafe: int,
+    data: schemas.TramiteFifonafeEventoUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db,
+        models.TramiteFifonafeEvento,
+        models.TramiteFifonafeEvento.id_evento_fifonafe,
+        id_evento_fifonafe,
+        "Evento FIFONAFE no encontrado",
+    )
+    require_fifonafe_access(db, user, entity.id_tramite_fifonafe, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
+@router.delete("/eventos-fifonafe/{id_evento_fifonafe}", status_code=200)
+def delete_fifonafe_event(
+    id_evento_fifonafe: int,
+    data: schemas.BajaRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db,
+        models.TramiteFifonafeEvento,
+        models.TramiteFifonafeEvento.id_evento_fifonafe,
+        id_evento_fifonafe,
+        "Evento FIFONAFE no encontrado",
+    )
+    require_fifonafe_access(db, user, entity.id_tramite_fifonafe, mode="capture")
+    service.logical_delete(db, entity, user.id_usuario, data.motivo)
+    return {"detail": "Evento FIFONAFE dado de baja"}
+
+
+@router.get(
+    "/fifonafe/{id_tramite_fifonafe}/intervinientes",
+    response_model=list[schemas.TramiteFifonafeIntervinienteResponse],
+)
+def list_fifonafe_intervinientes(
+    id_tramite_fifonafe: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    require_fifonafe_access(db, user, id_tramite_fifonafe)
+    return db.query(models.TramiteFifonafeInterviniente).filter(
+        models.TramiteFifonafeInterviniente.id_tramite_fifonafe
+        == id_tramite_fifonafe,
+        models.TramiteFifonafeInterviniente.activo.is_(True),
+    ).order_by(models.TramiteFifonafeInterviniente.id_interviniente_fifonafe).all()
+
+
+@router.post(
+    "/fifonafe/{id_tramite_fifonafe}/intervinientes",
+    response_model=schemas.TramiteFifonafeIntervinienteResponse,
+    status_code=201,
+)
+def add_fifonafe_interviniente(
+    id_tramite_fifonafe: int,
+    data: schemas.TramiteFifonafeIntervinienteCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.add_fifonafe_interviniente(
+        db, id_tramite_fifonafe, data, user
+    )
+
+
+@router.delete(
+    "/intervinientes-fifonafe/{id_interviniente_fifonafe}", status_code=200
+)
+def delete_fifonafe_interviniente(
+    id_interviniente_fifonafe: int,
+    data: schemas.BajaRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = _active_or_404(
+        db,
+        models.TramiteFifonafeInterviniente,
+        models.TramiteFifonafeInterviniente.id_interviniente_fifonafe,
+        id_interviniente_fifonafe,
+        "Interviniente FIFONAFE no encontrado",
+    )
+    require_fifonafe_access(db, user, entity.id_tramite_fifonafe, mode="capture")
+    service.logical_delete(db, entity, user.id_usuario, data.motivo)
+    return {"detail": "Interviniente FIFONAFE dado de baja"}
 
 
 @router.get(

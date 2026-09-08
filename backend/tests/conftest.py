@@ -56,13 +56,26 @@ def admin_headers(client: TestClient) -> dict[str, str]:
 
 @pytest.fixture(scope="session")
 def api(client: TestClient, admin_headers: dict[str, str]):
+    created_projects: set[int] = set()
+
     def request(method: str, path: str, *, expected: int = 200, **kwargs):
         headers = {**admin_headers, **kwargs.pop("headers", {})}
         response = client.request(method, path, headers=headers, **kwargs)
         assert response.status_code == expected, response.text
+        if method.upper() == "POST" and path == "/api/proyectos" and expected == 201:
+            created_projects.add(response.json()["id_proyecto"])
         return response
 
-    return request
+    yield request
+
+    for project_id in sorted(created_projects, reverse=True):
+        response = client.request(
+            "DELETE",
+            f"/api/proyectos/{project_id}",
+            headers=admin_headers,
+            json={"motivo": "Cierre lógico de fixture sintética QA"},
+        )
+        assert response.status_code in (200, 404), response.text
 
 
 @pytest.fixture(scope="session")

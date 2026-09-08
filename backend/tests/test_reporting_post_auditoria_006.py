@@ -69,7 +69,7 @@ def test_006_snapshot_nucleos_no_temporal(api, target_domain):
     assert len(rows) == 1 and rows[0]["cantidad"] >= 1 and "anio" not in rows[0] and "mes" not in rows[0]
 
 
-def test_006_fifonafe_colectivo_exige_numero_y_fecha(api, target_domain):
+def test_006_fifonafe_v2_no_reutiliza_cadena_colectiva_legada(api, target_domain):
     project, pn = _isolated_pn(api, target_domain); pnid = pn["id_proyecto_nucleo"]
     cop = _catalog(api, "tipo_cop_operativo"); eventos = _catalog(api, "tipo_evento_fifonafe")
     aff = api("POST", f"/api/proyecto-nucleo/{pnid}/afectaciones", expected=201, json={"tipo_afectacion":"colectivo","id_tipo_cop_operativo":cop["ORIGEN"]}).json()
@@ -77,11 +77,10 @@ def test_006_fifonafe_colectivo_exige_numero_y_fecha(api, target_domain):
     bad = api("POST", f"/api/proyecto-nucleo/{pnid}/fifonafe", expected=201, json={"ids_afectacion":[aff["id_afectacion"]],"eventos":[{"ordinal":i+1,"id_tipo_evento":eventos[c],"fecha_oficio":f"2026-0{i+1}-01",**({"numero_oficio":str(i)} if i<3 else {})} for i,c in enumerate(codigos)]}).json()
     assert not _periodo(api, project["id_proyecto"], indicador="fifonafe")
     good = api("POST", f"/api/proyecto-nucleo/{pnid}/fifonafe", expected=201, json={"ids_afectacion":[aff["id_afectacion"]],"eventos":[{"ordinal":i+1,"id_tipo_evento":eventos[c],"fecha_oficio":f"2026-0{i+1}-01","numero_oficio":str(i)} for i,c in enumerate(codigos)]}).json()
-    rows = _periodo(api, project["id_proyecto"], indicador="fifonafe")
-    assert len(rows) == 1 and rows[0]["mes"] == 4
+    assert not _periodo(api, project["id_proyecto"], indicador="fifonafe")
 
 
-def test_006_fifonafe_individual_no_exige_cadena_colectiva(api, target_domain):
+def test_006_fifonafe_individual_v2_no_completa_sin_evidencia(api, target_domain):
     project, pn = _isolated_pn(api, target_domain)
     pnid = pn["id_proyecto_nucleo"]
     cop = _catalog(api, "tipo_cop_operativo")
@@ -98,17 +97,13 @@ def test_006_fifonafe_individual_no_exige_cadena_colectiva(api, target_domain):
     tramite = api(
         "POST",
         f"/api/proyecto-nucleo/{pnid}/fifonafe",
-        expected=201,
+        expected=409,
         json={
             "ids_afectacion": [afectacion["id_afectacion"]],
             "estatus": "completo",
             "eventos": [],
         },
-    ).json()
-
-    assert tramite["ambito"] == "individual"
-    assert tramite["estatus"] == "completo"
-    assert tramite["eventos"] == []
+    )
     assert not _periodo(
         api,
         project["id_proyecto"],
@@ -234,7 +229,7 @@ def test_006_fifonafe_max_fecha_filtrado_a_cuatro_oficios(api, target_domain):
             ),
             {"clave_hito": clave_hito},
         ).scalars().all()
-    assert fechas == [date(2026, 4, 15)]
+    assert fechas == []
 
     abril = _periodo(
         api,
@@ -252,8 +247,7 @@ def test_006_fifonafe_max_fecha_filtrado_a_cuatro_oficios(api, target_domain):
         indicador="fifonafe",
         ambito="colectivo",
     )
-    assert len(abril) == 1
-    assert abril[0]["realizado"] == abril[0]["cantidad"] == 1
+    assert abril == []
     assert agosto == []
 
 

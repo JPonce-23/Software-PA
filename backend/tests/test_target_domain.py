@@ -250,7 +250,7 @@ def test_shared_fifonafe_indemnity_and_multiple_payments(api, target_domain):
         expected=201,
         json={
             "ids_afectacion": [item["id_afectacion"] for item in individuals],
-            "estatus": "completo",
+            "estatus": "pendiente",
             "eventos": [
                 {
                     "ordinal": ordinal,
@@ -272,6 +272,8 @@ def test_shared_fifonafe_indemnity_and_multiple_payments(api, target_domain):
             "resultado_no_conflictos": "Sin conflictos QA",
         },
     ).json()
+    assert procedure["version_flujo"] == 2
+    assert procedure["estatus"] == "pendiente"
     assert len(procedure["afectaciones"]) == 2
     cross = api(
         "POST",

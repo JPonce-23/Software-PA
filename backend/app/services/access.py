@@ -483,6 +483,27 @@ def project_ids_for_document_target(
                 models.ProyectoNucleo.activo.is_(True),
             )
         )
+    elif entity_type == "tramite_fifonafe_interviniente":
+        query = (
+            db.query(models.ProyectoNucleo.id_proyecto)
+            .join(
+                models.TramiteFifonafe,
+                models.TramiteFifonafe.id_proyecto_nucleo
+                == models.ProyectoNucleo.id_proyecto_nucleo,
+            )
+            .join(
+                models.TramiteFifonafeInterviniente,
+                models.TramiteFifonafeInterviniente.id_tramite_fifonafe
+                == models.TramiteFifonafe.id_tramite_fifonafe,
+            )
+            .filter(
+                models.TramiteFifonafeInterviniente.id_interviniente_fifonafe
+                == entity_id,
+                models.TramiteFifonafeInterviniente.activo.is_(True),
+                models.TramiteFifonafe.activo.is_(True),
+                models.ProyectoNucleo.activo.is_(True),
+            )
+        )
     elif entity_type == "indemnizacion":
         query = (
             db.query(models.ProyectoNucleo.id_proyecto)

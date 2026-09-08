@@ -58,7 +58,10 @@ BEGIN
     END LOOP;
 
     -- 5. Canonical sources presence in view definitions
-    v_def := pg_get_viewdef('vw_hito_seguimiento'::regclass, true);
+    v_def := pg_get_viewdef(
+        coalesce(to_regclass('public.vw_hito_seguimiento_007'),
+                 'vw_hito_seguimiento'::regclass), true
+    );
     IF position('tramite_ran_evento' in v_def) = 0 THEN
         RAISE EXCEPTION 'tramite_ran_evento no referenciado en vw_hito_seguimiento';
     END IF;
@@ -71,10 +74,14 @@ BEGIN
     IF position('convenio' in v_def) = 0 THEN
         RAISE EXCEPTION 'convenio no referenciado en vw_hito_seguimiento';
     END IF;
-    IF position('afectacion_unidad_agraria' in v_def) = 0 THEN
+    IF position('afectacion_unidad_agraria' in v_def) = 0
+       AND (to_regclass('public.vw_hito_seguimiento_005') IS NULL
+            OR position('afectacion_unidad_agraria' in pg_get_viewdef('vw_hito_seguimiento_005'::regclass, true)) = 0) THEN
         RAISE EXCEPTION 'afectacion_unidad_agraria no referenciado en vw_hito_seguimiento';
     END IF;
-    IF position('seguimiento_evento' in v_def) = 0 THEN
+    IF position('seguimiento_evento' in v_def) = 0
+       AND (to_regclass('public.vw_hito_seguimiento_005') IS NULL
+            OR position('seguimiento_evento' in pg_get_viewdef('vw_hito_seguimiento_005'::regclass, true)) = 0) THEN
         RAISE EXCEPTION 'seguimiento_evento no referenciado en vw_hito_seguimiento';
     END IF;
 
@@ -91,7 +98,8 @@ BEGIN
         RAISE EXCEPTION 'Columna auxiliar o prohibida detectada en schema public';
     END IF;
 
-    -- 7. No extraneous FIFONAFE columns added to base tables
+    -- 7. No extraneous FIFONAFE columns. 008 sólo autoriza identidad documental,
+    -- versión de contrato y Asamblea de retiro; no introduce datos financieros.
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema='public' AND table_name='tramite_fifonafe'
@@ -99,7 +107,8 @@ BEGIN
             'id_tramite_fifonafe','id_proyecto_nucleo','ambito','estatus',
             'hay_conflictos','resultado_no_conflictos','activo','creado_en',
             'creado_por','actualizado_en','actualizado_por','fecha_baja',
-            'id_usuario_baja','motivo_baja','observaciones','acuse_fifonafe_fecha'
+            'id_usuario_baja','motivo_baja','observaciones','acuse_fifonafe_fecha',
+            'referencia_expediente','version_flujo','id_asamblea_retiro'
           )
     ) THEN
         RAISE EXCEPTION 'Columnas extrañas no autorizadas en tramite_fifonafe';

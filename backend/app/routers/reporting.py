@@ -6,7 +6,7 @@ import json
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func
+from sqlalchemy import func, literal
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -120,7 +120,303 @@ def reporte_resumen_actual(
     for field, value in ((models.ReporteSnapshotActual.id_entidad, id_entidad), (models.ReporteSnapshotActual.ambito, ambito), (models.ReporteSnapshotActual.indicador, indicador), (models.ReporteSnapshotActual.tipo_cop_operativo, tipo_cop_operativo), (models.ReporteSnapshotActual.destino_superficie, destino_superficie)):
         if value is not None:
             query = query.filter(field == value)
-    return query.order_by(models.ReporteSnapshotActual.id_proyecto, models.ReporteSnapshotActual.indicador).all()
+    rows = query.order_by(
+        models.ReporteSnapshotActual.id_proyecto,
+        models.ReporteSnapshotActual.indicador,
+    ).all()
+
+    # 006 no publicó un snapshot de esta condición. Se calcula en la capa de
+    # lectura desde el valor vigente de afectaciones activas y se deduplica por
+    # ProyectoNucleo; los eventos históricos no participan en el conteo.
+    include_current_expropriation = (
+        indicador in (None, "expropiacion_directa_actual")
+        and ambito in (None, "colectivo")
+        and tipo_cop_operativo is None
+        and destino_superficie is None
+    )
+    if include_current_expropriation:
+        current = (
+            db.query(
+                models.ProyectoNucleo.id_proyecto.label("id_proyecto"),
+                models.Municipio.id_entidad.label("id_entidad"),
+                literal("colectivo").label("ambito"),
+                literal("expropiacion_directa_actual").label("indicador"),
+                literal(None).label("tipo_cop_operativo"),
+                literal(None).label("destino_superficie"),
+                func.count(
+                    func.distinct(models.ProyectoNucleo.id_proyecto_nucleo)
+                ).label("cantidad"),
+                literal(None).label("superficie_ha"),
+                literal(None).label("monto"),
+            )
+            .join(
+                models.NucleoAgrario,
+                models.NucleoAgrario.id_nucleo == models.ProyectoNucleo.id_nucleo,
+            )
+            .join(
+                models.Municipio,
+                models.Municipio.id_municipio == models.NucleoAgrario.id_municipio,
+            )
+            .join(
+                models.Afectacion,
+                models.Afectacion.id_proyecto_nucleo
+                == models.ProyectoNucleo.id_proyecto_nucleo,
+            )
+            .filter(
+                models.ProyectoNucleo.activo.is_(True),
+                models.NucleoAgrario.activo.is_(True),
+                models.Afectacion.activo.is_(True),
+                models.Afectacion.condicion_especial == "expropiacion_directa",
+            )
+        )
+        if id_proyecto is not None:
+            current = current.filter(models.ProyectoNucleo.id_proyecto == id_proyecto)
+        else:
+            current = current.filter(
+                models.ProyectoNucleo.id_proyecto.in_(authorized_project_ids(db, user))
+            )
+        if id_entidad is not None:
+            current = current.filter(models.Municipio.id_entidad == id_entidad)
+        current = current.group_by(
+            models.ProyectoNucleo.id_proyecto,
+            models.Municipio.id_entidad,
+        )
+        rows.extend(current.all())
+
+    return sorted(
+        rows,
+        key=lambda row: (row.id_proyecto, row.indicador, row.id_entidad),
+    )
+
+
+@router.get(
+    "/reportes/convenios/valores-declarados",
+    response_model=list[schemas.ConvenioValorDeclaradoResponse],
+)
+def reporte_convenios_valores_declarados(
+    id_proyecto: int | None = None,
+    id_entidad: int | None = Query(default=None, gt=0),
+    id_proyecto_nucleo: int | None = Query(default=None, gt=0),
+    id_convenio: int | None = Query(default=None, gt=0),
+    ambito: str | None = None,
+    concepto: str | None = None,
+    firma_acreditada: bool | None = None,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.ConvenioValorDeclarado)
+    if id_proyecto is not None:
+        require_project_access(db, user, id_proyecto)
+        query = query.filter(models.ConvenioValorDeclarado.id_proyecto == id_proyecto)
+    else:
+        query = query.filter(
+            models.ConvenioValorDeclarado.id_proyecto.in_(authorized_project_ids(db, user))
+        )
+    for field, value in (
+        (models.ConvenioValorDeclarado.id_entidad, id_entidad),
+        (models.ConvenioValorDeclarado.id_proyecto_nucleo, id_proyecto_nucleo),
+        (models.ConvenioValorDeclarado.id_convenio, id_convenio),
+        (models.ConvenioValorDeclarado.ambito, ambito),
+        (models.ConvenioValorDeclarado.concepto, concepto),
+        (models.ConvenioValorDeclarado.firma_acreditada, firma_acreditada),
+    ):
+        if value is not None:
+            query = query.filter(field == value)
+    return query.order_by(
+        models.ConvenioValorDeclarado.id_proyecto,
+        models.ConvenioValorDeclarado.id_convenio,
+        models.ConvenioValorDeclarado.concepto,
+    ).all()
+
+
+@router.get(
+    "/reportes/convenios/impactos",
+    response_model=list[schemas.ConvenioImpactoResponse],
+)
+def reporte_convenios_impactos(
+    id_proyecto: int | None = None,
+    id_entidad: int | None = Query(default=None, gt=0),
+    id_proyecto_nucleo: int | None = Query(default=None, gt=0),
+    id_convenio: int | None = Query(default=None, gt=0),
+    id_afectacion: int | None = Query(default=None, gt=0),
+    ambito: str | None = None,
+    concepto: str | None = None,
+    efecto: str | None = None,
+    pendiente: bool | None = None,
+    firma_acreditada: bool | None = None,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.ConvenioImpacto)
+    if id_proyecto is not None:
+        require_project_access(db, user, id_proyecto)
+        query = query.filter(models.ConvenioImpacto.id_proyecto == id_proyecto)
+    else:
+        query = query.filter(
+            models.ConvenioImpacto.id_proyecto.in_(authorized_project_ids(db, user))
+        )
+    for field, value in (
+        (models.ConvenioImpacto.id_entidad, id_entidad),
+        (models.ConvenioImpacto.id_proyecto_nucleo, id_proyecto_nucleo),
+        (models.ConvenioImpacto.id_convenio, id_convenio),
+        (models.ConvenioImpacto.id_afectacion, id_afectacion),
+        (models.ConvenioImpacto.ambito, ambito),
+        (models.ConvenioImpacto.concepto, concepto),
+        (models.ConvenioImpacto.efecto, efecto),
+        (models.ConvenioImpacto.pendiente, pendiente),
+        (models.ConvenioImpacto.firma_acreditada, firma_acreditada),
+    ):
+        if value is not None:
+            query = query.filter(field == value)
+    return query.order_by(
+        models.ConvenioImpacto.id_proyecto,
+        models.ConvenioImpacto.id_convenio,
+        models.ConvenioImpacto.clave_impacto,
+    ).all()
+
+
+@router.get(
+    "/reportes/convenios/impactos-periodo",
+    response_model=list[schemas.ReporteConvenioImpactoPeriodoResponse],
+)
+def reporte_convenios_impactos_periodo(
+    id_proyecto: int | None = None,
+    id_entidad: int | None = Query(default=None, gt=0),
+    anio: int | None = Query(default=None, ge=2000, le=2200),
+    mes: int | None = Query(default=None, ge=1, le=12),
+    trimestre: int | None = Query(default=None, ge=1, le=4),
+    ambito: str | None = None,
+    tipo_cop_operativo: str | None = None,
+    tipo_convenio: str | None = None,
+    concepto: str | None = None,
+    efecto: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.ReporteConvenioImpactoPeriodo)
+    if id_proyecto is not None:
+        require_project_access(db, user, id_proyecto)
+        query = query.filter(
+            models.ReporteConvenioImpactoPeriodo.id_proyecto == id_proyecto
+        )
+    else:
+        query = query.filter(
+            models.ReporteConvenioImpactoPeriodo.id_proyecto.in_(
+                authorized_project_ids(db, user)
+            )
+        )
+    for field, value in (
+        (models.ReporteConvenioImpactoPeriodo.id_entidad, id_entidad),
+        (models.ReporteConvenioImpactoPeriodo.anio, anio),
+        (models.ReporteConvenioImpactoPeriodo.mes, mes),
+        (models.ReporteConvenioImpactoPeriodo.trimestre, trimestre),
+        (models.ReporteConvenioImpactoPeriodo.ambito, ambito),
+        (models.ReporteConvenioImpactoPeriodo.tipo_cop_operativo, tipo_cop_operativo),
+        (models.ReporteConvenioImpactoPeriodo.tipo_convenio, tipo_convenio),
+        (models.ReporteConvenioImpactoPeriodo.concepto, concepto),
+        (models.ReporteConvenioImpactoPeriodo.efecto, efecto),
+    ):
+        if value is not None:
+            query = query.filter(field == value)
+    return query.order_by(
+        models.ReporteConvenioImpactoPeriodo.id_proyecto,
+        models.ReporteConvenioImpactoPeriodo.anio,
+        models.ReporteConvenioImpactoPeriodo.mes,
+        models.ReporteConvenioImpactoPeriodo.concepto,
+    ).all()
+
+
+@router.get(
+    "/reportes/convenios/cobertura-impactos",
+    response_model=list[schemas.ConvenioCoberturaImpactoResponse],
+)
+def reporte_convenios_cobertura_impactos(
+    id_proyecto: int | None = None,
+    id_entidad: int | None = Query(default=None, gt=0),
+    ambito: str | None = None,
+    concepto: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.ConvenioCoberturaImpacto)
+    if id_proyecto is not None:
+        require_project_access(db, user, id_proyecto)
+        query = query.filter(
+            models.ConvenioCoberturaImpacto.id_proyecto == id_proyecto
+        )
+    else:
+        query = query.filter(
+            models.ConvenioCoberturaImpacto.id_proyecto.in_(
+                authorized_project_ids(db, user)
+            )
+        )
+    for field, value in (
+        (models.ConvenioCoberturaImpacto.id_entidad, id_entidad),
+        (models.ConvenioCoberturaImpacto.ambito, ambito),
+        (models.ConvenioCoberturaImpacto.concepto, concepto),
+    ):
+        if value is not None:
+            query = query.filter(field == value)
+    return query.order_by(
+        models.ConvenioCoberturaImpacto.id_proyecto,
+        models.ConvenioCoberturaImpacto.id_entidad,
+        models.ConvenioCoberturaImpacto.concepto,
+    ).all()
+
+
+@router.get(
+    "/reportes/fifonafe/cobertura",
+    response_model=list[schemas.FifonafeCoberturaResponse],
+)
+def reporte_fifonafe_cobertura(
+    id_proyecto: int | None = None,
+    ambito: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.FifonafeCobertura)
+    if id_proyecto is not None:
+        require_project_access(db, user, id_proyecto)
+        query = query.filter(models.FifonafeCobertura.id_proyecto == id_proyecto)
+    else:
+        query = query.filter(
+            models.FifonafeCobertura.id_proyecto.in_(authorized_project_ids(db, user))
+        )
+    if ambito is not None:
+        query = query.filter(models.FifonafeCobertura.ambito == ambito)
+    return query.order_by(
+        models.FifonafeCobertura.id_proyecto, models.FifonafeCobertura.ambito
+    ).all()
+
+
+@router.get(
+    "/reportes/fifonafe/indicador-institucional",
+    response_model=list[schemas.FifonafeIndicadorInstitucionalResponse],
+)
+def reporte_fifonafe_indicador_institucional(
+    id_proyecto: int | None = None,
+    anio: int | None = Query(default=None, ge=2000, le=2200),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.FifonafeIndicadorInstitucional)
+    if id_proyecto is not None:
+        require_project_access(db, user, id_proyecto)
+        query = query.filter(
+            models.FifonafeIndicadorInstitucional.id_proyecto == id_proyecto
+        )
+    else:
+        query = query.filter(
+            models.FifonafeIndicadorInstitucional.id_proyecto.in_(
+                authorized_project_ids(db, user)
+            )
+        )
+    if anio is not None:
+        query = query.filter(models.FifonafeIndicadorInstitucional.anio == anio)
+    return query.order_by(
+        models.FifonafeIndicadorInstitucional.id_proyecto,
+        models.FifonafeIndicadorInstitucional.anio,
+    ).all()
 
 
 @router.get("/exportaciones/dashboard.csv")

@@ -460,8 +460,8 @@ class Afectacion(Base, AuditableMixin):
         Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False
     )
     tipo_afectacion = Column(String(20), nullable=False)
-    superficie_preliminar_ha = Column(Numeric(14, 6))
-    superficie_afectada_ha = Column(Numeric(14, 6))
+    superficie_preliminar_ha = Column(Numeric(15, 7))
+    superficie_afectada_ha = Column(Numeric(15, 7))
     situacion = Column(String(100))
     condicion_especial = Column(String(50))
     descripcion_condicion = Column(Text)
@@ -535,8 +535,8 @@ class AfectacionUnidadAgraria(Base, AuditableMixin):
     id_afectacion_unidad = Column(BigInteger, primary_key=True)
     id_afectacion = Column(Integer, ForeignKey("afectacion.id_afectacion"), nullable=False)
     id_unidad_agraria = Column(BigInteger, ForeignKey("unidad_agraria.id_unidad_agraria"), nullable=False)
-    superficie_preliminar_ha = Column(Numeric(14, 6))
-    superficie_afectada_ha = Column(Numeric(14, 6))
+    superficie_preliminar_ha = Column(Numeric(15, 7))
+    superficie_afectada_ha = Column(Numeric(15, 7))
     superficie_valor_original = Column(String(120))
     superficie_formato_origen = Column(String(50))
     fuente = Column(String(250))
@@ -623,7 +623,12 @@ class Convenio(Base, AuditableMixin):
     monto_90 = Column(Numeric(18, 2))
     monto_100 = Column(Numeric(18, 2))
     monto_bdt = Column(Numeric(18, 2))
-    superficie_ha = Column(Numeric(14, 6))
+    superficie_ha = Column(Numeric(15, 7))
+    efecto_monto = Column(String(20), nullable=False, default="pendiente")
+    monto_90_impacto = Column(Numeric(18, 2))
+    monto_100_impacto = Column(Numeric(18, 2))
+    monto_bdt_impacto = Column(Numeric(18, 2))
+    estado_antecedente = Column(String(30))
 
     proyecto_nucleo = relationship("ProyectoNucleo", back_populates="convenios")
     padre = relationship(
@@ -653,6 +658,8 @@ class ConvenioAfectacion(Base, AuditableMixin):
         Integer, ForeignKey("afectacion.id_afectacion"), nullable=False
     )
     rol = Column(String(20), nullable=False, default="principal")
+    efecto_superficie = Column(String(20), nullable=False, default="pendiente")
+    superficie_impacto_ha = Column(Numeric(15, 7))
 
     convenio = relationship("Convenio", back_populates="afectaciones")
     afectacion = relationship("Afectacion", back_populates="convenios")
@@ -738,6 +745,9 @@ class TramiteFifonafe(Base, AuditableMixin):
     acuse_fifonafe_fecha = Column(Date)
     hay_conflictos = Column(Boolean)
     resultado_no_conflictos = Column(Text)
+    referencia_expediente = Column(String(200))
+    version_flujo = Column(SmallInteger, nullable=False, server_default="2")
+    id_asamblea_retiro = Column(Integer, ForeignKey("asamblea.id_asamblea"))
 
     proyecto_nucleo = relationship(
         "ProyectoNucleo", back_populates="tramites_fifonafe"
@@ -747,6 +757,10 @@ class TramiteFifonafe(Base, AuditableMixin):
     )
     eventos = relationship(
         "TramiteFifonafeEvento", back_populates="tramite", lazy="selectin"
+    )
+    asamblea_retiro = relationship("Asamblea", foreign_keys=[id_asamblea_retiro])
+    intervinientes = relationship(
+        "TramiteFifonafeInterviniente", back_populates="tramite", lazy="selectin"
     )
 
 
@@ -766,9 +780,37 @@ class TramiteFifonafeEvento(Base, AuditableMixin):
     numero_oficio = Column(String(150))
     fecha_oficio = Column(Date)
     id_documento = Column(Integer, ForeignKey("documento.id_documento"))
+    ciclo_consulta = Column(Integer)
+    fecha_evento = Column(Date)
+    conflicto_impide_retiro = Column(Boolean)
 
     tramite = relationship("TramiteFifonafe", back_populates="eventos")
     tipo_evento = relationship("CatalogoOperativo", foreign_keys=[id_tipo_evento])
+    intervinientes = relationship(
+        "TramiteFifonafeInterviniente", back_populates="evento", lazy="selectin"
+    )
+
+
+class TramiteFifonafeInterviniente(Base, AuditableMixin):
+    __tablename__ = "tramite_fifonafe_interviniente"
+
+    id_interviniente_fifonafe = Column(Integer, primary_key=True)
+    id_tramite_fifonafe = Column(
+        Integer, ForeignKey("tramite_fifonafe.id_tramite_fifonafe"), nullable=False
+    )
+    id_persona = Column(Integer, ForeignKey("persona.id_persona"), nullable=False)
+    rol = Column(String(30), nullable=False)
+    id_evento_fifonafe = Column(
+        BigInteger, ForeignKey("tramite_fifonafe_evento.id_evento_fifonafe")
+    )
+    id_orv_integrante = Column(
+        Integer, ForeignKey("orv_integrante.id_orv_integrante")
+    )
+
+    tramite = relationship("TramiteFifonafe", back_populates="intervinientes")
+    evento = relationship("TramiteFifonafeEvento", back_populates="intervinientes")
+    persona = relationship("Persona")
+    orv_integrante = relationship("OrvIntegrante")
 
 
 class TramiteFifonafeAfectacion(Base, AuditableMixin):
@@ -1316,3 +1358,98 @@ class ReporteSnapshotActual(Base):
     cantidad = Column(BigInteger)
     superficie_ha = Column(Numeric)
     monto = Column(Numeric)
+
+
+class FifonafeCobertura(Base):
+    __tablename__ = "vw_fifonafe_cobertura_008"
+
+    id_proyecto = Column(Integer, primary_key=True)
+    ambito = Column(Text, primary_key=True)
+    universo_solicitudes = Column(BigInteger)
+    solicitudes_recibidas_acreditadas = Column(BigInteger)
+    eventos_consulta_sin_ciclo = Column(BigInteger)
+    respuestas_sin_soporte = Column(BigInteger)
+    actuaciones_sin_soporte = Column(BigInteger)
+    completos_integrales = Column(BigInteger)
+    pendientes_integrales = Column(BigInteger)
+
+
+class FifonafeIndicadorInstitucional(Base):
+    __tablename__ = "vw_fifonafe_indicador_institucional_008"
+
+    id_proyecto = Column(Integer, primary_key=True)
+    anio = Column(Integer, primary_key=True)
+    solicitudes_recibidas = Column(BigInteger)
+    solicitudes_resueltas_positivas = Column(BigInteger)
+    porcentaje = Column(Numeric)
+
+
+class ConvenioValorDeclarado(Base):
+    __tablename__ = "vw_convenio_valor_declarado"
+
+    id_convenio = Column(Integer, primary_key=True)
+    concepto = Column(Text, primary_key=True)
+    id_proyecto = Column(Integer)
+    id_entidad = Column(Integer)
+    id_proyecto_nucleo = Column(Integer)
+    ambito = Column(Text)
+    tipo_cop_operativo = Column(Text)
+    tipo_convenio = Column(Text)
+    unidad = Column(Text)
+    valor_declarado = Column(Numeric)
+    fecha_instrumento_reportada = Column(Date)
+    firma_acreditada = Column(Boolean)
+
+
+class ConvenioImpacto(Base):
+    __tablename__ = "vw_convenio_impacto"
+
+    clave_impacto = Column(Text, primary_key=True)
+    id_proyecto = Column(Integer)
+    id_entidad = Column(Integer)
+    id_proyecto_nucleo = Column(Integer)
+    id_convenio = Column(Integer)
+    id_convenio_afectacion = Column(Integer)
+    id_afectacion = Column(Integer)
+    ambito = Column(Text)
+    tipo_cop_operativo = Column(Text)
+    tipo_convenio = Column(Text)
+    concepto = Column(Text)
+    unidad = Column(Text)
+    efecto = Column(Text)
+    fecha_efecto = Column(Date)
+    valor_impacto = Column(Numeric)
+    pendiente = Column(Boolean)
+    firma_acreditada = Column(Boolean)
+
+
+class ReporteConvenioImpactoPeriodo(Base):
+    __tablename__ = "vw_reporte_convenio_impacto_periodo"
+
+    id_proyecto = Column(Integer, primary_key=True)
+    id_entidad = Column(Integer, primary_key=True)
+    ambito = Column(Text, primary_key=True)
+    tipo_cop_operativo = Column(Text, primary_key=True)
+    tipo_convenio = Column(Text, primary_key=True)
+    concepto = Column(Text, primary_key=True)
+    unidad = Column(Text, primary_key=True)
+    efecto = Column(Text, primary_key=True)
+    anio = Column(Integer, primary_key=True)
+    mes = Column(Integer, primary_key=True)
+    trimestre = Column(Integer)
+    cantidad = Column(BigInteger)
+    valor_impacto = Column(Numeric)
+
+
+class ConvenioCoberturaImpacto(Base):
+    __tablename__ = "vw_convenio_cobertura_impacto"
+
+    id_proyecto = Column(Integer, primary_key=True)
+    id_entidad = Column(Integer, primary_key=True)
+    ambito = Column(Text, primary_key=True)
+    concepto = Column(Text, primary_key=True)
+    unidad = Column(Text, primary_key=True)
+    universo = Column(BigInteger)
+    clasificados = Column(BigInteger)
+    pendientes = Column(BigInteger)
+    sin_firma_acreditada = Column(BigInteger)
