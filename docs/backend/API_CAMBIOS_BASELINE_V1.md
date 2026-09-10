@@ -53,3 +53,35 @@
 
 Vigentes: 001, 002, 003, 004, 005. Siguiente migración: 006.
 El Modelo Excel V1 queda funcionalmente congelado en 005; 006+ sólo se justifica por requerimientos nuevos o defectos reales, no por campos ya presentes en las fuentes auditadas.
+
+## 009_bitacora_append_only
+
+**Ahora:** la bitácora queda disponible para consulta desde la aplicación, pero
+el rol runtime no puede insertarla, actualizarla ni eliminarla directamente.
+
+**Impacto frontend:** no hay endpoint nuevo ni cambio de body. La auditoría se
+mantiene como evidencia generada por el backend; el frontend no debe intentar
+escribir bitácora ni conectarse a PostgreSQL.
+
+## 010_credenciales_auditoria
+
+**Ahora:** se incorporan eventos de acceso para cambio de correo, cambio de
+contraseña y restablecimiento administrativo. Los cambios exclusivos de hashes
+de contraseña, token o CSRF no exponen secretos ni generan snapshots vacíos de
+bitácora. Se habilitan los endpoints de sesión y administración de credenciales
+descritos en el contrato frontend.
+
+**Impacto frontend:** aditivo. El cliente usa cookies de sesión y CSRF; cambio
+de correo, cambio/restablecimiento de contraseña y revocación devuelven el
+conteo `sesiones_revocadas` cuando corresponde.
+
+## 011_auditoria_actor_update
+
+**Ahora:** todo `UPDATE` auditado, salvo la expiración automática de sesión
+correlacionada por el sistema, exige un actor de aplicación antes de omitir un
+cambio sólo de secretos. Se conservan la exclusión de hashes sensibles y la
+supresión de filas vacías.
+
+**Impacto frontend:** no cambia endpoints ni bodies. Refuerza que las acciones
+de credenciales se ejecutan exclusivamente mediante la API autenticada y que
+sus secretos nunca se leen ni se envían a bitácora.
