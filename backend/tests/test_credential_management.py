@@ -42,6 +42,27 @@ def _block(email):
         assert response.status_code == 401, response.text
 
 
+def test_existing_user_login_with_password_over_72_utf8_bytes_is_generic_401(api):
+    target, _ = _create_user(api)
+    response = TestClient(app, raise_server_exceptions=False).post(
+        "/api/auth/sesiones",
+        data={"username": target["correo"], "password": "ñ" * 37},
+        headers={"Origin": AUTH_SETTINGS.allowed_origins[0]},
+    )
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Credenciales incorrectas"}
+
+
+def test_unknown_user_login_with_password_over_72_utf8_bytes_is_generic_401():
+    response = TestClient(app, raise_server_exceptions=False).post(
+        "/api/auth/sesiones",
+        data={"username": f"missing-{uuid.uuid4().hex[:16]}@qa.local", "password": "ñ" * 37},
+        headers={"Origin": AUTH_SETTINGS.allowed_origins[0]},
+    )
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Credenciales incorrectas"}
+
+
 @pytest.mark.parametrize(
     ("password", "expected"),
     [

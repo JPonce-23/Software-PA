@@ -1,5 +1,4 @@
 import os
-import bcrypt
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from . import models, database
@@ -35,7 +34,7 @@ if _is_insecure_secret_key(SECRET_KEY):
     )
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    return authentication_service.password_matches(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
     return authentication_service.hash_password(password)

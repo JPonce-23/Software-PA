@@ -11,13 +11,14 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..config import AUTH_SETTINGS
+from ..passwords import is_within_bcrypt_limit
 from .common import commit_or_conflict, set_audit_context
 
 
 _DUMMY_PASSWORD_HASH = bcrypt.hashpw(
     b"software-pa-dummy-authentication-value",
     bcrypt.gensalt(),
-)
+).decode("utf-8")
 
 
 def _utcnow() -> datetime:
@@ -30,6 +31,14 @@ def _hash_secret(value: str) -> str:
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def password_matches(password: str, password_hash: str) -> bool:
+    """Compare a password only when it is safe to pass to bcrypt."""
+    password_bytes = password.encode("utf-8")
+    if not is_within_bcrypt_limit(password):
+        return False
+    return bcrypt.checkpw(password_bytes, password_hash.encode("utf-8"))
 
 
 def _safe_user_agent(request: Request) -> str | None:
@@ -126,7 +135,7 @@ def create_session(
     )
 
     if user is None:
-        bcrypt.checkpw(password.encode("utf-8"), _DUMMY_PASSWORD_HASH)
+        password_matches(password, _DUMMY_PASSWORD_HASH)
         _event(
             db,
             event_type="login_fallido",
@@ -146,9 +155,7 @@ def create_session(
         db.rollback()
         raise RuntimeError("El usuario no tiene estado de autenticación")
 
-    password_valid = bcrypt.checkpw(
-        password.encode("utf-8"), user.contrasena_hash.encode("utf-8")
-    )
+    password_valid = password_matches(password, user.contrasena_hash)
     if not user.activo:
         _event(
             db,
@@ -466,10 +473,10 @@ def change_own_password(
     if target is None:
         db.rollback()
         raise HTTPException(status_code=401, detail="No se pudo validar la sesión")
-    if not bcrypt.checkpw(current_password.encode("utf-8"), target.contrasena_hash.encode("utf-8")):
+    if not password_matches(current_password, target.contrasena_hash):
         db.rollback()
         raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
-    if bcrypt.checkpw(new_password.encode("utf-8"), target.contrasena_hash.encode("utf-8")):
+    if password_matches(new_password, target.contrasena_hash):
         db.rollback()
         raise HTTPException(status_code=409, detail="La contraseña nueva no puede coincidir con la actual")
     set_audit_context(db, user_id)
@@ -505,7 +512,7 @@ def reset_user_password(
     if target is None:
         db.rollback()
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    if bcrypt.checkpw(new_password.encode("utf-8"), target.contrasena_hash.encode("utf-8")):
+    if password_matches(new_password, target.contrasena_hash):
         db.rollback()
         raise HTTPException(status_code=409, detail="La contraseña nueva no puede coincidir con la actual")
     set_audit_context(db, actor_user_id)
