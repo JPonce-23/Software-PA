@@ -6,9 +6,28 @@ Actúa como arquitecto de software y desarrollador full-stack senior especializa
 
 Estás trabajando sobre un sistema existente y evolutivo.
 
-`ESTADO_PROYECTO.md` es la fuente principal de continuidad. Contiene el estado conocido del sistema, las decisiones aprobadas, el trabajo terminado, el siguiente trabajo pendiente, las reglas obligatorias y el orden de documentos que deben consultarse.
+`ESTADO_PROYECTO.md` es fuente de continuidad histórica y técnica. Contiene el estado conocido del sistema, decisiones registradas, trabajo terminado, trabajo pendiente y orden de documentos que deben consultarse. No define el alcance funcional vigente cuando contradiga `docs/ALCANCE_FUNCIONAL_EXCEL.md`, `docs/Descripción proceso.md` o `docs/requirements.md`.
 
 No asumas que los documentos históricos representan el estado actual. El esquema ejecutable debe determinarse mediante las migraciones y, cuando sea posible, mediante la inspección de la base activa.
+
+## Contrato funcional obligatorio
+
+Antes de diseñar, lee completamente `docs/ALCANCE_FUNCIONAL_EXCEL.md`.
+
+Regla invariable: “SOFTWARE-PA debe demostrar correspondencia con el modelo operativo Excel, no correspondencia exhaustiva con el Derecho Agrario mexicano.”
+
+Toda ampliación funcional propuesta requiere evidencia previa. Para cualquier nueva tabla, entidad, proceso, estado o pantalla, identifica:
+
+* archivo Excel;
+* hoja;
+* columna, registro, fórmula o comportamiento;
+* necesidad de captura, historial o reporting que lo justifica.
+
+Si no existe evidencia Excel ni decisión funcional aprobada, clasifica la propuesta como:
+
+```text
+FUERA_DE_ALCANCE
+```
 
 ## Tarea exacta
 
@@ -54,6 +73,9 @@ No asumas que los documentos históricos representan el estado actual. El esquem
 ## Restricciones
 
 * No inventes el alcance.
+* No amplíes el alcance por exhaustividad jurídica.
+* No conviertas legislación o flujograma en generadores automáticos del modelo.
+* Prefiere resolver mediante modelo existente, catálogo, backend o reporting antes de proponer nueva estructura.
 * No reimplementes trabajo terminado.
 * No conviertas decisiones históricas en vigentes.
 * No elimines estructuras existentes sin una transición compatible.
@@ -67,6 +89,7 @@ No asumas que los documentos históricos representan el estado actual. El esquem
 * No realices bajas físicas de entidades operativas.
 * No expongas secretos ni errores internos.
 * No modifiques todavía `ESTADO_PROYECTO.md`.
+* No implementes nada: este prompt sigue siendo exclusivamente de diseño.
 
 ## Formato de salida
 

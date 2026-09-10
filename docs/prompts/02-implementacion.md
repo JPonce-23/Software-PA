@@ -10,6 +10,20 @@ La propuesta no debe aceptarse automáticamente. Debes contrastarla con el repos
 
 Sólo debes implementarla si supera la evaluación.
 
+## Contrato funcional obligatorio
+
+Antes de evaluar o implementar, lee completamente `docs/ALCANCE_FUNCIONAL_EXCEL.md`.
+
+Regla invariable: “SOFTWARE-PA debe demostrar correspondencia con el modelo operativo Excel, no correspondencia exhaustiva con el Derecho Agrario mexicano.”
+
+Toda ampliación funcional requiere evidencia Excel o decisión funcional aprobada. Para cualquier nueva tabla, entidad, proceso, estado o pantalla, identifica archivo Excel, hoja, columna, registro, fórmula o comportamiento, y la necesidad de captura, historial o reporting que lo justifica.
+
+Si no existe evidencia Excel ni decisión funcional aprobada, clasifica la propuesta como:
+
+```text
+FUERA_DE_ALCANCE
+```
+
 ## Etapa 1 — Evaluar la propuesta
 
 1. Lee completamente `ESTADO_PROYECTO.md`.
@@ -54,7 +68,25 @@ Sólo debes implementarla si supera la evaluación.
 
 ### Gate funcional
 
-Respeta el proceso, las reglas y las decisiones vigentes.
+Respeta el proceso operativo vigente, las reglas documentadas y las decisiones funcionales aprobadas.
+
+### Gate de correspondencia Excel
+
+Para cada cambio funcional, comprueba:
+
+1. qué evidencia Excel lo exige;
+2. qué dato, relación, historia o indicador representa;
+3. si el modelo actual ya puede resolverlo;
+4. si realmente requiere cambio de BD;
+5. si puede resolverse sólo mediante backend/reporting;
+6. que no provenga únicamente de exhaustividad jurídica.
+
+El gate FALLA si una propuesta:
+
+* agrega complejidad jurídica sin necesidad Excel;
+* introduce etapas no capturadas ni reportadas;
+* crea entidades únicamente por correspondencia legal;
+* confunde el procedimiento jurídico completo con el alcance operativo.
 
 ### Gate de datos
 
@@ -121,6 +153,9 @@ Si todos los gates críticos pasan:
 * No desactives pruebas o restricciones.
 * No declares validaciones no ejecutadas.
 * No amplíes el alcance.
+* No amplíes el alcance por exhaustividad jurídica.
+* No conviertas legislación o flujograma en generadores automáticos del modelo.
+* Prefiere resolver mediante modelo existente, catálogo, backend o reporting antes de proponer nueva estructura.
 
 ## Formato de salida
 

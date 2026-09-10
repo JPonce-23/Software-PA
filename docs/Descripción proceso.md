@@ -2,11 +2,18 @@
 
 > Estado: documento canónico del proceso objetivo, alineado con el esquema 035.  
 > Fecha de actualización: 2026-08-31.  
-> Alcance: especificación funcional del proceso administrativo; la implementación técnica se describe en `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md`.
+> Alcance: especificación funcional del proceso operativo necesario para representar los Excel; la implementación técnica se describe en `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md`.
+> Precedencia: `docs/ALCANCE_FUNCIONAL_EXCEL.md` es el contrato superior de alcance.
 
 ## Principio rector
 
 SOFTWARE-PA representa los hechos administrativos que aparecen en los Excel de seguimiento. El flujograma y la normativa ayudan a interpretar el orden y significado, pero no autorizan crear pantallas, módulos o etapas sin datos reales que capturar.
+
+Este documento describe el proceso operativo requerido para sustituir el seguimiento en Excel. No pretende describir exhaustivamente el procedimiento jurídico agrario. El flujograma ayuda a comprender relaciones y contexto, pero no obliga a crear etapas que no generen información requerida por los Excel.
+
+Regla invariable: SOFTWARE-PA debe demostrar correspondencia con el modelo operativo Excel, no correspondencia exhaustiva con el Derecho Agrario mexicano.
+
+Los procesos no lineales observados en Excel deben conservarse sin inferir consecuencias jurídicas automáticas. Expropiación directa, comunidad indígena, no afectación, suspensión, reapertura, cancelación, reprogramación o cambio de alcance se registran como condiciones o hechos sólo cuando la información operativa lo demuestra.
 
 ```text
 Proyecto

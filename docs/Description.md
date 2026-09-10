@@ -5,6 +5,14 @@
 > Rama de referencia: `feature/backend-logica`.  
 > Este documento describe el modelo funcional; `docs/Arquitectura_Actual.md` y `docs/Diccionario_Datos_SSALFER.md` documentan su implementación vigente.
 
+## Contrato de alcance
+
+Este documento está subordinado a `docs/ALCANCE_FUNCIONAL_EXCEL.md`, que gobierna el alcance funcional y la interpretación de fuentes. Los Excel operativos son la fuente funcional primaria del contenido operativo.
+
+SOFTWARE-PA sustituye el seguimiento actualmente mantenido en Excel mediante captura estructurada, seguimiento, consulta, trazabilidad, dashboard/reporteador y visor geoespacial de apoyo. La normativa, el flujograma, presentaciones y demás documentos institucionales ayudan a interpretar datos y conceptos presentes en las fuentes, pero no generan automáticamente requisitos, módulos, entidades, estados, etapas ni pantallas.
+
+Regla invariable: SOFTWARE-PA debe demostrar correspondencia con el modelo operativo Excel, no correspondencia exhaustiva con el Derecho Agrario mexicano.
+
 ## Propósito
 
 SOFTWARE-PA digitaliza y estructura el seguimiento que hoy se concentra en archivos Excel de la Procuraduría Agraria. Su objetivo principal es producir captura estructurada, consulta, seguimiento administrativo, dashboard/reporteador y un visor geoespacial de apoyo.
@@ -13,7 +21,7 @@ El sistema no debe convertirse en un GIS complejo ni en una máquina de estados 
 
 ## Fuentes y precedencia
 
-Los tres Excel locales se verificaron el 2026-08-25 en `fuentes_locales/excel/`; pudieron abrirse como libros OOXML y se listaron sus hojas. `fuentes_locales/` está excluido en `.gitignore`, por lo que estas fuentes no deben versionarse ni copiarse dentro de directorios de Git.
+Los Excel locales se verificaron el 2026-08-25 en `fuentes_locales/excel/`; pudieron abrirse como libros OOXML y se listaron sus hojas. `fuentes_locales/` está excluido en `.gitignore`, por lo que estas fuentes no deben versionarse ni copiarse dentro de directorios de Git.
 
 La documentación institucional se usa sólo para interpretar el dominio: Reglamento de la Ley Agraria en Materia de Ordenamiento de la Propiedad Rural, artículos 56 y 57; Lineamientos en Materia de Convenios de Ocupación Previa y Expropiación de Tierras Ejidales o Comunales de la Procuraduría Agraria; y fuentes oficiales del RAN para núcleos, parcelas/cartografía y trámites registrales. Ninguna de estas fuentes sustituye los campos realmente usados en el seguimiento Excel.
 

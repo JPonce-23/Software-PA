@@ -10,6 +10,24 @@ El sistema DEBERÁ digitalizar el seguimiento administrativo de liberación de d
 
 ## Requisitos funcionales
 
+### R0. Contrato de alcance funcional
+
+El sistema DEBERÁ modelar la información necesaria para sustituir los Excel operativos de seguimiento por una aplicación estructurada, práctica, trazable y capaz de generar sus reportes.
+
+Todo nuevo requisito funcional DEBERÁ contar con evidencia en Excel o con una decisión funcional aprobada. La evidencia puede provenir de archivo Excel, hoja, columna, registro, fórmula o comportamiento observado que demuestre una necesidad de captura, relación, historial, excepción, indicador o reporting.
+
+La legislación, reglamentos, flujogramas, presentaciones y demás documentos institucionales NO DEBERÁN generar por sí mismos requisitos, módulos, entidades, estados, etapas ni pantallas. El sistema NO DEBERÁ ampliar su dominio únicamente por exhaustividad jurídica.
+
+La correspondencia funcional DEBERÁ evaluarse mediante:
+
+1. captura sin pérdida;
+2. relaciones;
+3. historial necesario;
+4. excepciones reales;
+5. indicadores;
+6. reporting;
+7. trazabilidad.
+
 ### R1. Fuentes y trazabilidad
 
 El sistema DEBERÁ permitir capturar los campos usados en los Excel locales no versionados y conservar trazabilidad de archivo, hoja, fila, columna y soporte cuando se importe o concilie información.

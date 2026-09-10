@@ -19,12 +19,23 @@ Son transcripciones/fuentes literales. No se reescriben para coincidir con la ar
 
 ## Modelo funcional objetivo canónico
 
+- `docs/ALCANCE_FUNCIONAL_EXCEL.md`
 - `docs/Description.md`
 - `docs/Descripción proceso.md`
 - `docs/requirements.md`
 - `docs/contexto/contexto_funcional_liberacion_propiedad_social_v2.md`
 
-`docs/Descripción proceso.md` es el **documento funcional canónico**. Sus definiciones prevalecen sobre descripciones funcionales anteriores.
+`docs/ALCANCE_FUNCIONAL_EXCEL.md` es la **autoridad canónica del alcance funcional**: define qué fuentes tienen autoridad y cómo deben interpretarse. No sustituye a los Excel como fuente de datos.
+
+Los Excel operativos locales son la **fuente funcional primaria del contenido operativo**: determinan qué datos se capturan, qué relaciones se conservan, qué eventos o cambios se historizan, qué excepciones se representan, qué indicadores se calculan y qué reportes debe generar el sistema.
+
+`docs/Descripción proceso.md` sigue siendo el **documento canónico del proceso/modelo funcional**, siempre subordinado al contrato de alcance definido en `docs/ALCANCE_FUNCIONAL_EXCEL.md`. `docs/Description.md`, `docs/requirements.md` y `docs/contexto/contexto_funcional_liberacion_propiedad_social_v2.md` documentan el modelo funcional vigente bajo esa misma subordinación.
+
+Regla invariable: **SOFTWARE-PA debe demostrar correspondencia con el modelo operativo Excel, no correspondencia exhaustiva con el Derecho Agrario mexicano.**
+
+El flujograma y las fuentes institucionales son fuentes interpretativas. La legislación, reglamentos, lineamientos, presentaciones, RAN, FIFONAFE, INDAABIN, INPI y demás documentos institucionales pueden explicar conceptos, pero no generan automáticamente módulos, tablas, pantallas, estados, etapas, procesos ni requisitos.
+
+La implementación técnica vigente describe lo construido, pero no puede ampliar el dominio por sí sola. `docs/historico/*` sirve como antecedente y trazabilidad; no tiene autoridad funcional vigente.
 
 ## Diseño técnico objetivo canónico
 

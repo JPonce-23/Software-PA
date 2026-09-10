@@ -1,20 +1,27 @@
 # ESTADO DEL PROYECTO — SOFTWARE-PA
 
-> **ARCHIVO HISTÓRICO.** Desde Baseline V1 este documento no es una guía de
-> instalación ni la fuente del esquema vigente. Para el estado actual consulte
-> `docs/Arquitectura_Actual.md`, `docs/Diccionario_Datos_SSALFER.md` y
-> `docs/migraciones.md`. Las rutas y versiones 001–039 que siguen abajo se
-> conservan únicamente como trazabilidad en Git.
+> **ARCHIVO HISTÓRICO / CONTINUIDAD TÉCNICA.** Desde Baseline V1 este documento
+> no define el alcance funcional vigente ni es la fuente del esquema vigente.
+> Para alcance funcional prevalece `docs/ALCANCE_FUNCIONAL_EXCEL.md`; para el
+> modelo funcional vigente consulte `docs/Descripción proceso.md` y
+> `docs/requirements.md`, siempre subordinados a ese contrato. Para el estado
+> técnico actual consulte `docs/Arquitectura_Actual.md`,
+> `docs/Diccionario_Datos_SSALFER.md` y `docs/migraciones.md`. Las rutas y
+> versiones 001–039 que siguen abajo se conservan únicamente como trazabilidad
+> en Git.
 >
 > **Documento de continuidad para personas y agentes de IA.**
 > Leer completo antes de proponer o modificar código. No asumir que la
 > numeración de las fases operativas, los cortes principales y los subcortes de
 > Adaptaciones 2.0 significan lo mismo.
 >
-> **Fuente única de continuidad del proyecto:** este archivo concentra el
-> estado actual, las decisiones aprobadas y el trabajo futuro. La fuente
-> funcional del proceso es el flujograma de propiedad social, resumido en
-> `docs/Descripción proceso.md`; el esquema ejecutable se determina por las
+> **Continuidad histórica del proyecto:** este archivo conserva decisiones,
+> cortes, migraciones y trabajo documentado en momentos anteriores. No debe
+> usarse para reconstruir automáticamente el dominio funcional vigente.
+> Los Excel constituyen la fuente funcional primaria del contenido operativo.
+> `docs/ALCANCE_FUNCIONAL_EXCEL.md` gobierna cómo se interpreta el alcance. El
+> flujograma y la normativa son fuentes interpretativas, no generadores
+> automáticos de requisitos. El esquema ejecutable se determina por las
 > migraciones aplicadas. Los detalles de los subcortes A, B y C ya ejecutados
 > se conservan únicamente como registro cerrado en
 > `docs/historico/Adaptaciones 2.0 - Implementación.md`; ese archivo no es un
@@ -24,21 +31,27 @@
 
 **Rama de trabajo:** `feature/backend-logica`
 
-**Trabajo funcional actual:** la Administración territorial y de accesos quedó
-implementada y validada. La importación territorial GeoJSON quedó implementada
-como flujo con previsualización y confirmación para tramos, núcleos agrarios,
-derecho de vía, parcelas y cruces operativos. El ambiente aislado
-`software_pa_uat` quedó migrado a 017 con respaldo previo, y la base aislada
-`software_pa_admin_test_final` quedó alineada a 018 para la regresión.
-La base original `db_trenes` permanece alineada a 016; replicar 017 allí queda
-pendiente de respaldo y autorización operativa. El siguiente trabajo funcional
-vigente es probar desde el frontend con archivos GeoJSON reales y preparar la
-replicación controlada de 017 a las bases que correspondan. El Corte 4
-permanece con contracción local validada y aceptación operativa TLS/E2E
-diferida; ese gate no bloquea este incremento local, pero sí bloquea liberar
-autenticación a operación.
+**Trabajo funcional documentado al 13 de agosto de 2026:** la Administración
+territorial y de accesos quedó implementada y validada. La importación
+territorial GeoJSON quedó implementada como flujo con previsualización y
+confirmación para tramos, núcleos agrarios, derecho de vía, parcelas y cruces
+operativos. El ambiente aislado `software_pa_uat` quedó migrado a 017 con
+respaldo previo, y la base aislada `software_pa_admin_test_final` quedó
+alineada a 018 para la regresión. La base original `db_trenes` permanece
+alineada a 016; replicar 017 allí queda pendiente de respaldo y autorización
+operativa. El siguiente trabajo documentado entonces era probar desde el
+frontend con archivos GeoJSON reales y preparar la replicación controlada de
+017 a las bases que correspondan. El Corte 4 permanece con contracción local
+validada y aceptación operativa TLS/E2E diferida; ese gate no bloquea este
+incremento local, pero sí bloquea liberar autenticación a operación.
 
-## 1. Objetivo y dominio
+## 1. Objetivo y dominio histórico
+
+> **Nota de vigencia:** esta sección conserva el modelo de dominio histórico
+> documentado antes del contrato Excel. No define el alcance funcional vigente.
+> Las referencias a `Tramo_Núcleo`, `tramo_nucleo`, `afectacion_ciclo`,
+> `usuario_tramo` o jerarquías anteriores deben leerse como trazabilidad, salvo
+> que los documentos funcionales vigentes las confirmen expresamente.
 
 SOFTWARE-PA gestiona el seguimiento de la liberación de derecho de vía
 ferroviario exclusivamente sobre propiedad social, para derechos colectivos e
@@ -51,15 +64,16 @@ indígena tampoco son procesos gestionados por la PA: sólo se registra que una
 afectación o, cuando corresponda, el núcleo completo quedó en uno de esos
 supuestos y se detiene su seguimiento ordinario.
 
-La jerarquía territorial aprobada es:
+Históricamente, la jerarquía territorial aprobada en este corte fue:
 
 ```text
 Proyecto → Tramo → Tramo_Núcleo
 ```
 
-`tramo_nucleo` representa el cruce territorial de un tramo con un núcleo
-agrario. Es el expediente maestro territorial de la liberación de derecho de
-vía en ese cruce y no debe eliminarse ni reducirse a un selector.
+En ese modelo histórico, `tramo_nucleo` representa el cruce territorial de un
+tramo con un núcleo agrario. Es el expediente maestro territorial de la
+liberación de derecho de vía en ese cruce y no debe eliminarse ni reducirse a
+un selector dentro de ese corte.
 `afectacion` representa cada subexpediente operativo confirmado, colectivo o
 individual, que nace dentro de él.
 
@@ -183,18 +197,23 @@ método y path en `main.py` o en otro router.
 
 Orden recomendado para recuperar contexto:
 
-1. Este archivo.
-2. El flujograma externo `flujograma propiedad social.pdf`, como fuente
-   funcional, y su resumen `docs/Descripción proceso.md`.
-3. `docs/Flujo liberacion derechos.md`.
-4. `docs/Estructura Datos.md`.
-5. `docs/Diccionario_Datos_SSALFER.md`.
-6. `docs/requirements.md`.
-7. Las migraciones `001`, `002`, `003`, `004`, `005` y `006` en orden, como fuente
+1. `docs/ALCANCE_FUNCIONAL_EXCEL.md`, como contrato superior de alcance.
+2. Los Excel operativos locales, como fuente funcional primaria del contenido
+   operativo.
+3. `docs/Descripción proceso.md`.
+4. `docs/requirements.md`.
+5. `docs/Description.md`.
+6. Este archivo, como continuidad histórica y técnica.
+7. El flujograma externo `flujograma propiedad social.pdf`, como fuente
+   interpretativa, y su resumen vigente en `docs/Descripción proceso.md`.
+8. `docs/Flujo liberacion derechos.md`.
+9. `docs/Estructura Datos.md`.
+10. `docs/Diccionario_Datos_SSALFER.md`.
+11. Las migraciones `001`, `002`, `003`, `004`, `005` y `006` en orden, como fuente
    del esquema ejecutable.
-8. `docs/propuestas/2026-07-31-subcorte-2a-propuesta.md`, como registro de la separación ya
+12. `docs/propuestas/2026-07-31-subcorte-2a-propuesta.md`, como registro de la separación ya
    implementada entre afectaciones colectivas e individuales.
-9. `docs/design.md`, con la advertencia de que conserva fragmentos históricos
+13. `docs/design.md`, con la advertencia de que conserva fragmentos históricos
    y propuestas aún no implementadas.
 
 Cuando se investigue la migración 004 o las decisiones de Adaptaciones 2.0,
@@ -204,7 +223,12 @@ histórico opcional: sus subcortes A, B y C no son los cortes principales 2, 3
 y 4, y cualquier diferencia con este archivo se resuelve a favor de
 `ESTADO_PROYECTO.md`.
 
-## 4. Reglas de negocio y técnicas obligatorias
+## 4. Reglas de negocio y técnicas históricas
+
+> **Nota de vigencia:** las reglas siguientes describen el estado y criterios
+> técnicos de cortes anteriores. No amplían el alcance funcional vigente. Ante
+> contradicción, prevalecen `docs/ALCANCE_FUNCIONAL_EXCEL.md`,
+> `docs/Descripción proceso.md` y `docs/requirements.md`.
 
 - Revisar autorización por rol y pertenencia territorial en cada operación;
   no confiar en identificadores enviados por el cliente.
@@ -225,7 +249,7 @@ y 4, y cualquier diferencia con este archivo se resuelve a favor de
   y una fila nuevos, con SHA-256 calculado por el servidor.
 - Una migración se aplica una sola vez y con `ON_ERROR_STOP=1`, después de un
   respaldo y sin escrituras concurrentes.
-- El flujo ordinario debe conservar esta secuencia:
+- En el modelo histórico de este corte, el flujo ordinario conservaba esta secuencia:
   sensibilización → caminamiento → afectación confirmada → asamblea, sólo
   para derechos colectivos → convenio → RAN → FIFONAFE → pago → liberado.
 - Una afectación sólo está `liberada` después de completar el pago del flujo
@@ -235,7 +259,7 @@ y 4, y cualquier diferencia con este archivo se resuelve a favor de
   está en `completo`. En derechos colectivos exige además una asamblea de
   `retiro_fondos` en `completo` vinculada al mismo ciclo. Alcanzar el límite
   económico o registrar `tipo_pago = total` no presume conclusión.
-- `afectacion_ciclo` es la identidad estable de cada COP original o variante.
+- En el modelo histórico, `afectacion_ciclo` era la identidad estable de cada COP original o variante.
   El ciclo original nace con la afectación; los ciclos posteriores se abren
   explícitamente y deben ser compatibles con el tipo de derecho.
 - Un convenio modificatorio sustituye los importes financieros vigentes de
@@ -777,15 +801,22 @@ DB_NAME=software_pa_uat APP_ENV=test docker compose up -d --no-deps \
   --force-recreate backend alertas_scheduler
 ```
 
-## 8. Plan principal vigente de cinco cortes
+## 8. Plan principal histórico de cinco cortes
+
+> **Nota histórica:** este plan conserva la continuidad de los cortes previos.
+> Las referencias a `Tramo_Núcleo`, expediente maestro, `usuario_tramo` y
+> `afectacion_ciclo` no deben usarse para reconstruir automáticamente el dominio
+> vigente si contradicen el contrato de alcance Excel o el modelo funcional
+> vigente.
 
 ### Corte 1 — Modelo territorial: terminado
 
-Proyecto + Tramo + Tramo_Núcleo sin Frente + `usuario_tramo`.
+Históricamente implementado: Proyecto + Tramo + Tramo_Núcleo sin Frente +
+`usuario_tramo`.
 
 ### Corte 2 — Expediente maestro y subexpedientes por afectación: implementado técnicamente
 
-Decisión aprobada:
+Decisión aprobada en ese corte histórico:
 
 ```text
 tramo_nucleo = expediente maestro territorial de liberación
@@ -808,7 +839,7 @@ Situación actual:
 - Está pendiente la validación funcional y de experiencia con usuarios finales
   sobre el recorrido completo de 2C.
 
-Resultado esperado:
+Resultado esperado en ese corte histórico:
 
 ```text
 Proyecto
@@ -838,7 +869,7 @@ quedan accesibles desde el subexpediente como antecedentes. El alcance actual
 sólo conserva `convenio.monto_bdt`, observaciones y documentos de soporte; no
 incluye diseñar un inventario detallado ni un proceso de avalúo.
 
-Reglas que guiaron el Corte 2 y deben conservarse:
+Reglas que guiaron el Corte 2 y se conservan como trazabilidad histórica:
 
 1. Auditar qué entidades son propias de una afectación y cuáles son
    compartidas.
@@ -849,7 +880,7 @@ Reglas que guiaron el Corte 2 y deben conservarse:
 5. Conservar la navegación para abrir afectaciones dentro de su
    `tramo_nucleo`, sin eliminar la vista maestra.
 6. Mostrar sólo las etapas aplicables al tipo colectivo o individual.
-7. Hacer cumplir la secuencia obligatoria con las entidades existentes y
+7. Hacer cumplir la secuencia operativa documentada entonces con las entidades existentes y
    calcular avance legal, geoespacial y financiero por afectación.
 8. Migrar o vincular datos existentes sin inferir relaciones ambiguas.
 9. Añadir pruebas de aislamiento: datos de una afectación no deben aparecer
@@ -1235,7 +1266,7 @@ Se implementó y validó la propuesta de **Cierre Financiero estricto**.
 3. **Frontend:** `FlujoLiberacionPanel.jsx` bloquea la transición a completo cuando `saldo_disponible > 0`. `PagosPanel.jsx` muestra una advertencia de falta de fondos cuando aplica.
 4. Las pruebas automatizadas fallan si falta `TEST_ADMIN_EMAIL` en `.env`.
 
-### Siguiente incremento aprobado — Administración territorial y de accesos
+### Incremento histórico — Administración territorial y de accesos
 
 **Estado:** implementación completa y validada; UAT local activa en 016 y
 aceptación funcional manual por los cuatro roles pendiente.
@@ -1248,8 +1279,8 @@ ofrecía dashboard, mapa y expedientes. Las nuevas vistas administrativas cierra
 esa brecha para la operación normal; el fixture queda reservado para preparar
 un ambiente UAT aislado.
 
-El incremento debe cubrir la Fase 1 descrita en el proceso funcional, antes de
-la operación cotidiana de los expedientes:
+El incremento cubría la Fase 1 descrita entonces en el proceso funcional, antes
+de la operación cotidiana de los expedientes:
 
 ```text
 Proyecto
@@ -1300,9 +1331,9 @@ Las vistas quedaron integradas en el layout y React Router existentes como
 `/administracion/territorio` y `/administracion/usuarios`, sin duplicar una
 misma operación en interfaces separadas.
 
-#### Reglas obligatorias del incremento
+#### Reglas históricas del incremento
 
-- Reutilizar la jerarquía aprobada `Proyecto → Tramo → Tramo_Núcleo`; no crear
+- Reutilizar la jerarquía aprobada en ese corte `Proyecto → Tramo → Tramo_Núcleo`; no crear
   una entidad paralela ni reintroducir `Frente`.
 - No crear una afectación durante la configuración territorial. La afectación
   se registra después, cuando derecho, superficie, geometría y sujetos están
@@ -1432,8 +1463,9 @@ para:
 - parcelas;
 - cruces operativos.
 
-El flujo reduce la captura manual rígida y permite preparar territorialmente el
-expediente desde archivos geoespaciales, sin romper la jerarquía aprobada:
+El flujo redujo la captura manual rígida y permitió preparar territorialmente el
+expediente desde archivos geoespaciales, según la jerarquía aprobada en ese
+corte histórico:
 
 ```text
 Proyecto → Tramo → Cruce operativo → Afectación
@@ -1443,7 +1475,7 @@ Proyecto → Tramo → Cruce operativo → Afectación
 aprueba todavía renombrar tablas, modelos ni endpoints; el cambio inicial debe
 ser de lenguaje funcional y UX.
 
-#### Decisiones funcionales vigentes
+#### Decisiones funcionales registradas para ese incremento
 
 - GeoJSON será el formato principal de esta fase.
 - Se aceptan archivos con extensión `.geojson` o `.json`, siempre que el

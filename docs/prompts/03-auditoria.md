@@ -13,6 +13,20 @@ Tu tarea es auditar de manera independiente la implementación real.
 
 No confíes únicamente en la propuesta, el reporte anterior ni las pruebas existentes.
 
+## Contrato funcional obligatorio
+
+Antes de auditar, lee completamente `docs/ALCANCE_FUNCIONAL_EXCEL.md`.
+
+Regla invariable: “SOFTWARE-PA debe demostrar correspondencia con el modelo operativo Excel, no correspondencia exhaustiva con el Derecho Agrario mexicano.”
+
+Toda ampliación funcional auditada requiere evidencia Excel o decisión funcional aprobada. Para cualquier nueva tabla, entidad, proceso, estado o pantalla, identifica archivo Excel, hoja, columna, registro, fórmula o comportamiento, y la necesidad de captura, historial o reporting que lo justifica.
+
+Si no existe evidencia Excel ni decisión funcional aprobada, clasifica la recomendación como:
+
+```text
+FUERA_DE_ALCANCE_JURIDICO
+```
+
 ## Tarea exacta
 
 1. Lee `ESTADO_PROYECTO.md`.
@@ -75,8 +89,41 @@ Después utiliza los comandos reales del repositorio.
 
 * El trabajo coincide con el alcance vigente.
 * Se respetan las reglas documentadas.
-* No se omiten etapas obligatorias.
+* No se omiten etapas requeridas por el modelo operativo vigente, comportamientos demostrados por fuentes Excel o decisiones funcionales aprobadas.
 * Backend y frontend presentan el mismo comportamiento.
+
+### Gate de correspondencia Excel
+
+Para cada cambio funcional, comprueba:
+
+1. qué evidencia Excel lo exige;
+2. qué dato, relación, historia o indicador representa;
+3. si el modelo actual ya puede resolverlo;
+4. si realmente requiere cambio de BD;
+5. si puede resolverse sólo mediante backend/reporting;
+6. que no provenga únicamente de exhaustividad jurídica.
+
+El gate FALLA si una propuesta:
+
+* agrega complejidad jurídica sin necesidad Excel;
+* introduce etapas no capturadas ni reportadas;
+* crea entidades únicamente por correspondencia legal;
+* confunde el procedimiento jurídico completo con el alcance operativo.
+
+La auditoría debe clasificar los hallazgos funcionales con estas categorías cuando apliquen:
+
+```text
+CORRESPONDENCIA_EXCEL
+FALTA_MODELO
+FALTA_BACKEND
+FALTA_REPORTING
+DATO_DERIVADO
+ERROR_FUENTE_EXCEL
+DECISION_FUNCIONAL_REQUERIDA
+FUERA_DE_ALCANCE_JURIDICO
+```
+
+Una recomendación jurídica sin impacto demostrado en los Excel se clasifica como `FUERA_DE_ALCANCE_JURIDICO` y no como defecto del sistema.
 
 ### Datos
 
@@ -163,6 +210,9 @@ Distingue:
 * No uses `docker compose down -v`.
 * No apliques migraciones a una base importante sin respaldo.
 * No amplíes el alcance.
+* No amplíes el alcance por exhaustividad jurídica.
+* No conviertas legislación o flujograma en generadores automáticos del modelo.
+* Prefiere resolver mediante modelo existente, catálogo, backend o reporting antes de proponer nueva estructura.
 * No marques como terminado algo no comprobado.
 
 ## Formato de salida
