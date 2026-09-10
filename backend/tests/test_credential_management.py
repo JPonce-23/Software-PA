@@ -2,12 +2,16 @@
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import DBAPIError
 
 from app import models
 from app.config import AUTH_SETTINGS
 from app.database import SessionLocal
 from app.main import app
+from app.services.authentication import hash_password
+from app.services.common import set_audit_context
 
 
 def _password() -> str:
@@ -36,6 +40,80 @@ def _block(email):
             "/api/auth/sesiones", data={"username": email, "password": "Contraseña incorrecta"}, headers={"Origin": AUTH_SETTINGS.allowed_origins[0]},
         )
         assert response.status_code == 401, response.text
+
+
+@pytest.mark.parametrize(
+    ("password", "expected"),
+    [
+        ("abc1234", 422),
+        ("abcd1234", 201),
+        ("12345678", 422),
+        ("abcdefgh", 422),
+        ("a1" + "ñ" * 36, 422),
+    ],
+)
+def test_user_create_password_policy(api, password, expected):
+    response = api(
+        "POST", "/api/usuarios", expected=expected,
+        json={
+            "nombre": "Política",
+            "apellido_paterno": "QA",
+            "correo": f"policy-{uuid.uuid4().hex[:16]}@qa.local",
+            "rol": "operador",
+            "contrasena": password,
+        },
+    )
+    assert response.status_code == expected
+
+
+def test_password_policy_applies_to_own_change_and_admin_reset(api):
+    target, old_password = _create_user(api)
+    client, headers = _login(target["correo"], old_password)
+    assert client.post(
+        "/api/auth/cambiar-contrasena", headers=headers,
+        json={"contrasena_actual": old_password, "contrasena_nueva": "abcd1234"},
+    ).status_code == 200
+    reset_target, _ = _create_user(api)
+    assert api(
+        "POST", f"/api/usuarios/{reset_target['id_usuario']}/restablecer-contrasena",
+        json={"contrasena_nueva": "abcd1234", "motivo": "Validación de política QA"},
+    ).status_code == 200
+
+
+def test_current_password_over_72_utf8_bytes_is_422(api):
+    target, password = _create_user(api)
+    client, headers = _login(target["correo"], password)
+    response = client.post(
+        "/api/auth/cambiar-contrasena", headers=headers,
+        json={"contrasena_actual": "ñ" * 37, "contrasena_nueva": _password()},
+    )
+    assert response.status_code == 422
+
+
+def test_password_hash_update_requires_actor_and_creates_no_empty_audit(api):
+    target, _ = _create_user(api)
+    with SessionLocal() as db:
+        user = db.get(models.Usuario, target["id_usuario"])
+        user.contrasena_hash = hash_password("actorless123")
+        with pytest.raises(DBAPIError, match="app.current_user_id"):
+            db.commit()
+        db.rollback()
+
+    actor_id = api("GET", "/api/auth/sesion").json()["user"]["id_usuario"]
+    with SessionLocal() as db:
+        before = db.query(models.Bitacora).filter(
+            models.Bitacora.entidad_tipo == "usuario",
+            models.Bitacora.entidad_id == target["id_usuario"],
+        ).count()
+        user = db.get(models.Usuario, target["id_usuario"])
+        set_audit_context(db, actor_id)
+        user.contrasena_hash = hash_password("actorpresent123")
+        db.commit()
+        after = db.query(models.Bitacora).filter(
+            models.Bitacora.entidad_tipo == "usuario",
+            models.Bitacora.entidad_id == target["id_usuario"],
+        ).count()
+        assert after == before
 
 
 def test_admin_changes_email_atomically_and_keeps_account_state(api):

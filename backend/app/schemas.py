@@ -108,17 +108,15 @@ class UsuarioCreate(UsuarioBase):
 
 
 def validar_politica_contrasena(value: str) -> str:
-    checks = (
-        len(value) >= 12,
-        any(char.islower() for char in value),
-        any(char.isupper() for char in value),
-        any(char.isdigit() for char in value),
-        any(not char.isalnum() for char in value),
-    )
-    if not all(checks):
+    if (
+        len(value) < 8
+        or len(value.encode("utf-8")) > 72
+        or not any(char.isalpha() for char in value)
+        or not any(char.isdigit() for char in value)
+    ):
         raise ValueError(
-            "La contraseña debe tener al menos 12 caracteres e incluir "
-            "mayúscula, minúscula, número y símbolo"
+            "La contraseña debe tener al menos 8 caracteres, una letra y un número, "
+            "y no superar 72 bytes UTF-8"
         )
     return value
 
@@ -142,6 +140,13 @@ class ChangeOwnPasswordRequest(BaseModel):
     @classmethod
     def validar_contrasena_nueva(cls, value: str) -> str:
         return validar_politica_contrasena(value)
+
+    @field_validator("contrasena_actual")
+    @classmethod
+    def validar_contrasena_actual(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("La contraseña actual no puede superar 72 bytes UTF-8")
+        return value
 
 
 class AdminPasswordResetRequest(AuthActionRequest):
