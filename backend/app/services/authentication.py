@@ -336,6 +336,15 @@ def revoke_user_sessions(
     reason: str,
     event_reason: str,
 ) -> int:
+    target = (
+        db.query(models.Usuario)
+        .filter(models.Usuario.id_usuario == target_user_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if target is None:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     sessions = (
         db.query(models.SesionUsuario)
         .filter(
@@ -350,7 +359,7 @@ def revoke_user_sessions(
     for session in sessions:
         session.revocada_en = now
         session.id_usuario_revoca = actor_user_id
-        session.motivo_revocacion = reason[:100]
+        session.motivo_revocacion = reason
         _event(
             db,
             event_type="sesion_revocada",
@@ -385,8 +394,9 @@ def unlock_user(
 ) -> None:
     user = db.query(models.Usuario).filter(
         models.Usuario.id_usuario == target_user_id
-    ).one_or_none()
+    ).with_for_update().one_or_none()
     if user is None:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     state = (
         db.query(models.EstadoAutenticacionUsuario)
@@ -394,6 +404,11 @@ def unlock_user(
         .with_for_update()
         .one()
     )
+    now = _utcnow()
+    if state.bloqueado_hasta is None or state.bloqueado_hasta <= now:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="La cuenta no está bloqueada")
+    set_audit_context(db, actor_user_id)
     event = _event(
         db,
         event_type="desbloqueo",
@@ -406,5 +421,5 @@ def unlock_user(
     _link_state_event(db, event.id_evento)
     state.intentos_fallidos = 0
     state.bloqueado_hasta = None
-    state.actualizado_en = _utcnow()
+    state.actualizado_en = now
     db.commit()

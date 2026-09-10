@@ -62,11 +62,23 @@ class AuthSessionResponse(BaseModel):
 
 
 class AuthActionRequest(BajaRequest):
-    pass
+    """Administrative authentication action.
+
+    The 100-character maximum matches ``sesion_usuario.motivo_revocacion``
+    and prevents silent truncation before the reason is persisted.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    motivo: str = Field(min_length=3, max_length=100)
 
 
 class AuthOperationResponse(BaseModel):
     detail: str
+
+
+class SessionRevocationResponse(AuthOperationResponse):
+    sesiones_revocadas: int
 
 
 class UsuarioBase(BaseModel):
@@ -108,6 +120,8 @@ class UsuarioCreate(UsuarioBase):
 
 
 class UsuarioUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     nombre: str | None = Field(default=None, min_length=1, max_length=250)
     apellido_paterno: str | None = Field(default=None, min_length=1, max_length=250)
     apellido_materno: str | None = Field(default=None, max_length=250)
@@ -118,6 +132,12 @@ class UsuarioResponse(UsuarioBase, ORMModel):
     id_usuario: int
     activo: bool
     fecha_alta: datetime
+
+
+class UsuarioAdminResponse(UsuarioResponse):
+    bloqueado: bool
+    bloqueado_hasta: datetime | None = None
+    ultimo_acceso_en: datetime | None = None
 
 
 class EntidadFederativaResponse(ORMModel):
@@ -1450,3 +1470,54 @@ class BitacoraResponse(ORMModel):
     fecha_hora: datetime
     ip_origen: str | None = None
     user_agent: str | None = None
+
+
+class AuditUserSummary(ORMModel):
+    id_usuario: int
+    nombre: str
+    apellido_paterno: str
+    apellido_materno: str | None = None
+    correo: str
+
+
+class AuditFieldChange(BaseModel):
+    campo: str
+    anterior: Any = None
+    nuevo: Any = None
+
+
+class AuditChangeItem(BaseModel):
+    id_bitacora: int
+    fecha_hora: datetime
+    usuario: AuditUserSummary | None = None
+    id_proyecto: int | None = None
+    id_proyecto_nucleo: int | None = None
+    id_nucleo: int | None = None
+    entidad_tipo: str
+    entidad_id: int | None = None
+    accion: str
+    accion_descripcion: str
+    cambios: list[AuditFieldChange]
+
+
+class AuditChangePageResponse(BaseModel):
+    total: int
+    items: list[AuditChangeItem]
+
+
+class AuditAccessItem(BaseModel):
+    id_evento: int
+    fecha_hora: datetime
+    usuario: AuditUserSummary | None = None
+    usuario_actor: AuditUserSummary | None = None
+    tipo_evento: str
+    motivo_codigo: str
+    detalle: str | None = None
+    id_sesion: int | None = None
+    ip_origen: str | None = None
+    user_agent: str | None = None
+
+
+class AuditAccessPageResponse(BaseModel):
+    total: int
+    items: list[AuditAccessItem]

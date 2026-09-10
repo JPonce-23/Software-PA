@@ -156,7 +156,7 @@ def unlock_user(
 
 @router.post(
     "/usuarios/{id_usuario}/revocar-sesiones",
-    response_model=schemas.AuthOperationResponse,
+    response_model=schemas.SessionRevocationResponse,
     summary="Revocar las sesiones de un usuario",
 )
 def revoke_sessions(
@@ -166,7 +166,7 @@ def revoke_sessions(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
 ):
-    service.revoke_user_sessions(
+    revoked = service.revoke_user_sessions(
         db,
         request,
         target_user_id=id_usuario,
@@ -174,4 +174,4 @@ def revoke_sessions(
         reason=data.motivo,
         event_reason="revocacion_admin",
     )
-    return {"detail": "Sesiones revocadas"}
+    return {"detail": "Sesiones revocadas", "sesiones_revocadas": revoked}

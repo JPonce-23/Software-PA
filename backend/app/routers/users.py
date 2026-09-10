@@ -1,6 +1,7 @@
 """Secure user administration and project assignments."""
 
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, text
@@ -37,16 +38,49 @@ def create_user(
     return record
 
 
-@router.get("/usuarios", response_model=list[schemas.UsuarioResponse])
+@router.get("/usuarios", response_model=list[schemas.UsuarioAdminResponse])
 def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
+    estado: Literal["activos", "inactivos", "todos"] = "activos",
     db: Session = Depends(get_db),
     _: models.Usuario = Depends(auth.RoleChecker(["admin"])),
 ):
-    return db.query(models.Usuario).filter(
-        models.Usuario.activo.is_(True)
-    ).order_by(models.Usuario.correo).offset(skip).limit(limit).all()
+    query = db.query(models.Usuario, models.EstadoAutenticacionUsuario).outerjoin(
+        models.EstadoAutenticacionUsuario,
+        models.EstadoAutenticacionUsuario.id_usuario == models.Usuario.id_usuario,
+    )
+    if estado == "activos":
+        query = query.filter(models.Usuario.activo.is_(True))
+    elif estado == "inactivos":
+        query = query.filter(models.Usuario.activo.is_(False))
+
+    now = datetime.now(timezone.utc)
+    records = query.order_by(models.Usuario.correo).offset(skip).limit(limit).all()
+    return [
+        {
+            "id_usuario": record.id_usuario,
+            "nombre": record.nombre,
+            "apellido_paterno": record.apellido_paterno,
+            "apellido_materno": record.apellido_materno,
+            "correo": record.correo,
+            "rol": record.rol,
+            "activo": record.activo,
+            "fecha_alta": record.fecha_alta,
+            "bloqueado": bool(
+                auth_state
+                and auth_state.bloqueado_hasta
+                and auth_state.bloqueado_hasta > now
+            ),
+            "bloqueado_hasta": (
+                auth_state.bloqueado_hasta if auth_state is not None else None
+            ),
+            "ultimo_acceso_en": (
+                auth_state.ultimo_acceso_en if auth_state is not None else None
+            ),
+        }
+        for record, auth_state in records
+    ]
 
 
 @router.patch("/usuarios/{id_usuario}", response_model=schemas.UsuarioResponse)
@@ -83,6 +117,34 @@ def update_user(
     commit_or_conflict(db)
     db.refresh(target)
     return target
+
+
+@router.post(
+    "/usuarios/{id_usuario}/reactivar",
+    response_model=schemas.AuthOperationResponse,
+)
+def reactivate_user(
+    id_usuario: int,
+    data: schemas.AuthActionRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    target = db.query(models.Usuario).filter(
+        models.Usuario.id_usuario == id_usuario,
+    ).with_for_update().first()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if target.activo:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="El usuario ya está activo")
+
+    set_audit_context(db, user.id_usuario)
+    target.activo = True
+    target.fecha_reactivacion = datetime.now(timezone.utc)
+    target.id_usuario_reactivacion = user.id_usuario
+    target.motivo_reactivacion = data.motivo
+    commit_or_conflict(db, "No fue posible reactivar el usuario")
+    return {"detail": "Usuario reactivado"}
 
 
 @router.delete(
