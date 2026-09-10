@@ -11,6 +11,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, InternalError
 from .config import AUTH_SETTINGS
 from .database import SessionLocal
 from .routers import (
+    audit,
     authentication,
     documents,
     domain,
@@ -103,6 +104,7 @@ def global_exception_handler(request, exc):
 
 app.include_router(authentication.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
 app.include_router(domain.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(geospatial_imports.router, prefix="/api")
