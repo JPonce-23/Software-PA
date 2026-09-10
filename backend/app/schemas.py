@@ -104,19 +104,53 @@ class UsuarioCreate(UsuarioBase):
     @field_validator("contrasena")
     @classmethod
     def validar_contrasena(cls, value: str) -> str:
-        checks = (
-            len(value) >= 12,
-            any(char.islower() for char in value),
-            any(char.isupper() for char in value),
-            any(char.isdigit() for char in value),
-            any(not char.isalnum() for char in value),
+        return validar_politica_contrasena(value)
+
+
+def validar_politica_contrasena(value: str) -> str:
+    checks = (
+        len(value) >= 12,
+        any(char.islower() for char in value),
+        any(char.isupper() for char in value),
+        any(char.isdigit() for char in value),
+        any(not char.isalnum() for char in value),
+    )
+    if not all(checks):
+        raise ValueError(
+            "La contraseña debe tener al menos 12 caracteres e incluir "
+            "mayúscula, minúscula, número y símbolo"
         )
-        if not all(checks):
-            raise ValueError(
-                "La contraseña debe tener al menos 12 caracteres e incluir "
-                "mayúscula, minúscula, número y símbolo"
-            )
-        return value
+    return value
+
+
+class UserEmailChangeRequest(AuthActionRequest):
+    correo: str = Field(max_length=320)
+
+    @field_validator("correo")
+    @classmethod
+    def normalizar_correo(cls, value: str) -> str:
+        return UsuarioBase.normalizar_correo(value)
+
+
+class ChangeOwnPasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contrasena_actual: str = Field(min_length=1)
+    contrasena_nueva: str
+
+    @field_validator("contrasena_nueva")
+    @classmethod
+    def validar_contrasena_nueva(cls, value: str) -> str:
+        return validar_politica_contrasena(value)
+
+
+class AdminPasswordResetRequest(AuthActionRequest):
+    contrasena_nueva: str
+
+    @field_validator("contrasena_nueva")
+    @classmethod
+    def validar_contrasena_nueva(cls, value: str) -> str:
+        return validar_politica_contrasena(value)
 
 
 class UsuarioUpdate(BaseModel):

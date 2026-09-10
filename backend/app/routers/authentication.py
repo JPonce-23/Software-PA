@@ -133,6 +133,29 @@ def logout_all(
 
 
 @router.post(
+    "/auth/cambiar-contrasena",
+    response_model=schemas.SessionRevocationResponse,
+    summary="Cambiar la contraseña propia",
+)
+def change_own_password(
+    data: schemas.ChangeOwnPasswordRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.get_current_user),
+):
+    revoked = service.change_own_password(
+        db,
+        request,
+        user_id=current_user.id_usuario,
+        current_password=data.contrasena_actual,
+        new_password=data.contrasena_nueva,
+    )
+    _clear_auth_cookies(response)
+    return {"detail": "Contraseña actualizada", "sesiones_revocadas": revoked}
+
+
+@router.post(
     "/usuarios/{id_usuario}/desbloquear",
     response_model=schemas.AuthOperationResponse,
     summary="Desbloquear una cuenta",
@@ -175,3 +198,26 @@ def revoke_sessions(
         event_reason="revocacion_admin",
     )
     return {"detail": "Sesiones revocadas", "sesiones_revocadas": revoked}
+
+
+@router.post(
+    "/usuarios/{id_usuario}/restablecer-contrasena",
+    response_model=schemas.SessionRevocationResponse,
+    summary="Restablecer contraseña de un usuario",
+)
+def reset_user_password(
+    id_usuario: int,
+    data: schemas.AdminPasswordResetRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    revoked = service.reset_user_password(
+        db,
+        request,
+        target_user_id=id_usuario,
+        actor_user_id=current_user.id_usuario,
+        new_password=data.contrasena_nueva,
+        reason=data.motivo,
+    )
+    return {"detail": "Contraseña restablecida", "sesiones_revocadas": revoked}

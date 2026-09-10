@@ -3,12 +3,13 @@
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
 from ..database import get_db
+from ..services import authentication as authentication_service
 from ..services.common import commit_or_conflict, set_audit_context
 
 
@@ -117,6 +118,28 @@ def update_user(
     commit_or_conflict(db)
     db.refresh(target)
     return target
+
+
+@router.patch(
+    "/usuarios/{id_usuario}/correo",
+    response_model=schemas.SessionRevocationResponse,
+)
+def change_user_email(
+    id_usuario: int,
+    data: schemas.UserEmailChangeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    revoked = authentication_service.change_user_email(
+        db,
+        request,
+        target_user_id=id_usuario,
+        actor_user_id=user.id_usuario,
+        email=data.correo,
+        reason=data.motivo,
+    )
+    return {"detail": "Correo actualizado", "sesiones_revocadas": revoked}
 
 
 @router.post(

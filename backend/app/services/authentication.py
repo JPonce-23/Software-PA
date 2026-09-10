@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..config import AUTH_SETTINGS
-from .common import set_audit_context
+from .common import commit_or_conflict, set_audit_context
 
 
 _DUMMY_PASSWORD_HASH = bcrypt.hashpw(
@@ -26,6 +26,10 @@ def _utcnow() -> datetime:
 
 def _hash_secret(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def _safe_user_agent(request: Request) -> str | None:
@@ -327,7 +331,7 @@ def revoke_current_session(
     db.commit()
 
 
-def revoke_user_sessions(
+def _revoke_user_sessions_in_transaction(
     db: Session,
     request: Request,
     *,
@@ -336,15 +340,6 @@ def revoke_user_sessions(
     reason: str,
     event_reason: str,
 ) -> int:
-    target = (
-        db.query(models.Usuario)
-        .filter(models.Usuario.id_usuario == target_user_id)
-        .with_for_update()
-        .one_or_none()
-    )
-    if target is None:
-        db.rollback()
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     sessions = (
         db.query(models.SesionUsuario)
         .filter(
@@ -380,8 +375,151 @@ def revoke_user_sessions(
             actor_id=actor_user_id,
             detail=reason,
         )
-    db.commit()
     return len(sessions)
+
+
+def revoke_user_sessions(
+    db: Session,
+    request: Request,
+    *,
+    target_user_id: int,
+    actor_user_id: int,
+    reason: str,
+    event_reason: str,
+) -> int:
+    target = (
+        db.query(models.Usuario)
+        .filter(models.Usuario.id_usuario == target_user_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if target is None:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    revoked = _revoke_user_sessions_in_transaction(
+        db,
+        request,
+        target_user_id=target_user_id,
+        actor_user_id=actor_user_id,
+        reason=reason,
+        event_reason=event_reason,
+    )
+    db.commit()
+    return revoked
+
+
+def change_user_email(
+    db: Session,
+    request: Request,
+    *,
+    target_user_id: int,
+    actor_user_id: int,
+    email: str,
+    reason: str,
+) -> int:
+    target = db.query(models.Usuario).filter(
+        models.Usuario.id_usuario == target_user_id
+    ).with_for_update().one_or_none()
+    if target is None:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if target.correo.strip().lower() == email:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="El correo no presenta cambios")
+    duplicate = db.query(models.Usuario.id_usuario).filter(
+        func.lower(func.btrim(models.Usuario.correo)) == email,
+        models.Usuario.id_usuario != target_user_id,
+    ).first()
+    if duplicate is not None:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="El correo ya está registrado")
+    set_audit_context(db, actor_user_id)
+    target.correo = email
+    _event(
+        db,
+        event_type="cambio_correo",
+        reason="cambio_correo_admin",
+        request=request,
+        user_id=target_user_id,
+        actor_id=actor_user_id,
+        detail=reason,
+    )
+    revoked = _revoke_user_sessions_in_transaction(
+        db, request, target_user_id=target_user_id, actor_user_id=actor_user_id,
+        reason=reason, event_reason="cambio_correo_admin",
+    )
+    commit_or_conflict(db, "No fue posible cambiar el correo")
+    return revoked
+
+
+def change_own_password(
+    db: Session,
+    request: Request,
+    *,
+    user_id: int,
+    current_password: str,
+    new_password: str,
+) -> int:
+    target = db.query(models.Usuario).filter(
+        models.Usuario.id_usuario == user_id
+    ).with_for_update().one_or_none()
+    if target is None:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="No se pudo validar la sesión")
+    if not bcrypt.checkpw(current_password.encode("utf-8"), target.contrasena_hash.encode("utf-8")):
+        db.rollback()
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+    if bcrypt.checkpw(new_password.encode("utf-8"), target.contrasena_hash.encode("utf-8")):
+        db.rollback()
+        raise HTTPException(status_code=409, detail="La contraseña nueva no puede coincidir con la actual")
+    set_audit_context(db, user_id)
+    target.contrasena_hash = hash_password(new_password)
+    _event(
+        db, event_type="cambio_contrasena", reason="cambio_contrasena_usuario",
+        request=request, user_id=user_id, actor_id=user_id,
+        detail="Cambio de contraseña solicitado por el usuario",
+    )
+    revoked = _revoke_user_sessions_in_transaction(
+        db, request, target_user_id=user_id, actor_user_id=user_id,
+        reason="Cambio de contraseña solicitado por el usuario",
+        event_reason="cambio_contrasena_usuario",
+    )
+    commit_or_conflict(db, "No fue posible cambiar la contraseña")
+    return revoked
+
+
+def reset_user_password(
+    db: Session,
+    request: Request,
+    *,
+    target_user_id: int,
+    actor_user_id: int,
+    new_password: str,
+    reason: str,
+) -> int:
+    if target_user_id == actor_user_id:
+        raise HTTPException(status_code=409, detail="Use el cambio de contraseña propio")
+    target = db.query(models.Usuario).filter(
+        models.Usuario.id_usuario == target_user_id
+    ).with_for_update().one_or_none()
+    if target is None:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if bcrypt.checkpw(new_password.encode("utf-8"), target.contrasena_hash.encode("utf-8")):
+        db.rollback()
+        raise HTTPException(status_code=409, detail="La contraseña nueva no puede coincidir con la actual")
+    set_audit_context(db, actor_user_id)
+    target.contrasena_hash = hash_password(new_password)
+    _event(
+        db, event_type="restablecimiento_contrasena", reason="restablecimiento_contrasena_admin",
+        request=request, user_id=target_user_id, actor_id=actor_user_id, detail=reason,
+    )
+    revoked = _revoke_user_sessions_in_transaction(
+        db, request, target_user_id=target_user_id, actor_user_id=actor_user_id,
+        reason=reason, event_reason="restablecimiento_contrasena_admin",
+    )
+    commit_or_conflict(db, "No fue posible restablecer la contraseña")
+    return revoked
 
 
 def unlock_user(
