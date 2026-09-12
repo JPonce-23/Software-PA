@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>FIFONAFE | SSALFER</title>
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/fifonafe.css">
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button class="btn-menu" type="button">
+        <i class="bi bi-list"></i>
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn" type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                        CONTENIDO
+===================================================== -->
+
+<main class="contenedor">
+
+
+    <!-- =================================================
+                    ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+        <div>
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Proyectos
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a href="/dashboard.html" class="js-miga-proyecto">Proyecto</a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a id="enlaceNucleo"
+                    href="#">
+                    Núcleo agrario
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    FIFONAFE
+                </span>
+
+            </div>
+
+
+            <p class="etiqueta">
+                SEGUIMIENTO DE TRÁMITES
+            </p>
+
+
+            <h1>
+                Registro y seguimiento de FIFONAFE
+            </h1>
+
+
+            <p class="subtitulo">
+
+                Núcleo agrario:
+                <strong id="nombreNucleo">
+                    Núcleo demostrativo
+
+                </strong>
+
+            </p>
+
+        </div>
+
+
+        <div class="acciones-header">
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnVolver">
+
+                <i class="bi bi-arrow-left"></i>
+
+                Volver
+
+            </button>
+
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnNuevoTramite">
+
+                <i class="bi bi-plus-lg"></i>
+
+                Nuevo trámite FIFONAFE
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    INFORMACIÓN
+    ================================================== -->
+
+    <section class="aviso-contexto">
+
+        <i class="bi bi-info-circle"></i>
+
+        <div>
+
+            <strong>
+                Trámite asociado al núcleo agrario
+            </strong>
+
+            <p>
+                Un trámite FIFONAFE puede cubrir una o varias
+                afectaciones pertenecientes a este núcleo.
+            </p>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    TRÁMITES REGISTRADOS
+    ================================================== -->
+
+    <section class="tarjeta">
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-folder2-open"></i>
+
+                <h2>
+                    Trámites registrados
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div
+            id="tramitesContainer"
+            class="tramites-container">
+
+
+            <!-- TRÁMITE DEMOSTRATIVO -->
+
+            <article class="tramite">
+
+                <div class="tramite-header">
+
+                    <div>
+
+                        <span class="tramite-id">
+                            FIF-001
+                        </span>
+
+                        <h3>
+                            Trámite FIFONAFE
+                        </h3>
+
+                    </div>
+
+
+                    <span class="estado estado-pendiente">
+                        Pendiente
+                    </span>
+
+                </div>
+
+
+                <div class="tramite-datos">
+
+                    <div>
+
+                        <span>
+                            Afectaciones
+                        </span>
+
+                        <strong>
+                            AF-001 · AF-002
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Acuse FIFONAFE
+                        </span>
+
+                        <strong>
+                            20/08/2026
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Conflictos
+                        </span>
+
+                        <strong>
+                            Sin definir
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Eventos
+                        </span>
+
+                        <strong>
+                            2 registrados
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="tramite-acciones">
+
+                    <button
+                        type="button"
+                        class="btn-secundario btn-ver-tramite">
+
+                        <i class="bi bi-eye"></i>
+
+                        Ver seguimiento
+
+                    </button>
+
+                </div>
+
+            </article>
+
+
+
+            <!-- ESTADO VACÍO -->
+
+            <div
+                id="sinTramites"
+                class="sin-registros"
+                hidden>
+
+                <i class="bi bi-folder2"></i>
+
+                <p>
+                    No hay trámites FIFONAFE registrados.
+                </p>
+
+                <span>
+                    Puedes registrar el primero utilizando
+                    "Nuevo trámite FIFONAFE".
+                </span>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    FORMULARIO NUEVO TRÁMITE
+    ================================================== -->
+
+    <section
+        id="formularioContenedor"
+        class="tarjeta formulario-contenedor"
+        hidden>
+
+
+        <div class="formulario-header">
+
+            <div>
+
+                <p class="etiqueta">
+                    NUEVO REGISTRO
+                </p>
+
+                <h2>
+                    Nuevo trámite FIFONAFE
+                </h2>
+
+                <p>
+                    Registra las afectaciones y el seguimiento
+                    documental correspondiente.
+                </p>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="btn-cerrar-formulario"
+                id="btnCerrarFormulario">
+
+                <i class="bi bi-x-lg"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <form id="formFifonafe">
+
+
+            <!-- =================================================
+                        AFECTACIONES
+            ================================================== -->
+
+            <div class="bloque-formulario">
+
+                <div class="bloque-titulo">
+
+                    <i class="bi bi-link-45deg"></i>
+
+                    <div>
+
+                        <h3>
+                            Afectaciones relacionadas
+                        </h3>
+
+                        <p>
+                            Selecciona una o más afectaciones
+                            pertenecientes a este núcleo.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="afectacionesContainer"
+                    class="afectaciones-lista">
+
+
+                    <label class="afectacion-opcion">
+
+                        <input
+                            type="checkbox"
+                            name="ids_afectacion"
+                            value="101">
+
+                        <span>
+
+                            <strong>
+                                AF-001
+                            </strong>
+
+                            <small>
+                                Afectación individual · 12.500 ha
+                            </small>
+
+                        </span>
+
+                    </label>
+
+
+                    <label class="afectacion-opcion">
+
+                        <input
+                            type="checkbox"
+                            name="ids_afectacion"
+                            value="102">
+
+                        <span>
+
+                            <strong>
+                                AF-002
+                            </strong>
+
+                            <small>
+                                Afectación colectiva · 18.200 ha
+                            </small>
+
+                        </span>
+
+                    </label>
+
+
+                    <label class="afectacion-opcion">
+
+                        <input
+                            type="checkbox"
+                            name="ids_afectacion"
+                            value="103">
+
+                        <span>
+
+                            <strong>
+                                AF-003
+                            </strong>
+
+                            <small>
+                                Afectación individual · 7.850 ha
+                            </small>
+
+                        </span>
+
+                    </label>
+
+                </div>
+
+
+                <p
+                    id="errorAfectaciones"
+                    class="mensaje-error"
+                    hidden>
+
+                    <i class="bi bi-exclamation-circle"></i>
+
+                    Debes seleccionar al menos una afectación.
+
+                </p>
+
+            </div>
+
+
+
+            <!-- =================================================
+                        ESTADO
+            ================================================== -->
+
+            <div class="bloque-formulario">
+
+                <div class="bloque-titulo">
+
+                    <i class="bi bi-clipboard-check"></i>
+
+                    <div>
+
+                        <h3>
+                            Estado del trámite
+                        </h3>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-grid">
+
+
+                    <div class="campo">
+
+                        <label for="estatus">
+
+                            Estatus
+                            <span class="obligatorio">*</span>
+
+                        </label>
+
+
+                        <select
+                            id="estatus"
+                            name="estatus"
+                            required>
+
+                            <option value="pendiente">
+                                Pendiente
+                            </option>
+
+                            <option value="programado">
+                                Programado
+                            </option>
+
+                            <option value="completo">
+                                Completo
+                            </option>
+
+                            <option value="cancelado">
+                                Cancelado
+                            </option>
+
+                            <option value="otro">
+                                Otro
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="campo">
+
+                        <label for="acuseFecha">
+
+                            Fecha de acuse FIFONAFE
+
+                            <span class="opcional">
+                                Opcional
+                            </span>
+
+                        </label>
+
+
+                        <input
+                            type="date"
+                            id="acuseFecha"
+                            name="acuse_fifonafe_fecha">
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+                        CONFLICTOS
+            ================================================== -->
+
+            <div class="bloque-formulario">
+
+                <div class="bloque-titulo">
+
+                    <i class="bi bi-shield-exclamation"></i>
+
+                    <div>
+
+                        <h3>
+                            Conflictos
+                        </h3>
+
+                        <p>
+                            Registra si se identificaron conflictos
+                            durante el trámite.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="hayConflictos">
+
+                        ¿Hay conflictos?
+
+                    </label>
+
+
+                    <select
+                        id="hayConflictos"
+                        name="hay_conflictos">
+
+                        <option value="">
+                            Sin definir
+                        </option>
+
+                        <option value="true">
+                            Sí
+                        </option>
+
+                        <option value="false">
+                            No
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div
+                    id="campoResultadoConflictos"
+                    class="campo"
+                    hidden>
+
+                    <label for="resultadoNoConflictos">
+
+                        Resultado / observaciones
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <textarea
+                        id="resultadoNoConflictos"
+                        name="resultado_no_conflictos"
+                        rows="3"
+                        placeholder="Describe el resultado relacionado con la ausencia de conflictos..."></textarea>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+                        EVENTOS
+            ================================================== -->
+
+            <div class="bloque-formulario">
+
+                <div class="bloque-titulo titulo-con-boton">
+
+                    <div class="titulo-eventos">
+
+                        <i class="bi bi-file-earmark-text"></i>
+
+                        <div>
+
+                            <h3>
+                                Oficios y eventos
+                            </h3>
+
+                            <p>
+                                Registra los eventos documentales
+                                que formen parte del trámite.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <button
+                        type="button"
+                        class="btn-principal btn-agregar-evento"
+                        id="btnAgregarEvento">
+
+                        <i class="bi bi-plus-lg"></i>
+
+                        Agregar evento
+
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="eventosContainer"
+                    class="eventos-container">
+
+
+                    <!-- EVENTO 1 -->
+
+                    <article
+                        class="evento"
+                        data-evento>
+
+
+                        <div class="evento-header">
+
+                            <div>
+
+                                <span class="numero-evento">
+                                    1
+                                </span>
+
+                                <h4>
+                                    Evento 1
+                                </h4>
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                class="btn-eliminar-evento">
+
+                                <i class="bi bi-trash"></i>
+
+                            </button>
+
+                        </div>
+
+
+                        <div class="form-grid">
+
+
+                            <div class="campo">
+
+                                <label>
+
+                                    Ordinal
+                                    <span class="obligatorio">*</span>
+
+                                </label>
+
+                                <input
+                                    type="number"
+                                    name="eventos[0][ordinal]"
+                                    min="1"
+                                    step="1"
+                                    value="1"
+                                    required>
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+
+                                    Tipo de evento
+                                    <span class="obligatorio">*</span>
+
+                                </label>
+
+                                <select
+                                    name="eventos[0][id_tipo_evento]"
+                                    required>
+
+                                    <option value="">
+                                        Seleccionar tipo
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+
+                                    Origen
+
+                                    <span class="opcional">
+                                        Opcional
+                                    </span>
+
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="eventos[0][origen]"
+                                    maxlength="200"
+                                    placeholder="Área o institución de origen">
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+
+                                    Destino
+
+                                    <span class="opcional">
+                                        Opcional
+                                    </span>
+
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="eventos[0][destino]"
+                                    maxlength="200"
+                                    placeholder="Área o institución de destino">
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+
+                                    Número de oficio
+
+                                    <span class="opcional">
+                                        Opcional
+                                    </span>
+
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="eventos[0][numero_oficio]"
+                                    maxlength="150"
+                                    placeholder="Número o referencia del oficio">
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+
+                                    Fecha del oficio
+
+                                    <span class="opcional">
+                                        Opcional
+                                    </span>
+
+                                </label>
+
+                                <input
+                                    type="date"
+                                    name="eventos[0][fecha_oficio]">
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+
+                                    Documento
+
+                                    <span class="opcional">
+                                        Opcional
+                                    </span>
+
+                                </label>
+
+                                <input
+                                    type="number"
+                                    name="eventos[0][id_documento]"
+                                    min="1"
+                                    placeholder="ID documento">
+
+                                <small>
+                                    Referencia a un documento ya registrado.
+                                </small>
+
+                            </div>
+
+                        </div>
+
+                    </article>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+                        ACCIONES
+            ================================================== -->
+
+            <div class="acciones-formulario">
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelar">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Guardar trámite
+
+                </button>
+
+            </div>
+
+
+        </form>
+
+    </section>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/fifonafe.js"></script>
+
+</body>
+
+</html>

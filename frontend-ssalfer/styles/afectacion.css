@@ -1,0 +1,844 @@
+/* =========================================================
+        CONTENEDOR
+========================================================= */
+
+.contenedor-afectacion {
+
+    grid-area: contenedor;
+
+    min-width: 0;
+
+    padding: 30px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 25px;
+
+    overflow-y: auto;
+
+}
+
+
+/* =========================================================
+        ENCABEZADO
+========================================================= */
+
+.encabezado-pagina {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 20px;
+
+}
+
+
+.ruta {
+
+    display: block;
+
+    margin-bottom: 8px;
+
+    color: #777;
+
+    font-size: .85rem;
+
+}
+
+
+.encabezado-pagina h1 {
+
+    color: var(--verde);
+
+    font-size: 2rem;
+
+    margin-bottom: 6px;
+
+}
+
+
+.encabezado-pagina p {
+
+    color: #666;
+
+}
+
+
+/* =========================================================
+        BOTÓN NUEVA
+========================================================= */
+
+.btn-nueva {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    padding: 11px 18px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background: var(--verde);
+
+    color: white;
+
+    font-size: .95rem;
+
+    cursor: pointer;
+
+    transition: .2s;
+
+}
+
+
+.btn-nueva:hover {
+
+    background: var(--verde-oscuro);
+
+    transform: translateY(-2px);
+
+}
+
+
+/* =========================================================
+        INDICADORES
+========================================================= */
+
+.resumen-afectaciones {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    gap: 20px;
+
+}
+
+
+.indicador {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 15px;
+
+    padding: 18px;
+
+    background: white;
+
+    border-radius: 12px;
+
+    box-shadow: var(--sombra);
+
+}
+
+
+.indicador > i {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 45px;
+
+    height: 45px;
+
+    border-radius: 10px;
+
+    background: #e7efe8;
+
+    color: var(--verde);
+
+    font-size: 1.3rem;
+
+}
+
+
+.indicador span {
+
+    display: block;
+
+    color: #777;
+
+    font-size: .85rem;
+
+    margin-bottom: 4px;
+
+}
+
+
+.indicador strong {
+
+    color: var(--verde);
+
+    font-size: 1.2rem;
+
+}
+
+
+/* =========================================================
+        FORMULARIO
+========================================================= */
+
+.formulario-contenedor {
+
+   /* display: none;*/
+
+    background: white;
+
+    border-radius: 12px;
+
+    padding: 25px;
+
+    box-shadow: var(--sombra);
+
+}
+
+
+
+.formulario-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-start;
+
+    margin-bottom: 25px;
+
+}
+
+
+.formulario-header h2 {
+
+    color: var(--verde);
+
+    margin-bottom: 5px;
+
+}
+
+
+.formulario-header p {
+
+    color: #777;
+
+    font-size: .9rem;
+
+}
+
+
+.btn-cerrar-formulario {
+
+    border: none;
+
+    background: none;
+
+    color: #777;
+
+    font-size: 1.2rem;
+
+    cursor: pointer;
+
+}
+
+
+.btn-cerrar-formulario:hover {
+
+    color: #222;
+
+}
+
+
+/* =========================================================
+        CAMPOS
+========================================================= */
+
+#formAfectacion {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 18px;
+
+}
+
+
+.campo {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+}
+
+
+.campo label {
+
+    color: #555;
+
+    font-weight: bold;
+
+    font-size: .9rem;
+
+}
+
+
+.campo input,
+.campo select,
+.campo textarea {
+
+    width: 100%;
+
+    padding: 10px 12px;
+
+    border: 1px solid #ccc;
+
+    border-radius: 7px;
+
+    background: #fafafa;
+
+    color: #444;
+
+    font-size: .95rem;
+
+    outline: none;
+
+}
+
+
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus {
+
+    border-color: var(--verde);
+
+    box-shadow: 0 0 0 2px rgba(40,107,48,.10);
+
+}
+
+
+.grupo-campos {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 20px;
+
+}
+
+
+.formulario-subtitulo {
+
+    margin-top: 8px;
+
+    padding-bottom: 8px;
+
+    border-bottom: 1px solid #ddd;
+
+}
+
+
+.formulario-subtitulo h3 {
+
+    color: var(--verde);
+
+    font-size: 1rem;
+
+}
+
+
+.checkbox-campo label {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    font-weight: normal;
+
+    cursor: pointer;
+
+}
+
+
+.checkbox-campo input {
+
+    width: auto;
+
+}
+
+
+/* =========================================================
+        ACCIONES FORMULARIO
+========================================================= */
+
+.acciones-formulario {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    margin-top: 10px;
+
+    padding-top: 20px;
+
+    border-top: 1px solid #ddd;
+
+}
+
+
+.btn-cancelar,
+.btn-guardar {
+
+    border: none;
+
+    border-radius: 7px;
+
+    padding: 10px 18px;
+
+    cursor: pointer;
+
+    font-size: .9rem;
+
+}
+
+
+.btn-cancelar {
+
+    background: #e8e8e8;
+
+    color: #555;
+
+}
+
+
+.btn-guardar {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    background: var(--verde);
+
+    color: white;
+
+}
+
+
+.btn-guardar:hover {
+
+    background: var(--verde-oscuro);
+
+}
+
+
+/* =========================================================
+        LISTADO
+========================================================= */
+
+.lista-afectaciones {
+
+    background: transparent;
+
+}
+
+
+.titulo-listado {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    gap: 20px;
+
+    margin-bottom: 18px;
+
+}
+
+
+.titulo-listado h2 {
+
+    color: var(--verde);
+
+    font-size: 1.35rem;
+
+    margin-bottom: 4px;
+
+}
+
+
+.titulo-listado p {
+
+    color: #777;
+
+    font-size: .9rem;
+
+}
+
+
+.filtro {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    color: #666;
+
+    font-size: .9rem;
+
+}
+
+
+.filtro select {
+
+    padding: 7px 10px;
+
+    border: 1px solid #ccc;
+
+    border-radius: 6px;
+
+}
+
+
+/* =========================================================
+        GRID DE AFECTACIONES
+========================================================= */
+
+.afectaciones-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 20px;
+
+}
+
+
+.tarjeta-afectacion {
+
+    padding: 20px;
+
+    background: white;
+
+    border-radius: 12px;
+
+    box-shadow: var(--sombra);
+
+    border-left: 5px solid #aaa;
+
+    transition: .2s;
+
+}
+
+
+.tarjeta-afectacion:hover {
+
+    transform: translateY(-3px);
+
+}
+
+
+.tarjeta-afectacion.completa {
+
+    border-left-color: var(--verde);
+
+}
+
+
+.tarjeta-afectacion.pendiente {
+
+    border-left-color: #c49a28;
+
+}
+
+
+/* =========================================================
+        TARJETA
+========================================================= */
+
+.tarjeta-superior {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-start;
+
+    gap: 15px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.identificador {
+
+    display: block;
+
+    color: #777;
+
+    font-size: .8rem;
+
+    margin-bottom: 4px;
+
+}
+
+
+.tarjeta-superior h3 {
+
+    color: #444;
+
+    font-size: 1.1rem;
+
+}
+
+
+.estado-badge {
+
+    padding: 5px 10px;
+
+    border-radius: 20px;
+
+    font-size: .75rem;
+
+    font-weight: bold;
+
+}
+
+
+.completa .estado-badge {
+
+    background: #dcefe0;
+
+    color: #23612b;
+
+}
+
+
+.pendiente .estado-badge {
+
+    background: #fff0c9;
+
+    color: #806000;
+
+}
+
+
+/* =========================================================
+        DATOS
+========================================================= */
+
+.datos-afectacion {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 15px;
+
+}
+
+
+.datos-afectacion div {
+
+    padding: 10px;
+
+    border-radius: 7px;
+
+    background: #f6f6f6;
+
+}
+
+
+.datos-afectacion span {
+
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #888;
+
+    font-size: .75rem;
+
+}
+
+
+.datos-afectacion strong {
+
+    color: #555;
+
+    font-size: .85rem;
+
+}
+
+
+/* =========================================================
+        ACCIONES TARJETA
+========================================================= */
+
+.tarjeta-acciones {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    margin-top: 18px;
+
+}
+
+
+.btn-detalle,
+.btn-continuar {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    padding: 8px 13px;
+
+    cursor: pointer;
+
+    font-size: .85rem;
+
+}
+
+
+.btn-detalle {
+
+    background: #eeeeee;
+
+    color: #555;
+
+}
+
+
+.btn-continuar {
+
+    background: var(--verde);
+
+    color: white;
+
+}
+
+
+.btn-detalle:hover {
+
+    background: #dddddd;
+
+}
+
+
+.btn-continuar:hover {
+
+    background: var(--verde-oscuro);
+
+}
+
+
+/* =========================================================
+        RESPONSIVE
+========================================================= */
+
+@media (max-width: 1000px) {
+
+    .resumen-afectaciones {
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+    }
+
+
+    .afectaciones-grid {
+
+        grid-template-columns: 1fr;
+
+    }
+
+}
+
+
+@media (max-width: 700px) {
+
+    .contenedor-afectacion {
+
+        padding: 20px;
+
+    }
+
+
+    .encabezado-pagina {
+
+        flex-direction: column;
+
+        align-items: flex-start;
+
+    }
+
+
+    .resumen-afectaciones {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .grupo-campos {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .titulo-listado {
+
+        flex-direction: column;
+
+        align-items: flex-start;
+
+    }
+
+
+    .datos-afectacion {
+
+        grid-template-columns: 1fr;
+
+    }
+
+}

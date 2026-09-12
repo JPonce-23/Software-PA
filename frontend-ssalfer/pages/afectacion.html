@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Liberación Propiedad Social | AIFA - Pachuca</title>
+
+    <!-- CSS GENERAL -->
+    <link
+        rel="stylesheet"
+        href="/styles/dashboard.css"
+    >
+
+    <!-- CSS ESPECÍFICO -->
+    <link
+        rel="stylesheet"
+        href="/styles/afectacion.css"
+    >
+
+    <!-- ICONOS -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+    >
+
+</head>
+
+
+<body>
+
+
+    <!-- =====================================================
+                            ASIDE
+    ====================================================== -->
+
+    <aside class="aside">
+
+        <button
+            class="btn-menu"
+            id="btnMenu"
+            type="button"
+            aria-label="Contraer menú"
+        >
+
+            <i class="bi bi-list"></i>
+
+        </button>
+
+
+        <div class="logo-aside">
+
+            <img
+                src="/img/LOGOS VERDE/IMAGOTIPO.png"
+                alt="Logo SSALFER"
+            >
+
+        </div>
+
+
+        <div class="bienvenida">
+
+            <h3>Bienvenido</h3>
+
+            <span class="js-usuario-nombre">Nombre usuario</span>
+
+        </div>
+
+
+        <nav class="barra">
+
+            <a href="/dashboard.html">
+
+                <i class="bi bi-grid"></i>
+
+                <span>Todos los proyectos</span>
+
+            </a>
+
+
+            <div class="proyectos">
+
+                <h4>Proyectos</h4>
+
+
+                <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+            </div>
+
+
+            <a href="#">
+
+                <i class="bi bi-map"></i>
+
+                <span>Ver mapa</span>
+
+            </a>
+
+        </nav>
+
+
+        <!-- USUARIO -->
+
+        <div class="usuario-panel">
+
+            <button
+                class="usuario-btn"
+                id="usuarioBtn"
+                type="button"
+            >
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+                <i
+                    class="bi bi-chevron-down"
+                    id="usuarioIcon"
+                ></i>
+
+            </button>
+
+
+            <ul
+                class="opciones-usuario"
+                id="opcionesUsuario"
+            >
+
+                <li>
+
+                    <a href="#">
+
+                        <i class="bi bi-lock"></i>
+
+                        <span>Cambiar contraseña</span>
+
+                    </a>
+
+                </li>
+
+
+                <li>
+
+                    <a href="#">
+
+                        <i class="bi bi-box-arrow-left"></i>
+
+                        <span>Cerrar sesión</span>
+
+                    </a>
+
+                </li>
+
+            </ul>
+
+        </div>
+
+    </aside>
+
+
+
+    <!-- =====================================================
+                            HEADER
+    ====================================================== -->
+
+    <header class="header">
+
+        <div class="logo-ssalfer">
+
+            <img
+                src="/img/LOGOS VERDE/SSALFER.png"
+                alt="SSALFER"
+            >
+
+            <img
+                src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+                alt="Sistema SSALFER"
+            >
+
+        </div>
+
+
+        <div class="logo-pa">
+
+            <a
+                href="https://www.gob.mx/pa"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+
+                <img
+                    src="/img/LOGOS VERDE/palogo-2.png"
+                    alt="Procuraduría Agraria"
+                >
+
+            </a>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- =====================================================
+                            MAIN
+    ====================================================== -->
+
+    <main
+        class="contenedor-afectacion"
+        data-proyecto="AIFA - Pachuca"
+    >
+
+
+        <!-- =================================================
+                            ENCABEZADO
+        ================================================== -->
+
+        <section class="encabezado-pagina">
+
+            <div>
+
+                <span class="ruta">
+
+                    Proyecto /
+                    AIFA - Pachuca /
+                    Liberación propiedad social
+
+                </span>
+
+
+                <h1>
+                    Liberación de propiedad social
+                </h1>
+
+
+                <p>
+                    Consulta y seguimiento de las afectaciones registradas.
+                </p>
+
+            </div>
+
+
+            <button
+                class="btn-nueva"
+                id="btnNuevaAfectacion"
+                type="button"
+            >
+
+                <i class="bi bi-plus-lg"></i>
+
+                Nueva afectación
+
+            </button>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    RESUMEN DE AFECTACIONES
+        ================================================== -->
+
+        <section class="resumen-afectaciones">
+
+            <article class="indicador">
+
+                <i class="bi bi-files"></i>
+
+                <div>
+
+                    <span>Total</span>
+
+                    <strong id="totalAfectaciones">
+                        3
+                    </strong>
+
+                </div>
+
+            </article>
+
+
+            <article class="indicador">
+
+                <i class="bi bi-check-circle"></i>
+
+                <div>
+
+                    <span>Completas</span>
+
+                    <strong id="afectacionesCompletas">
+                        1
+                    </strong>
+
+                </div>
+
+            </article>
+
+
+            <article class="indicador">
+
+                <i class="bi bi-clock"></i>
+
+                <div>
+
+                    <span>Pendientes</span>
+
+                    <strong id="afectacionesPendientes">
+                        2
+                    </strong>
+
+                </div>
+
+            </article>
+
+
+            <article class="indicador">
+
+                <i class="bi bi-rulers"></i>
+
+                <div>
+
+                    <span>Superficie afectada</span>
+
+                    <strong id="superficieTotal">
+                        48.50 ha
+                    </strong>
+
+                </div>
+
+            </article>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    FORMULARIO NUEVA AFECTACIÓN
+        ================================================== -->
+
+        <section
+            class="formulario-contenedor"
+            id="formularioContenedor"
+            hidden
+        >
+
+            <div class="formulario-header">
+
+                <div>
+
+                    <h2>Nueva afectación</h2>
+
+                    <p>
+                        Registra la información disponible.
+                        Puedes guardar el avance y continuar posteriormente.
+                    </p>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="btn-cerrar-formulario"
+                    id="btnCerrarFormulario"
+                    aria-label="Cerrar formulario"
+                >
+
+                    <i class="bi bi-x-lg"></i>
+
+                </button>
+
+            </div>
+
+
+
+            <!--
+                El id_proyecto_nucleo NO se envía como campo del formulario.
+
+                El backend lo recibe en la ruta:
+
+                POST /proyecto-nucleo/{id_proyecto_nucleo}/afectaciones
+
+                Por eso JS lo obtendrá del parámetro:
+
+                ?id_proyecto_nucleo=...
+
+            -->
+
+            <form
+                id="formAfectacion"
+                novalidate
+            >
+
+
+                <!-- =================================================
+                                TIPO DE AFECTACIÓN
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="tipoAfectacion">
+
+                        Tipo de afectación *
+
+                    </label>
+
+
+                    <select
+                        id="tipoAfectacion"
+                        name="tipo_afectacion"
+                        required
+                    >
+
+                        <option value="">
+                            Seleccionar
+                        </option>
+
+                        <option value="individual">
+                            Individual
+                        </option>
+
+                        <option value="colectivo">
+                            Colectiva
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- =================================================
+                                SUPERFICIES
+                ================================================== -->
+
+                <div class="grupo-campos">
+
+
+                    <div class="campo">
+
+                        <label for="superficiePreliminar">
+
+                            Superficie preliminar (ha)
+
+                        </label>
+
+
+                        <input
+                            type="number"
+                            id="superficiePreliminar"
+                            name="superficie_preliminar_ha"
+                            min="0"
+                            step="0.000001"
+                            placeholder="0.000000"
+                        >
+
+                    </div>
+
+
+                    <div class="campo">
+
+                        <label for="superficieAfectada">
+
+                            Superficie afectada real (ha)
+
+                        </label>
+
+
+                        <input
+                            type="number"
+                            id="superficieAfectada"
+                            name="superficie_afectada_ha"
+                            min="0"
+                            step="0.000001"
+                            placeholder="0.000000"
+                        >
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- =================================================
+                                SITUACIÓN
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="situacion">
+
+                        Situación
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="situacion"
+                        name="situacion"
+                        maxlength="100"
+                        placeholder="Situación actual de la afectación"
+                    >
+
+                </div>
+
+
+
+                <!-- =================================================
+                            CONDICIÓN ESPECIAL
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="condicionEspecial">
+
+                        Condición especial
+
+                    </label>
+
+
+                    <select
+                        id="condicionEspecial"
+                        name="condicion_especial"
+                    >
+
+                        <option value="">
+                            Sin condición especial
+                        </option>
+
+                        <option value="expropiacion_directa">
+                            Expropiación directa
+                        </option>
+
+                        <option value="comunidad_indigena">
+                            Comunidad indígena
+                        </option>
+
+                        <option value="otro">
+                            Otro
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- =================================================
+                        DESCRIPCIÓN DE CONDICIÓN
+                ================================================== -->
+
+                <div
+                    class="campo"
+                    id="descripcionCondicionCampo"
+                    hidden
+                >
+
+                    <label for="descripcionCondicion">
+
+                        Descripción de la condición *
+
+                    </label>
+
+
+                    <textarea
+                        id="descripcionCondicion"
+                        name="descripcion_condicion"
+                        rows="3"
+                        placeholder="Describe la condición especial"
+                    ></textarea>
+
+                </div>
+
+
+
+                <!-- =================================================
+                                AVALÚO
+                ================================================== -->
+
+                <div class="formulario-subtitulo">
+
+                    <h3>
+                        Información del avalúo
+                    </h3>
+
+                </div>
+
+
+                <div class="grupo-campos">
+
+
+                    <div class="campo">
+
+                        <label for="avaluoMonto">
+
+                            Monto del avalúo
+
+                        </label>
+
+
+                        <input
+                            type="number"
+                            id="avaluoMonto"
+                            name="avaluo_monto"
+                            min="0"
+                            step="0.01"
+                            placeholder="$0.00"
+                        >
+
+                    </div>
+
+
+                    <div class="campo">
+
+                        <label for="avaluoFecha">
+
+                            Fecha del avalúo
+
+                        </label>
+
+
+                        <input
+                            type="date"
+                            id="avaluoFecha"
+                            name="avaluo_fecha"
+                        >
+
+                    </div>
+
+
+                </div>
+
+
+                <div class="grupo-campos">
+
+
+                    <div class="campo">
+
+                        <label for="avaluoReferencia">
+
+                            Referencia del avalúo
+
+                        </label>
+
+
+                        <input
+                            type="text"
+                            id="avaluoReferencia"
+                            name="avaluo_referencia"
+                            maxlength="150"
+                            placeholder="Referencia"
+                        >
+
+                    </div>
+
+
+                    <div class="campo">
+
+                        <label for="avaluoInstitucion">
+
+                            Institución
+
+                        </label>
+
+
+                        <input
+                            type="text"
+                            id="avaluoInstitucion"
+                            name="avaluo_institucion"
+                            maxlength="150"
+                            placeholder="Institución que realizó el avalúo"
+                        >
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- =================================================
+                            CONTROL OPERATIVO
+                ================================================== -->
+
+                <div class="formulario-subtitulo">
+
+                    <h3>
+                        Control operativo
+                    </h3>
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="tipoCop">
+
+                        Tipo de COP operativo
+
+                    </label>
+
+
+                    <select
+                        id="tipoCop"
+                        name="id_tipo_cop_operativo"
+                        data-catalogo="tipo_cop_operativo"
+                    >
+
+                        <option value="">
+
+                            Seleccionar
+
+                        </option>
+
+                        <!--
+                            Las opciones reales NO se escriben aquí.
+
+                            Se cargarán posteriormente desde:
+
+                            GET /catalogos/operativos/tipo_cop_operativo
+
+                            No debemos inventar IDs 1, 2 y 3.
+                        -->
+
+                    </select>
+
+                </div>
+
+
+
+                <div class="campo checkbox-campo">
+
+                    <label>
+
+                        <input
+                            type="checkbox"
+                            id="revisionPendiente"
+                            name="tipo_cop_revision_pendiente"
+                        >
+
+                        <span>
+
+                            Requiere revisión del COP
+
+                        </span>
+
+                    </label>
+
+                </div>
+
+
+
+                <div
+                    class="campo"
+                    id="detalleRevisionCampo"
+                    hidden
+                >
+
+                    <label for="revisionDetalle">
+
+                        Detalle de revisión
+
+                    </label>
+
+
+                    <textarea
+                        id="revisionDetalle"
+                        name="tipo_cop_revision_detalle"
+                        rows="3"
+                        placeholder="Indica qué debe revisarse"
+                    ></textarea>
+
+                </div>
+
+
+
+                <!-- =================================================
+                            OBSERVACIONES
+                ================================================== -->
+
+                <div class="formulario-subtitulo">
+
+                    <h3>
+
+                        Observaciones
+
+                    </h3>
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="observaciones">
+
+                        Observaciones
+
+                    </label>
+
+
+                    <textarea
+                        id="observaciones"
+                        name="observaciones"
+                        rows="4"
+                        placeholder="Agrega observaciones relevantes..."
+                    ></textarea>
+
+                </div>
+
+
+
+                <!-- =================================================
+                                ACCIONES
+                ================================================== -->
+
+                <div class="acciones-formulario">
+
+                    <button
+                        type="button"
+                        class="btn-cancelar"
+                        id="btnCancelar"
+                    >
+
+                        Cancelar
+
+                    </button>
+
+
+                    <button
+                        type="submit"
+                        class="btn-guardar"
+                    >
+
+                        <i class="bi bi-save"></i>
+
+                        Guardar afectación
+
+                    </button>
+
+                </div>
+
+
+            </form>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    LISTADO DE AFECTACIONES
+        ================================================== -->
+
+        <section class="lista-afectaciones">
+
+
+            <div class="titulo-listado">
+
+                <div>
+
+                    <h2>
+                        Afectaciones registradas
+                    </h2>
+
+                    <p>
+                        Selecciona una afectación para continuar con su expediente.
+                    </p>
+
+                </div>
+
+
+                <div class="filtro">
+
+                    <label for="filtroEstado">
+
+                        Mostrar:
+
+                    </label>
+
+
+                    <select id="filtroEstado">
+
+                        <option value="todas">
+                            Todas
+                        </option>
+
+                        <option value="pendiente">
+                            Pendientes
+                        </option>
+
+                        <option value="completa">
+                            Completas
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+
+            <div
+                class="afectaciones-grid"
+                id="afectacionesGrid"
+            >
+
+                <p class="proyectos-lista-vacia">
+                    Cargando afectaciones…
+                </p>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =====================================================
+                            FOOTER
+    ====================================================== -->
+
+    <footer class="footer">
+
+        <p>
+
+            &copy; 2026 Procuraduría Agraria.
+            Todos los derechos reservados.
+
+        </p>
+
+    </footer>
+
+
+
+    <!-- =====================================================
+                            JAVASCRIPT
+    ====================================================== -->
+
+
+    <script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/afectacion.js"></script>
+
+
+</body>
+
+</html>

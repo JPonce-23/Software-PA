@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Trámite ante el RAN | SSALFER</title>
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/tramiteRan.css">
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+====================================================== -->
+
+<aside class="aside">
+
+    <button class="btn-menu">
+        <i class="bi bi-list"></i>
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+====================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                    CONTENIDO PRINCIPAL
+====================================================== -->
+
+<main class="contenedor">
+
+
+    <div class="migas">
+
+        <a
+            id="enlaceAsamblea"
+            href="#">
+
+            Asamblea
+
+        </a>
+
+        <i class="bi bi-chevron-right"></i>
+
+        <span>
+            Trámite ante el RAN
+        </span>
+
+    </div>
+
+
+
+    <!-- =================================================
+                    ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+        <div>
+
+            <span class="etiqueta">
+                REGISTRO AGRARIO NACIONAL
+            </span>
+
+            <h1>
+                Trámite ante el RAN
+            </h1>
+
+            <p class="subtitulo">
+                Registra el ingreso y seguimiento del trámite
+                correspondiente ante el Registro Agrario Nacional.
+            </p>
+
+        </div>
+
+
+        <div class="acciones-header">
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnVolver">
+
+                <i class="bi bi-arrow-left"></i>
+
+                Volver
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    CONTEXTO DEL TRÁMITE
+    ================================================== -->
+
+    <section class="tarjeta contexto-tramite">
+
+        <div class="contexto-icono">
+
+            <i class="bi bi-building"></i>
+
+        </div>
+
+
+        <div>
+
+            <span class="contexto-etiqueta">
+                TRÁMITE ASOCIADO A
+            </span>
+
+            <h2 id="objetivoNombre">
+                Asamblea
+            </h2>
+
+            <p id="objetivoDescripcion">
+                Este trámite será registrado para la asamblea
+                seleccionada.
+            </p>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    DATOS DEL TRÁMITE
+    ================================================== -->
+
+    <section class="tarjeta">
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-file-earmark-text"></i>
+
+                <div>
+
+                    <h2>
+                        Información del trámite
+                    </h2>
+
+                    <p class="descripcion-seccion">
+                        Captura los datos generales del trámite.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <form id="formTramiteRan">
+
+            <div class="form-grid">
+
+
+                <div class="campo">
+
+                    <label for="fecha_programada_ingreso">
+                        Fecha programada de ingreso
+                        <span class="opcional">
+                            (opcional)
+                        </span>
+                    </label>
+
+                    <input
+                        type="date"
+                        id="fecha_programada_ingreso"
+                        name="fecha_programada_ingreso">
+
+                </div>
+
+
+
+                <div class="campo">
+
+                    <label for="referencia_expediente">
+                        Referencia del expediente
+                        <span class="opcional">
+                            (opcional)
+                        </span>
+                    </label>
+
+                    <input
+                        type="text"
+                        id="referencia_expediente"
+                        name="referencia_expediente"
+                        maxlength="150"
+                        placeholder="Folio o referencia">
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =========================================
+                        EVENTOS
+            ========================================== -->
+
+            <div class="subseccion">
+
+                <div class="subseccion-header">
+
+                    <div>
+
+                        <h3>
+                            Seguimiento del trámite
+                        </h3>
+
+                        <p>
+                            Registra los eventos que ocurran durante
+                            el proceso ante el RAN.
+                        </p>
+
+                    </div>
+
+
+                    <button
+                        type="button"
+                        class="btn-principal"
+                        id="btnAgregarEvento">
+
+                        <i class="bi bi-plus-lg"></i>
+
+                        Agregar evento
+
+                    </button>
+
+                </div>
+
+
+
+                <div
+                    class="eventos-lista"
+                    id="eventosLista">
+
+
+                    <!-- =================================
+                            EVENTO 1
+                    ================================== -->
+
+                    <div
+                        class="evento"
+                        data-evento="0">
+
+                        <div class="evento-header">
+
+                            <div class="evento-numero">
+
+                                <span>
+                                    Evento
+                                </span>
+
+                                <strong>
+                                    1
+                                </strong>
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                class="btn-eliminar-evento"
+                                title="Eliminar evento">
+
+                                <i class="bi bi-trash"></i>
+
+                            </button>
+
+                        </div>
+
+
+                        <div class="form-grid evento-grid">
+
+
+                            <div class="campo">
+
+                                <label>
+                                    Orden
+                                    <span class="obligatorio">
+                                        *
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="number"
+                                    name="eventos[0][ordinal]"
+                                    min="1"
+                                    step="1"
+                                    value="1"
+                                    required>
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+                                    Tipo de evento
+                                    <span class="obligatorio">
+                                        *
+                                    </span>
+                                </label>
+
+                                <select
+                                    name="eventos[0][id_tipo_evento]"
+                                    class="catalogo-tipo-evento"
+                                    required>
+
+                                    <option value="">
+                                        Selecciona una opción
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+                                    Fecha del evento
+                                </label>
+
+                                <input
+                                    type="date"
+                                    name="eventos[0][fecha_evento]">
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+                                    Número de solicitud
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="eventos[0][numero_solicitud]"
+                                    maxlength="150">
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+                                    Resultado
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="eventos[0][resultado]"
+                                    maxlength="250">
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+                                    Calificación
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="eventos[0][calificacion]">
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+                                    Folio / referencia
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="eventos[0][folio_referencia]"
+                                    maxlength="200">
+
+                            </div>
+
+
+                            <div class="campo">
+
+                                <label>
+                                    Documento relacionado
+                                </label>
+
+                                <select
+                                    name="eventos[0][id_documento]"
+                                    class="catalogo-documento">
+
+                                    <option value="">
+                                        Sin documento relacionado
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =========================================
+                        ACCIONES
+            ========================================== -->
+
+            <div class="acciones-formulario">
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelar">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Guardar trámite
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    AVISO
+    ================================================== -->
+
+    <div class="aviso-ran">
+
+        <i class="bi bi-info-circle"></i>
+
+        <p>
+            Los eventos permiten llevar el seguimiento de las
+            distintas etapas del trámite. Puedes agregar tantos
+            como sean necesarios y mantenerlos en el orden en
+            que ocurrieron.
+        </p>
+
+    </div>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+====================================================== -->
+
+<footer class="footer">
+
+    <p>
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+    </p>
+
+</footer>
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/tramiteRan.js"></script>
+
+</body>
+
+</html>

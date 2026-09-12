@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Unidad Agraria | SSALFER</title>
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/unidadAgraria.css">
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button class="btn-menu" type="button">
+        <i class="bi bi-list"></i>
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn" type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Sistema SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank"
+        rel="noopener noreferrer">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                    CONTENIDO PRINCIPAL
+===================================================== -->
+
+<main class="contenedor">
+
+
+    <!-- =================================================
+                        ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+        <div>
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Proyectos
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a id="enlaceNucleo" href="#">
+                    Núcleo agrario
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Unidad agraria
+                </span>
+
+            </div>
+
+
+            <p class="etiqueta">
+                DERECHOS INDIVIDUALES
+            </p>
+
+
+            <h1>
+                Unidades Agrarias
+            </h1>
+
+
+            <p class="subtitulo">
+                Administra las unidades agrarias registradas en
+                este núcleo y su relación con las afectaciones.
+            </p>
+
+        </div>
+
+
+        <div class="acciones-header">
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnNuevaUnidad">
+
+                <i class="bi bi-plus-lg"></i>
+
+                Nueva unidad agraria
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    UNIDADES REGISTRADAS
+    ================================================== -->
+
+    <section class="tarjeta">
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-building"></i>
+
+                <div>
+
+                    <h2>
+                        Unidades registradas
+                    </h2>
+
+                    <p class="descripcion-seccion">
+                        Unidades agrarias pertenecientes
+                        al núcleo seleccionado.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <span
+                class="contador-registros"
+                id="contadorUnidades">
+
+                0 unidades
+
+            </span>
+
+        </div>
+
+
+        <div
+            id="unidadesContainer"
+            class="unidades-container">
+
+
+            <!-- =========================================
+                    REGISTRO DEMOSTRATIVO
+            ========================================== -->
+
+            <article
+                class="unidad"
+                data-unidad>
+
+
+                <div class="unidad-icono">
+
+                    <i class="bi bi-house"></i>
+
+                </div>
+
+
+                <div class="unidad-datos">
+
+                    <h3>
+                        Unidad agraria demostrativa
+                    </h3>
+
+
+                    <span>
+                        Tipo de tierra:
+                        —
+                    </span>
+
+
+                    <span>
+                        Tipo de titularidad:
+                        —
+                    </span>
+
+
+                    <span>
+                        Referencia:
+                        —
+                    </span>
+
+                </div>
+
+
+                <div class="unidad-accion">
+
+                    <button
+                        type="button"
+                        class="btn-secundario btn-ver-unidad">
+
+                        <i class="bi bi-eye"></i>
+
+                        Consultar
+
+                    </button>
+
+                </div>
+
+            </article>
+
+
+        </div>
+
+
+        <!-- =============================================
+                    ESTADO VACÍO
+        ============================================== -->
+
+        <div
+            id="sinUnidades"
+            class="sin-registros"
+            hidden>
+
+            <i class="bi bi-building-x"></i>
+
+            <p>
+                No hay unidades agrarias registradas.
+            </p>
+
+            <span>
+                Puedes registrar una nueva unidad
+                para este núcleo.
+            </span>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                FORMULARIO NUEVA UNIDAD
+    ================================================== -->
+
+    <section
+        class="tarjeta formulario-unidad"
+        id="formularioUnidad"
+        hidden>
+
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-plus-circle"></i>
+
+                <div>
+
+                    <h2>
+                        Registrar unidad agraria
+                    </h2>
+
+                    <p class="descripcion-seccion">
+                        Captura los datos generales de la
+                        unidad antes de relacionarla con
+                        una afectación.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="btn-cerrar"
+                id="btnCerrarFormulario"
+                aria-label="Cerrar formulario">
+
+                <i class="bi bi-x-lg"></i>
+
+            </button>
+
+        </div>
+
+
+        <form id="formUnidadAgraria">
+
+
+            <div class="form-grid">
+
+
+                <!-- =====================================
+                        TIPO DE TIERRA
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="idTipoTierra">
+
+                        Tipo de tierra
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idTipoTierra"
+                        name="id_tipo_tierra"
+                        required>
+
+                        <option value="">
+                            Seleccionar
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- =====================================
+                    TIPO DE TITULARIDAD
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="idTipoTitularidad">
+
+                        Tipo de titularidad
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idTipoTitularidad"
+                        name="id_tipo_titularidad"
+                        required>
+
+                        <option value="">
+                            Seleccionar
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <div class="campo campo-completo">
+
+                    <small>
+                        Además del tipo de tierra y del tipo de titularidad,
+                        debes capturar al menos uno de los siguientes datos:
+                        tipo de gestión, destino de la superficie, parcela relacionada,
+                        referencia o detalle.
+                    </small>
+
+                </div>
+
+
+                <!-- =====================================
+                        TIPO DE GESTIÓN
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="idTipoGestion">
+
+                        Tipo de gestión
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idTipoGestion"
+                        name="id_tipo_gestion">
+
+                        <option value="">
+                            Seleccionar
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- =====================================
+                    DESTINO SUPERFICIE
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="idDestinoSuperficie">
+
+                        Destino de la superficie
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idDestinoSuperficie"
+                        name="id_destino_superficie">
+
+                        <option value="">
+                            Seleccionar
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- =====================================
+                        PARCELA
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="idParcela">
+
+                        Parcela relacionada
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idParcela"
+                        name="id_parcela">
+
+                        <option value="">
+                            Sin parcela relacionada
+                        </option>
+
+                    </select>
+
+
+                    <small>
+                        Selecciona una parcela previamente
+                        registrada si corresponde.
+                    </small>
+
+                </div>
+
+
+
+                <!-- =====================================
+                    REFERENCIA
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="referenciaAlfanumerica">
+
+                        Referencia
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="referenciaAlfanumerica"
+                        name="referencia_alfanumerica"
+                        maxlength="150"
+                        placeholder="Referencia de la unidad">
+
+                </div>
+
+
+
+                <!-- =====================================
+                        DETALLE
+                ====================================== -->
+
+                <div class="campo campo-completo">
+
+                    <label for="detalle">
+
+                        Detalle
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <textarea
+                        id="detalle"
+                        name="detalle"
+                        rows="4"
+                        placeholder="Información adicional sobre la unidad agraria"></textarea>
+
+                </div>
+
+
+
+                <!-- =====================================
+                        FUENTE
+                ====================================== -->
+
+                <div class="campo campo-completo">
+
+                    <label for="fuente">
+
+                        Fuente
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="fuente"
+                        name="fuente"
+                        maxlength="250"
+                        placeholder="Origen de la información">
+
+                </div>
+
+
+
+                <!-- =====================================
+                    REQUIERE REVISIÓN
+                ====================================== -->
+
+                <div class="campo campo-completo campo-checkbox">
+
+                    <label>
+
+                        <input
+                            type="checkbox"
+                            id="requiereRevision"
+                            name="requiere_revision">
+
+                        <span>
+                            Requiere revisión
+                        </span>
+
+                    </label>
+
+                </div>
+
+
+
+                <!-- =====================================
+                    MOTIVO REVISIÓN
+                ====================================== -->
+
+                <div
+                    class="campo campo-completo"
+                    id="contenedorMotivoRevision"
+                    hidden>
+
+                    <label for="motivoRevision">
+
+                        Motivo de revisión
+
+                    </label>
+
+
+                    <textarea
+                        id="motivoRevision"
+                        name="motivo_revision"
+                        rows="3"
+                        placeholder="Indica qué información requiere revisión"></textarea>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="acciones-formulario">
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelarUnidad">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Registrar unidad
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </section>
+
+
+
+    <!-- =================================================
+                TITULARES DE LA UNIDAD
+    ================================================== -->
+
+    <section
+        class="tarjeta"
+        id="seccionTitulares"
+        hidden>
+
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-people"></i>
+
+                <div>
+
+                    <h2>
+                        Titulares de la unidad
+                    </h2>
+
+                    <p class="descripcion-seccion">
+                        Personas relacionadas con la
+                        unidad agraria seleccionada.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnAgregarTitular">
+
+                <i class="bi bi-person-plus"></i>
+
+                Agregar titular
+
+            </button>
+
+        </div>
+
+
+        <div
+            id="titularesUnidadContainer"
+            class="titulares-container">
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+            VINCULAR CON AFECTACIÓN
+    ================================================== -->
+
+    <section
+        class="tarjeta vinculacion-afectacion"
+        id="seccionVinculacion"
+        hidden>
+
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-link-45deg"></i>
+
+                <div>
+
+                    <h2>
+                        Relacionar con afectación
+                    </h2>
+
+                    <p class="descripcion-seccion">
+                        Indica cómo esta unidad agraria
+                        participa en la afectación actual.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <form id="formVinculacion">
+
+
+            <div class="form-grid">
+
+
+                <!-- =====================================
+                        SUPERFICIE PRELIMINAR
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="superficiePreliminar">
+
+                        Superficie preliminar (ha)
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="number"
+                        id="superficiePreliminar"
+                        name="superficie_preliminar_ha"
+                        min="0"
+                        step="0.0001">
+
+                </div>
+
+
+
+                <!-- =====================================
+                    SUPERFICIE AFECTADA
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="superficieAfectada">
+
+                        Superficie afectada (ha)
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="number"
+                        id="superficieAfectada"
+                        name="superficie_afectada_ha"
+                        min="0"
+                        step="0.0001">
+
+                </div>
+
+
+
+                <!-- =====================================
+                VALOR ORIGINAL
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="superficieValorOriginal">
+
+                        Superficie en fuente original
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="superficieValorOriginal"
+                        name="superficie_valor_original"
+                        placeholder="Ej. 2-15-30">
+
+                </div>
+
+
+
+                <!-- =====================================
+                    FORMATO ORIGEN
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="superficieFormatoOrigen">
+
+                        Formato de origen
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="superficieFormatoOrigen"
+                        name="superficie_formato_origen"
+                        placeholder="Ej. Hectáreas-áreas-centiáreas">
+
+                </div>
+
+
+
+                <!-- =====================================
+                        FUENTE
+                ====================================== -->
+
+                <div class="campo campo-completo">
+
+                    <label for="fuenteVinculacion">
+
+                        Fuente
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="fuenteVinculacion"
+                        name="fuente"
+                        maxlength="250"
+                        placeholder="Origen de la información">
+
+                </div>
+
+            </div>
+
+
+            <div class="acciones-formulario">
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelarVinculacion">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-link"></i>
+
+                    Vincular afectación
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </section>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    <p>
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+    </p>
+
+</footer>
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/unidadAgraria.js"></script>
+
+</body>
+
+</html>

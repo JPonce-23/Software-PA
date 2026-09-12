@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Indemnización | SSALFER</title>
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/indemnizacion.css">
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button class="btn-menu" type="button">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn" type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                        CONTENIDO
+===================================================== -->
+
+<main class="contenedor">
+
+
+    <!-- =================================================
+                    ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+        <div>
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Proyectos
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span id="nombreProyecto">
+                    AIFA - Pachuca
+                </span>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Afectación
+                </span>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Indemnización
+                </span>
+
+            </div>
+
+
+            <p class="etiqueta">
+                LIBERACIÓN DE PROPIEDAD SOCIAL
+            </p>
+
+
+            <h1>
+                Indemnización y pagos
+            </h1>
+
+
+            <p class="subtitulo">
+
+                Afectación:
+                <strong id="identificadorAfectacion">
+                    AF-001
+                </strong>
+
+            </p>
+
+        </div>
+
+
+        <button
+            type="button"
+            class="btn-secundario"
+            id="btnVolver">
+
+            <i class="bi bi-arrow-left"></i>
+
+            Volver a afectación
+
+        </button>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    RESUMEN FINANCIERO
+    ================================================== -->
+
+    <section class="resumen-financiero">
+
+
+        <div class="resumen-item">
+
+            <span>
+                Valor financiero
+            </span>
+
+            <strong id="valorFinanciero">
+                $0.00
+            </strong>
+
+        </div>
+
+
+        <div class="resumen-item">
+
+            <span>
+                Total pagado
+            </span>
+
+            <strong id="totalPagado">
+                $0.00
+            </strong>
+
+        </div>
+
+
+        <div class="resumen-item">
+
+            <span>
+                Saldo pendiente
+            </span>
+
+            <strong id="saldoPendiente">
+                $0.00
+            </strong>
+
+        </div>
+
+
+        <div class="resumen-item">
+
+            <span>
+                Avance financiero
+            </span>
+
+            <strong id="avanceFinanciero">
+                0%
+            </strong>
+
+        </div>
+
+    </section>
+
+
+    <p class="nota-formula">
+
+        <i class="bi bi-info-circle"></i>
+
+        El valor financiero mostrado utiliza provisionalmente la
+        fórmula <strong>monto 100% + monto BDT</strong> de los convenios
+        asociados a esta afectación. Esta fórmula aún no constituye
+        una definición oficial del indicador.
+
+    </p>
+
+
+
+    <!-- =================================================
+                    INDEMNIZACIÓN
+    ================================================== -->
+
+    <section class="tarjeta">
+
+
+        <div class="seccion-header">
+
+            <div>
+
+                <p class="etiqueta">
+                    01 · INDEMNIZACIÓN
+                </p>
+
+                <h2>
+                    Estado de la indemnización
+                </h2>
+
+                <p>
+                    Registra o actualiza el estado de la indemnización
+                    correspondiente a esta afectación.
+                </p>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- SIN INDEMNIZACIÓN -->
+
+        <div
+            id="sinIndemnizacion"
+            class="estado-vacio">
+
+            <i class="bi bi-file-earmark-plus"></i>
+
+            <h3>
+                No existe una indemnización registrada
+            </h3>
+
+            <p>
+                Para registrar pagos primero debes crear la
+                indemnización correspondiente a esta afectación.
+            </p>
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnCrearIndemnizacion">
+
+                <i class="bi bi-plus-lg"></i>
+
+                Crear indemnización
+
+            </button>
+
+        </div>
+
+
+
+        <!-- FORMULARIO INDEMNIZACIÓN -->
+
+        <form
+            id="formIndemnizacion"
+            class="formulario"
+            hidden>
+
+
+            <div class="form-grid">
+
+
+                <div class="campo">
+
+                    <label for="estatus">
+
+                        Estatus
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+
+                    <select
+                        id="estatus"
+                        name="estatus"
+                        required>
+
+                        <option value="pendiente">
+                            Pendiente
+                        </option>
+
+                        <option value="programado">
+                            Programado
+                        </option>
+
+                        <option value="en_proceso">
+                            En proceso
+                        </option>
+
+                        <option value="completo">
+                            Completo
+                        </option>
+
+                        <option value="pagado">
+                            Pagado
+                        </option>
+
+                        <option value="cancelado">
+                            Cancelado
+                        </option>
+
+                        <option value="otro">
+                            Otro
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div
+                    class="campo"
+                    id="campoDescripcionEstatus"
+                    hidden>
+
+                    <label for="descripcionEstatus">
+
+                        Descripción del estatus
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="text"
+                        id="descripcionEstatus"
+                        name="descripcion_estatus"
+                        maxlength="500">
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="fechaProgramada">
+
+                        Fecha programada
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="date"
+                        id="fechaProgramada"
+                        name="fecha_programada">
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="fechaResolucion">
+
+                        Fecha de resolución
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="date"
+                        id="fechaResolucion"
+                        name="fecha_resolucion">
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="fechaEntrega">
+
+                        Entrega de expediente PA
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="date"
+                        id="fechaEntrega"
+                        name="fecha_entrega_expediente_pa">
+
+                </div>
+
+            </div>
+
+
+            <div class="acciones-formulario">
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelarIndemnizacion">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Guardar indemnización
+
+                </button>
+
+            </div>
+
+        </form>
+
+
+        <!-- INDEMNIZACIÓN REGISTRADA -->
+
+        <div
+            id="indemnizacionRegistrada"
+            hidden>
+
+
+            <div class="estado-indemnizacion">
+
+                <div>
+
+                    <span>
+                        Estatus actual
+                    </span>
+
+                    <strong id="estatusActual">
+                        Pendiente
+                    </strong>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnEditarIndemnizacion">
+
+                    <i class="bi bi-pencil"></i>
+
+                    Editar
+
+                </button>
+
+            </div>
+
+
+            <div class="datos-indemnizacion">
+
+                <div>
+
+                    <span>
+                        Fecha programada
+                    </span>
+
+                    <strong id="datoFechaProgramada">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Fecha de resolución
+                    </span>
+
+                    <strong id="datoFechaResolucion">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Entrega expediente PA
+                    </span>
+
+                    <strong id="datoFechaEntrega">
+                        —
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="datoDescripcionEstatus"
+                class="descripcion-estatus"
+                hidden>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    PAGOS
+    ================================================== -->
+
+    <section
+        id="seccionPagos"
+        class="tarjeta"
+        hidden>
+
+
+        <div class="seccion-header pagos-header">
+
+            <div>
+
+                <p class="etiqueta">
+                    02 · PAGOS
+                </p>
+
+                <h2>
+                    Pagos registrados
+                </h2>
+
+                <p>
+                    Consulta los pagos asociados a esta indemnización
+                    y registra nuevos movimientos.
+                </p>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnRegistrarPago">
+
+                <i class="bi bi-plus-lg"></i>
+
+                Registrar pago
+
+            </button>
+
+        </div>
+
+
+
+        <!-- TABLA -->
+
+        <div class="tabla-contenedor">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Fecha
+                        </th>
+
+                        <th>
+                            Beneficiario
+                        </th>
+
+                        <th>
+                            Monto
+                        </th>
+
+                        <th>
+                            Medio
+                        </th>
+
+                        <th>
+                            Referencia
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="pagosBody">
+
+                    <!-- Datos demostrativos -->
+
+                    <tr>
+
+                        <td>
+                            05/08/2026
+                        </td>
+
+                        <td>
+                            Beneficiario demostrativo
+                        </td>
+
+                        <td>
+                            $500,000.00
+                        </td>
+
+                        <td>
+                            Transferencia
+                        </td>
+
+                        <td>
+                            REF-001
+                        </td>
+
+                    </tr>
+
+
+                    <tr>
+
+                        <td>
+                            15/08/2026
+                        </td>
+
+                        <td>
+                            Beneficiario demostrativo
+                        </td>
+
+                        <td>
+                            $300,000.00
+                        </td>
+
+                        <td>
+                            Transferencia
+                        </td>
+
+                        <td>
+                            REF-002
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+
+        <!-- SIN PAGOS -->
+
+        <div
+            id="sinPagos"
+            class="estado-vacio pequeno"
+            hidden>
+
+            <i class="bi bi-cash-stack"></i>
+
+            <p>
+                Todavía no hay pagos registrados.
+            </p>
+
+        </div>
+
+
+
+        <!-- FORMULARIO PAGO -->
+
+        <form
+            id="formPago"
+            class="formulario-pago"
+            hidden>
+
+
+            <div class="formulario-pago-header">
+
+                <div>
+
+                    <h3>
+                        Registrar pago
+                    </h3>
+
+                    <p>
+                        Registra el movimiento realizado para
+                        esta indemnización.
+                    </p>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="btn-cerrar-formulario"
+                    id="btnCerrarPago">
+
+                    <i class="bi bi-x-lg"></i>
+
+                </button>
+
+            </div>
+
+
+            <div class="form-grid">
+
+
+                <div class="campo">
+
+                    <label for="fechaPago">
+
+                        Fecha de pago
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+                    <input
+                        type="date"
+                        id="fechaPago"
+                        name="fecha_pago"
+                        required>
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="montoPago">
+
+                        Monto
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+                    <input
+                        type="number"
+                        id="montoPago"
+                        name="monto"
+                        min="0.01"
+                        step="0.01"
+                        required>
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="idPersonaBeneficiaria">
+
+                        Persona beneficiaria
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="number"
+                        id="idPersonaBeneficiaria"
+                        name="id_persona_beneficiaria"
+                        min="1"
+                        placeholder="ID de persona">
+
+                    <small>
+                        Se conectará al buscador de personas registradas.
+                    </small>
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="beneficiarioNombre">
+
+                        Nombre del beneficiario
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+                    <input
+                        type="text"
+                        id="beneficiarioNombre"
+                        name="beneficiario_nombre"
+                        maxlength="300"
+                        required>
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="referencia">
+
+                        Referencia
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="text"
+                        id="referencia"
+                        name="referencia"
+                        maxlength="150"
+                        placeholder="Folio o referencia bancaria">
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="medioPago">
+
+                        Medio de pago
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="medioPago"
+                        name="medio_pago">
+
+                        <option value="">
+                            Seleccionar
+                        </option>
+
+                        <option value="transferencia">
+                            Transferencia
+                        </option>
+
+                        <option value="cheque">
+                            Cheque
+                        </option>
+
+                        <option value="efectivo">
+                            Efectivo
+                        </option>
+
+                        <option value="deposito">
+                            Depósito
+                        </option>
+
+                        <option value="otro">
+                            Otro
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+            <div class="acciones-formulario">
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelarPago">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Guardar pago
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </section>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/indemnizacion.js"></script>
+
+</body>
+
+</html>

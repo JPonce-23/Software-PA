@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Personas | SSALFER</title>
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/persona.css">
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button class="btn-menu" type="button">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn" type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Sistema SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank"
+        rel="noopener noreferrer">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                        CONTENIDO
+===================================================== -->
+
+<main class="contenedor">
+
+
+    <!-- =================================================
+                        ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+        <div>
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Proyectos
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Personas
+                </span>
+
+            </div>
+
+
+            <p class="etiqueta">
+                DIRECTORIO DEL PROYECTO
+            </p>
+
+
+            <h1>
+                Personas
+            </h1>
+
+
+            <p class="subtitulo">
+                Consulta y registra las personas que participan
+                en el expediente del proyecto.
+            </p>
+
+        </div>
+
+
+        <div class="acciones-header">
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnNuevaPersona">
+
+                <i class="bi bi-person-plus"></i>
+
+                Nueva persona
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    CONTEXTO
+    ================================================== -->
+
+    <section class="aviso-contexto">
+
+        <i class="bi bi-info-circle"></i>
+
+        <div>
+
+            <strong>
+                Registro compartido del proyecto
+            </strong>
+
+            <p>
+                Una persona puede participar en distintos
+                núcleos y módulos del mismo proyecto. Por eso
+                se registra una sola vez y posteriormente se
+                reutiliza mediante su ID.
+            </p>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    BUSCADOR
+    ================================================== -->
+
+    <section class="tarjeta">
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-search"></i>
+
+                <h2>
+                    Buscar persona
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div class="busqueda-persona">
+
+            <div class="campo">
+
+                <label for="busqueda">
+
+                    Nombre o CURP
+
+                </label>
+
+                <input
+                    type="search"
+                    id="busqueda"
+                    placeholder="Buscar por nombre o CURP...">
+
+            </div>
+
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnLimpiarBusqueda">
+
+                <i class="bi bi-x-circle"></i>
+
+                Limpiar
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    DIRECTORIO
+    ================================================== -->
+
+    <section class="tarjeta">
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-people"></i>
+
+                <h2>
+                    Directorio de personas
+                </h2>
+
+            </div>
+
+
+            <span
+                class="contador-registros"
+                id="contadorPersonas">
+
+                0 personas
+
+            </span>
+
+        </div>
+
+
+        <div
+            id="personasContainer"
+            class="personas-container">
+
+
+            <!-- =========================================
+                        PERSONA DEMOSTRATIVA
+            ========================================== -->
+
+            <article
+                class="persona"
+                data-persona>
+
+
+                <div class="persona-icono">
+
+                    <i class="bi bi-person"></i>
+
+                </div>
+
+
+                <div class="persona-datos">
+
+                    <h3>
+                        Persona demostrativa
+                    </h3>
+
+                    <span>
+                        CURP: Pendiente
+                    </span>
+
+                    <span>
+                        Teléfono: Pendiente
+                    </span>
+
+                    <span>
+                        Correo: Pendiente
+                    </span>
+
+                </div>
+
+
+                <div class="persona-estado">
+
+                    <span class="estado-identidad incompleta">
+                        Identidad incompleta
+                    </span>
+
+                </div>
+
+            </article>
+
+
+        </div>
+
+
+        <!-- =============================================
+                    ESTADO VACÍO
+        ============================================== -->
+
+        <div
+            id="sinPersonas"
+            class="sin-registros"
+            hidden>
+
+            <i class="bi bi-person-x"></i>
+
+            <p>
+                No hay personas registradas.
+            </p>
+
+            <span>
+                Utiliza "Nueva persona" para registrar
+                la primera.
+            </span>
+
+        </div>
+
+    </section>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                    MODAL NUEVA PERSONA
+===================================================== -->
+
+<div
+    class="modal"
+    id="modalPersona"
+    hidden>
+
+
+    <div
+        class="modal-contenido"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tituloModalPersona">
+
+
+        <!-- =============================================
+                        ENCABEZADO
+        ============================================== -->
+
+        <div class="modal-header">
+
+            <div>
+
+                <p class="etiqueta">
+                    NUEVO REGISTRO
+                </p>
+
+                <h2 id="tituloModalPersona">
+                    Nueva persona
+                </h2>
+
+                <p>
+                    Registra los datos disponibles de la persona.
+                </p>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="btn-cerrar-modal"
+                id="btnCerrarModal"
+                aria-label="Cerrar">
+
+                <i class="bi bi-x-lg"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <!-- =============================================
+                        FORMULARIO
+        ============================================== -->
+
+        <form id="formPersona">
+
+
+            <div class="form-grid">
+
+
+                <!-- NOMBRE -->
+
+                <div class="campo campo-completo">
+
+                    <label for="nombre">
+
+                        Nombre(s)
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+                    <input
+                        type="text"
+                        id="nombre"
+                        name="nombre"
+                        maxlength="300"
+                        required
+                        autocomplete="given-name"
+                        placeholder="Nombre o nombres">
+
+                </div>
+
+
+
+                <!-- APELLIDO PATERNO -->
+
+                <div class="campo">
+
+                    <label for="apellidoPaterno">
+
+                        Apellido paterno
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="text"
+                        id="apellidoPaterno"
+                        name="apellido_paterno"
+                        maxlength="200"
+                        autocomplete="family-name"
+                        placeholder="Apellido paterno">
+
+                </div>
+
+
+
+                <!-- APELLIDO MATERNO -->
+
+                <div class="campo">
+
+                    <label for="apellidoMaterno">
+
+                        Apellido materno
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="text"
+                        id="apellidoMaterno"
+                        name="apellido_materno"
+                        maxlength="200"
+                        placeholder="Apellido materno">
+
+                </div>
+
+
+
+                <!-- CURP -->
+
+                <div class="campo">
+
+                    <label for="curp">
+
+                        CURP
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="text"
+                        id="curp"
+                        name="curp"
+                        maxlength="18"
+                        placeholder="CURP">
+
+                    <small>
+                        Máximo 18 caracteres.
+                    </small>
+
+                </div>
+
+
+
+                <!-- RFC -->
+
+                <div class="campo">
+
+                    <label for="rfc">
+
+                        RFC
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="text"
+                        id="rfc"
+                        name="rfc"
+                        maxlength="13"
+                        placeholder="RFC">
+
+                </div>
+
+
+
+                <!-- TELÉFONO -->
+
+                <div class="campo">
+
+                    <label for="telefono">
+
+                        Teléfono
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="tel"
+                        id="telefono"
+                        name="telefono"
+                        maxlength="30"
+                        autocomplete="tel"
+                        placeholder="Número telefónico">
+
+                </div>
+
+
+
+                <!-- CORREO -->
+
+                <div class="campo">
+
+                    <label for="correoElectronico">
+
+                        Correo electrónico
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="email"
+                        id="correoElectronico"
+                        name="correo_electronico"
+                        maxlength="320"
+                        autocomplete="email"
+                        placeholder="correo@ejemplo.com">
+
+                </div>
+
+
+
+                <!-- IDENTIDAD INCOMPLETA -->
+
+                <div class="campo-checkbox campo-completo">
+
+                    <label>
+
+                        <input
+                            type="checkbox"
+                            id="datosIdentidadIncompletos"
+                            name="datos_identidad_incompletos">
+
+                        <span>
+
+                            Los datos de identidad están incompletos
+
+                        </span>
+
+                    </label>
+
+
+                    <small>
+
+                        Actívalo cuando la persona se registre
+                        sin CURP o documentación de identidad completa.
+
+                    </small>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+                            AVISO
+            ================================================== -->
+
+            <div class="aviso-identidad">
+
+                <i class="bi bi-shield-check"></i>
+
+                <p>
+
+                    <strong>Registro desde el sistema</strong>.
+
+                    <br>
+
+                    Esta persona se registrará directamente
+                    desde SSALFER.
+
+                </p>
+
+            </div>
+
+
+
+            <!-- =================================================
+                            ACCIONES
+            ================================================== -->
+
+            <div class="acciones-formulario">
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelarPersona">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Guardar persona
+
+                </button>
+
+            </div>
+
+
+        </form>
+
+    </div>
+
+</div>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/persona.js"></script>
+
+
+</body>
+
+</html>

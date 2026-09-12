@@ -1,0 +1,828 @@
+/* =========================================================
+        INDEMNIZACIÓN
+========================================================= */
+
+
+/* =========================================================
+        ENCABEZADO
+========================================================= */
+
+.pagina-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-end;
+
+    gap: 25px;
+
+    margin-bottom: 25px;
+
+}
+
+
+.migas {
+
+    display: flex;
+
+    align-items: center;
+
+    flex-wrap: wrap;
+
+    gap: 8px;
+
+    margin-bottom: 18px;
+
+    color: #777;
+
+    font-size: .9rem;
+
+}
+
+
+.migas a {
+
+    color: var(--verde);
+
+    text-decoration: none;
+
+}
+
+
+.migas a:hover {
+
+    text-decoration: underline;
+
+}
+
+
+.migas i {
+
+    color: #aaa;
+
+    font-size: .7rem;
+
+}
+
+
+.etiqueta {
+
+    color: var(--verde);
+
+    font-size: .78rem;
+
+    font-weight: bold;
+
+    letter-spacing: 1.5px;
+
+    margin-bottom: 5px;
+
+}
+
+
+.pagina-header h1 {
+
+    color: var(--verde);
+
+    font-size: 2rem;
+
+    margin-bottom: 5px;
+
+}
+
+
+.subtitulo {
+
+    color: #666;
+
+    font-size: .95rem;
+
+}
+
+
+/* =========================================================
+        BOTONES
+========================================================= */
+
+.btn-principal,
+.btn-secundario {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 8px;
+
+    padding: 10px 18px;
+
+    border-radius: 7px;
+
+    cursor: pointer;
+
+    font-size: .9rem;
+
+    transition: .2s;
+
+}
+
+
+.btn-principal {
+
+    border: none;
+
+    background: var(--verde);
+
+    color: white;
+
+}
+
+
+.btn-principal:hover {
+
+    background: var(--verde-oscuro);
+
+    transform: translateY(-2px);
+
+}
+
+
+.btn-secundario {
+
+    border: 1px solid #ccc;
+
+    background: white;
+
+    color: #555;
+
+}
+
+
+.btn-secundario:hover {
+
+    border-color: var(--verde);
+
+    color: var(--verde);
+
+}
+
+
+/* =========================================================
+        TARJETAS
+========================================================= */
+
+.tarjeta {
+
+    background: white;
+
+    border-radius: 12px;
+
+    padding: 25px;
+
+    margin-bottom: 25px;
+
+    box-shadow: var(--sombra);
+
+}
+
+
+.seccion-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-start;
+
+    gap: 20px;
+
+    margin-bottom: 25px;
+
+}
+
+
+.seccion-header h2 {
+
+    color: var(--verde);
+
+    font-size: 1.3rem;
+
+    margin-bottom: 5px;
+
+}
+
+
+.seccion-header p:not(.etiqueta) {
+
+    color: #777;
+
+    font-size: .85rem;
+
+}
+
+
+/* =========================================================
+        RESUMEN FINANCIERO
+========================================================= */
+
+.resumen-financiero {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    gap: 18px;
+
+    margin-bottom: 15px;
+
+}
+
+
+.resumen-item {
+
+    padding: 20px;
+
+    border-radius: 10px;
+
+    background: var(--gris-claro);
+
+    text-align: center;
+
+}
+
+
+.resumen-item span {
+
+    display: block;
+
+    color: #777;
+
+    font-size: .8rem;
+
+    margin-bottom: 8px;
+
+}
+
+
+.resumen-item strong {
+
+    color: var(--verde);
+
+    font-size: 1.35rem;
+
+}
+
+
+.nota-formula {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 8px;
+
+    margin-bottom: 25px;
+
+    color: #777;
+
+    font-size: .75rem;
+
+}
+
+
+.nota-formula i {
+
+    color: var(--verde);
+
+    margin-top: 2px;
+
+}
+
+
+/* =========================================================
+        ESTADO VACÍO
+========================================================= */
+
+.estado-vacio {
+
+    padding: 35px 20px;
+
+    text-align: center;
+
+    border: 1px dashed #ccc;
+
+    border-radius: 10px;
+
+    background: #fafafa;
+
+}
+
+
+.estado-vacio i {
+
+    display: block;
+
+    margin-bottom: 12px;
+
+    color: #aaa;
+
+    font-size: 2.3rem;
+
+}
+
+
+.estado-vacio h3 {
+
+    color: #555;
+
+    font-size: 1rem;
+
+    margin-bottom: 8px;
+
+}
+
+
+.estado-vacio p {
+
+    max-width: 600px;
+
+    margin: 0 auto 18px;
+
+    color: #888;
+
+    font-size: .85rem;
+
+}
+
+
+.estado-vacio.pequeno {
+
+    padding: 25px;
+
+}
+
+
+/* =========================================================
+        FORMULARIOS
+========================================================= */
+
+.formulario {
+
+    border-top: 1px solid #e2e2e2;
+
+    padding-top: 25px;
+
+}
+
+
+.form-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 20px;
+
+}
+
+
+.campo {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+}
+
+
+.campo label {
+
+    color: #444;
+
+    font-size: .9rem;
+
+    font-weight: bold;
+
+}
+
+
+.campo input,
+.campo select,
+.campo textarea {
+
+    width: 100%;
+
+    padding: 11px 12px;
+
+    border: 1px solid #ccc;
+
+    border-radius: 7px;
+
+    background: white;
+
+    color: #333;
+
+    font-size: .9rem;
+
+    outline: none;
+
+    transition: .2s;
+
+}
+
+
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus {
+
+    border-color: var(--verde);
+
+    box-shadow:
+        0 0 0 2px rgba(40, 107, 48, .10);
+
+}
+
+
+.campo small {
+
+    color: #888;
+
+    font-size: .75rem;
+
+}
+
+
+.obligatorio {
+
+    color: #b3261e;
+
+}
+
+
+.opcional {
+
+    color: #888;
+
+    font-size: .75rem;
+
+    font-weight: normal;
+
+}
+
+
+.acciones-formulario {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    margin-top: 25px;
+
+    padding-top: 20px;
+
+    border-top: 1px solid #e2e2e2;
+
+}
+
+
+/* =========================================================
+        INDEMNIZACIÓN REGISTRADA
+========================================================= */
+
+.estado-indemnizacion {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    gap: 20px;
+
+    padding: 18px;
+
+    border-radius: 9px;
+
+    background: var(--gris-claro);
+
+}
+
+
+.estado-indemnizacion span {
+
+    display: block;
+
+    color: #888;
+
+    font-size: .75rem;
+
+    margin-bottom: 5px;
+
+}
+
+
+.estado-indemnizacion strong {
+
+    color: var(--verde);
+
+    font-size: 1.1rem;
+
+}
+
+
+.datos-indemnizacion {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+    gap: 15px;
+
+    margin-top: 15px;
+
+}
+
+
+.datos-indemnizacion div {
+
+    padding: 15px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 8px;
+
+}
+
+
+.datos-indemnizacion span {
+
+    display: block;
+
+    color: #888;
+
+    font-size: .75rem;
+
+    margin-bottom: 5px;
+
+}
+
+
+.datos-indemnizacion strong {
+
+    color: #444;
+
+    font-size: .9rem;
+
+}
+
+
+.descripcion-estatus {
+
+    margin-top: 15px;
+
+    padding: 12px 15px;
+
+    border-radius: 7px;
+
+    background: #f8f8f8;
+
+    color: #666;
+
+    font-size: .85rem;
+
+}
+
+
+/* =========================================================
+        PAGOS
+========================================================= */
+
+.pagos-header {
+
+    align-items: center;
+
+}
+
+
+.tabla-contenedor {
+
+    width: 100%;
+
+    overflow-x: auto;
+
+}
+
+
+.tabla-contenedor table {
+
+    width: 100%;
+
+    border-collapse: collapse;
+
+    min-width: 700px;
+
+}
+
+
+.tabla-contenedor th {
+
+    padding: 12px;
+
+    text-align: left;
+
+    background: var(--gris-claro);
+
+    color: #555;
+
+    font-size: .8rem;
+
+}
+
+
+.tabla-contenedor td {
+
+    padding: 13px 12px;
+
+    border-bottom: 1px solid #e5e5e5;
+
+    color: #555;
+
+    font-size: .85rem;
+
+}
+
+
+.tabla-contenedor tbody tr:hover {
+
+    background: #fafafa;
+
+}
+
+
+/* =========================================================
+        FORMULARIO PAGO
+========================================================= */
+
+.formulario-pago {
+
+    margin-top: 25px;
+
+    padding: 22px;
+
+    border-radius: 10px;
+
+    background: var(--gris-claro);
+
+}
+
+
+.formulario-pago-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-start;
+
+    gap: 20px;
+
+    margin-bottom: 22px;
+
+}
+
+
+.formulario-pago-header h3 {
+
+    color: var(--verde);
+
+    margin-bottom: 5px;
+
+}
+
+
+.formulario-pago-header p {
+
+    color: #777;
+
+    font-size: .85rem;
+
+}
+
+
+.btn-cerrar-formulario {
+
+    border: none;
+
+    background: none;
+
+    color: #777;
+
+    font-size: 1.1rem;
+
+    cursor: pointer;
+
+}
+
+
+.btn-cerrar-formulario:hover {
+
+    color: #222;
+
+}
+
+
+/* =========================================================
+        RESPONSIVE
+========================================================= */
+
+@media (max-width: 900px) {
+
+    .pagina-header {
+
+        flex-direction: column;
+
+        align-items: flex-start;
+
+    }
+
+
+    .resumen-financiero {
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+    }
+
+
+    .datos-indemnizacion {
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+    }
+
+}
+
+
+@media (max-width: 700px) {
+
+    .form-grid {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .resumen-financiero {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .datos-indemnizacion {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .pagos-header {
+
+        flex-direction: column;
+
+        align-items: flex-start;
+
+    }
+
+
+    .pagos-header .btn-principal {
+
+        width: 100%;
+
+    }
+
+
+    .acciones-formulario {
+
+        flex-direction: column-reverse;
+
+    }
+
+
+    .acciones-formulario button {
+
+        width: 100%;
+
+    }
+
+}

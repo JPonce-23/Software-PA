@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>
+        Auditoría | SSALFER
+    </title>
+
+
+    <link
+        rel="stylesheet"
+        href="/styles/dashboard.css">
+
+    <link
+        rel="stylesheet"
+        href="/styles/auditoria.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+
+    <link
+        rel="icon"
+        type="image/png"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button
+        class="btn-menu"
+        type="button"
+        aria-label="Contraer menú">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">
+            Usuario
+        </span>
+
+    </div>
+
+
+    <nav class="barra">
+
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div
+                class="proyectos-lista-dinamica"
+                id="proyectosLista">
+            </div>
+
+
+            <a href="/pages/nuevoProyecto.html">
+
+                <i class="bi bi-plus-circle"></i>
+
+                <span>
+                    Nuevo proyecto
+                </span>
+
+            </a>
+
+        </div>
+
+
+
+        <div class="proyectos">
+
+            <h4>
+                Administración
+            </h4>
+
+
+            <a href="/pages/usuarios.html">
+
+                <i class="bi bi-people"></i>
+
+                <span>
+                    Usuarios
+                </span>
+
+            </a>
+
+
+            <a href="/pages/catalogosOperativos.html">
+
+                <i class="bi bi-list-check"></i>
+
+                <span>
+                    Catálogos operativos
+                </span>
+
+            </a>
+
+
+            <a
+                href="/pages/auditoria.html"
+                class="activo">
+
+                <i class="bi bi-journal-text"></i>
+
+                <span>
+                    Auditoría
+                </span>
+
+            </a>
+
+        </div>
+
+
+
+        <div class="usuario-panel">
+
+            <button
+                class="usuario-btn"
+                type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">
+                    Usuario
+                </span>
+
+                <i class="bi bi-chevron-up"></i>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="/dashboard.html">
+
+                    <i class="bi bi-house"></i>
+
+                    Dashboard
+
+                </a>
+
+            </div>
+
+        </div>
+
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Procuraduría Agraria">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                        CONTENIDO
+===================================================== -->
+
+<main
+    class="contenedor auditoria-contenedor">
+
+
+    <nav
+        class="migas"
+        aria-label="Breadcrumb">
+
+        <a href="/dashboard.html">
+            Proyectos
+        </a>
+
+        <i class="bi bi-chevron-right"></i>
+
+        <span>
+            Auditoría
+        </span>
+
+    </nav>
+
+
+
+    <section class="auditoria-encabezado">
+
+        <div>
+
+            <p class="auditoria-eyebrow">
+                Administración
+            </p>
+
+
+            <h1>
+                Auditoría
+            </h1>
+
+
+            <p class="auditoria-subtitulo">
+
+                Consulta la bitácora de cambios
+                y los eventos de acceso
+                registrados por el backend.
+
+                Esta pantalla es de solo lectura.
+
+            </p>
+
+        </div>
+
+    </section>
+
+
+
+    <div
+        id="auditoriaError"
+        class="auditoria-alerta auditoria-alerta-error"
+        hidden>
+    </div>
+
+
+
+    <section class="auditoria-nota-seguridad">
+
+        <i class="bi bi-shield-lock"></i>
+
+
+        <p>
+
+            El backend restringe estas consultas
+            al rol <strong>admin</strong> y aplica
+            redacción del lado del servidor a
+            contraseñas, tokens, sesiones,
+            secretos y datos geométricos.
+
+            La interfaz muestra únicamente lo
+            que la API entrega.
+
+        </p>
+
+    </section>
+
+
+
+    <!-- =================================================
+                            TABS
+    ================================================== -->
+
+    <div
+        class="auditoria-tabs"
+        role="tablist"
+        aria-label="Tipo de auditoría">
+
+
+        <button
+            class="auditoria-tab activo"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            data-auditoria-tab="cambios">
+
+            <i class="bi bi-pencil-square"></i>
+
+            Cambios
+
+        </button>
+
+
+        <button
+            class="auditoria-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-auditoria-tab="accesos">
+
+            <i class="bi bi-box-arrow-in-right"></i>
+
+            Accesos
+
+        </button>
+
+
+    </div>
+
+
+
+    <!-- =================================================
+                    AUDITORÍA DE CAMBIOS
+    ================================================== -->
+
+    <section
+        id="panelCambios"
+        class="auditoria-panel"
+        role="tabpanel">
+
+
+        <article class="auditoria-card">
+
+
+            <div class="auditoria-card-header">
+
+                <div>
+
+                    <h2>
+                        Filtros de cambios
+                    </h2>
+
+                    <p>
+
+                        Filtra por usuario,
+                        proyecto, entidad, acción
+                        y rango de fecha.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+
+            <form
+                id="formFiltrosCambios"
+                class="auditoria-filtros">
+
+
+                <div class="auditoria-campo">
+
+                    <label for="cambiosUsuario">
+                        ID usuario
+                    </label>
+
+                    <input
+                        id="cambiosUsuario"
+                        name="id_usuario"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="Ej. 12">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="cambiosProyecto">
+                        ID proyecto
+                    </label>
+
+                    <input
+                        id="cambiosProyecto"
+                        name="id_proyecto"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="Ej. 4">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="cambiosProyectoNucleo">
+                        ID proyecto-núcleo
+                    </label>
+
+                    <input
+                        id="cambiosProyectoNucleo"
+                        name="id_proyecto_nucleo"
+                        type="number"
+                        min="1"
+                        step="1">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="cambiosNucleo">
+                        ID núcleo
+                    </label>
+
+                    <input
+                        id="cambiosNucleo"
+                        name="id_nucleo"
+                        type="number"
+                        min="1"
+                        step="1">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="cambiosEntidadTipo">
+                        Tipo de entidad
+                    </label>
+
+                    <input
+                        id="cambiosEntidadTipo"
+                        name="entidad_tipo"
+                        type="text"
+                        maxlength="100"
+                        placeholder="Ej. usuario, proyecto">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="cambiosEntidadId">
+                        ID entidad
+                    </label>
+
+                    <input
+                        id="cambiosEntidadId"
+                        name="entidad_id"
+                        type="number"
+                        min="1"
+                        step="1">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="cambiosAccion">
+                        Acción técnica
+                    </label>
+
+                    <input
+                        id="cambiosAccion"
+                        name="accion"
+                        type="text"
+                        maxlength="30"
+                        placeholder="Ej. insert, update">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="cambiosDesde">
+                        Desde
+                    </label>
+
+                    <input
+                        id="cambiosDesde"
+                        name="desde"
+                        type="datetime-local">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="cambiosHasta">
+                        Hasta
+                    </label>
+
+                    <input
+                        id="cambiosHasta"
+                        name="hasta"
+                        type="datetime-local">
+
+                </div>
+
+
+
+                <div class="auditoria-filtros-acciones">
+
+
+                    <button
+                        id="btnLimpiarCambios"
+                        class="auditoria-btn auditoria-btn-secundario"
+                        type="button">
+
+                        <i class="bi bi-eraser"></i>
+
+                        Limpiar filtros
+
+                    </button>
+
+
+                    <button
+                        class="auditoria-btn auditoria-btn-primario"
+                        type="submit">
+
+                        <i class="bi bi-search"></i>
+
+                        Consultar cambios
+
+                    </button>
+
+
+                </div>
+
+
+            </form>
+
+
+        </article>
+
+
+
+        <article class="auditoria-card">
+
+
+            <div class="auditoria-tabla-cabecera">
+
+
+                <p
+                    id="totalCambios"
+                    class="auditoria-total">
+
+                    0 registro(s)
+
+                </p>
+
+
+                <label
+                    class="auditoria-limite"
+                    for="limiteCambios">
+
+                    Registros por página
+
+
+                    <select id="limiteCambios">
+
+                        <option value="25">
+                            25
+                        </option>
+
+                        <option
+                            value="50"
+                            selected>
+                            50
+                        </option>
+
+                        <option value="100">
+                            100
+                        </option>
+
+                        <option value="200">
+                            200
+                        </option>
+
+                    </select>
+
+                </label>
+
+
+            </div>
+
+
+
+            <div class="auditoria-tabla-wrap">
+
+                <table class="auditoria-tabla">
+
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Fecha
+                            </th>
+
+                            <th>
+                                Usuario
+                            </th>
+
+                            <th>
+                                Proyecto
+                            </th>
+
+                            <th>
+                                Entidad
+                            </th>
+
+                            <th>
+                                Acción
+                            </th>
+
+                            <th>
+                                Campos
+                            </th>
+
+                            <th>
+                                Detalle
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+
+                    <tbody id="tablaCambios">
+
+                        <tr>
+
+                            <td
+                                colspan="7"
+                                class="auditoria-tabla-estado">
+
+                                Cargando...
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+
+                </table>
+
+            </div>
+
+
+
+            <div class="auditoria-paginacion">
+
+
+                <button
+                    id="btnAnteriorCambios"
+                    class="auditoria-btn auditoria-btn-secundario"
+                    type="button"
+                    disabled>
+
+                    <i class="bi bi-chevron-left"></i>
+
+                    Anterior
+
+                </button>
+
+
+                <span id="paginaCambios">
+                    Página 1 de 1
+                </span>
+
+
+                <button
+                    id="btnSiguienteCambios"
+                    class="auditoria-btn auditoria-btn-secundario"
+                    type="button"
+                    disabled>
+
+                    Siguiente
+
+                    <i class="bi bi-chevron-right"></i>
+
+                </button>
+
+
+            </div>
+
+
+        </article>
+
+
+    </section>
+
+
+
+    <!-- =================================================
+                    AUDITORÍA DE ACCESOS
+    ================================================== -->
+
+    <section
+        id="panelAccesos"
+        class="auditoria-panel"
+        role="tabpanel"
+        hidden>
+
+
+        <article class="auditoria-card">
+
+
+            <div class="auditoria-card-header">
+
+                <div>
+
+                    <h2>
+                        Filtros de accesos
+                    </h2>
+
+
+                    <p>
+
+                        Consulta autenticación,
+                        bloqueos, desbloqueos,
+                        revocaciones y demás
+                        eventos registrados.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+
+            <form
+                id="formFiltrosAccesos"
+                class="auditoria-filtros">
+
+
+                <div class="auditoria-campo">
+
+                    <label for="accesosUsuario">
+                        ID usuario afectado
+                    </label>
+
+                    <input
+                        id="accesosUsuario"
+                        name="id_usuario"
+                        type="number"
+                        min="1"
+                        step="1">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="accesosActor">
+                        ID usuario actor
+                    </label>
+
+                    <input
+                        id="accesosActor"
+                        name="id_usuario_actor"
+                        type="number"
+                        min="1"
+                        step="1">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="accesosTipoEvento">
+                        Tipo de evento
+                    </label>
+
+                    <input
+                        id="accesosTipoEvento"
+                        name="tipo_evento"
+                        type="text"
+                        maxlength="40"
+                        placeholder="Ej. desbloqueo">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="accesosMotivo">
+                        Código de motivo
+                    </label>
+
+                    <input
+                        id="accesosMotivo"
+                        name="motivo_codigo"
+                        type="text"
+                        maxlength="50"
+                        placeholder="Ej. desbloqueo_admin">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="accesosDesde">
+                        Desde
+                    </label>
+
+                    <input
+                        id="accesosDesde"
+                        name="desde"
+                        type="datetime-local">
+
+                </div>
+
+
+
+                <div class="auditoria-campo">
+
+                    <label for="accesosHasta">
+                        Hasta
+                    </label>
+
+                    <input
+                        id="accesosHasta"
+                        name="hasta"
+                        type="datetime-local">
+
+                </div>
+
+
+
+                <div class="auditoria-filtros-acciones">
+
+
+                    <button
+                        id="btnLimpiarAccesos"
+                        class="auditoria-btn auditoria-btn-secundario"
+                        type="button">
+
+                        <i class="bi bi-eraser"></i>
+
+                        Limpiar filtros
+
+                    </button>
+
+
+                    <button
+                        class="auditoria-btn auditoria-btn-primario"
+                        type="submit">
+
+                        <i class="bi bi-search"></i>
+
+                        Consultar accesos
+
+                    </button>
+
+
+                </div>
+
+
+            </form>
+
+
+        </article>
+
+
+
+        <article class="auditoria-card">
+
+
+            <div class="auditoria-tabla-cabecera">
+
+
+                <p
+                    id="totalAccesos"
+                    class="auditoria-total">
+
+                    0 registro(s)
+
+                </p>
+
+
+                <label
+                    class="auditoria-limite"
+                    for="limiteAccesos">
+
+                    Registros por página
+
+
+                    <select id="limiteAccesos">
+
+                        <option value="25">
+                            25
+                        </option>
+
+                        <option
+                            value="50"
+                            selected>
+                            50
+                        </option>
+
+                        <option value="100">
+                            100
+                        </option>
+
+                        <option value="200">
+                            200
+                        </option>
+
+                    </select>
+
+                </label>
+
+
+            </div>
+
+
+
+            <div class="auditoria-tabla-wrap">
+
+                <table class="auditoria-tabla">
+
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Fecha
+                            </th>
+
+                            <th>
+                                Usuario
+                            </th>
+
+                            <th>
+                                Actor
+                            </th>
+
+                            <th>
+                                Evento
+                            </th>
+
+                            <th>
+                                Motivo
+                            </th>
+
+                            <th>
+                                IP
+                            </th>
+
+                            <th>
+                                Sesión
+                            </th>
+
+                            <th>
+                                Detalle
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+
+                    <tbody id="tablaAccesos">
+
+                        <tr>
+
+                            <td
+                                colspan="8"
+                                class="auditoria-tabla-estado">
+
+                                Selecciona la pestaña
+                                para consultar.
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+
+                </table>
+
+            </div>
+
+
+
+            <div class="auditoria-paginacion">
+
+
+                <button
+                    id="btnAnteriorAccesos"
+                    class="auditoria-btn auditoria-btn-secundario"
+                    type="button"
+                    disabled>
+
+                    <i class="bi bi-chevron-left"></i>
+
+                    Anterior
+
+                </button>
+
+
+                <span id="paginaAccesos">
+                    Página 1 de 1
+                </span>
+
+
+                <button
+                    id="btnSiguienteAccesos"
+                    class="auditoria-btn auditoria-btn-secundario"
+                    type="button"
+                    disabled>
+
+                    Siguiente
+
+                    <i class="bi bi-chevron-right"></i>
+
+                </button>
+
+
+            </div>
+
+
+        </article>
+
+
+    </section>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    SSALFER
+
+</footer>
+
+
+
+<!-- =====================================================
+                    MODAL DETALLE
+===================================================== -->
+
+<div
+    id="modalAuditoriaDetalle"
+    class="auditoria-modal"
+    hidden>
+
+
+    <section
+        class="auditoria-modal-dialogo"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalAuditoriaTitulo">
+
+
+        <div class="auditoria-modal-header">
+
+
+            <div>
+
+                <h2 id="modalAuditoriaTitulo">
+                    Detalle de auditoría
+                </h2>
+
+                <p id="modalAuditoriaSubtitulo">
+                </p>
+
+            </div>
+
+
+            <button
+                class="auditoria-modal-cerrar"
+                type="button"
+                data-cerrar-auditoria-modal
+                aria-label="Cerrar">
+
+                <i class="bi bi-x-lg"></i>
+
+            </button>
+
+
+        </div>
+
+
+
+        <div
+            id="modalAuditoriaContenido"
+            class="auditoria-modal-contenido">
+        </div>
+
+
+    </section>
+
+
+</div>
+
+
+
+<!-- =====================================================
+                        SCRIPTS
+===================================================== -->
+
+<script src="/js/env.js"></script>
+
+<script src="/js/config.js"></script>
+
+<script src="/js/api/cliente.js"></script>
+
+<script src="/js/api/auth.js"></script>
+
+<script src="/js/api/proyectos.js"></script>
+
+<script src="/js/api/auditoria.js"></script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/auditoria.js"></script>
+
+
+</body>
+
+</html>

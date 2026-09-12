@@ -1,0 +1,1080 @@
+/* =========================================================
+        FIFONAFE
+========================================================= */
+
+
+/* =========================================================
+        ENCABEZADO
+========================================================= */
+
+.pagina-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-end;
+
+    gap: 25px;
+
+    margin-bottom: 25px;
+
+}
+
+
+.migas {
+
+    display: flex;
+
+    align-items: center;
+
+    flex-wrap: wrap;
+
+    gap: 8px;
+
+    margin-bottom: 18px;
+
+    color: #777;
+
+    font-size: .9rem;
+
+}
+
+
+.migas a {
+
+    color: var(--verde);
+
+    text-decoration: none;
+
+}
+
+
+.migas a:hover {
+
+    text-decoration: underline;
+
+}
+
+
+.migas i {
+
+    color: #aaa;
+
+    font-size: .7rem;
+
+}
+
+
+.etiqueta {
+
+    color: var(--verde);
+
+    font-size: .78rem;
+
+    font-weight: bold;
+
+    letter-spacing: 1.5px;
+
+    margin-bottom: 5px;
+
+}
+
+
+.pagina-header h1 {
+
+    color: var(--verde);
+
+    font-size: 2rem;
+
+    margin-bottom: 5px;
+
+}
+
+
+.subtitulo {
+
+    color: #666;
+
+    font-size: .95rem;
+
+}
+
+
+/* =========================================================
+        BOTONES
+========================================================= */
+
+.acciones-header {
+
+    display: flex;
+
+    gap: 10px;
+
+}
+
+
+.btn-principal,
+.btn-secundario {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 8px;
+
+    padding: 10px 18px;
+
+    border-radius: 7px;
+
+    cursor: pointer;
+
+    font-size: .9rem;
+
+    transition: .2s;
+
+}
+
+
+.btn-principal {
+
+    border: none;
+
+    background: var(--verde);
+
+    color: white;
+
+}
+
+
+.btn-principal:hover {
+
+    background: var(--verde-oscuro);
+
+    transform: translateY(-2px);
+
+}
+
+
+.btn-secundario {
+
+    border: 1px solid #ccc;
+
+    background: white;
+
+    color: #555;
+
+}
+
+
+.btn-secundario:hover {
+
+    border-color: var(--verde);
+
+    color: var(--verde);
+
+}
+
+
+/* =========================================================
+        AVISO
+========================================================= */
+
+.aviso-contexto {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 12px;
+
+    margin-bottom: 25px;
+
+    padding: 15px 18px;
+
+    border-left: 4px solid var(--verde);
+
+    border-radius: 8px;
+
+    background: #eef5ef;
+
+    color: #555;
+
+}
+
+
+.aviso-contexto > i {
+
+    color: var(--verde);
+
+    font-size: 1.2rem;
+
+}
+
+
+.aviso-contexto strong {
+
+    display: block;
+
+    margin-bottom: 4px;
+
+}
+
+
+.aviso-contexto p {
+
+    font-size: .85rem;
+
+    color: #666;
+
+}
+
+
+/* =========================================================
+        TARJETAS
+========================================================= */
+
+.tarjeta {
+
+    background: white;
+
+    border-radius: 12px;
+
+    padding: 25px;
+
+    margin-bottom: 25px;
+
+    box-shadow: var(--sombra);
+
+}
+
+
+.seccion-titulo {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.seccion-titulo > div {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+}
+
+
+.seccion-titulo i {
+
+    color: var(--verde);
+
+    font-size: 1.25rem;
+
+}
+
+
+.seccion-titulo h2 {
+
+    color: var(--verde);
+
+    font-size: 1.3rem;
+
+}
+
+
+/* =========================================================
+        TRÁMITES
+========================================================= */
+
+.tramites-container {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 18px;
+
+}
+
+
+.tramite {
+
+    padding: 20px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 10px;
+
+    background: var(--gris-claro);
+
+}
+
+
+.tramite-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    gap: 15px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.tramite-header > div {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+}
+
+
+.tramite-id {
+
+    padding: 5px 9px;
+
+    border-radius: 5px;
+
+    background: var(--verde);
+
+    color: white;
+
+    font-size: .75rem;
+
+    font-weight: bold;
+
+}
+
+
+.tramite h3 {
+
+    color: #444;
+
+    font-size: 1rem;
+
+}
+
+
+.estado {
+
+    padding: 6px 12px;
+
+    border-radius: 20px;
+
+    font-size: .75rem;
+
+    font-weight: bold;
+
+}
+
+
+.estado-pendiente {
+
+    background: #fff2cc;
+
+    color: #806600;
+
+}
+
+
+.tramite-datos {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    gap: 15px;
+
+}
+
+
+.tramite-datos div {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+
+}
+
+
+.tramite-datos span {
+
+    color: #888;
+
+    font-size: .75rem;
+
+}
+
+
+.tramite-datos strong {
+
+    color: #444;
+
+    font-size: .9rem;
+
+}
+
+
+.tramite-acciones {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    margin-top: 18px;
+
+}
+
+
+/* =========================================================
+        FORMULARIO
+========================================================= */
+
+.formulario-contenedor {
+
+    background: white;
+
+}
+
+
+.formulario-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-start;
+
+    margin-bottom: 30px;
+
+}
+
+
+.formulario-header h2 {
+
+    color: var(--verde);
+
+    margin-bottom: 5px;
+
+}
+
+
+.formulario-header p:not(.etiqueta) {
+
+    color: #777;
+
+    font-size: .9rem;
+
+}
+
+
+.btn-cerrar-formulario {
+
+    border: none;
+
+    background: none;
+
+    color: #777;
+
+    font-size: 1.2rem;
+
+    cursor: pointer;
+
+}
+
+
+.btn-cerrar-formulario:hover {
+
+    color: #222;
+
+}
+
+
+/* =========================================================
+        BLOQUES
+========================================================= */
+
+.bloque-formulario {
+
+    padding: 22px 0;
+
+    border-top: 1px solid #e2e2e2;
+
+}
+
+
+.bloque-formulario:first-of-type {
+
+    border-top: none;
+
+}
+
+
+.bloque-titulo {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 10px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.bloque-titulo > i {
+
+    color: var(--verde);
+
+    font-size: 1.2rem;
+
+    margin-top: 2px;
+
+}
+
+
+.bloque-titulo h3 {
+
+    color: #444;
+
+    font-size: 1rem;
+
+    margin-bottom: 4px;
+
+}
+
+
+.bloque-titulo p {
+
+    color: #888;
+
+    font-size: .8rem;
+
+}
+
+
+/* =========================================================
+        FORM GRID
+========================================================= */
+
+.form-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 20px;
+
+}
+
+
+.campo {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+}
+
+
+.campo label {
+
+    color: #444;
+
+    font-size: .9rem;
+
+    font-weight: bold;
+
+}
+
+
+.campo input,
+.campo select,
+.campo textarea {
+
+    width: 100%;
+
+    padding: 11px 12px;
+
+    border: 1px solid #ccc;
+
+    border-radius: 7px;
+
+    background: white;
+
+    color: #333;
+
+    font-size: .9rem;
+
+    outline: none;
+
+    transition: .2s;
+
+}
+
+
+.campo textarea {
+
+    resize: vertical;
+
+}
+
+
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus {
+
+    border-color: var(--verde);
+
+    box-shadow:
+        0 0 0 2px rgba(40, 107, 48, .10);
+
+}
+
+
+.campo small {
+
+    color: #888;
+
+    font-size: .75rem;
+
+}
+
+
+.obligatorio {
+
+    color: #b3261e;
+
+}
+
+
+.opcional {
+
+    color: #888;
+
+    font-size: .75rem;
+
+    font-weight: normal;
+
+}
+
+
+/* =========================================================
+        AFECTACIONES
+========================================================= */
+
+.afectaciones-lista {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 10px;
+
+}
+
+
+.afectacion-opcion {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 10px;
+
+    padding: 14px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 8px;
+
+    background: #fafafa;
+
+    cursor: pointer;
+
+    transition: .2s;
+
+}
+
+
+.afectacion-opcion:hover {
+
+    border-color: var(--verde);
+
+}
+
+
+.afectacion-opcion input {
+
+    margin-top: 3px;
+
+    accent-color: var(--verde);
+
+}
+
+
+.afectacion-opcion span {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+}
+
+
+.afectacion-opcion strong {
+
+    color: #444;
+
+    font-size: .9rem;
+
+}
+
+
+.afectacion-opcion small {
+
+    color: #888;
+
+    font-size: .75rem;
+
+}
+
+
+/* =========================================================
+        EVENTOS
+========================================================= */
+
+.titulo-con-boton {
+
+    justify-content: space-between;
+
+}
+
+
+.titulo-eventos {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 10px;
+
+}
+
+
+.btn-agregar-evento {
+
+    padding: 8px 14px;
+
+    font-size: .8rem;
+
+}
+
+
+.eventos-container {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 18px;
+
+}
+
+
+.evento {
+
+    padding: 18px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 10px;
+
+    background: var(--gris-claro);
+
+}
+
+
+.evento-header {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    margin-bottom: 18px;
+
+}
+
+
+.evento-header > div {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+}
+
+
+.numero-evento {
+
+    width: 30px;
+
+    height: 30px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: var(--verde);
+
+    color: white;
+
+    font-size: .8rem;
+
+    font-weight: bold;
+
+}
+
+
+.evento h4 {
+
+    color: #444;
+
+    font-size: .95rem;
+
+}
+
+
+.btn-eliminar-evento {
+
+    width: 34px;
+
+    height: 34px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    background: white;
+
+    color: #777;
+
+    cursor: pointer;
+
+}
+
+
+.btn-eliminar-evento:hover {
+
+    color: #b3261e;
+
+}
+
+
+/* =========================================================
+        ERROR
+========================================================= */
+
+.mensaje-error {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    margin-top: 10px;
+
+    padding: 10px 12px;
+
+    border-radius: 7px;
+
+    background: #fcebea;
+
+    color: #b3261e;
+
+    font-size: .8rem;
+
+}
+
+
+/* =========================================================
+        ACCIONES
+========================================================= */
+
+.acciones-formulario {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    padding-top: 25px;
+
+    border-top: 1px solid #e2e2e2;
+
+}
+
+
+/* =========================================================
+        SIN REGISTROS
+========================================================= */
+
+.sin-registros {
+
+    padding: 40px 20px;
+
+    text-align: center;
+
+    color: #888;
+
+}
+
+
+.sin-registros i {
+
+    display: block;
+
+    margin-bottom: 10px;
+
+    font-size: 2rem;
+
+}
+
+
+.sin-registros p {
+
+    margin-bottom: 5px;
+
+    font-weight: bold;
+
+}
+
+
+.sin-registros span {
+
+    font-size: .85rem;
+
+}
+
+
+/* =========================================================
+        RESPONSIVE
+========================================================= */
+
+@media (max-width: 900px) {
+
+    .pagina-header {
+
+        flex-direction: column;
+
+        align-items: flex-start;
+
+    }
+
+
+    .acciones-header {
+
+        width: 100%;
+
+    }
+
+
+    .tramite-datos {
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+    }
+
+
+    .afectaciones-lista {
+
+        grid-template-columns: 1fr;
+
+    }
+
+}
+
+
+@media (max-width: 700px) {
+
+    .form-grid {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .tramite-datos {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .titulo-con-boton {
+
+        flex-direction: column;
+
+    }
+
+
+    .btn-agregar-evento {
+
+        width: 100%;
+
+    }
+
+
+    .acciones-formulario {
+
+        flex-direction: column-reverse;
+
+    }
+
+
+    .acciones-formulario button {
+
+        width: 100%;
+
+    }
+
+}

@@ -613,7 +613,37 @@ class UnidadAgrariaBase(BaseModel):
     motivo_revision: str | None = None
 
 class UnidadAgrariaCreate(UnidadAgrariaBase, AuditInput):
-    pass
+
+    @model_validator(mode="after")
+    def validar_dato_identificador(self):
+        referencia = (
+            self.referencia_alfanumerica.strip()
+            if self.referencia_alfanumerica
+            else ""
+        )
+
+        detalle = (
+            self.detalle.strip()
+            if self.detalle
+            else ""
+        )
+
+        tiene_dato = any([
+            self.id_tipo_gestion is not None,
+            self.id_destino_superficie is not None,
+            self.id_parcela is not None,
+            bool(referencia),
+            bool(detalle),
+        ])
+
+        if not tiene_dato:
+            raise ValueError(
+                "Debe indicar al menos uno de estos datos: "
+                "tipo de gestión, destino de superficie, parcela, "
+                "referencia alfanumérica o detalle"
+            )
+
+        return self
 
 class UnidadAgrariaUpdate(BaseModel):
     id_tipo_tierra: int | None = Field(default=None, gt=0)

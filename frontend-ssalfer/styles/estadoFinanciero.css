@@ -1,0 +1,658 @@
+/* =========================================================
+        ESTADO FINANCIERO
+========================================================= */
+
+
+.contenedor-financiero {
+
+    grid-area: contenedor;
+
+    min-width: 0;
+
+    padding: 30px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 25px;
+
+    overflow-y: auto;
+
+}
+
+
+/* =========================================================
+        ENCABEZADO
+========================================================= */
+
+
+.encabezado-financiero {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    gap: 20px;
+
+}
+
+
+.ruta {
+
+    display: block;
+
+    margin-bottom: 8px;
+
+    font-size: .85rem;
+
+    color: #777;
+
+}
+
+
+.encabezado-financiero h1 {
+
+    color: var(--verde);
+
+    font-size: 2rem;
+
+    margin-bottom: 6px;
+
+}
+
+
+.encabezado-financiero p {
+
+    color: #666;
+
+}
+
+
+.corte {
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: flex-end;
+
+    gap: 5px;
+
+    color: #666;
+
+}
+
+
+.corte strong {
+
+    color: var(--verde);
+
+}
+
+
+/* =========================================================
+        RESUMEN
+========================================================= */
+
+
+.resumen-financiero {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    gap: 20px;
+
+}
+
+
+.indicador-financiero {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 15px;
+
+    padding: 20px;
+
+    background: var(--blanco);
+
+    border-radius: 12px;
+
+    box-shadow: var(--sombra);
+
+}
+
+
+.icono-indicador {
+
+    width: 48px;
+
+    height: 48px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border-radius: 10px;
+
+    background: #e7efe8;
+
+    color: var(--verde);
+
+    font-size: 1.4rem;
+
+}
+
+
+.indicador-financiero span {
+
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #777;
+
+    font-size: .85rem;
+
+}
+
+
+.indicador-financiero strong {
+
+    color: var(--verde);
+
+    font-size: 1.25rem;
+
+}
+
+
+/* =========================================================
+        SECCIONES
+========================================================= */
+
+
+.seccion-financiera {
+
+    background: var(--blanco);
+
+    border-radius: 12px;
+
+    padding: 25px;
+
+    box-shadow: var(--sombra);
+
+}
+
+
+.titulo-seccion {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 20px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.titulo-seccion h2 {
+
+    color: var(--verde);
+
+    font-size: 1.25rem;
+
+    margin-bottom: 5px;
+
+}
+
+
+.titulo-seccion p {
+
+    color: #777;
+
+    font-size: .9rem;
+
+}
+
+
+.titulo-seccion > strong {
+
+    color: var(--verde);
+
+    font-size: 1.2rem;
+
+}
+
+
+/* =========================================================
+        BARRA DE PROGRESO
+========================================================= */
+
+
+.barra-progreso {
+
+    width: 100%;
+
+    height: 18px;
+
+    overflow: hidden;
+
+    border-radius: 20px;
+
+    background: #e3e3e3;
+
+}
+
+
+.barra-progreso-valor {
+
+    height: 100%;
+
+    border-radius: 20px;
+
+    background: var(--verde);
+
+    transition: width .5s ease;
+
+}
+
+
+.detalle-progreso {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    margin-top: 12px;
+
+    color: #666;
+
+    font-size: .9rem;
+
+}
+
+
+.detalle-progreso strong {
+
+    color: var(--verde);
+
+}
+
+
+/* =========================================================
+        TABLAS
+========================================================= */
+
+
+.tabla-contenedor {
+
+    width: 100%;
+
+    overflow-x: auto;
+
+}
+
+
+.tabla-contenedor table {
+
+    width: 100%;
+
+    border-collapse: collapse;
+
+    min-width: 700px;
+
+}
+
+
+.tabla-contenedor th {
+
+    padding: 13px;
+
+    text-align: left;
+
+    background: var(--verde);
+
+    color: white;
+
+    font-size: .85rem;
+
+}
+
+
+.tabla-contenedor td {
+
+    padding: 13px;
+
+    border-bottom: 1px solid #e5e5e5;
+
+    color: #555;
+
+    font-size: .9rem;
+
+}
+
+
+.tabla-contenedor tbody tr:hover {
+
+    background: #f5f7f5;
+
+}
+
+
+/* =========================================================
+        ESTADOS
+========================================================= */
+
+
+.estado {
+
+    display: inline-block;
+
+    padding: 5px 10px;
+
+    border-radius: 20px;
+
+    font-size: .8rem;
+
+    font-weight: bold;
+
+}
+
+
+.estado.completo {
+
+    background: #dcefe0;
+
+    color: #23612b;
+
+}
+
+
+.estado.proceso {
+
+    background: #fff0c9;
+
+    color: #806000;
+
+}
+
+
+.estado.pendiente {
+
+    background: #eeeeee;
+
+    color: #666;
+
+}
+
+
+/* =========================================================
+        BOTONES
+========================================================= */
+
+
+.btn-principal,
+.btn-secundario {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 8px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    padding: 9px 15px;
+
+    cursor: pointer;
+
+    transition: .2s;
+
+}
+
+
+.btn-principal {
+
+    background: var(--verde);
+
+    color: white;
+
+}
+
+
+.btn-principal:hover {
+
+    background: var(--verde-oscuro);
+
+    transform: translateY(-2px);
+
+}
+
+
+.btn-secundario {
+
+    background: #eeeeee;
+
+    color: #555;
+
+}
+
+
+.btn-secundario:hover {
+
+    background: #dddddd;
+
+}
+
+
+/* =========================================================
+        ALERTA
+========================================================= */
+
+
+.alerta-financiera {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 15px;
+
+    padding: 18px 20px;
+
+    border-left: 5px solid var(--verde);
+
+    border-radius: 8px;
+
+    background: #eaf3eb;
+
+}
+
+
+.alerta-financiera > i {
+
+    color: var(--verde);
+
+    font-size: 1.5rem;
+
+}
+
+
+.alerta-financiera strong {
+
+    color: var(--verde);
+
+}
+
+
+.alerta-financiera p {
+
+    margin-top: 3px;
+
+    color: #555;
+
+    font-size: .9rem;
+
+}
+
+
+/* =========================================================
+        RESPONSIVE
+========================================================= */
+
+
+@media (max-width: 1100px) {
+
+    .resumen-financiero {
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+    }
+
+}
+
+
+@media (max-width: 700px) {
+
+    .contenedor-financiero {
+
+        padding: 20px;
+
+    }
+
+
+    .encabezado-financiero {
+
+        align-items: flex-start;
+
+        flex-direction: column;
+
+    }
+
+
+    .corte {
+
+        align-items: flex-start;
+
+    }
+
+
+    .resumen-financiero {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .titulo-seccion {
+
+        align-items: flex-start;
+
+        flex-direction: column;
+
+    }
+
+
+    .seccion-financiera {
+
+        padding: 18px;
+
+    }
+
+}
+
+/* =========================================================
+        AJUSTES PARA EL DASHBOARD DE REPORTES AGREGADOS
+        (fichas nuevas: migas, botón de exportación y
+        secciones de tabla por reporte real)
+========================================================= */
+
+.migas {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    margin-bottom: 10px;
+
+    color: #777;
+
+    font-size: .9rem;
+
+}
+
+
+.migas a {
+
+    color: var(--verde);
+
+    text-decoration: none;
+
+}
+
+
+.migas a:hover {
+
+    text-decoration: underline;
+
+}
+
+
+.seccion-tabla h2 {
+
+    color: var(--verde);
+
+    margin-bottom: 4px;
+
+}
+
+
+.seccion-tabla > p {
+
+    color: #777;
+
+    font-size: .85rem;
+
+    margin-bottom: 15px;
+}
+
+
+.seccion-tabla code {
+
+    background: #eef3ee;
+
+    padding: 1px 6px;
+
+    border-radius: 4px;
+
+    font-size: .8rem;
+
+}
+
+
+.encabezado-financiero .btn-secundario {
+
+    text-decoration: none;
+
+    white-space: nowrap;
+
+}

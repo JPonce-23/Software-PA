@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Nuevo convenio | SSALFER</title>
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/nuevoConvenio.css">
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button class="btn-menu" type="button">
+        <i class="bi bi-list"></i>
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn" type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                        CONTENIDO
+===================================================== -->
+
+<main class="contenedor">
+
+
+    <!-- =================================================
+                    ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+        <div>
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Proyectos
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a href="/dashboard.html" class="js-miga-proyecto">Proyecto</a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a href="/pages/afectacion.html">
+                    Afectaciones
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a
+                    id="enlaceDetalle"
+                    href="/pages/detalleAfectacion.html?id=1">
+
+                    Afectación
+
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Nuevo convenio
+                </span>
+
+            </div>
+
+
+            <p class="etiqueta">
+                LIBERACIÓN DE PROPIEDAD SOCIAL
+            </p>
+
+
+            <h1>
+                Nuevo convenio
+            </h1>
+
+
+            <p class="subtitulo">
+
+                Afectación:
+                <strong id="identificadorAfectacion">
+                    AF-001
+                </strong>
+
+            </p>
+
+        </div>
+
+
+        <div class="acciones-header">
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnVolver">
+
+                <i class="bi bi-arrow-left"></i>
+
+                Volver a la afectación
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    AVISO DE CONTEXTO
+    ================================================== -->
+
+    <section class="aviso-contexto">
+
+        <i class="bi bi-info-circle"></i>
+
+        <div>
+
+            <strong>
+                Convenio asociado a una afectación
+            </strong>
+
+            <p>
+                El ámbito del convenio se determina automáticamente
+                a partir de la afectación de origen.
+            </p>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    FORMULARIO
+    ================================================== -->
+
+    <form id="formConvenio">
+
+
+        <!-- =================================================
+                    INSTRUMENTO
+        ================================================== -->
+
+        <section class="tarjeta">
+
+            <div class="seccion-titulo">
+
+                <div>
+
+                    <i class="bi bi-file-earmark-text"></i>
+
+                    <h2>
+                        Información del instrumento
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-grid">
+
+
+                <!-- TIPO INSTRUMENTO -->
+
+                <div class="campo">
+
+                    <label for="tipoInstrumento">
+
+                        Tipo de instrumento
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+
+                    <select
+                        id="tipoInstrumento"
+                        name="tipo_instrumento"
+                        required>
+
+                        <option value="convenio">
+                            Convenio
+                        </option>
+
+                        <option value="otro">
+                            Otro
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- TIPO CONVENIO -->
+
+                <div class="campo" id="campoTipoConvenio">
+
+                    <label for="tipoConvenio">
+
+                        Tipo de convenio
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+
+                    <select
+                        id="tipoConvenio"
+                        name="tipo_convenio">
+
+                        <option value="">
+                            Seleccionar tipo
+                        </option>
+
+                    </select>
+
+                    <small id="ayudaTipoConvenio">
+                        Las opciones dependen del tipo de afectación.
+                    </small>
+
+                </div>
+
+
+
+                <!-- MODALIDAD -->
+
+                <div class="campo">
+
+                    <label for="modalidadEspecial">
+
+                        Modalidad especial
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="modalidadEspecial"
+                        name="modalidad_especial">
+
+                        <option value="">
+                            Sin modalidad especial
+                        </option>
+
+                        <option value="permuta">
+                            Permuta
+                        </option>
+
+                        <option value="otra">
+                            Otra
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- DESCRIPCIÓN MODALIDAD -->
+
+                <div
+                    class="campo"
+                    id="campoDescripcionModalidad"
+                    hidden>
+
+                    <label for="descripcionModalidad">
+
+                        Descripción de modalidad
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+
+                    <textarea
+                        id="descripcionModalidad"
+                        name="descripcion_modalidad"
+                        rows="3"
+                        placeholder="Describe la modalidad especial..."></textarea>
+
+                </div>
+
+
+
+                <!-- DESCRIPCIÓN INSTRUMENTO -->
+
+                <div
+                    class="campo campo-completo"
+                    id="campoDescripcionInstrumento"
+                    hidden>
+
+                    <label for="descripcionInstrumento">
+
+                        Descripción del instrumento
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+
+                    <textarea
+                        id="descripcionInstrumento"
+                        name="descripcion_instrumento"
+                        rows="3"
+                        placeholder="Describe el instrumento que se utilizará..."></textarea>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    CONTROL DEL CONVENIO
+        ================================================== -->
+
+        <section class="tarjeta">
+
+            <div class="seccion-titulo">
+
+                <div>
+
+                    <i class="bi bi-diagram-3"></i>
+
+                    <h2>
+                        Control del convenio
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-grid">
+
+
+                <!-- CONSECUTIVO -->
+
+                <div class="campo">
+
+                    <label for="consecutivo">
+
+                        Consecutivo
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+
+                    <input
+                        type="number"
+                        id="consecutivo"
+                        name="consecutivo"
+                        value="1"
+                        min="1"
+                        step="1"
+                        required>
+
+                </div>
+
+
+
+                <!-- CONVENIO PADRE -->
+
+                <div class="campo">
+
+                    <label for="idConvenioPadre">
+
+                        Convenio padre
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idConvenioPadre"
+                        name="id_convenio_padre">
+
+                        <option value="">
+                            Sin convenio padre
+                        </option>
+
+                    </select>
+
+                    <small>
+                        Utilízalo para modificatorios o ampliaciones. Se llena
+                        con los convenios ya existentes de esta afectación.
+                    </small>
+
+                </div>
+
+
+
+                <!-- ASAMBLEA -->
+
+                <div
+                    class="campo"
+                    id="campoAsamblea">
+
+                    <label for="idAsambleaAutorizacion">
+
+                        Asamblea de autorización
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idAsambleaAutorizacion"
+                        name="id_asamblea_autorizacion">
+
+                        <option value="">
+                            Sin asamblea asociada
+                        </option>
+
+                    </select>
+
+                    <small>
+                        Disponible para convenios del ámbito colectivo.
+                    </small>
+
+                </div>
+
+
+
+                <!-- FECHA PROGRAMADA -->
+
+                <div class="campo">
+
+                    <label for="fechaProgramadaFirma">
+
+                        Fecha programada de firma
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="date"
+                        id="fechaProgramadaFirma"
+                        name="fecha_programada_firma">
+
+                </div>
+
+
+
+                <!-- FECHA FIRMA -->
+
+                <div class="campo">
+
+                    <label for="fechaFirma">
+
+                        Fecha de firma
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="date"
+                        id="fechaFirma"
+                        name="fecha_firma">
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    DATOS ECONÓMICOS
+        ================================================== -->
+
+        <section class="tarjeta">
+
+            <div class="seccion-titulo">
+
+                <div>
+
+                    <i class="bi bi-cash-stack"></i>
+
+                    <h2>
+                        Información económica
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-grid">
+
+
+                <div class="campo">
+
+                    <label for="monto90">
+
+                        Monto 90 %
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <div class="campo-monto">
+
+                        <span>
+                            $
+                        </span>
+
+                        <input
+                            type="number"
+                            id="monto90"
+                            name="monto_90"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00">
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="campo">
+
+                    <label for="monto100">
+
+                        Monto 100 %
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <div class="campo-monto">
+
+                        <span>
+                            $
+                        </span>
+
+                        <input
+                            type="number"
+                            id="monto100"
+                            name="monto_100"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00">
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="campo">
+
+                    <label for="montoBdt">
+
+                        Monto BDT
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <div class="campo-monto">
+
+                        <span>
+                            $
+                        </span>
+
+                        <input
+                            type="number"
+                            id="montoBdt"
+                            name="monto_bdt"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00">
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="campo">
+
+                    <label for="superficieHa">
+
+                        Superficie (ha)
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="number"
+                        id="superficieHa"
+                        name="superficie_ha"
+                        min="0"
+                        step="0.000001"
+                        placeholder="0.000000">
+
+                </div>
+
+
+                <div
+                    class="campo campo-completo"
+                    id="errorMontos"
+                    hidden>
+
+                    <div class="mensaje-error">
+
+                        <i class="bi bi-exclamation-circle"></i>
+
+                        <span>
+                            El monto 90 % no puede ser mayor que el monto 100 %.
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    COMPARECIENTES
+        ================================================== -->
+
+        <section class="tarjeta">
+
+            <div class="seccion-titulo">
+
+                <div>
+
+                    <i class="bi bi-person-vcard"></i>
+
+                    <h2>
+                        Comparecientes
+                    </h2>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="btn-principal"
+                    id="btnAgregarCompareciente">
+
+                    <i class="bi bi-plus-lg"></i>
+
+                    Agregar compareciente
+
+                </button>
+
+            </div>
+
+
+            <p class="descripcion">
+
+                Registra las personas que intervienen en el convenio.
+                La persona debe existir en el sistema antes de asociarla.
+
+            </p>
+
+
+            <div
+                id="comparecientesContainer"
+                class="comparecientes-container">
+
+
+                <!-- =================================================
+                    COMPARECIENTE DEMOSTRATIVO
+                ================================================== -->
+
+                <div
+                    class="compareciente"
+                    data-compareciente>
+
+
+                    <div class="compareciente-titulo">
+
+                        <div>
+
+                            <span class="numero-compareciente">
+                                1
+                            </span>
+
+                            <h3>
+                                Compareciente 1
+                            </h3>
+
+                        </div>
+
+
+                        <button
+                            type="button"
+                            class="btn-eliminar-compareciente"
+                            title="Eliminar compareciente">
+
+                            <i class="bi bi-trash"></i>
+
+                        </button>
+
+                    </div>
+
+
+                    <div class="form-grid">
+
+
+                        <!-- PERSONA -->
+
+                        <div class="campo campo-completo">
+
+                            <label>
+
+                                Persona
+                                <span class="obligatorio">*</span>
+
+                            </label>
+
+
+                            <div class="persona-selector">
+
+                                <select
+                                    name="comparecientes[0][id_persona]"
+                                    required>
+
+                                    <option value="">
+                                        Seleccionar persona
+                                    </option>
+
+                                </select>
+
+
+                                <button
+                                    type="button"
+                                    class="btn-persona"
+                                    title="Alta de persona">
+
+                                    <i class="bi bi-person-plus"></i>
+
+                                    Nueva persona
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- CALIDAD -->
+
+                        <div class="campo">
+
+                            <label>
+
+                                Calidad del compareciente
+                                <span class="obligatorio">*</span>
+
+                            </label>
+
+
+                            <select
+                                name="comparecientes[0][id_tipo_calidad]"
+                                required>
+
+                                <option value="">
+                                    Seleccionar calidad
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+
+                        <!-- ACREDITACIÓN -->
+
+                        <div class="campo">
+
+                            <label>
+
+                                Tipo de acreditación
+
+                                <span class="opcional">
+                                    Opcional
+                                </span>
+
+                            </label>
+
+
+                            <select
+                                name="comparecientes[0][id_tipo_acreditacion]">
+
+                                <option value="">
+                                    Seleccionar tipo
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+
+                        <!-- REFERENCIA -->
+
+                        <div class="campo">
+
+                            <label>
+
+                                Referencia de acreditación
+
+                                <span class="opcional">
+                                    Opcional
+                                </span>
+
+                            </label>
+
+
+                            <input
+                                type="text"
+                                name="comparecientes[0][referencia_acreditacion]"
+                                maxlength="200"
+                                placeholder="Folio o referencia">
+
+                        </div>
+
+
+
+                        <!-- FECHA ACREDITACIÓN -->
+
+                        <div class="campo">
+
+                            <label>
+
+                                Fecha de acreditación
+
+                                <span class="opcional">
+                                    Opcional
+                                </span>
+
+                            </label>
+
+
+                            <input
+                                type="date"
+                                name="comparecientes[0][fecha_acreditacion]">
+
+                        </div>
+
+
+
+                        <!-- NOMBRE EN INSTRUMENTO -->
+
+                        <div class="campo campo-completo">
+
+                            <label>
+
+                                Nombre en el instrumento
+                                <span class="obligatorio">*</span>
+
+                            </label>
+
+
+                            <input
+                                type="text"
+                                name="comparecientes[0][nombre_en_instrumento]"
+                                maxlength="300"
+                                required
+                                placeholder="Nombre exactamente como aparece en el convenio">
+
+                        </div>
+
+
+
+                        <!-- FIRMANTE -->
+
+                        <div class="campo-checkbox">
+
+                            <label>
+
+                                <input
+                                    type="checkbox"
+                                    name="comparecientes[0][es_firmante]"
+                                    checked>
+
+                                <span>
+                                    Es firmante
+                                </span>
+
+                            </label>
+
+                        </div>
+
+
+
+                        <!-- BENEFICIARIO -->
+
+                        <div class="campo-checkbox">
+
+                            <label>
+
+                                <input
+                                    type="checkbox"
+                                    name="comparecientes[0][es_beneficiario_pago]">
+
+                                <span>
+                                    Es beneficiario de pago
+                                </span>
+
+                            </label>
+
+                        </div>
+
+
+
+                        <!-- REVISIÓN -->
+
+                        <div class="campo-checkbox campo-completo">
+
+                            <label>
+
+                                <input
+                                    type="checkbox"
+                                    class="checkRevision"
+                                    name="comparecientes[0][requiere_revision]">
+
+                                <span>
+                                    Requiere revisión
+                                </span>
+
+                            </label>
+
+                        </div>
+
+
+
+                        <!-- MOTIVO REVISIÓN -->
+
+                        <div
+                            class="campo campo-completo campo-motivo-revision"
+                            hidden>
+
+                            <label>
+
+                                Motivo de revisión
+                                <span class="obligatorio">*</span>
+
+                            </label>
+
+
+                            <textarea
+                                name="comparecientes[0][motivo_revision]"
+                                rows="3"
+                                placeholder="Indica por qué requiere revisión..."></textarea>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="sinComparecientes"
+                class="sin-registros"
+                hidden>
+
+                <i class="bi bi-person-x"></i>
+
+                <p>
+                    No hay comparecientes registrados.
+                </p>
+
+                <span>
+                    Utiliza "Agregar compareciente" para registrar uno.
+                </span>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    ACCIONES
+        ================================================== -->
+
+        <section class="acciones-formulario">
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnCancelar">
+
+                Cancelar
+
+            </button>
+
+
+            <button
+                type="submit"
+                class="btn-principal">
+
+                <i class="bi bi-check-lg"></i>
+
+                Guardar convenio
+
+            </button>
+
+        </section>
+
+
+    </form>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/nuevoConvenio.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,474 @@
+.convenios-reportes-contenedor {
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+}
+
+.convenios-reportes-encabezado {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+}
+
+.convenios-reportes-eyebrow {
+    margin: 0 0 5px;
+    color: var(--verde);
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.convenios-reportes-encabezado h1 {
+    margin: 0;
+    color: #212529;
+    font-size: clamp(1.8rem, 3vw, 2.5rem);
+}
+
+.convenios-reportes-subtitulo {
+    max-width: 820px;
+    margin: 8px 0 0;
+    color: #60656a;
+    line-height: 1.5;
+}
+
+.convenios-reportes-alerta {
+    padding: 13px 16px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    line-height: 1.4;
+}
+
+.convenios-reportes-alerta-error {
+    color: #842029;
+    background: #f8d7da;
+    border-color: #f5c2c7;
+}
+
+.convenios-reportes-alerta-info {
+    color: #055160;
+    background: #cff4fc;
+    border-color: #b6effb;
+}
+
+.convenios-reportes-nota {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 15px 17px;
+    border: 1px solid #d8e4da;
+    border-radius: 10px;
+    background: #f5faf6;
+    color: #34443a;
+    line-height: 1.45;
+}
+
+.convenios-reportes-nota i {
+    margin-top: 1px;
+    color: var(--verde);
+    font-size: 1.25rem;
+}
+
+.convenios-reportes-nota p {
+    margin: 0;
+    font-size: .88rem;
+}
+
+.convenios-reportes-tabs {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    padding: 5px;
+    overflow-x: auto;
+    border: 1px solid #dfe3e6;
+    border-radius: 11px;
+    background: #f4f6f7;
+}
+
+.convenios-reportes-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 9px 15px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #555c62;
+    font: inherit;
+    font-size: .88rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.convenios-reportes-tab:hover {
+    background: #e9ecef;
+}
+
+.convenios-reportes-tab.activo {
+    background: #ffffff;
+    color: var(--verde-oscuro);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .09);
+}
+
+.convenios-reportes-card {
+    min-width: 0;
+    padding: 22px;
+    border: 1px solid #e1e5e7;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 2px 9px rgba(0, 0, 0, .06);
+}
+
+.convenios-reportes-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 20px;
+}
+
+.convenios-reportes-card-header h2 {
+    margin: 0;
+    color: #252a2e;
+    font-size: 1.3rem;
+}
+
+.convenios-reportes-card-header p {
+    margin: 5px 0 0;
+    color: #6a7075;
+    font-size: .87rem;
+    line-height: 1.45;
+}
+
+.convenios-reportes-filtros-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.convenios-reportes-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+}
+
+.convenios-reportes-campo span,
+.convenios-reportes-campo label {
+    color: #343a40;
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+.convenios-reportes-campo input,
+.convenios-reportes-campo select {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 11px;
+    border: 1px solid #cfd4d8;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #212529;
+    font: inherit;
+    outline: none;
+}
+
+.convenios-reportes-campo input:focus,
+.convenios-reportes-campo select:focus {
+    border-color: var(--verde);
+    box-shadow: 0 0 0 3px rgba(40, 107, 48, .12);
+}
+
+.convenios-reportes-filtros-acciones {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.convenios-reportes-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 39px;
+    padding: 9px 14px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font: inherit;
+    font-size: .87rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, transform .15s, border-color .15s;
+}
+
+.convenios-reportes-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.convenios-reportes-btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.convenios-reportes-btn-primario {
+    color: #ffffff;
+    background: var(--verde);
+    border-color: var(--verde);
+}
+
+.convenios-reportes-btn-primario:hover:not(:disabled) {
+    background: var(--verde-oscuro);
+}
+
+.convenios-reportes-btn-secundario {
+    color: #30363b;
+    background: #ffffff;
+    border-color: #c8ced3;
+}
+
+.convenios-reportes-btn-secundario:hover:not(:disabled) {
+    background: #f4f6f7;
+}
+
+.convenios-reportes-resumen {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.convenios-reportes-kpi {
+    min-width: 0;
+    padding: 17px;
+    border: 1px solid #e1e5e7;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .05);
+}
+
+.convenios-reportes-kpi span {
+    display: block;
+    margin-bottom: 7px;
+    color: #697076;
+    font-size: .75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.convenios-reportes-kpi strong {
+    display: block;
+    color: #243029;
+    font-size: clamp(1.2rem, 2vw, 1.65rem);
+    overflow-wrap: anywhere;
+}
+
+.convenios-reportes-herramientas {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 15px;
+}
+
+.convenios-reportes-busqueda {
+    width: min(500px, 100%);
+}
+
+.convenios-reportes-input-icono {
+    position: relative;
+}
+
+.convenios-reportes-input-icono i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #7a8085;
+}
+
+.convenios-reportes-input-icono input {
+    padding-left: 36px;
+}
+
+.convenios-reportes-tabla-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+}
+
+.convenios-reportes-total {
+    color: #5f656a;
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+.convenios-reportes-por-pagina {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #5d6368;
+    font-size: .82rem;
+    white-space: nowrap;
+}
+
+.convenios-reportes-por-pagina select {
+    padding: 6px 8px;
+    border: 1px solid #cfd4d8;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #30363b;
+    font: inherit;
+}
+
+.convenios-reportes-tabla-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #e3e6e8;
+    border-radius: 10px;
+}
+
+.convenios-reportes-tabla {
+    width: 100%;
+    min-width: 1300px;
+    border-collapse: collapse;
+    background: #ffffff;
+}
+
+.convenios-reportes-tabla th,
+.convenios-reportes-tabla td {
+    padding: 11px 12px;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: top;
+    text-align: left;
+    font-size: .82rem;
+}
+
+.convenios-reportes-tabla th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--verde-oscuro);
+    color: #ffffff;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.convenios-reportes-tabla tbody tr:hover {
+    background: #f7faf7;
+}
+
+.convenios-reportes-tabla tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.convenios-reportes-tabla-estado {
+    padding: 30px !important;
+    color: #6c757d;
+    text-align: center !important;
+}
+
+.convenios-reportes-numero {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.convenios-reportes-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.convenios-reportes-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: .74rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.convenios-reportes-badge-ok {
+    color: #17602d;
+    background: #dcefe1;
+}
+
+.convenios-reportes-badge-peligro {
+    color: #7b232b;
+    background: #f3dfe1;
+}
+
+.convenios-reportes-badge-info {
+    color: #174f6a;
+    background: #dbeef6;
+}
+
+.convenios-reportes-badge-neutro {
+    color: #4e565c;
+    background: #e9ecef;
+}
+
+.convenios-reportes-paginacion {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.convenios-reportes-paginacion span {
+    min-width: 130px;
+    color: #565d62;
+    text-align: center;
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+    .convenios-reportes-filtros-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .convenios-reportes-resumen {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .convenios-reportes-contenedor {
+        padding: 20px 14px;
+    }
+
+    .convenios-reportes-filtros-grid,
+    .convenios-reportes-resumen {
+        grid-template-columns: 1fr;
+    }
+
+    .convenios-reportes-card-header,
+    .convenios-reportes-herramientas,
+    .convenios-reportes-tabla-meta {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .convenios-reportes-filtros-acciones {
+        flex-direction: column-reverse;
+    }
+
+    .convenios-reportes-filtros-acciones .convenios-reportes-btn,
+    .convenios-reportes-herramientas .convenios-reportes-btn {
+        width: 100%;
+    }
+
+    .convenios-reportes-paginacion {
+        flex-wrap: wrap;
+    }
+}

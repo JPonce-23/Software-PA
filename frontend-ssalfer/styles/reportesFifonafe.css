@@ -1,0 +1,778 @@
+.fif-reportes-contenedor {
+    padding: 32px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 22px;
+
+    min-width: 0;
+}
+
+
+.fif-reportes-encabezado {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-start;
+
+    gap: 24px;
+}
+
+
+.fif-reportes-eyebrow {
+    margin: 0 0 5px;
+
+    color: var(--verde);
+
+    font-size: .78rem;
+    font-weight: 800;
+
+    letter-spacing: .08em;
+
+    text-transform: uppercase;
+}
+
+
+.fif-reportes-encabezado h1 {
+    margin: 0;
+
+    color: #212529;
+
+    font-size: clamp(
+        1.8rem,
+        3vw,
+        2.5rem
+    );
+}
+
+
+.fif-reportes-subtitulo {
+    max-width: 820px;
+
+    margin: 8px 0 0;
+
+    color: #60656a;
+
+    line-height: 1.5;
+}
+
+
+/* =====================================================
+                        ALERTAS
+===================================================== */
+
+.fif-reportes-alerta {
+    padding: 13px 16px;
+
+    border: 1px solid transparent;
+    border-radius: 9px;
+
+    line-height: 1.4;
+}
+
+
+.fif-reportes-alerta-error {
+    color: #842029;
+
+    background: #f8d7da;
+
+    border-color: #f5c2c7;
+}
+
+
+.fif-reportes-alerta-info {
+    color: #055160;
+
+    background: #cff4fc;
+
+    border-color: #b6effb;
+}
+
+
+/* =====================================================
+                        NOTA
+===================================================== */
+
+.fif-reportes-nota {
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 12px;
+
+    padding: 15px 17px;
+
+    border: 1px solid #d8e4da;
+    border-radius: 10px;
+
+    background: #f5faf6;
+
+    color: #34443a;
+
+    line-height: 1.45;
+}
+
+
+.fif-reportes-nota i {
+    margin-top: 1px;
+
+    color: var(--verde);
+
+    font-size: 1.25rem;
+}
+
+
+.fif-reportes-nota p {
+    margin: 0;
+
+    font-size: .88rem;
+}
+
+
+/* =====================================================
+                        TABS
+===================================================== */
+
+.fif-reportes-tabs {
+    display: flex;
+
+    gap: 8px;
+
+    width: fit-content;
+
+    padding: 5px;
+
+    border: 1px solid #dfe3e6;
+    border-radius: 11px;
+
+    background: #f4f6f7;
+}
+
+
+.fif-reportes-tab {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    min-height: 40px;
+
+    padding: 9px 15px;
+
+    border: 0;
+    border-radius: 8px;
+
+    background: transparent;
+
+    color: #555c62;
+
+    font: inherit;
+    font-size: .9rem;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+
+.fif-reportes-tab:hover {
+    background: #e9ecef;
+}
+
+
+.fif-reportes-tab.activo {
+    background: #ffffff;
+
+    color: var(--verde-oscuro);
+
+    box-shadow:
+        0 1px 4px
+        rgba(0, 0, 0, .09);
+}
+
+
+/* =====================================================
+                        CARD
+===================================================== */
+
+.fif-reportes-card {
+    min-width: 0;
+
+    padding: 22px;
+
+    border: 1px solid #e1e5e7;
+    border-radius: 14px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 2px 9px
+        rgba(0, 0, 0, .06);
+}
+
+
+.fif-reportes-card-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-start;
+
+    gap: 18px;
+
+    margin-bottom: 20px;
+}
+
+
+.fif-reportes-card-header h2 {
+    margin: 0;
+
+    color: #252a2e;
+
+    font-size: 1.3rem;
+}
+
+
+.fif-reportes-card-header p {
+    margin: 5px 0 0;
+
+    color: #6a7075;
+
+    font-size: .87rem;
+
+    line-height: 1.45;
+}
+
+
+/* =====================================================
+                        FILTROS
+===================================================== */
+
+.fif-reportes-filtros {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 16px;
+}
+
+
+.fif-reportes-filtros > .fif-reportes-campo {
+    width: min(
+        360px,
+        100%
+    );
+}
+
+
+.fif-reportes-campo {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+    min-width: 0;
+}
+
+
+.fif-reportes-campo > span {
+    color: #343a40;
+
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+
+.fif-reportes-campo input,
+.fif-reportes-campo select {
+    width: 100%;
+
+    min-height: 42px;
+
+    padding: 9px 11px;
+
+    border: 1px solid #cfd4d8;
+    border-radius: 8px;
+
+    background: #ffffff;
+
+    color: #212529;
+
+    font: inherit;
+
+    outline: none;
+}
+
+
+.fif-reportes-campo input:focus,
+.fif-reportes-campo select:focus {
+    border-color: var(--verde);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(40, 107, 48, .12);
+}
+
+
+.fif-reportes-filtros-acciones {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    padding-top: 4px;
+}
+
+
+/* =====================================================
+                        BOTONES
+===================================================== */
+
+.fif-reportes-btn {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+
+    min-height: 39px;
+
+    padding: 9px 14px;
+
+    border: 1px solid transparent;
+    border-radius: 8px;
+
+    font: inherit;
+    font-size: .87rem;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        background .15s,
+        transform .15s,
+        border-color .15s;
+}
+
+
+.fif-reportes-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+
+.fif-reportes-btn:disabled {
+    opacity: .55;
+
+    cursor: not-allowed;
+}
+
+
+.fif-reportes-btn-primario {
+    color: #ffffff;
+
+    background: var(--verde);
+
+    border-color: var(--verde);
+}
+
+
+.fif-reportes-btn-primario:hover:not(:disabled) {
+    background: var(--verde-oscuro);
+}
+
+
+.fif-reportes-btn-secundario {
+    color: #30363b;
+
+    background: #ffffff;
+
+    border-color: #c8ced3;
+}
+
+
+.fif-reportes-btn-secundario:hover:not(:disabled) {
+    background: #f4f6f7;
+}
+
+
+/* =====================================================
+                        KPIs
+===================================================== */
+
+.fif-reportes-resumen {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(0, 1fr)
+        );
+
+    gap: 14px;
+}
+
+
+.fif-reportes-kpi {
+    min-width: 0;
+
+    padding: 17px;
+
+    border: 1px solid #e1e5e7;
+    border-radius: 12px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0, 0, 0, .05);
+}
+
+
+.fif-reportes-kpi span {
+    display: block;
+
+    margin-bottom: 7px;
+
+    color: #697076;
+
+    font-size: .76rem;
+    font-weight: 800;
+
+    text-transform: uppercase;
+
+    letter-spacing: .04em;
+}
+
+
+.fif-reportes-kpi strong {
+    display: block;
+
+    color: #243029;
+
+    font-size: clamp(
+        1.2rem,
+        2vw,
+        1.65rem
+    );
+
+    overflow-wrap: anywhere;
+}
+
+
+/* =====================================================
+                    HERRAMIENTAS
+===================================================== */
+
+.fif-reportes-herramientas {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-end;
+
+    gap: 16px;
+
+    margin-bottom: 15px;
+}
+
+
+.fif-reportes-busqueda {
+    width: min(
+        480px,
+        100%
+    );
+}
+
+
+.fif-reportes-input-icono {
+    position: relative;
+}
+
+
+.fif-reportes-input-icono i {
+    position: absolute;
+
+    left: 12px;
+    top: 50%;
+
+    transform: translateY(-50%);
+
+    color: #7a8085;
+}
+
+
+.fif-reportes-input-icono input {
+    padding-left: 36px;
+}
+
+
+/* =====================================================
+                        TABLA
+===================================================== */
+
+.fif-reportes-tabla-meta {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 14px;
+
+    margin-bottom: 12px;
+}
+
+
+.fif-reportes-total {
+    color: #5f656a;
+
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+
+.fif-reportes-por-pagina {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    color: #5d6368;
+
+    font-size: .82rem;
+
+    white-space: nowrap;
+}
+
+
+.fif-reportes-por-pagina select {
+    padding: 6px 8px;
+
+    border: 1px solid #cfd4d8;
+    border-radius: 7px;
+
+    background: #ffffff;
+
+    color: #30363b;
+
+    font: inherit;
+}
+
+
+.fif-reportes-tabla-wrap {
+    width: 100%;
+
+    overflow-x: auto;
+
+    border: 1px solid #e3e6e8;
+    border-radius: 10px;
+}
+
+
+.fif-reportes-tabla {
+    width: 100%;
+
+    min-width: 1100px;
+
+    border-collapse: collapse;
+
+    background: #ffffff;
+}
+
+
+.fif-reportes-tabla th,
+.fif-reportes-tabla td {
+    padding: 11px 12px;
+
+    border-bottom:
+        1px solid #e9ecef;
+
+    vertical-align: top;
+
+    text-align: left;
+
+    font-size: .82rem;
+}
+
+
+.fif-reportes-tabla th {
+    background:
+        var(--verde-oscuro);
+
+    color: #ffffff;
+
+    font-weight: 700;
+
+    white-space: nowrap;
+}
+
+
+.fif-reportes-tabla tbody tr:hover {
+    background: #f7faf7;
+}
+
+
+.fif-reportes-tabla tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+
+.fif-reportes-tabla-estado {
+    padding: 30px !important;
+
+    color: #6c757d;
+
+    text-align: center !important;
+}
+
+
+.fif-reportes-numero {
+    text-align: right !important;
+
+    font-variant-numeric:
+        tabular-nums;
+
+    white-space: nowrap;
+}
+
+
+/* =====================================================
+                        BADGES
+===================================================== */
+
+.fif-reportes-badge {
+    display: inline-flex;
+
+    align-items: center;
+
+    padding: 4px 8px;
+
+    border-radius: 999px;
+
+    font-size: .74rem;
+    font-weight: 800;
+
+    white-space: nowrap;
+
+    text-transform: capitalize;
+}
+
+
+.fif-reportes-badge-colectivo {
+    color: #235c37;
+
+    background: #dcefe1;
+}
+
+
+.fif-reportes-badge-individual {
+    color: #174f6a;
+
+    background: #dbeef6;
+}
+
+
+/* =====================================================
+                        PAGINACIÓN
+===================================================== */
+
+.fif-reportes-paginacion {
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    gap: 12px;
+
+    margin-top: 16px;
+}
+
+
+.fif-reportes-paginacion span {
+    min-width: 130px;
+
+    color: #565d62;
+
+    text-align: center;
+
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+
+/* =====================================================
+                        RESPONSIVE
+===================================================== */
+
+@media (max-width: 1050px) {
+
+    .fif-reportes-resumen {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+}
+
+
+@media (max-width: 760px) {
+
+    .fif-reportes-contenedor {
+        padding: 20px 14px;
+    }
+
+
+    .fif-reportes-tabs {
+        width: 100%;
+
+        flex-direction: column;
+    }
+
+
+    .fif-reportes-tab {
+        width: 100%;
+    }
+
+
+    .fif-reportes-resumen {
+        grid-template-columns: 1fr;
+    }
+
+
+    .fif-reportes-herramientas,
+    .fif-reportes-card-header {
+        flex-direction: column;
+
+        align-items: stretch;
+    }
+
+
+    .fif-reportes-filtros-acciones {
+        flex-direction:
+            column-reverse;
+    }
+
+
+    .fif-reportes-filtros-acciones
+    .fif-reportes-btn,
+    .fif-reportes-herramientas
+    .fif-reportes-btn {
+        width: 100%;
+    }
+
+
+    .fif-reportes-tabla-meta {
+        flex-wrap: wrap;
+    }
+
+
+    .fif-reportes-paginacion {
+        flex-wrap: wrap;
+    }
+
+}

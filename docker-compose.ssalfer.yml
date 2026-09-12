@@ -1,0 +1,45 @@
+# docker-compose.ssalfer.yml
+#
+# Este archivo NO reemplaza ni modifica el docker-compose.yml del
+# backend: se usa JUNTO a él, agregando un servicio más al mismo
+# proyecto. Así el backend queda intacto, tal como se pidió.
+#
+# Dónde colocarlo: en la raíz del repo del backend (mismo nivel que
+# docker-compose.yml), junto a una carpeta "frontend-ssalfer" con
+# TODO el contenido de este entregable (Index.html, dashboard.html,
+# /js, /styles, /img, /pages, /deploy).
+#
+# Estructura esperada:
+#
+#   Software-PA-feature-backend-logica/
+#     docker-compose.yml              <- del backend, sin tocar
+#     docker-compose.ssalfer.yml      <- este archivo
+#     backend/                        <- del backend, sin tocar
+#     frontend/                       <- prototipo React/Vite existente, sin tocar
+#     frontend-ssalfer/               <- este entregable (contenido de "connected/")
+#       Index.html
+#       dashboard.html
+#       js/
+#       styles/
+#       img/
+#       pages/
+#       deploy/
+#         Dockerfile
+#         nginx.conf
+#
+# Cómo levantarlo (un solo comando, ver DEPLOY.md para el detalle
+# paso a paso con Docker Desktop):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.ssalfer.yml up -d --build
+
+services:
+  frontend_ssalfer:
+    build:
+      context: ./frontend-ssalfer
+      dockerfile: deploy/Dockerfile
+    restart: always
+    ports:
+      - "127.0.0.1:${SSALFER_HOST_PORT:-5174}:80"
+    depends_on:
+      backend:
+        condition: service_healthy

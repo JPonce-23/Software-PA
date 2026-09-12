@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Expediente Documental | SSALFER</title>
+
+
+    <link rel="stylesheet"
+          href="/styles/dashboard.css">
+
+    <link rel="stylesheet"
+          href="/styles/expedienteDocumental.css">
+
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+
+    <link rel="icon"
+          type="image/png"
+          sizes="40x40"
+          href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =================================================
+                        ASIDE
+================================================== -->
+
+<aside class="aside">
+
+
+    <button class="btn-menu">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+
+    </nav>
+
+</aside>
+
+
+
+
+<!-- =================================================
+                        HEADER
+================================================== -->
+
+<header class="header">
+
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+
+<!-- =================================================
+                    CONTENIDO PRINCIPAL
+================================================== -->
+
+<main
+    class="contenedor"
+    data-proyecto-nucleo-id="">
+
+
+
+    <!-- =================================================
+                    ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+
+        <div>
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Inicio
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Expediente Documental
+                </span>
+
+            </div>
+
+
+            <span class="etiqueta">
+                CONTROL DOCUMENTAL
+            </span>
+
+
+            <h1>
+                Expediente Documental
+            </h1>
+
+
+            <p class="subtitulo">
+
+                Consulta el cumplimiento de los requisitos
+                documentales asociados al expediente.
+
+            </p>
+
+        </div>
+
+
+        <div class="acciones-header">
+
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnVolver">
+
+                <i class="bi bi-arrow-left"></i>
+
+                Volver
+
+            </button>
+
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnNuevoRequisito">
+
+                <i class="bi bi-plus-lg"></i>
+
+                Registrar requisito
+
+            </button>
+
+        </div>
+
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    RESUMEN DOCUMENTAL
+    ================================================== -->
+
+    <section class="bloque">
+
+
+        <div class="bloque-titulo">
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+                    01
+                </span>
+
+
+                <div>
+
+                    <h2>
+                        Estado del expediente
+                    </h2>
+
+                    <p>
+                        Resumen de los requisitos documentales
+                        registrados para este núcleo.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="datos-grid">
+
+
+            <div class="dato">
+
+                <span>
+                    Requisitos
+                </span>
+
+                <strong id="totalRequisitos">
+                    0
+                </strong>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span>
+                    Cumplidos
+                </span>
+
+                <strong id="totalCumplidos">
+                    0
+                </strong>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span>
+                    Pendientes
+                </span>
+
+                <strong id="totalPendientes">
+                    0
+                </strong>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span>
+                    Documentos relacionados
+                </span>
+
+                <strong id="totalDocumentos">
+                    0
+                </strong>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    REQUISITOS DOCUMENTALES
+    ================================================== -->
+
+    <section class="bloque">
+
+
+        <div class="bloque-titulo">
+
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+                    02
+                </span>
+
+
+                <div>
+
+                    <h2>
+                        Requisitos documentales
+                    </h2>
+
+                    <p>
+                        Requisitos que forman parte del expediente
+                        y su estado actual.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="filtros">
+
+
+            <div class="campo-filtro">
+
+                <label for="filtroAmbito">
+                    Entidad
+                </label>
+
+
+                <select id="filtroAmbito">
+
+                    <option value="">
+                        Todas
+                    </option>
+
+                    <option value="proyecto_nucleo">
+                        Núcleo del proyecto
+                    </option>
+
+                    <option value="afectacion">
+                        Afectación
+                    </option>
+
+                    <option value="parcela">
+                        Parcela
+                    </option>
+
+                    <option value="parcela_titular">
+                        Titular de parcela
+                    </option>
+
+                    <option value="unidad_agraria">
+                        Unidad agraria
+                    </option>
+
+                    <option value="unidad_agraria_titular">
+                        Titular de unidad agraria
+                    </option>
+
+                    <option value="convenio">
+                        Convenio
+                    </option>
+
+                    <option value="convenio_compareciente">
+                        Compareciente de convenio
+                    </option>
+
+                    <option value="tramite_ran">
+                        Trámite RAN
+                    </option>
+
+                    <option value="tramite_ran_evento">
+                        Evento RAN
+                    </option>
+
+                    <option value="tramite_fifonafe">
+                        Trámite FIFONAFE
+                    </option>
+
+                    <option value="tramite_fifonafe_evento">
+                        Evento FIFONAFE
+                    </option>
+
+                    <option value="tramite_fifonafe_interviniente">
+                        Interviniente FIFONAFE
+                    </option>
+
+                    <option value="indemnizacion">
+                        Indemnización
+                    </option>
+
+                    <option value="pago">
+                        Pago
+                    </option>
+
+                    <option value="orv">
+                        ORV
+                    </option>
+
+                    <option value="padron_historial">
+                        Padrón
+                    </option>
+
+                    <option value="actividad_campo">
+                        Actividad de campo
+                    </option>
+
+                    <option value="asamblea">
+                        Asamblea
+                    </option>
+
+                    <option value="asamblea_convocatoria">
+                        Convocatoria de asamblea
+                    </option>
+
+                </select>
+
+            </div>
+
+
+
+            <div class="campo-filtro">
+
+                <label for="filtroEstado">
+                    Estado
+                </label>
+
+
+                <select id="filtroEstado">
+
+                    <option value="">
+                        Todos
+                    </option>
+
+                    <!--
+                        El catálogo real de estados se cargará
+                        posteriormente desde backend.
+                    -->
+
+                </select>
+
+            </div>
+
+
+        </div>
+
+
+
+        <div class="tabla-contenedor">
+
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Requisito
+                        </th>
+
+                        <th>
+                            Entidad
+                        </th>
+
+                        <th>
+                            Identificador
+                        </th>
+
+                        <th>
+                            Estado
+                        </th>
+
+                        <th>
+                            Documento
+                        </th>
+
+                        <th>
+                            Detalle
+                        </th>
+
+                        <th>
+                            Acción
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="requisitosTabla">
+
+                    <tr>
+
+                        <td
+                            colspan="7"
+                            class="tabla-vacia">
+
+                            No hay requisitos documentales registrados.
+
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+
+        </div>
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    REGISTRAR REQUISITO
+    ================================================== -->
+
+    <section
+        class="bloque formulario-bloque"
+        id="formularioRequisito"
+        hidden>
+
+
+        <div class="bloque-titulo">
+
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+                    03
+                </span>
+
+
+                <div>
+
+                    <h2>
+                        Registrar requisito documental
+                    </h2>
+
+                    <p>
+                        Relaciona un requisito con una entidad
+                        concreta del expediente.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <form
+            id="formRequisito"
+            novalidate>
+
+
+            <div class="form-grid">
+
+
+                <!-- =================================================
+                            REQUISITO
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="idRequisito">
+
+                        Requisito
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idRequisito"
+                        name="id_requisito"
+                        required>
+
+                        <option value="">
+
+                            Selecciona un requisito
+
+                        </option>
+
+
+                        <!--
+                            Se poblará con:
+
+                            GET
+                            /catalogos/requisitos-documentales
+                        -->
+
+                    </select>
+
+                </div>
+
+
+
+
+                <!-- =================================================
+                            ESTADO
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="idEstado">
+
+                        Estado
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idEstado"
+                        name="id_estado"
+                        required>
+
+                        <option value="">
+
+                            Selecciona un estado
+
+                        </option>
+
+
+                        <!--
+                            Catálogo dinámico.
+                            No colocar IDs ficticios.
+                        -->
+
+                    </select>
+
+                </div>
+
+
+
+
+                <!-- =================================================
+                            ENTIDAD
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="entidadTipo">
+
+                        Tipo de entidad
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="entidadTipo"
+                        name="entidad_tipo"
+                        required>
+
+
+                        <option value="">
+
+                            Selecciona una opción
+
+                        </option>
+
+
+                        <option value="proyecto_nucleo">
+
+                            Núcleo del proyecto
+
+                        </option>
+
+
+                        <option value="afectacion">
+
+                            Afectación
+
+                        </option>
+
+
+                        <option value="parcela">
+
+                            Parcela
+
+                        </option>
+
+
+                        <option value="parcela_titular">
+
+                            Titular de parcela
+
+                        </option>
+
+
+                        <option value="unidad_agraria">
+
+                            Unidad agraria
+
+                        </option>
+
+
+                        <option value="unidad_agraria_titular">
+
+                            Titular de unidad agraria
+
+                        </option>
+
+
+                        <option value="convenio">
+
+                            Convenio
+
+                        </option>
+
+
+                        <option value="convenio_compareciente">
+
+                            Compareciente de convenio
+
+                        </option>
+
+
+                        <option value="tramite_ran">
+
+                            Trámite RAN
+
+                        </option>
+
+
+                        <option value="tramite_ran_evento">
+
+                            Evento de trámite RAN
+
+                        </option>
+
+
+                        <option value="tramite_fifonafe">
+
+                            Trámite FIFONAFE
+
+                        </option>
+
+
+                        <option value="tramite_fifonafe_evento">
+
+                            Evento FIFONAFE
+
+                        </option>
+
+
+                        <option value="tramite_fifonafe_interviniente">
+
+                            Interviniente FIFONAFE
+
+                        </option>
+
+
+                        <option value="indemnizacion">
+
+                            Indemnización
+
+                        </option>
+
+
+                        <option value="pago">
+
+                            Pago
+
+                        </option>
+
+
+                        <option value="orv">
+
+                            ORV
+
+                        </option>
+
+
+                        <option value="padron_historial">
+
+                            Padrón
+
+                        </option>
+
+
+                        <option value="actividad_campo">
+
+                            Actividad de campo
+
+                        </option>
+
+
+                        <option value="asamblea">
+
+                            Asamblea
+
+                        </option>
+
+
+                        <option value="asamblea_convocatoria">
+
+                            Convocatoria de asamblea
+
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+
+                <!-- =================================================
+                            ID ENTIDAD
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="entidadId">
+
+                        Identificador
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="number"
+                        id="entidadId"
+                        name="entidad_id"
+                        min="1"
+                        required
+                        placeholder="ID del registro relacionado">
+
+                    <small>
+
+                        Identificador del registro al que
+                        corresponde este requisito.
+
+                    </small>
+
+                </div>
+
+
+
+
+                <!-- =================================================
+                            DOCUMENTO
+                ================================================== -->
+
+                <div class="campo campo-completo">
+
+                    <label for="idDocumento">
+
+                        Documento relacionado
+
+                    </label>
+
+
+                    <select
+                        id="idDocumento"
+                        name="id_documento">
+
+                        <option value="">
+                            Sin documento relacionado
+                        </option>
+
+                    </select>
+
+                    <small>
+
+                        Opcional. Relaciona un documento
+                        que ya exista en el expediente. Se
+                        habilita al indicar el tipo y el
+                        identificador del registro.
+
+                    </small>
+
+                </div>
+
+
+
+
+                <!-- =================================================
+                            DETALLE
+                ================================================== -->
+
+                <div class="campo campo-completo">
+
+                    <label for="detalle">
+
+                        Detalle
+
+                    </label>
+
+
+                    <textarea
+                        id="detalle"
+                        name="detalle"
+                        rows="5"
+                        placeholder="Agrega información adicional sobre el requisito."></textarea>
+
+                </div>
+
+            </div>
+
+
+
+
+            <!-- =================================================
+                            AVISO
+            ================================================== -->
+
+            <div class="aviso-identidad">
+
+                <i class="bi bi-folder-check"></i>
+
+                <p>
+
+                    Aquí se indica qué requisito debe cumplirse
+                    y, cuando corresponda, qué documento lo respalda.
+
+                </p>
+
+            </div>
+
+
+
+
+            <!-- =================================================
+                            MENSAJE
+            ================================================== -->
+
+            <div
+                id="mensajeFormulario"
+                class="mensaje-formulario">
+
+            </div>
+
+
+
+
+            <!-- =================================================
+                            ACCIONES
+            ================================================== -->
+
+            <div class="formulario-acciones">
+
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelarRequisito">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Registrar requisito
+
+                </button>
+
+            </div>
+
+
+        </form>
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    INFORMACIÓN
+    ================================================== -->
+
+    <section class="bloque informacion-documental">
+
+
+        <div class="bloque-titulo">
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+                    04
+                </span>
+
+
+                <div>
+
+                    <h2>
+                        Sobre los documentos
+                    </h2>
+
+                    <p>
+                        Información del control documental.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="aviso-identidad">
+
+            <i class="bi bi-info-circle"></i>
+
+            <p>
+
+                Los documentos se identifican dentro del expediente
+                mediante sus datos y relaciones. La carga y gestión
+                física del archivo se integrará cuando esté disponible
+                el flujo correspondiente del sistema.
+
+            </p>
+
+        </div>
+
+    </section>
+
+
+</main>
+
+
+
+
+<!-- =================================================
+                        FOOTER
+================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/expedienteDocumental.js"></script>
+
+
+</body>
+
+</html>

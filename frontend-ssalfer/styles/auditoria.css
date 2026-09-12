@@ -1,0 +1,1008 @@
+.auditoria-contenedor {
+    padding: 32px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 22px;
+
+    min-width: 0;
+}
+
+
+.auditoria-encabezado {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-start;
+
+    gap: 24px;
+}
+
+
+.auditoria-eyebrow {
+    margin: 0 0 5px;
+
+    color: var(--verde);
+
+    font-size: .78rem;
+    font-weight: 800;
+
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+
+.auditoria-encabezado h1 {
+    margin: 0;
+
+    color: #212529;
+
+    font-size: clamp(
+        1.8rem,
+        3vw,
+        2.5rem
+    );
+}
+
+
+.auditoria-subtitulo {
+    max-width: 780px;
+
+    margin: 8px 0 0;
+
+    color: #60656a;
+
+    line-height: 1.5;
+}
+
+
+.auditoria-alerta {
+    padding: 13px 16px;
+
+    border: 1px solid transparent;
+    border-radius: 9px;
+
+    line-height: 1.4;
+}
+
+
+.auditoria-alerta-error {
+    color: #842029;
+
+    background: #f8d7da;
+
+    border-color: #f5c2c7;
+}
+
+
+.auditoria-nota-seguridad {
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 12px;
+
+    padding: 15px 17px;
+
+    border: 1px solid #d8e4da;
+    border-radius: 10px;
+
+    background: #f5faf6;
+
+    color: #34443a;
+
+    line-height: 1.45;
+}
+
+
+.auditoria-nota-seguridad i {
+    flex: 0 0 auto;
+
+    margin-top: 1px;
+
+    color: var(--verde);
+
+    font-size: 1.25rem;
+}
+
+
+.auditoria-nota-seguridad p {
+    margin: 0;
+
+    font-size: .88rem;
+}
+
+
+/* =====================================================
+                        TABS
+===================================================== */
+
+.auditoria-tabs {
+    display: flex;
+
+    gap: 8px;
+
+    width: fit-content;
+
+    padding: 5px;
+
+    border: 1px solid #dfe3e6;
+    border-radius: 11px;
+
+    background: #f4f6f7;
+}
+
+
+.auditoria-tab {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    min-height: 40px;
+
+    padding: 9px 15px;
+
+    border: 0;
+    border-radius: 8px;
+
+    background: transparent;
+
+    color: #555c62;
+
+    font: inherit;
+    font-size: .9rem;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+
+.auditoria-tab:hover {
+    background: #e9ecef;
+}
+
+
+.auditoria-tab.activo {
+    background: #ffffff;
+
+    color: var(--verde-oscuro);
+
+    box-shadow:
+        0 1px 4px
+        rgba(0, 0, 0, .09);
+}
+
+
+/* =====================================================
+                    PANEL / CARDS
+===================================================== */
+
+.auditoria-panel {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 18px;
+}
+
+
+.auditoria-card {
+    min-width: 0;
+
+    padding: 22px;
+
+    border: 1px solid #e1e5e7;
+    border-radius: 14px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 2px 9px
+        rgba(0, 0, 0, .06);
+}
+
+
+.auditoria-card-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-start;
+
+    gap: 18px;
+
+    margin-bottom: 20px;
+}
+
+
+.auditoria-card-header h2 {
+    margin: 0;
+
+    color: #252a2e;
+
+    font-size: 1.3rem;
+}
+
+
+.auditoria-card-header p {
+    margin: 5px 0 0;
+
+    color: #6a7075;
+
+    font-size: .87rem;
+
+    line-height: 1.45;
+}
+
+
+/* =====================================================
+                        FILTROS
+===================================================== */
+
+.auditoria-filtros {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(0, 1fr)
+        );
+
+    gap: 16px;
+}
+
+
+.auditoria-campo {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+    min-width: 0;
+}
+
+
+.auditoria-campo label,
+.auditoria-campo > span {
+    color: #343a40;
+
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+
+.auditoria-campo input,
+.auditoria-campo select {
+    width: 100%;
+
+    min-height: 42px;
+
+    padding: 9px 11px;
+
+    border: 1px solid #cfd4d8;
+    border-radius: 8px;
+
+    background: #ffffff;
+
+    color: #212529;
+
+    font: inherit;
+
+    outline: none;
+}
+
+
+.auditoria-campo input:focus,
+.auditoria-campo select:focus {
+    border-color: var(--verde);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(40, 107, 48, .12);
+}
+
+
+.auditoria-filtros-acciones {
+    grid-column: 1 / -1;
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    padding-top: 4px;
+}
+
+
+/* =====================================================
+                        BOTONES
+===================================================== */
+
+.auditoria-btn {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+
+    min-height: 39px;
+
+    padding: 9px 14px;
+
+    border: 1px solid transparent;
+    border-radius: 8px;
+
+    font: inherit;
+    font-size: .87rem;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        background .15s,
+        transform .15s,
+        border-color .15s;
+}
+
+
+.auditoria-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+
+.auditoria-btn:disabled {
+    opacity: .55;
+
+    cursor: not-allowed;
+}
+
+
+.auditoria-btn-primario {
+    color: #ffffff;
+
+    background: var(--verde);
+
+    border-color: var(--verde);
+}
+
+
+.auditoria-btn-primario:hover:not(:disabled) {
+    background: var(--verde-oscuro);
+}
+
+
+.auditoria-btn-secundario {
+    color: #30363b;
+
+    background: #ffffff;
+
+    border-color: #c8ced3;
+}
+
+
+.auditoria-btn-secundario:hover:not(:disabled) {
+    background: #f4f6f7;
+}
+
+
+.auditoria-btn-compacto {
+    min-height: 32px;
+
+    padding: 6px 9px;
+
+    font-size: .78rem;
+
+    white-space: nowrap;
+}
+
+
+/* =====================================================
+                        TABLAS
+===================================================== */
+
+.auditoria-tabla-cabecera {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: center;
+
+    gap: 16px;
+
+    margin-bottom: 12px;
+}
+
+
+.auditoria-total {
+    margin: 0;
+
+    color: #5f656a;
+
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+
+.auditoria-limite {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    color: #5d6368;
+
+    font-size: .83rem;
+}
+
+
+.auditoria-limite select {
+    padding: 6px 8px;
+
+    border: 1px solid #cfd4d8;
+    border-radius: 7px;
+
+    background: #ffffff;
+
+    color: #30363b;
+
+    font: inherit;
+}
+
+
+.auditoria-tabla-wrap {
+    width: 100%;
+
+    overflow-x: auto;
+
+    border: 1px solid #e3e6e8;
+    border-radius: 10px;
+}
+
+
+.auditoria-tabla {
+    width: 100%;
+
+    min-width: 1060px;
+
+    border-collapse: collapse;
+
+    background: #ffffff;
+}
+
+
+.auditoria-tabla th,
+.auditoria-tabla td {
+    padding: 12px 13px;
+
+    border-bottom:
+        1px solid #e9ecef;
+
+    vertical-align: top;
+
+    text-align: left;
+
+    font-size: .84rem;
+}
+
+
+.auditoria-tabla th {
+    background:
+        var(--verde-oscuro);
+
+    color: #ffffff;
+
+    font-weight: 700;
+
+    white-space: nowrap;
+}
+
+
+.auditoria-tabla tbody tr:hover {
+    background: #f7faf7;
+}
+
+
+.auditoria-tabla tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+
+.auditoria-tabla td strong,
+.auditoria-tabla td small {
+    display: block;
+}
+
+
+.auditoria-tabla td small {
+    margin-top: 4px;
+
+    color: #73797e;
+
+    line-height: 1.3;
+}
+
+
+.auditoria-fecha {
+    min-width: 165px;
+
+    white-space: nowrap;
+}
+
+
+.auditoria-mono {
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        monospace;
+}
+
+
+.auditoria-tabla-estado {
+    padding: 28px !important;
+
+    color: #6c757d;
+
+    text-align: center !important;
+}
+
+
+/* =====================================================
+                        BADGES
+===================================================== */
+
+.auditoria-badge {
+    display: inline-flex;
+
+    align-items: center;
+
+    padding: 4px 8px;
+
+    border-radius: 999px;
+
+    font-size: .74rem;
+    font-weight: 800;
+
+    white-space: nowrap;
+}
+
+
+.auditoria-badge-neutro {
+    color: #4e565c;
+
+    background: #e9ecef;
+}
+
+
+.auditoria-badge-info {
+    color: #174f6a;
+
+    background: #dbeef6;
+}
+
+
+.auditoria-badge-ok {
+    color: #17602d;
+
+    background: #dcefe1;
+}
+
+
+.auditoria-badge-peligro {
+    color: #7b232b;
+
+    background: #f3dfe1;
+}
+
+
+/* =====================================================
+                    PAGINACIÓN
+===================================================== */
+
+.auditoria-paginacion {
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    gap: 12px;
+
+    margin-top: 16px;
+}
+
+
+.auditoria-paginacion span {
+    min-width: 130px;
+
+    color: #565d62;
+
+    text-align: center;
+
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+
+/* =====================================================
+                        MODAL
+===================================================== */
+
+.auditoria-modal[hidden] {
+    display: none;
+}
+
+
+.auditoria-modal {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 1100;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 24px;
+
+    background:
+        rgba(0, 0, 0, .52);
+
+    overflow-y: auto;
+}
+
+
+.auditoria-modal-abierto {
+    overflow: hidden;
+}
+
+
+.auditoria-modal-dialogo {
+    width: min(920px, 100%);
+
+    max-height:
+        calc(100vh - 48px);
+
+    overflow-y: auto;
+
+    border-radius: 14px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 22px 55px
+        rgba(0, 0, 0, .28);
+}
+
+
+.auditoria-modal-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-start;
+
+    gap: 18px;
+
+    padding: 20px 22px;
+
+    border-bottom:
+        1px solid #e7eaec;
+}
+
+
+.auditoria-modal-header h2 {
+    margin: 0;
+
+    color: #252a2e;
+
+    font-size: 1.35rem;
+}
+
+
+.auditoria-modal-header p {
+    margin: 5px 0 0;
+
+    color: #6e7479;
+
+    font-size: .85rem;
+}
+
+
+.auditoria-modal-cerrar {
+    display: grid;
+
+    place-items: center;
+
+    width: 38px;
+    height: 38px;
+
+    flex: 0 0 38px;
+
+    border: 0;
+
+    border-radius: 50%;
+
+    background: #f1f3f5;
+
+    color: #353b40;
+
+    cursor: pointer;
+}
+
+
+.auditoria-modal-cerrar:hover {
+    background: #e5e8ea;
+}
+
+
+.auditoria-modal-contenido {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 22px;
+
+    padding: 22px;
+}
+
+
+/* =====================================================
+                    DETALLE
+===================================================== */
+
+.auditoria-detalle-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
+
+    gap: 12px;
+}
+
+
+.auditoria-detalle-dato {
+    min-width: 0;
+
+    padding: 12px 13px;
+
+    border: 1px solid #e3e6e8;
+    border-radius: 9px;
+
+    background: #fafbfb;
+}
+
+
+.auditoria-detalle-dato span {
+    display: block;
+
+    margin-bottom: 4px;
+
+    color: #757b80;
+
+    font-size: .75rem;
+    font-weight: 700;
+
+    text-transform: uppercase;
+
+    letter-spacing: .04em;
+}
+
+
+.auditoria-detalle-dato strong {
+    display: block;
+
+    overflow-wrap: anywhere;
+
+    color: #30363b;
+
+    font-size: .9rem;
+
+    white-space: pre-wrap;
+}
+
+
+.auditoria-modal-contenido h3 {
+    margin: 0;
+
+    color: #30363b;
+
+    font-size: 1rem;
+}
+
+
+.auditoria-cambios-lista {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 12px;
+}
+
+
+.auditoria-cambio-item {
+    padding: 14px;
+
+    border: 1px solid #e1e5e7;
+    border-radius: 10px;
+}
+
+
+.auditoria-cambio-item h4 {
+    margin: 0 0 11px;
+
+    color: var(--verde-oscuro);
+
+    font-size: .94rem;
+}
+
+
+.auditoria-cambio-comparacion {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
+
+    gap: 12px;
+}
+
+
+.auditoria-cambio-comparacion > div > span {
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #6f757a;
+
+    font-size: .75rem;
+    font-weight: 700;
+
+    text-transform: uppercase;
+}
+
+
+.auditoria-cambio-comparacion pre,
+.auditoria-detalle-seccion pre {
+    margin: 0;
+
+    padding: 11px;
+
+    overflow-x: auto;
+
+    border-radius: 8px;
+
+    background: #f4f6f7;
+
+    color: #343a40;
+
+    font:
+        .8rem/1.45
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        monospace;
+
+    white-space: pre-wrap;
+
+    overflow-wrap: anywhere;
+}
+
+
+.auditoria-detalle-seccion {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+
+.auditoria-detalle-vacio {
+    margin: 0;
+
+    padding: 14px;
+
+    border-radius: 8px;
+
+    background: #f5f6f7;
+
+    color: #686e73;
+
+    font-size: .86rem;
+}
+
+
+/* =====================================================
+                    RESPONSIVE
+===================================================== */
+
+@media (max-width: 1150px) {
+
+    .auditoria-filtros {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+}
+
+
+@media (max-width: 760px) {
+
+    .auditoria-contenedor {
+        padding: 20px 14px;
+    }
+
+
+    .auditoria-encabezado,
+    .auditoria-card-header,
+    .auditoria-tabla-cabecera {
+        flex-direction: column;
+
+        align-items: stretch;
+    }
+
+
+    .auditoria-tabs {
+        width: 100%;
+    }
+
+
+    .auditoria-tab {
+        flex: 1;
+    }
+
+
+    .auditoria-filtros,
+    .auditoria-detalle-grid,
+    .auditoria-cambio-comparacion {
+        grid-template-columns: 1fr;
+    }
+
+
+    .auditoria-filtros-acciones {
+        flex-direction:
+            column-reverse;
+    }
+
+
+    .auditoria-filtros-acciones
+    .auditoria-btn {
+        width: 100%;
+    }
+
+
+    .auditoria-paginacion {
+        flex-wrap: wrap;
+    }
+
+
+    .auditoria-modal {
+        padding: 12px;
+    }
+
+
+    .auditoria-modal-dialogo {
+        max-height:
+            calc(100vh - 24px);
+    }
+
+}

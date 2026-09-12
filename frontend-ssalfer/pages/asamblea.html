@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Registro de Asamblea | SSALFER</title>
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/asamblea.css">
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button class="btn-menu" type="button">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn" type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                        CONTENIDO
+===================================================== -->
+
+<main class="contenedor">
+
+
+    <!-- =================================================
+                    ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+        <div>
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Proyectos
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a href="/dashboard.html" class="js-miga-proyecto">Proyecto</a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a href="/pages/nucleoAgrario.html?id_proyecto_nucleo=1">
+                    Ejido San Antonio
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Asamblea
+                </span>
+
+            </div>
+
+
+            <p class="etiqueta">
+                DERECHOS COLECTIVOS
+            </p>
+
+
+            <h1>
+                Registro de Asamblea
+            </h1>
+
+
+            <p class="subtitulo">
+
+                Núcleo agrario:
+                <strong id="nombreNucleo">
+                    Ejido San Antonio
+                </strong>
+
+            </p>
+
+        </div>
+
+
+        <div class="acciones-header">
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnVolver">
+
+                <i class="bi bi-arrow-left"></i>
+
+                Volver al núcleo
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    FORMULARIO
+    ================================================== -->
+
+    <form id="formAsamblea">
+
+
+        <!-- =================================================
+                    DATOS DE ASAMBLEA
+        ================================================== -->
+
+        <section class="tarjeta">
+
+            <div class="seccion-titulo">
+
+                <div>
+
+                    <i class="bi bi-people"></i>
+
+                    <h2>
+                        Información de la asamblea
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-grid">
+
+
+                <!-- PADRÓN -->
+
+                <div class="campo">
+
+                    <label for="idPadron">
+
+                        Padrón utilizado
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select id="idPadron" name="id_padron">
+
+                        <option value="">
+                            Seleccionar padrón
+                        </option>
+
+                    </select>
+
+
+                    <small>
+                        Solo se pueden seleccionar padrones
+                        previamente registrados para este núcleo.
+                    </small>
+
+                </div>
+
+
+
+                <!-- TIPO DE ASAMBLEA -->
+
+                <div class="campo">
+
+                    <label for="idTipoAsamblea">
+
+                        Tipo de asamblea
+                        <span class="obligatorio">*</span>
+
+                    </label>
+
+
+                    <select
+                        id="idTipoAsamblea"
+                        name="id_tipo_asamblea"
+                        required>
+
+                        <option value="">
+                            Seleccionar tipo
+                        </option>
+                    </select>
+
+                </div>
+
+
+
+                <!-- CONTEXTO -->
+
+                <div class="campo">
+
+                    <label for="idContextoAsamblea">
+
+                        Contexto de asamblea
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idContextoAsamblea"
+                        name="id_contexto_asamblea">
+
+                        <option value="">
+                            Seleccionar contexto
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- COP OPERATIVO -->
+
+                <div class="campo">
+
+                    <label for="idTipoCopOperativo">
+
+                        Tipo de COP operativo
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="idTipoCopOperativo"
+                        name="id_tipo_cop_operativo">
+
+                        <option value="">
+                            Seleccionar tipo
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- PROPÓSITO -->
+
+                <div class="campo campo-completo">
+
+                    <label for="proposito">
+
+                        Propósito
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <textarea
+                        id="proposito"
+                        name="proposito"
+                        rows="3"
+                        placeholder="Describe el propósito de la asamblea..."></textarea>
+
+                </div>
+
+
+
+                <!-- RESULTADO -->
+
+                <div class="campo">
+
+                    <label for="resultado">
+
+                        Resultado
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="resultado"
+                        name="resultado"
+                        maxlength="50"
+                        placeholder="Resultado de la asamblea">
+
+                    <small>
+                        Máximo 50 caracteres.
+                    </small>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    CONVOCATORIAS
+        ================================================== -->
+
+        <section class="tarjeta">
+
+            <div class="seccion-titulo convocatoria-header">
+
+                <div>
+
+                    <i class="bi bi-calendar-event"></i>
+
+                    <h2>
+                        Convocatorias
+                    </h2>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="btn-principal"
+                    id="btnAgregarConvocatoria">
+
+                    <i class="bi bi-plus-lg"></i>
+
+                    Agregar convocatoria
+
+                </button>
+
+            </div>
+
+
+            <p class="descripcion">
+
+                Registra las convocatorias correspondientes a esta
+                asamblea. El ordinal identifica el número de convocatoria
+                y no puede repetirse.
+
+            </p>
+
+
+            <div
+                id="convocatoriasContainer"
+                class="convocatorias-container">
+
+
+                <!-- =================================================
+                    CONVOCATORIA DEMOSTRATIVA
+                ================================================== -->
+
+                <div
+                    class="convocatoria"
+                    data-convocatoria>
+
+
+                    <div class="convocatoria-titulo">
+
+                        <div>
+
+                            <span class="numero-convocatoria">
+                                1
+                            </span>
+
+                            <h3>
+                                Convocatoria 1
+                            </h3>
+
+                        </div>
+
+
+                        <button
+                            type="button"
+                            class="btn-eliminar-convocatoria"
+                            title="Eliminar convocatoria">
+
+                            <i class="bi bi-trash"></i>
+
+                        </button>
+
+                    </div>
+
+
+                    <div class="form-grid">
+
+
+                        <!-- ORDINAL -->
+
+                        <div class="campo">
+
+                            <label>
+                                Ordinal
+                                <span class="obligatorio">*</span>
+                            </label>
+
+                            <input
+                                type="number"
+                                name="convocatorias[0][ordinal]"
+                                min="1"
+                                step="1"
+                                value="1"
+                                required>
+
+                        </div>
+
+
+
+                        <!-- FECHA EXPEDICIÓN -->
+
+                        <div class="campo">
+
+                            <label>
+                                Fecha de expedición
+                                <span class="opcional">
+                                    Opcional
+                                </span>
+                            </label>
+
+                            <input
+                                type="date"
+                                name="convocatorias[0][fecha_expedicion]">
+
+                        </div>
+
+
+
+                        <!-- FECHA PROGRAMADA -->
+
+                        <div class="campo">
+
+                            <label>
+                                Fecha de programada
+
+                                <span class="opcional">
+                                    Opcional
+                                </span>
+                            </label>
+
+                            <input
+                                type="date"
+                                name="convocatorias[0][fecha_programada]">
+
+                        </div>
+
+
+
+                        <!-- FECHA REALIZACIÓN -->
+
+                        <div class="campo">
+
+                            <label>
+                                Fecha de realización
+                                <span class="opcional">
+                                    Opcional
+                                </span>
+                            </label>
+
+                            <input
+                                type="date"
+                                name="convocatorias[0][fecha_realizacion]">
+
+                        </div>
+
+
+
+                        <!-- RESULTADO -->
+
+                        <div class="campo">
+
+                            <label>
+                                Resultado
+
+                                <span class="opcional">
+                                    Opcional
+                                </span>
+                            </label>
+
+                            <select
+                                name="convocatorias[0][id_resultado]">
+
+                                <option value="">
+                                    Seleccionar resultado
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+
+                        <!-- DOCUMENTO -->
+
+                        <div class="campo">
+
+                            <label>
+                                Documento
+                                <span class="opcional">
+                                    Opcional
+                                </span>
+                            </label>
+
+                            <select
+                                name="convocatorias[0][id_documento]">
+
+                                <option value="">
+                                    Sin documento
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+
+                        <!-- OBSERVACIONES -->
+
+                        <div class="campo campo-completo">
+
+                            <label>
+                                Observaciones del resultado
+
+                                <span class="opcional">
+                                    Opcional
+                                </span>
+
+                            </label>
+
+                            <textarea
+                                name="convocatorias[0][observaciones_resultado]"
+                                rows="3"
+                                placeholder="Observaciones relacionadas con el resultado..."></textarea>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="sinConvocatorias"
+                class="sin-convocatorias"
+                hidden>
+
+                <i class="bi bi-calendar-x"></i>
+
+                <p>
+                    No hay convocatorias registradas.
+                </p>
+
+                <span>
+                    Utiliza "Agregar convocatoria" para registrar una.
+                </span>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    ACCIONES
+        ================================================== -->
+
+        <section class="acciones-formulario">
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnCancelar">
+
+                Cancelar
+
+            </button>
+
+
+            <button
+                type="submit"
+                class="btn-principal">
+
+                <i class="bi bi-check-lg"></i>
+
+                Guardar asamblea
+
+            </button>
+
+        </section>
+
+
+    </form>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/asamblea.js"></script>
+
+
+</body>
+
+</html>

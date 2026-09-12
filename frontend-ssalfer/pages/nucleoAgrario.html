@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Núcleo Agrario | SSALFER</title>
+
+    <link rel="stylesheet" href="/styles/nucleoAgrario.css">
+    <link rel="stylesheet" href="/styles/dashboard.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button class="btn-menu" type="button">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <!-- Ver mapa: fuera de alcance de esta tanda -->
+        <!-- <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a> -->
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn" type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+<a href="/pages/usuarios.html">
+
+                    <i class="bi bi-people"></i>
+
+                    Usuarios y permisos
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                        CONTENIDO
+===================================================== -->
+
+<main class="contenedor">
+
+    <div id="mensajeError" class="mensaje-error" hidden></div>
+
+
+    <!-- ENCABEZADO -->
+
+    <section class="pagina-header">
+
+        <div>
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Proyectos
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a href="/dashboard.html" class="js-miga-proyecto">Proyecto</a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Núcleo agrario
+                </span>
+
+            </div>
+
+
+            <p class="etiqueta">
+                FICHA DE NÚCLEO AGRARIO
+            </p>
+
+
+            <h1 id="nombreNucleo">
+                Núcleo agrario
+            </h1>
+
+
+            <p class="subtitulo">
+
+                Proyecto:
+                <strong id="nombreProyecto">
+                    —
+                </strong>
+
+            </p>
+
+        </div>
+
+
+        <div class="acciones-header">
+
+            <button
+                class="btn-secundario"
+                id="btnVolver">
+
+                <i class="bi bi-arrow-left"></i>
+
+                Volver al proyecto
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                INFORMACIÓN GENERAL
+    ================================================= -->
+
+    <section class="tarjeta">
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-info-circle"></i>
+
+                <h2>
+                    Información general
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div class="datos-grid">
+
+
+            <div class="dato">
+
+                <span>
+                    Entidad federativa
+                </span>
+
+                <strong id="entidad">—</strong>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span>
+                    Municipio
+                </span>
+
+                <strong id="municipio">—</strong>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span>
+                    Tipo de tenencia
+                </span>
+
+                <strong id="tipoTenencia">—</strong>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span>
+                    Residencia
+                </span>
+
+                <strong id="residencia">—</strong>
+
+            </div>
+
+
+            <div class="dato dato-ancho">
+
+                <span>
+                    Referencia principal
+                </span>
+
+                <strong id="referencia">—</strong>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    RESPONSABLE
+    ================================================= -->
+
+    <section class="tarjeta">
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-person-badge"></i>
+
+                <h2>
+                    Responsable del seguimiento
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div class="responsable">
+
+            <div class="responsable-icono">
+
+                <i class="bi bi-person"></i>
+
+            </div>
+
+
+            <div class="responsable-datos">
+
+                <strong id="responsableNombre">—</strong>
+
+                <span id="responsableCargo">—</span>
+
+                <span id="responsableContacto">—</span>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    RESUMEN DEL NÚCLEO
+    ================================================= -->
+
+    <section class="tarjeta">
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-bar-chart"></i>
+
+                <h2>
+                    Resumen del núcleo
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div class="resumen-grid">
+
+
+            <div class="resumen-item">
+
+                <span>
+                    Parcelas
+                </span>
+
+                <strong id="totalParcelas">0</strong>
+
+            </div>
+
+
+
+            <!-- UNIDADES AGRARIAS -->
+
+            <div class="resumen-item">
+
+                <span>
+                    Afectaciones
+                </span>
+
+                <strong id="totalAfectaciones">0</strong>
+
+            </div>
+
+
+            <div class="resumen-item">
+
+                <span>
+                    Afectaciones colectivas
+                </span>
+
+                <strong id="afectacionesColectivas">0</strong>
+
+            </div>
+
+
+            <div class="resumen-item">
+
+                <span>
+                    Afectaciones individuales
+                </span>
+
+                <strong id="afectacionesIndividuales">0</strong>
+
+            </div>
+
+
+            <div class="resumen-item">
+
+                <span>
+                    Superficie preliminar
+                </span>
+
+                <strong id="superficiePreliminar">0.000000 ha</strong>
+
+            </div>
+
+
+            <div class="resumen-item">
+
+                <span>
+                    Superficie afectada
+                </span>
+
+                <strong id="superficieAfectada">0.000000 ha</strong>
+
+            </div>
+
+
+            <div class="resumen-item">
+
+                <span>
+                    Asambleas
+                </span>
+
+                <strong id="totalAsambleas">0</strong>
+
+            </div>
+
+
+            <div class="resumen-item">
+
+                <span>
+                    Convenios
+                </span>
+
+                <strong id="totalConvenios">0</strong>
+
+            </div>
+
+
+            <div class="resumen-item">
+
+                <span>
+                    Unidades afectadas
+                </span>
+
+                <strong id="totalUnidades">0</strong>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    MÓDULOS
+    ================================================= -->
+
+    <section class="tarjeta">
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-grid"></i>
+
+                <h2>
+                    Módulos del núcleo
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <p class="descripcion-modulos">
+
+            Consulta y seguimiento de la información registrada
+            para este núcleo agrario.
+
+        </p>
+
+
+        <div class="modulos-grid">
+
+
+
+            <!-- ASAMBLEA -->
+
+            <a
+                class="modulo"
+                id="btnAsamblea"
+                href="#">
+
+                <div class="modulo-icono">
+                    <i class="bi bi-people"></i>
+                </div>
+
+                <div>
+                    <h3>
+                        Asamblea
+                    </h3>
+
+                    <span>
+                        Convocatorias, acuerdos y seguimiento
+                        de asambleas del núcleo agrario.
+                    </span>
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+
+
+
+
+            <!-- SEGUIMIENTO -->
+            <a class="modulo" id="btnSeguimiento" href="#">
+                <div class="modulo-icono">
+                    <i class="bi bi-journal-check"></i>
+                </div>
+
+                <div>
+                    <h3>Seguimiento</h3>
+                    <span>
+                        Historial de eventos, suspensiones, reaperturas y cambios de seguimiento.
+                    </span>
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+            </a>
+
+            <!-- PADRONES -->
+            <a class="modulo" id="btnPadrones" href="#">
+                <div class="modulo-icono">
+                    <i class="bi bi-card-list"></i>
+                </div>
+
+                <div>
+                    <h3>Padrones</h3>
+                    <span>
+                        Consulta y administra el historial de padrones del núcleo agrario.
+                    </span>
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+            </a>
+
+
+
+
+            <!-- ORV -->
+
+            <a class="modulo" id="btnOrv" href="#">
+
+                <div class="modulo-icono">
+
+                    <i class="bi bi-people"></i>
+
+                </div>
+
+                <div>
+
+                    <h3>
+                        ORV
+                    </h3>
+
+                    <span>
+                        Organización y representación
+                        de vigilancia.
+                    </span>
+
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+
+
+            <!-- PADRÓN -->
+
+            <a class="modulo" id="btnPadron" href="#">
+
+                <div class="modulo-icono">
+
+                    <i class="bi bi-person-lines-fill"></i>
+
+                </div>
+
+                <div>
+
+                    <h3>
+                        Padrón
+                    </h3>
+
+                    <span>
+                        Consulta del padrón histórico
+                        del núcleo.
+                    </span>
+
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+
+
+            <!-- SENSIBILIZACIÓN -->
+
+            <a class="modulo" id="btnSensibilizacion" href="#">
+
+                <div class="modulo-icono">
+
+                    <i class="bi bi-chat-dots"></i>
+
+                </div>
+
+                <div>
+
+                    <h3>
+                        Sensibilización
+                    </h3>
+
+                    <span>
+                        Actividades de campo
+                        registradas.
+                    </span>
+
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+
+
+            <!-- CAMINAMIENTO -->
+
+            <a class="modulo" id="btnCaminamiento" href="#">
+
+                <div class="modulo-icono">
+
+                    <i class="bi bi-signpost-2"></i>
+
+                </div>
+
+                <div>
+
+                    <h3>
+                        Caminamiento
+                    </h3>
+
+                    <span>
+                        Actividades de caminamiento
+                        registradas.
+                    </span>
+
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+
+
+            <!-- DERECHOS COLECTIVOS -->
+
+            <a
+                class="modulo"
+                id="btnAsamblea"
+                href="#">
+
+                <div class="modulo-icono">
+
+                    <i class="bi bi-people"></i>
+
+                </div>
+
+                <div>
+
+                    <h3>
+                        Derechos colectivos
+                    </h3>
+
+                    <span>
+                        Asamblea y afectaciones
+                        colectivas.
+                    </span>
+
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+
+
+            <!-- PARCELAS -->
+
+            <a class="modulo" id="btnParcelas" href="#">
+
+                <div class="modulo-icono">
+
+                    <i class="bi bi-grid-3x3-gap"></i>
+
+                </div>
+
+                <div>
+
+                    <h3>
+                        Parcelas
+                    </h3>
+
+                    <span>
+                        Derechos individuales
+                        y parcelas.
+                    </span>
+
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+
+
+            <!-- UNIDADES AGRARIAS -->
+
+            <a
+                class="modulo"
+                id="btnUnidadesAgrarias"
+                href="#">
+
+                <div class="modulo-icono">
+
+                    <i class="bi bi-house"></i>
+
+                </div>
+
+                <div>
+
+                    <h3>
+                        Unidades agrarias
+                    </h3>
+
+                    <span>
+                        Unidades, parcelas y titulares
+                        relacionados con el núcleo.
+                    </span>
+
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+
+            <!-- AFECTACIONES -->
+
+            <a
+                class="modulo modulo-principal"
+                id="btnAfectaciones"
+                href="#">
+
+                <div class="modulo-icono">
+
+                    <i class="bi bi-file-earmark-text"></i>
+
+                </div>
+
+                <div>
+
+                    <h3>
+                        Afectaciones
+                    </h3>
+
+                    <span>
+                        Liberación de propiedad social
+                        y afectaciones registradas.
+                    </span>
+
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+
+
+            <!-- FIFONAFE -->
+
+            <a class="modulo" id="btnFifonafe" href="#">
+
+                <div class="modulo-icono">
+
+                    <i class="bi bi-bank"></i>
+
+                </div>
+
+                <div>
+
+                    <h3>
+                        FIFONAFE
+                    </h3>
+
+                    <span>
+                        Trámites relacionados con
+                        las afectaciones.
+                    </span>
+
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
+
+        </div>
+
+    </section>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/nucleoAgrario.js"></script>
+
+
+</body>
+
+</html>
