@@ -256,7 +256,8 @@ def test_ran_desistimiento_y_correccion_no_duplican_asamblea(api, target_domain)
 def test_ran_orv_conserva_objetivo_del_nucleo(api, target_domain):
     nucleus_id = target_domain["nucleus"]["id_nucleo"]
     pn_id = target_domain["project_nucleus"]["id_proyecto_nucleo"]
-    orv = api(
+    existing_orvs = api("GET", f"/api/proyecto-nucleo/{pn_id}/orv").json()
+    orv = existing_orvs[0] if existing_orvs else api(
         "POST",
         f"/api/proyecto-nucleo/{pn_id}/orv",
         expected=201,

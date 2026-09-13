@@ -2,29 +2,40 @@
 
 import os
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, text
+
+
+TEST_DATABASE = "software_pa_test"
+TEST_ADMIN_MARKER = "Cuenta administrada exclusivamente por pytest"
 
 
 def _assert_isolated_database() -> None:
     environment = os.getenv("APP_ENV", "").strip().lower()
     database = os.getenv("DB_NAME", "").strip().lower()
     explicitly_authorized = os.getenv("TEST_ALLOW_DATABASE", "").strip().lower()
-    database_is_authorized = "_test" in database or (
-        explicitly_authorized and database == explicitly_authorized
-    )
-    if environment != "test" or not database_is_authorized:
+    if (
+        environment != "test"
+        or database != TEST_DATABASE
+        or explicitly_authorized != TEST_DATABASE
+    ):
         raise RuntimeError(
-            "pytest requires APP_ENV=test and either an isolated DB_NAME containing "
-            "'_test' or an exact TEST_ALLOW_DATABASE opt-in"
+            "pytest requires APP_ENV=test, DB_NAME=software_pa_test and "
+            "TEST_ALLOW_DATABASE=software_pa_test"
         )
 
 
 _assert_isolated_database()
 
+from app import models, schemas
 from app.config import AUTH_SETTINGS
+from app.database import SessionLocal
 from app.main import app
+from app.services.authentication import hash_password, password_matches
+from app.services.common import set_audit_context
 
 
 def unique(prefix: str) -> str:
@@ -37,11 +48,75 @@ def client() -> TestClient:
 
 
 @pytest.fixture(scope="session")
-def admin_headers(client: TestClient) -> dict[str, str]:
+def test_admin_credentials() -> tuple[str, str]:
     email = os.getenv("TEST_ADMIN_EMAIL")
     password = os.getenv("TEST_ADMIN_PASSWORD")
     if not email or not password:
         pytest.fail("TEST_ADMIN_EMAIL y TEST_ADMIN_PASSWORD son obligatorios")
+    contract = schemas.UsuarioCreate(
+        nombre="Pytest",
+        apellido_paterno="QA",
+        correo=email,
+        rol="admin",
+        contrasena=password,
+    )
+
+    with SessionLocal() as db:
+        current_database = db.execute(text("SELECT current_database()")).scalar_one()
+        if current_database != TEST_DATABASE:
+            pytest.fail("La conexión de pytest no apunta a software_pa_test")
+        user = (
+            db.query(models.Usuario)
+            .filter(func.lower(func.btrim(models.Usuario.correo)) == contract.correo)
+            .one_or_none()
+        )
+        if user is None:
+            actor = (
+                db.query(models.Usuario)
+                .filter(
+                    models.Usuario.rol == "admin",
+                    models.Usuario.activo.is_(True),
+                )
+                .order_by(models.Usuario.id_usuario)
+                .first()
+            )
+            if actor is None:
+                pytest.fail(
+                    "software_pa_test requiere un administrador bootstrap para auditar "
+                    "la creación de la cuenta pytest"
+                )
+            set_audit_context(db, actor.id_usuario)
+            user = models.Usuario(
+                nombre=contract.nombre,
+                apellido_paterno=contract.apellido_paterno,
+                correo=contract.correo,
+                contrasena_hash=hash_password(contract.contrasena),
+                rol="admin",
+                activo=True,
+                fecha_alta=datetime.now(timezone.utc),
+                observaciones=TEST_ADMIN_MARKER,
+            )
+            db.add(user)
+            db.commit()
+        elif user.observaciones != TEST_ADMIN_MARKER:
+            pytest.fail(
+                "TEST_ADMIN_EMAIL pertenece a una cuenta no administrada por pytest"
+            )
+        elif not user.activo or user.rol != "admin":
+            pytest.fail("La cuenta administrada por pytest no es un admin activo")
+        elif not password_matches(contract.contrasena, user.contrasena_hash):
+            pytest.fail(
+                "TEST_ADMIN_PASSWORD no coincide con la cuenta administrada por pytest"
+            )
+
+    return contract.correo, contract.contrasena
+
+
+@pytest.fixture(scope="session")
+def admin_headers(
+    client: TestClient, test_admin_credentials: tuple[str, str]
+) -> dict[str, str]:
+    email, password = test_admin_credentials
     origin = AUTH_SETTINGS.allowed_origins[0]
     response = client.post(
         "/api/auth/sesiones",
