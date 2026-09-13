@@ -935,6 +935,97 @@ def add_fifonafe_affectation(
     )
 
 
+def validate_fifonafe_interviniente(
+    db: Session,
+    procedure: models.TramiteFifonafe,
+    data: schemas.TramiteFifonafeIntervinienteCreate,
+) -> None:
+    # 1. Si se proporciona id_orv_integrante, debe existir id_evento_fifonafe
+    if data.id_orv_integrante is not None and data.id_evento_fifonafe is None:
+        raise HTTPException(
+            status_code=422,
+            detail="La acreditación de integrante ORV requiere especificar un evento FIFONAFE (id_evento_fifonafe)",
+        )
+
+    # 2. Validar persona activa
+    person = db.query(models.Persona).filter(
+        models.Persona.id_persona == data.id_persona,
+        models.Persona.activo.is_(True),
+    ).first()
+    if person is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Persona inexistente o inactiva",
+        )
+
+    # 3. Validar evento FIFONAFE si se especifica
+    event = None
+    event_date = None
+    if data.id_evento_fifonafe is not None:
+        event = db.query(models.TramiteFifonafeEvento).filter(
+            models.TramiteFifonafeEvento.id_evento_fifonafe == data.id_evento_fifonafe,
+            models.TramiteFifonafeEvento.activo.is_(True),
+        ).first()
+        if event is None or event.id_tramite_fifonafe != procedure.id_tramite_fifonafe:
+            raise HTTPException(
+                status_code=409,
+                detail="Evento ajeno o inactivo",
+            )
+        event_date = event.fecha_evento or event.fecha_oficio
+
+    # 4. Validar ORV / integrante si se especifica
+    if data.id_orv_integrante is not None:
+        if event is None or event_date is None:
+            raise HTTPException(
+                status_code=409,
+                detail="La representación ORV histórica requiere un acto FIFONAFE con fecha de negocio",
+            )
+
+        member = db.query(models.OrvIntegrante).filter(
+            models.OrvIntegrante.id_orv_integrante == data.id_orv_integrante,
+            models.OrvIntegrante.activo.is_(True),
+        ).first()
+        if member is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: integrante inactivo o inexistente",
+            )
+
+        if member.id_persona != data.id_persona:
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: la persona no coincide",
+            )
+
+        orv = db.query(models.Orv).filter(
+            models.Orv.id_orv == member.id_orv,
+            models.Orv.activo.is_(True),
+        ).first()
+        if orv is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: ORV inactivo o inexistente",
+            )
+
+        pn = db.query(models.ProyectoNucleo).filter(
+            models.ProyectoNucleo.id_proyecto_nucleo == procedure.id_proyecto_nucleo,
+            models.ProyectoNucleo.activo.is_(True),
+        ).first()
+        if pn is None or pn.id_nucleo != orv.id_nucleo:
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: núcleo agrario incompatible",
+            )
+
+        if (member.fecha_inicio is not None and member.fecha_inicio > event_date) or (
+            member.fecha_fin is not None and member.fecha_fin < event_date
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: fuera de vigencia a la fecha del acto",
+            )
+
+
 def add_fifonafe_interviniente(
     db: Session,
     procedure_id: int,
@@ -942,6 +1033,7 @@ def add_fifonafe_interviniente(
     user: models.Usuario,
 ) -> models.TramiteFifonafeInterviniente:
     procedure = require_fifonafe_access(db, user, procedure_id, mode="capture")
+    validate_fifonafe_interviniente(db, procedure, data)
     entity = models.TramiteFifonafeInterviniente(
         id_tramite_fifonafe=procedure.id_tramite_fifonafe,
         **data.model_dump(exclude={"observaciones"}),

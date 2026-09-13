@@ -19,9 +19,17 @@ def _forbidden() -> HTTPException:
 def authorized_project_ids(db: Session, user: models.Usuario) -> select:
     if user.rol == "admin":
         return select(models.Proyecto.id_proyecto).where(models.Proyecto.activo.is_(True))
-    return select(models.UsuarioProyecto.id_proyecto).where(
-        models.UsuarioProyecto.id_usuario == user.id_usuario,
-        models.UsuarioProyecto.activo.is_(True),
+    return (
+        select(models.UsuarioProyecto.id_proyecto)
+        .join(
+            models.Proyecto,
+            models.Proyecto.id_proyecto == models.UsuarioProyecto.id_proyecto,
+        )
+        .where(
+            models.UsuarioProyecto.id_usuario == user.id_usuario,
+            models.UsuarioProyecto.activo.is_(True),
+            models.Proyecto.activo.is_(True),
+        )
     )
 
 

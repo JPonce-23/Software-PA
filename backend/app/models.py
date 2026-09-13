@@ -1453,3 +1453,24 @@ class ConvenioCoberturaImpacto(Base):
     clasificados = Column(BigInteger)
     pendientes = Column(BigInteger)
     sin_firma_acreditada = Column(BigInteger)
+
+
+class ConvenioColectivoDestino(Base):
+    __tablename__ = "vw_convenio_colectivo_destino"
+
+    id_convenio = Column(Integer, primary_key=True)
+    destino_superficie = Column(Text, primary_key=True)
+    id_proyecto = Column(Integer)
+    id_entidad = Column(Integer)
+    id_proyecto_nucleo = Column(Integer)
+    id_asamblea = Column(Integer)
+    ambito = Column(Text)
+    tipo_convenio = Column(Text)
+    tipo_cop_operativo = Column(Text)
+    superficie_ha = Column(Numeric)
+    superficie_declarada_ha = Column(Numeric)
+    monto_declarado = Column(Numeric)
+    fecha_firma = Column(Date)
+    anio = Column(Integer)
+    mes = Column(Integer)
+    trimestre = Column(Integer)

@@ -1033,6 +1033,12 @@ class TramiteRanCreate(AuditInput):
         return self
 
 
+class TramiteRanUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fecha_programada_ingreso: date | None = None
+
+
 class TramiteRanResponse(TramiteRanCreate, AuditRead):
     id_tramite_ran: int
     id_proyecto_nucleo: int | None = None
@@ -1115,10 +1121,40 @@ RolIntervinienteFifonafe = Literal[
 
 
 class TramiteFifonafeIntervinienteCreate(AuditInput):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "required": ["id_orv_integrante"],
+                        "properties": {
+                            "id_orv_integrante": {"not": {"type": "null"}}
+                        },
+                    },
+                    "then": {
+                        "required": ["id_evento_fifonafe"],
+                        "properties": {
+                            "id_evento_fifonafe": {"not": {"type": "null"}}
+                        },
+                    },
+                }
+            ]
+        },
+    )
+
     id_persona: int = Field(gt=0)
     rol: RolIntervinienteFifonafe
     id_evento_fifonafe: int | None = Field(default=None, gt=0)
     id_orv_integrante: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def validar_orv_evento(self):
+        if self.id_orv_integrante is not None and self.id_evento_fifonafe is None:
+            raise ValueError(
+                "La acreditación de integrante ORV requiere especificar un evento FIFONAFE (id_evento_fifonafe)"
+            )
+        return self
 
 
 class TramiteFifonafeIntervinienteResponse(
@@ -1493,6 +1529,32 @@ class ConvenioCoberturaImpactoResponse(ORMModel):
     clasificados: int
     pendientes: int
     sin_firma_acreditada: int
+
+
+class ConvenioColectivoDestinoResponse(ORMModel):
+    id_proyecto: int
+    id_entidad: int
+    id_proyecto_nucleo: int
+    id_convenio: int
+    id_asamblea: int | None = None
+    ambito: str
+    tipo_convenio: str | None = None
+    tipo_cop_operativo: str | None = None
+    destino_superficie: str | None = None
+    superficie_ha: Decimal | None = None
+    superficie_declarada_ha: Decimal | None = None
+    monto_declarado: Decimal | None = Field(
+        default=None,
+        description=(
+            "Monto económico declarado del instrumento (c.monto_100). Es un atributo descriptivo "
+            "NO ADITIVO que pertenece al convenio completo y no representa el monto del destino. "
+            "Para agregados económicos oficiales debe contarse una sola vez por id_convenio."
+        ),
+    )
+    fecha_firma: date | None = None
+    anio: int | None = None
+    mes: int | None = None
+    trimestre: int | None = None
 
 
 class BitacoraResponse(ORMModel):

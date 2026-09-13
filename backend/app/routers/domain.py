@@ -1056,6 +1056,25 @@ def get_ran_procedure(
     return require_ran_procedure_access(db, user, id_tramite_ran, mode="read")
 
 
+@router.patch(
+    "/tramites-ran/{id_tramite_ran}",
+    response_model=schemas.TramiteRanResponse,
+    responses={
+        403: {"description": "Rol o proyecto fuera del alcance autorizado"},
+        404: {"description": "Trámite RAN no encontrado"},
+        409: {"description": "Conflicto de dominio al actualizar la programación"},
+    },
+)
+def update_ran_procedure(
+    id_tramite_ran: int,
+    data: schemas.TramiteRanUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    entity = require_ran_procedure_access(db, user, id_tramite_ran, mode="capture")
+    return service.update_entity(db, entity, data, user)
+
+
 @router.get(
     "/asambleas/{id_asamblea}/tramites-ran",
     response_model=list[schemas.TramiteRanResponse],
@@ -1492,6 +1511,11 @@ def list_fifonafe_intervinientes(
     "/fifonafe/{id_tramite_fifonafe}/intervinientes",
     response_model=schemas.TramiteFifonafeIntervinienteResponse,
     status_code=201,
+    responses={
+        409: {
+            "description": "Conflicto de dominio en persona, evento, núcleo o vigencia ORV"
+        }
+    },
 )
 def add_fifonafe_interviniente(
     id_tramite_fifonafe: int,
