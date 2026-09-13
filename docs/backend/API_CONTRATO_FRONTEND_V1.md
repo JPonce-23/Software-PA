@@ -1,7 +1,8 @@
-# Contrato API Frontend V1 — esquema 011
+# Contrato API Frontend V1 — esquema 015
 
-Fuente de verdad: rutas FastAPI, `schemas.py`, el archivo generado
-`docs/backend/openapi-backend-schema-011.json` y migraciones vigentes 001–011.
+Este documento define los supuestos y contratos de integración entre el frontend
+y el backend para el cierre del sprint. Está alineado con el esquema OpenAPI en
+`docs/backend/openapi-backend-schema-015.json` y migraciones vigentes 001–015.
 Los catálogos se consultan en
 `GET /api/catalogos/operativos/{tipo_catalogo}`; nunca se asumen IDs.
 
@@ -41,6 +42,9 @@ Catálogos:
 `tipo_cop_operativo`: `ORIGEN`, `ADICIONAL`, `2A_ADICIONAL`, `COMPLEMENTARIAS`, `TRANSVERSALES`. `contexto_asamblea` incluye `transversal`; `resultado_convocatoria` usa `celebrada`, `no_verificativo`, `cancelada`, `reprogramada`, `otro`.
 
 `POST /api/tramites-ran` recibe exactamente uno de `id_asamblea`, `id_convenio`, `id_orv`, más `fecha_programada_ingreso`, `referencia_expediente`, `eventos`. Evento: `ordinal`, `id_tipo_evento`, `fecha_evento`, `numero_solicitud`, `resultado`, `calificacion`, `folio_referencia`, `id_documento`. No existen `numero_tramite` ni `estatus` planos.
+
+`PATCH /api/tramites-ran/{id_tramite_ran}` permite actualizar exclusivamente la programación del trámite (`fecha_programada_ingreso: date | None`) sin crear un nuevo trámite, sin alterar su identidad ni recrear sus eventos. Requiere rol de captura y validación de acceso al proyecto. Los campos contextuales (`id_proyecto_nucleo`, `id_nucleo`, `id_asamblea`, `id_convenio`, `id_orv`) y eventos permanecen inmutables. Enviar campos no permitidos en el body retorna `422 Unprocessable Entity`.
+Sus respuestas aplicables son `200` al actualizar, `403` por rol o proyecto fuera de alcance, `404` para trámite inexistente o inactivo, `409` ante conflicto de dominio al persistir y `422` por body inválido.
 
 Indemnización admite `pendiente`, `programado`, `en_proceso`, `completo`, `pagado`, `cancelado`, `otro`; `pagado` no inventa Pago. Checklist admite, además de objetivos previos, `orv`, `padron_historial`, `actividad_campo`, `asamblea`, `asamblea_convocatoria`.
 
@@ -87,8 +91,21 @@ sus endpoints hijos.
 - El valor declarado y el impacto económico son conceptos distintos; un impacto
   pendiente se expresa con `null`, nunca con cero implícito.
 - Reporting: `/api/reportes/convenios/valores-declarados`, `/impactos`,
-  `/impactos-periodo` y `/cobertura-impactos`. Los montos se contabilizan por
-  instrumento y no por cada relación N:M con afectaciones.
+  `/impactos-periodo`, `/cobertura-impactos` y `/colectivos-destino` (alias `/destinos`).
+  Los montos se contabilizan por instrumento y no por cada relación N:M con afectaciones.
+  El endpoint `/api/reportes/convenios/colectivos-destino` expone el desglose físico por destino
+  de superficie para convenios colectivos (`ambito = 'colectivo'`), distinguiendo la superficie física
+  afectada (`superficie_ha`) de la superficie declarada (`superficie_declarada_ha`) y del monto del
+  instrumento (`monto_declarado`). Regla económica fundamental de `monto_declarado`:
+  - Es **NO ADITIVO**: sumar los valores de esta columna entre filas multidestino arrojaría un importe falso.
+  - Pertenece al convenio completo (`c.monto_100`), no al destino de suelo.
+  - No representa el monto del destino (no hay prorrateo por destino).
+  - Para agregados económicos oficiales debe contarse una sola vez por `id_convenio`.
+  El read-model tiene granularidad de detalle: una fila por `id_convenio + destino_superficie`; no calcula cantidades agregadas. Los consumidores deben deduplicar la cantidad de convenios por `id_convenio` y la de asambleas por `id_asamblea`. Nunca deben sumar `monto_declarado` directamente sobre filas multidestino.
+  Soporta filtros por `id_proyecto`, `id_entidad`, `id_proyecto_nucleo`, `id_convenio`, `id_asamblea`,
+  `tipo_convenio`, `tipo_cop_operativo`, `destino_superficie`, `anio`, `mes` y `trimestre`. Ordena por
+  `id_proyecto`, `id_convenio` y `destino_superficie`.
+
 
 ## FIFONAFE (008)
 
@@ -109,6 +126,15 @@ deduplicación.
   y baja lógica en
   `/api/intervinientes-fifonafe/{id_interviniente_fifonafe}`. Registrar
   solicitante, representante, titular, beneficiario o receptor no crea un Pago.
+  La acreditación de un integrante ORV (`id_orv_integrante`) requiere
+  obligatoriamente en el payload un evento (`id_evento_fifonafe`), retornando
+  `422 Unprocessable Entity` si se omite. Asimismo, el servicio valida con
+  `409 Conflict` que el evento pertenezca al trámite y cuente con fecha de negocio
+  (`fecha_evento` o `fecha_oficio`), que la persona coincida, que el ORV pertenezca
+  al núcleo del trámite y que el nombramiento esté vigente en la fecha del acto.
+  `POST` responde `201 Created`; su schema OpenAPI expresa la dependencia
+  `id_orv_integrante` no nulo → `id_evento_fifonafe` no nulo y documenta `409 Conflict`
+  para las incompatibilidades de dominio anteriores.
 - `hay_conflictos` y `conflicto_impide_retiro` son triestados independientes.
   Consulta, resolución, entrega y comprobación son hitos distintos. Cuatro
   oficios no completan automáticamente un flujo v2.
@@ -220,8 +246,10 @@ documentos y reporting, lectura admite los cuatro roles, captura admite
   schema.
 
 `GET /health` no requiere sesión y, para la instancia de integración actual,
-debe responder `{ "status": "ok", "schema": 11 }`.
+debe responder `{ "status": "ok", "schema": 15 }`. La siguiente migración disponible es 016.
 
 Las consultas y mutaciones de dominio siguen aplicando la autorización por
-proyecto del backend. En QA, el frontend debe usar un `id_proyecto` explícito:
-los agregados sin filtro pueden incluir fixtures históricas.
+proyecto del backend. Los usuarios no administradores sólo reciben IDs de
+asignaciones activas cuyo proyecto también está activo. Los read-models de snapshot,
+seguimiento, avance periódico, dashboard y convenios colectivos por destino excluyen
+proyectos con `activo IS NOT TRUE`.
