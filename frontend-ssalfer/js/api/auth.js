@@ -80,10 +80,8 @@
         if (!enlace) {
             return;
         }
-
-        const texto = enlace.textContent.trim().toLowerCase();
-
-        if (texto !== "cerrar sesión") {
+        
+        if (enlace.dataset.action !== "logout") {
             return;
         }
 

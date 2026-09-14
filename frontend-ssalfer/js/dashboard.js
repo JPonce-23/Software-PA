@@ -1022,7 +1022,12 @@ document.addEventListener("DOMContentLoaded", () => {
             "click",
             evento => {
 
-                evento.stopPropagation();
+                const enlace = evento.target.closest("a");
+
+                if (!enlace) {
+                    evento.stopPropagation();
+                }
+
             }
         );
 
