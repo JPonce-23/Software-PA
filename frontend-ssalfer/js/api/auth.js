@@ -80,8 +80,12 @@
         if (!enlace) {
             return;
         }
-        
-        if (enlace.dataset.action !== "logout") {
+
+        const esLogout =
+            enlace.dataset.action === "logout" ||
+            enlace.textContent.trim().toLowerCase().includes("cerrar sesión");
+
+        if (!esLogout) {
             return;
         }
 
