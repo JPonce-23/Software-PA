@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .passwords import is_within_bcrypt_limit
+
 
 Role = Literal["admin", "operador", "visualizador", "geografo"]
 Ambito = Literal["colectivo", "individual"]
@@ -110,7 +112,7 @@ class UsuarioCreate(UsuarioBase):
 def validar_politica_contrasena(value: str) -> str:
     if (
         len(value) < 8
-        or len(value.encode("utf-8")) > 72
+        or not is_within_bcrypt_limit(value)
         or not any(char.isalpha() for char in value)
         or not any(char.isdigit() for char in value)
     ):
@@ -144,7 +146,7 @@ class ChangeOwnPasswordRequest(BaseModel):
     @field_validator("contrasena_actual")
     @classmethod
     def validar_contrasena_actual(cls, value: str) -> str:
-        if len(value.encode("utf-8")) > 72:
+        if not is_within_bcrypt_limit(value):
             raise ValueError("La contraseña actual no puede superar 72 bytes UTF-8")
         return value
 
