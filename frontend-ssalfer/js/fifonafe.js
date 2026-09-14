@@ -4,30 +4,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const parametros =
         new URLSearchParams(window.location.search);
 
-    const idFifonafe = Number(
-        parametros.get("id_fifonafe") ||
-        parametros.get("id") ||
-        document.querySelector(".contenedor")
-            ?.dataset.fifonafeId
-    );
-
     const idProyectoNucleo = Number(
         parametros.get("id_proyecto_nucleo")
     );
 
     if (
-        !Number.isInteger(idFifonafe) ||
-        idFifonafe <= 0 ||
         !Number.isInteger(idProyectoNucleo) ||
         idProyectoNucleo <= 0
     ) {
         alert(
-            "Falta el identificador del trámite o del proyecto-núcleo."
+            "Falta el identificador del proyecto-núcleo."
         );
 
-        window.location.href =
-            "/dashboard.html";
-
+        window.location.href = "/dashboard.html";
         return;
     }
 
@@ -38,94 +27,55 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const elementos = {
         btnVolver:
-            document.getElementById(
-                "btnVolver"
-            ),
+            document.getElementById("btnVolver"),
 
-        btnEditar:
-            document.getElementById(
-                "btnEditarFifonafe"
-            ),
+        btnNuevoTramite:
+            document.getElementById("btnNuevoTramite"),
 
-        btnEditarDatos:
-            document.getElementById(
-                "btnEditarDatos"
-            ),
+        tramitesContainer:
+            document.getElementById("tramitesContainer"),
 
-        btnAgregarAfectacion:
-            document.getElementById(
-                "btnAgregarAfectacion"
-            ),
+        sinTramites:
+            document.getElementById("sinTramites"),
+
+        formularioContenedor:
+            document.getElementById("formularioContenedor"),
+
+        btnCerrarFormulario:
+            document.getElementById("btnCerrarFormulario"),
+
+        btnCancelar:
+            document.getElementById("btnCancelar"),
+
+        formFifonafe:
+            document.getElementById("formFifonafe"),
+
+        afectacionesContainer:
+            document.getElementById("afectacionesContainer"),
+
+        errorAfectaciones:
+            document.getElementById("errorAfectaciones"),
+
+        eventosContainer:
+            document.getElementById("eventosContainer"),
 
         btnAgregarEvento:
-            document.getElementById(
-                "btnAgregarEvento"
-            ),
+            document.getElementById("btnAgregarEvento"),
 
-        idTramite:
-            document.getElementById(
-                "idTramite"
-            ),
+        campoEstatus:
+            document.getElementById("estatus"),
 
-        ambito:
-            document.getElementById(
-                "ambito"
-            ),
+        campoAcuseFecha:
+            document.getElementById("acuseFecha"),
 
-        estatus:
-            document.getElementById(
-                "estatus"
-            ),
+        campoHayConflictos:
+            document.getElementById("hayConflictos"),
 
-        estadoFifonafe:
-            document.getElementById(
-                "estadoFifonafe"
-            ),
+        campoResultadoConflictos:
+            document.getElementById("campoResultadoConflictos"),
 
-        acuseFifonafe:
-            document.getElementById(
-                "acuseFifonafe"
-            ),
-
-        hayConflictos:
-            document.getElementById(
-                "hayConflictos"
-            ),
-
-        resultadoNoConflictos:
-            document.getElementById(
-                "resultadoNoConflictos"
-            ),
-
-        datoResultadoConflictos:
-            document.getElementById(
-                "datoResultadoConflictos"
-            ),
-
-        totalAfectaciones:
-            document.getElementById(
-                "totalAfectaciones"
-            ),
-
-        afectacionesTabla:
-            document.getElementById(
-                "afectacionesTabla"
-            ),
-
-        totalEventos:
-            document.getElementById(
-                "totalEventos"
-            ),
-
-        eventosTabla:
-            document.getElementById(
-                "eventosTabla"
-            ),
-
-        observaciones:
-            document.getElementById(
-                "observaciones"
-            )
+        campoResultadoTexto:
+            document.getElementById("resultadoNoConflictos")
     };
 
 
@@ -133,19 +83,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                         ESTADO
     ====================================================== */
 
-    let tramite = null;
-    let afectaciones = [];
-    let eventos = [];
-
+    let tramites = [];
+    let afectacionesNucleo = [];
     let tiposEvento = [];
-    let tipoEventoPorId = new Map();
-
+    let contadorEventos = 0;
     let puedeCapturar = false;
-
-    let formularioEdicion = null;
-    let formularioEvento = null;
-
-    let idEventoEditando = null;
 
 
     /* =====================================================
@@ -171,32 +113,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             : String(valor);
     }
 
-    function textoOpcional(elemento) {
-        const valor =
-            elemento?.value?.trim();
-
-        return valor || null;
-    }
-
-    function numeroOpcional(elemento) {
-        const valor =
-            elemento?.value?.trim();
-
-        if (!valor) {
-            return null;
-        }
-
-        const numero =
-            Number(valor);
-
-        return (
-            Number.isInteger(numero) &&
-            numero > 0
-        )
-            ? numero
-            : NaN;
-    }
-
     function formatoConflictos(valor) {
         if (valor === true) {
             return "Sí";
@@ -218,37 +134,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             otro: "Otro"
         };
 
-        return nombres[valor] ||
-            valor ||
-            "—";
+        return nombres[valor] || valor || "—";
     }
 
-    function nombreTipoEvento(id) {
-        const opcion =
-            tipoEventoPorId.get(
-                Number(id)
-            );
-
-        return opcion?.nombre ||
-            opcion?.codigo ||
-            (id ? `#${id}` : "—");
-    }
-
-    function opcionesTipoEvento() {
-        return tiposEvento
-            .map(item => `
-                <option
-                    value="${escaparHTML(
-                        item.id_catalogo_opcion
-                    )}">
-                    ${escaparHTML(
-                        item.nombre ||
-                        item.codigo ||
-                        `#${item.id_catalogo_opcion}`
-                    )}
-                </option>
-            `)
-            .join("");
+    function claseEstatus(valor) {
+        return `estado-${valor || "pendiente"}`;
     }
 
 
@@ -258,35 +148,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
         const sesion =
-            await window.AuthAPI
-                .obtenerSesionActual();
+            await window.AuthAPI.obtenerSesionActual();
 
-        const rol =
-            sesion?.user?.rol;
+        const rol = sesion?.user?.rol;
 
         puedeCapturar =
-            rol === "admin" ||
-            rol === "operador";
+            rol === "admin" || rol === "operador";
 
     } catch (error) {
-        window.ClienteAPI
-            .mostrarErrorAPI(error);
-
+        window.ClienteAPI.mostrarErrorAPI(error);
         return;
     }
 
-    if (!puedeCapturar) {
-        [
-            elementos.btnEditar,
-            elementos.btnEditarDatos,
-            elementos.btnAgregarAfectacion,
-            elementos.btnAgregarEvento
-        ].forEach(boton => {
-            if (boton) {
-                boton.hidden = true;
-                boton.style.display = "none";
-            }
-        });
+    if (!puedeCapturar && elementos.btnNuevoTramite) {
+        elementos.btnNuevoTramite.hidden = true;
+        elementos.btnNuevoTramite.style.display = "none";
     }
 
 
@@ -296,769 +172,434 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     async function cargarDatos() {
         const [
-            tramites,
-            afectacionesNucleo,
-            tipos,
-            eventosReales
+            listaTramites,
+            listaAfectaciones,
+            listaTipos
         ] = await Promise.all([
-            window.FifonafeAPI
-                .listarPorProyectoNucleo(
-                    idProyectoNucleo
-                ),
+            window.FifonafeAPI.listarPorProyectoNucleo(
+                idProyectoNucleo
+            ),
 
-            window.AfectacionesAPI
-                .listarPorProyectoNucleo(
-                    idProyectoNucleo
-                ),
+            window.AfectacionesAPI.listarPorProyectoNucleo(
+                idProyectoNucleo
+            ),
 
-            window.CatalogosAPI
-                .obtenerOperativo(
-                    "tipo_evento_fifonafe"
-                ),
-
-            window.FifonafeAPI
-                .listarEventos(
-                    idFifonafe
-                )
+            window.CatalogosAPI.obtenerOperativo(
+                "tipo_evento_fifonafe"
+            )
         ]);
 
-        tramite =
-            (
-                Array.isArray(tramites)
-                    ? tramites
-                    : []
-            ).find(item =>
-                Number(
-                    item.id_tramite_fifonafe
-                ) === idFifonafe
-            );
+        tramites =
+            Array.isArray(listaTramites)
+                ? listaTramites
+                : [];
 
-        if (!tramite) {
-            throw new Error(
-                "El trámite FIFONAFE no fue encontrado."
-            );
-        }
+        afectacionesNucleo =
+            Array.isArray(listaAfectaciones)
+                ? listaAfectaciones
+                : [];
 
         tiposEvento =
-            Array.isArray(tipos)
-                ? tipos
+            Array.isArray(listaTipos)
+                ? listaTipos
                 : [];
-
-        tipoEventoPorId =
-            new Map(
-                tiposEvento.map(item => [
-                    Number(
-                        item.id_catalogo_opcion
-                    ),
-                    item
-                ])
-            );
-
-        eventos =
-            Array.isArray(eventosReales)
-                ? eventosReales
-                : [];
-
-        const idsRelacionados =
-            new Set(
-                (
-                    Array.isArray(
-                        tramite.afectaciones
-                    )
-                        ? tramite.afectaciones
-                        : []
-                ).map(item =>
-                    Number(
-                        item.id_afectacion
-                    )
-                )
-            );
-
-        afectaciones =
-            (
-                Array.isArray(
-                    afectacionesNucleo
-                )
-                    ? afectacionesNucleo
-                    : []
-            ).filter(item =>
-                idsRelacionados.has(
-                    Number(
-                        item.id_afectacion
-                    )
-                )
-            );
     }
 
     async function recargar() {
         await cargarDatos();
-
-        mostrarInformacion();
-        mostrarAfectaciones();
-        mostrarEventos();
+        mostrarTramites();
     }
 
 
     /* =====================================================
-                    INFORMACIÓN GENERAL
+                    RENDER DE LA LISTA
     ====================================================== */
 
-    function mostrarInformacion() {
-        elementos.idTramite.textContent =
-            tramite.id_tramite_fifonafe;
-
-        elementos.ambito.textContent =
-            texto(tramite.ambito);
-
-        elementos.estatus.textContent =
-            nombreEstatus(
-                tramite.estatus
+    function referenciasAfectaciones(tramite) {
+        const ids =
+            new Set(
+                (
+                    Array.isArray(tramite.afectaciones)
+                        ? tramite.afectaciones
+                        : []
+                ).map(item => Number(item.id_afectacion))
             );
 
-        elementos.estadoFifonafe.textContent =
-            nombreEstatus(
-                tramite.estatus
+        return afectacionesNucleo
+            .filter(item =>
+                ids.has(Number(item.id_afectacion))
+            )
+            .map(item =>
+                item.referencia ||
+                item.referencia_alfanumerica ||
+                `#${item.id_afectacion}`
             );
-
-        elementos.acuseFifonafe.textContent =
-            texto(
-                tramite.acuse_fifonafe_fecha
-            );
-
-        elementos.hayConflictos.textContent =
-            formatoConflictos(
-                tramite.hay_conflictos
-            );
-
-        elementos.resultadoNoConflictos
-            .textContent =
-            texto(
-                tramite.resultado_no_conflictos
-            );
-
-        elementos.datoResultadoConflictos
-            .style.opacity =
-            tramite.hay_conflictos === false
-                ? "1"
-                : ".55";
-
-        if (elementos.observaciones) {
-            elementos.observaciones.textContent =
-                tramite.referencia_expediente
-                    ? `Referencia de expediente: ${tramite.referencia_expediente}`
-                    : "No hay observaciones registradas.";
-        }
     }
 
+    function mostrarTramites() {
+        elementos.tramitesContainer.innerHTML = "";
 
-    /* =====================================================
-                        AFECTACIONES
-    ====================================================== */
-
-    function mostrarAfectaciones() {
-        elementos.totalAfectaciones.textContent =
-            afectaciones.length;
-
-        elementos.afectacionesTabla.innerHTML =
-            "";
-
-        if (!afectaciones.length) {
-            elementos.afectacionesTabla
-                .innerHTML = `
-                    <tr>
-                        <td
-                            colspan="4"
-                            class="tabla-vacia">
-                            No hay afectaciones relacionadas.
-                        </td>
-                    </tr>
-                `;
-
+        if (!tramites.length) {
+            elementos.sinTramites.hidden = false;
             return;
         }
 
-        afectaciones.forEach(afectacion => {
-            const fila =
-                document.createElement(
-                    "tr"
-                );
+        elementos.sinTramites.hidden = true;
 
-            const referencia =
-                afectacion.referencia ||
-                afectacion.referencia_alfanumerica ||
-                "—";
+        tramites.forEach(tramite => {
+            const referencias = referenciasAfectaciones(tramite);
 
-            const tipo =
-                afectacion.tipo_afectacion ||
-                "—";
+            const articulo = document.createElement("article");
+            articulo.className = "tramite";
 
-            fila.innerHTML = `
-                <td>
-                    ${escaparHTML(
-                        afectacion.id_afectacion
-                    )}
-                </td>
+            articulo.innerHTML = `
+                <div class="tramite-header">
+                    <div>
+                        <span class="tramite-id">
+                            FIF-${escaparHTML(tramite.id_tramite_fifonafe)}
+                        </span>
+                        <h3>Trámite FIFONAFE</h3>
+                    </div>
 
-                <td>
-                    ${escaparHTML(
-                        referencia
-                    )}
-                </td>
+                    <span class="estado ${claseEstatus(tramite.estatus)}">
+                        ${escaparHTML(nombreEstatus(tramite.estatus))}
+                    </span>
+                </div>
 
-                <td>
-                    ${escaparHTML(
-                        tipo
-                    )}
-                </td>
+                <div class="tramite-datos">
+                    <div>
+                        <span>Afectaciones</span>
+                        <strong>
+                            ${escaparHTML(
+                                referencias.length
+                                    ? referencias.join(" · ")
+                                    : "—"
+                            )}
+                        </strong>
+                    </div>
 
-                <td>
+                    <div>
+                        <span>Acuse FIFONAFE</span>
+                        <strong>
+                            ${escaparHTML(texto(tramite.acuse_fifonafe_fecha))}
+                        </strong>
+                    </div>
+
+                    <div>
+                        <span>Conflictos</span>
+                        <strong>
+                            ${escaparHTML(formatoConflictos(tramite.hay_conflictos))}
+                        </strong>
+                    </div>
+                </div>
+
+                <div class="tramite-acciones">
                     <button
                         type="button"
-                        class="btn-tabla"
-                        title="Ver afectación"
-                        data-ver-afectacion="${afectacion.id_afectacion}">
+                        class="btn-secundario btn-ver-tramite"
+                        data-id-fifonafe="${tramite.id_tramite_fifonafe}">
 
                         <i class="bi bi-eye"></i>
+                        Ver seguimiento
 
                     </button>
-                </td>
+                </div>
             `;
 
-            elementos.afectacionesTabla
-                .appendChild(fila);
+            elementos.tramitesContainer.appendChild(articulo);
         });
     }
 
-    elementos.afectacionesTabla
-        ?.addEventListener(
-            "click",
-            event => {
-                const boton =
-                    event.target.closest(
-                        "[data-ver-afectacion]"
-                    );
+    elementos.tramitesContainer
+        ?.addEventListener("click", event => {
+            const boton =
+                event.target.closest("[data-id-fifonafe]");
 
-                if (!boton) {
-                    return;
-                }
-
-                window.location.href =
-                    `/pages/detalleAfectacion.html?id_afectacion=${encodeURIComponent(
-                        boton.dataset.verAfectacion
-                    )}&id_proyecto_nucleo=${encodeURIComponent(
-                        idProyectoNucleo
-                    )}`;
+            if (!boton) {
+                return;
             }
-        );
+
+            window.location.href =
+                `/pages/fichaFifonafe.html?id_fifonafe=${encodeURIComponent(
+                    boton.dataset.idFifonafe
+                )}&id_proyecto_nucleo=${encodeURIComponent(
+                    idProyectoNucleo
+                )}`;
+        });
 
 
     /* =====================================================
-                        EVENTOS
+                FORMULARIO NUEVO TRÁMITE
     ====================================================== */
 
-    function mostrarEventos() {
-        elementos.totalEventos.textContent =
-            eventos.length;
-
-        elementos.eventosTabla.innerHTML =
-            "";
-
-        if (!eventos.length) {
-            elementos.eventosTabla.innerHTML = `
-                <tr>
-                    <td
-                        colspan="8"
-                        class="tabla-vacia">
-                        No hay eventos registrados.
-                    </td>
-                </tr>
-            `;
-
+    function poblarAfectaciones() {
+        if (!elementos.afectacionesContainer) {
             return;
         }
 
-        [...eventos]
-            .sort(
-                (a, b) =>
-                    Number(a.ordinal) -
-                    Number(b.ordinal)
-            )
-            .forEach(evento => {
-                const fila =
-                    document.createElement(
-                        "tr"
-                    );
-
-                const fecha =
-                    evento.fecha_evento ||
-                    evento.fecha_oficio ||
-                    "—";
-
-                fila.innerHTML = `
-                    <td>
-                        ${escaparHTML(
-                            evento.ordinal
-                        )}
-                    </td>
-
-                    <td>
-                        ${escaparHTML(
-                            nombreTipoEvento(
-                                evento.id_tipo_evento
-                            )
-                        )}
-                    </td>
-
-                    <td>
-                        ${escaparHTML(
-                            evento.origen || "—"
-                        )}
-                    </td>
-
-                    <td>
-                        ${escaparHTML(
-                            evento.destino || "—"
-                        )}
-                    </td>
-
-                    <td>
-                        ${escaparHTML(
-                            evento.numero_oficio || "—"
-                        )}
-                    </td>
-
-                    <td>
-                        ${escaparHTML(fecha)}
-                    </td>
-
-                    <td>
-                        ${
-                            evento.id_documento
-                                ? `
-                                    <span class="etiqueta-tabla">
-                                        <i class="bi bi-paperclip"></i>
-                                        #${escaparHTML(
-                                            evento.id_documento
-                                        )}
-                                    </span>
-                                `
-                                : "—"
-                        }
-                    </td>
-
-                    <td>
-                        <div class="acciones-tabla">
-
-                            <button
-                                type="button"
-                                class="btn-tabla"
-                                title="Ver evento"
-                                data-ver-evento="${evento.id_evento_fifonafe}">
-                                <i class="bi bi-eye"></i>
-                            </button>
-
-                            ${
-                                puedeCapturar
-                                    ? `
-                                        <button
-                                            type="button"
-                                            class="btn-tabla"
-                                            title="Editar evento"
-                                            data-editar-evento="${evento.id_evento_fifonafe}">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            class="btn-tabla"
-                                            title="Dar de baja evento"
-                                            data-eliminar-evento="${evento.id_evento_fifonafe}">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    `
-                                    : ""
-                            }
-
-                        </div>
-                    </td>
-                `;
-
-                elementos.eventosTabla
-                    .appendChild(fila);
-            });
-    }
-
-
-    /* =====================================================
-                    CONSULTAR EVENTO
-    ====================================================== */
-
-    function consultarEvento(idEvento) {
-        const evento =
-            eventos.find(item =>
-                Number(
-                    item.id_evento_fifonafe
-                ) ===
-                Number(idEvento)
-            );
-
-        if (!evento) {
+        if (!afectacionesNucleo.length) {
+            elementos.afectacionesContainer.innerHTML =
+                `<p class="tabla-vacia">No hay afectaciones registradas en este núcleo.</p>`;
             return;
         }
 
-        alert(
-            [
-                `Evento FIFONAFE #${evento.id_evento_fifonafe}`,
-                "",
-                `Ordinal: ${evento.ordinal}`,
-                `Tipo: ${nombreTipoEvento(evento.id_tipo_evento)}`,
-                `Origen: ${evento.origen || "—"}`,
-                `Destino: ${evento.destino || "—"}`,
-                `Número de oficio: ${evento.numero_oficio || "—"}`,
-                `Fecha de oficio: ${evento.fecha_oficio || "—"}`,
-                `Fecha del evento: ${evento.fecha_evento || "—"}`,
-                `Ciclo de consulta: ${evento.ciclo_consulta || "—"}`,
-                `Conflicto impide retiro: ${formatoConflictos(
-                    evento.conflicto_impide_retiro
-                )}`,
-                `Documento: ${
-                    evento.id_documento
-                        ? `#${evento.id_documento}`
-                        : "—"
-                }`
-            ].join("\n")
-        );
-    }
+        elementos.afectacionesContainer.innerHTML =
+            afectacionesNucleo.map(item => `
+                <label class="afectacion-opcion">
+                    <input
+                        type="checkbox"
+                        name="ids_afectacion"
+                        value="${item.id_afectacion}">
 
-
-    /* =====================================================
-                FORMULARIO EDITAR TRÁMITE
-    ====================================================== */
-
-    function crearFormularioEdicion() {
-        if (formularioEdicion) {
-            return;
-        }
-
-        const bloque =
-            elementos.btnEditarDatos
-                ?.closest(".bloque");
-
-        if (!bloque) {
-            return;
-        }
-
-        formularioEdicion =
-            document.createElement(
-                "section"
-            );
-
-        formularioEdicion.className =
-            "bloque";
-
-        formularioEdicion.hidden = true;
-
-        formularioEdicion.innerHTML = `
-            <div class="bloque-titulo">
-
-                <div class="bloque-titulo-info">
-
-                    <span class="numero-seccion">
-                        ✎
+                    <span>
+                        <strong>
+                            ${escaparHTML(
+                                item.referencia ||
+                                item.referencia_alfanumerica ||
+                                `#${item.id_afectacion}`
+                            )}
+                        </strong>
+                        <small>
+                            ${escaparHTML(item.tipo_afectacion || "—")}
+                        </small>
                     </span>
+                </label>
+            `).join("");
+    }
 
-                    <div>
-                        <h2>
-                            Editar trámite FIFONAFE
-                        </h2>
+    function opcionesTipoEvento() {
+        return tiposEvento.map(item => `
+            <option value="${escaparHTML(item.id_catalogo_opcion)}">
+                ${escaparHTML(
+                    item.nombre ||
+                    item.codigo ||
+                    `#${item.id_catalogo_opcion}`
+                )}
+            </option>
+        `).join("");
+    }
 
-                        <p>
-                            Modifica el estado y los datos generales
-                            del trámite.
-                        </p>
-                    </div>
+    function crearBloqueEvento(indice) {
+        const articulo = document.createElement("article");
+        articulo.className = "evento";
+        articulo.dataset.evento = "";
 
+        articulo.innerHTML = `
+            <div class="evento-header">
+                <div>
+                    <span class="numero-evento">${indice + 1}</span>
+                    <h4>Evento ${indice + 1}</h4>
                 </div>
 
+                <button type="button" class="btn-eliminar-evento">
+                    <i class="bi bi-trash"></i>
+                </button>
             </div>
 
-            <form id="formEditarFifonafe">
-
-                <div class="form-grid">
-
-                    <div class="campo">
-
-                        <label for="editarEstatus">
-                            Estatus
-                        </label>
-
-                        <select
-                            id="editarEstatus"
-                            required>
-
-                            <option value="programado">
-                                Programado
-                            </option>
-
-                            <option value="pendiente">
-                                Pendiente
-                            </option>
-
-                            <option value="completo">
-                                Completo
-                            </option>
-
-                            <option value="cancelado">
-                                Cancelado
-                            </option>
-
-                            <option value="otro">
-                                Otro
-                            </option>
-
-                        </select>
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="editarAcuse">
-                            Fecha de acuse FIFONAFE
-                        </label>
-
-                        <input
-                            type="date"
-                            id="editarAcuse">
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="editarConflictos">
-                            ¿Hay conflictos?
-                        </label>
-
-                        <select id="editarConflictos">
-
-                            <option value="">
-                                Sin definir
-                            </option>
-
-                            <option value="true">
-                                Sí
-                            </option>
-
-                            <option value="false">
-                                No
-                            </option>
-
-                        </select>
-
-                    </div>
-
-                    <div
-                        class="campo campo-completo"
-                        id="editarCampoResultado">
-
-                        <label for="editarResultado">
-                            Resultado de no conflictos
-                        </label>
-
-                        <textarea
-                            id="editarResultado"
-                            rows="3"></textarea>
-
-                    </div>
-
-                    <div class="campo campo-completo">
-
-                        <label for="editarReferencia">
-                            Referencia de expediente
-                        </label>
-
-                        <input
-                            type="text"
-                            maxlength="200"
-                            id="editarReferencia">
-
-                    </div>
-
+            <div class="form-grid">
+                <div class="campo">
+                    <label>
+                        Ordinal <span class="obligatorio">*</span>
+                    </label>
+                    <input
+                        type="number"
+                        name="eventos[${indice}][ordinal]"
+                        min="1" step="1" value="${indice + 1}" required>
                 </div>
 
-                <div class="acciones-formulario">
-
-                    <button
-                        type="button"
-                        class="btn-secundario"
-                        id="btnCancelarEditarFifonafe">
-                        Cancelar
-                    </button>
-
-                    <button
-                        type="submit"
-                        class="btn-principal"
-                        id="btnGuardarEditarFifonafe">
-
-                        <i class="bi bi-check-lg"></i>
-                        Guardar cambios
-
-                    </button>
-
+                <div class="campo">
+                    <label>
+                        Tipo de evento <span class="obligatorio">*</span>
+                    </label>
+                    <select name="eventos[${indice}][id_tipo_evento]" required>
+                        <option value="">Seleccionar tipo</option>
+                        ${opcionesTipoEvento()}
+                    </select>
                 </div>
 
-            </form>
+                <div class="campo">
+                    <label>Origen <span class="opcional">Opcional</span></label>
+                    <input type="text" name="eventos[${indice}][origen]" maxlength="200">
+                </div>
+
+                <div class="campo">
+                    <label>Destino <span class="opcional">Opcional</span></label>
+                    <input type="text" name="eventos[${indice}][destino]" maxlength="200">
+                </div>
+
+                <div class="campo">
+                    <label>
+                        Número de oficio <span class="opcional">Opcional</span>
+                    </label>
+                    <input type="text" name="eventos[${indice}][numero_oficio]" maxlength="150">
+                </div>
+
+                <div class="campo">
+                    <label>
+                        Fecha del oficio <span class="opcional">Opcional</span>
+                    </label>
+                    <input type="date" name="eventos[${indice}][fecha_oficio]">
+                </div>
+
+                <div class="campo">
+                    <label>
+                        Documento <span class="opcional">Opcional</span>
+                    </label>
+                    <input type="number" name="eventos[${indice}][id_documento]" min="1">
+                    <small>Referencia a un documento ya registrado.</small>
+                </div>
+            </div>
         `;
 
-        bloque.insertAdjacentElement(
-            "afterend",
-            formularioEdicion
-        );
+        articulo.querySelector(".btn-eliminar-evento")
+            .addEventListener("click", () => {
+                articulo.remove();
+                renumerarEventos();
+            });
 
-        document
-            .getElementById(
-                "editarConflictos"
-            )
-            ?.addEventListener(
-                "change",
-                actualizarResultadoEdicion
-            );
-
-        document
-            .getElementById(
-                "btnCancelarEditarFifonafe"
-            )
-            ?.addEventListener(
-                "click",
-                cerrarEdicion
-            );
-
-        document
-            .getElementById(
-                "formEditarFifonafe"
-            )
-            ?.addEventListener(
-                "submit",
-                guardarEdicion
-            );
+        return articulo;
     }
 
-    function actualizarResultadoEdicion() {
-        const conflictos =
-            document.getElementById(
-                "editarConflictos"
-            )?.value;
+    function renumerarEventos() {
+        const bloques =
+            elementos.eventosContainer.querySelectorAll("[data-evento]");
 
-        const campo =
-            document.getElementById(
-                "editarCampoResultado"
-            );
+        bloques.forEach((bloque, indice) => {
+            bloque.querySelector(".numero-evento").textContent =
+                String(indice + 1);
 
-        const resultado =
-            document.getElementById(
-                "editarResultado"
-            );
+            bloque.querySelector("h4").textContent =
+                `Evento ${indice + 1}`;
+        });
+    }
 
+    function agregarBloqueEvento() {
+        const bloque = crearBloqueEvento(contadorEventos);
+        contadorEventos += 1;
+        elementos.eventosContainer.appendChild(bloque);
+    }
+
+    function actualizarCampoResultado() {
         const visible =
-            conflictos === "false";
+            elementos.campoHayConflictos.value === "false";
 
-        if (campo) {
-            campo.hidden = !visible;
-        }
+        elementos.campoResultadoConflictos.hidden = !visible;
 
-        if (
-            !visible &&
-            resultado
-        ) {
-            resultado.value = "";
+        if (!visible) {
+            elementos.campoResultadoTexto.value = "";
         }
     }
 
-    function abrirEdicion() {
+    elementos.campoHayConflictos
+        ?.addEventListener("change", actualizarCampoResultado);
+
+    function reiniciarFormulario() {
+        elementos.formFifonafe.reset();
+        elementos.eventosContainer.innerHTML = "";
+        contadorEventos = 0;
+        agregarBloqueEvento();
+        elementos.errorAfectaciones.hidden = true;
+        actualizarCampoResultado();
+    }
+
+    function abrirFormulario() {
         if (!puedeCapturar) {
             return;
         }
 
-        crearFormularioEdicion();
+        poblarAfectaciones();
+        reiniciarFormulario();
 
-        document.getElementById(
-            "editarEstatus"
-        ).value =
-            tramite.estatus ||
-            "pendiente";
+        elementos.formularioContenedor.hidden = false;
 
-        document.getElementById(
-            "editarAcuse"
-        ).value =
-            tramite.acuse_fifonafe_fecha ||
-            "";
-
-        document.getElementById(
-            "editarConflictos"
-        ).value =
-            tramite.hay_conflictos === null ||
-            tramite.hay_conflictos === undefined
-                ? ""
-                : String(
-                    tramite.hay_conflictos
-                );
-
-        document.getElementById(
-            "editarResultado"
-        ).value =
-            tramite.resultado_no_conflictos ||
-            "";
-
-        document.getElementById(
-            "editarReferencia"
-        ).value =
-            tramite.referencia_expediente ||
-            "";
-
-        actualizarResultadoEdicion();
-
-        formularioEdicion.hidden =
-            false;
-
-        formularioEdicion.style.display =
-            "";
-
-        formularioEdicion.scrollIntoView({
+        elementos.formularioContenedor.scrollIntoView({
             behavior: "smooth",
             block: "start"
         });
     }
 
-    function cerrarEdicion() {
-        if (!formularioEdicion) {
+    function cerrarFormulario() {
+        elementos.formularioContenedor.hidden = true;
+    }
+
+    elementos.btnNuevoTramite?.addEventListener("click", abrirFormulario);
+    elementos.btnCerrarFormulario?.addEventListener("click", cerrarFormulario);
+    elementos.btnCancelar?.addEventListener("click", cerrarFormulario);
+    elementos.btnAgregarEvento?.addEventListener("click", agregarBloqueEvento);
+
+
+    /* =====================================================
+                    LEER EVENTOS DEL FORMULARIO
+    ====================================================== */
+
+    function leerEventos() {
+        const bloques =
+            [...elementos.eventosContainer.querySelectorAll("[data-evento]")];
+
+        return bloques.map(bloque => {
+            const obtener = sufijo =>
+                bloque.querySelector(`[name$="[${sufijo}]"]`);
+
+            const idDocumentoValor =
+                obtener("id_documento")?.value.trim();
+
+            return {
+                ordinal: Number(obtener("ordinal")?.value),
+                idTipoEvento: Number(obtener("id_tipo_evento")?.value),
+                origen: obtener("origen")?.value.trim() || null,
+                destino: obtener("destino")?.value.trim() || null,
+                numeroOficio: obtener("numero_oficio")?.value.trim() || null,
+                fechaOficio: obtener("fecha_oficio")?.value || null,
+                idDocumento: idDocumentoValor ? Number(idDocumentoValor) : null
+            };
+        });
+    }
+
+
+    /* =====================================================
+                        GUARDAR TRÁMITE
+    ====================================================== */
+
+    async function guardarTramite(event) {
+        event.preventDefault();
+
+        if (!puedeCapturar) {
             return;
         }
 
-        formularioEdicion.hidden =
-            true;
+        const idsAfectacion =
+            [...elementos.formFifonafe.querySelectorAll(
+                'input[name="ids_afectacion"]:checked'
+            )].map(input => Number(input.value));
 
-        formularioEdicion.style.display =
-            "none";
-    }
+        if (!idsAfectacion.length) {
+            elementos.errorAfectaciones.hidden = false;
+            return;
+        }
 
-    async function guardarEdicion(event) {
-        event.preventDefault();
+        elementos.errorAfectaciones.hidden = true;
 
-        const conflictosValor =
-            document.getElementById(
-                "editarConflictos"
-            ).value;
+        const eventos = leerEventos();
+
+        for (const evento of eventos) {
+            if (!Number.isInteger(evento.ordinal) || evento.ordinal <= 0) {
+                alert("Revisa el ordinal de los eventos.");
+                return;
+            }
+
+            if (!Number.isInteger(evento.idTipoEvento) || evento.idTipoEvento <= 0) {
+                alert("Selecciona el tipo de evento en cada evento agregado.");
+                return;
+            }
+        }
+
+        const conflictosValor = elementos.campoHayConflictos.value;
 
         const payload = {
-            estatus:
-                document.getElementById(
-                    "editarEstatus"
-                ).value,
+            estatus: elementos.campoEstatus.value,
 
             acuse_fifonafe_fecha:
-                document.getElementById(
-                    "editarAcuse"
-                ).value ||
-                null,
+                elementos.campoAcuseFecha.value || null,
 
             hay_conflictos:
                 conflictosValor === ""
@@ -1067,893 +608,76 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             resultado_no_conflictos:
                 conflictosValor === "false"
-                    ? (
-                        document.getElementById(
-                            "editarResultado"
-                        ).value.trim() ||
-                        null
-                    )
-                    : null,
-
-            referencia_expediente:
-                document.getElementById(
-                    "editarReferencia"
-                ).value.trim() ||
-                null
+                    ? (elementos.campoResultadoTexto.value.trim() || null)
+                    : null
         };
 
-        const boton =
-            document.getElementById(
-                "btnGuardarEditarFifonafe"
-            );
+        const botonEnviar =
+            elementos.formFifonafe.querySelector('button[type="submit"]');
 
-        boton.disabled = true;
+        if (botonEnviar) {
+            botonEnviar.disabled = true;
+        }
 
         try {
-            await window.FifonafeAPI
-                .actualizar(
-                    idFifonafe,
-                    payload
-                );
+            const tramiteCreado =
+                await window.FifonafeAPI.crear(idProyectoNucleo, payload);
 
-            alert(
-                "Trámite FIFONAFE actualizado correctamente."
-            );
+            const idTramite = tramiteCreado?.id_tramite_fifonafe;
 
-            cerrarEdicion();
-
-            await recargar();
-
-        } catch (error) {
-            window.ClienteAPI
-                .mostrarErrorAPI(error);
-
-        } finally {
-            boton.disabled = false;
-        }
-    }
-
-
-    /* =====================================================
-                    FORMULARIO EVENTO
-    ====================================================== */
-
-    function crearFormularioEvento() {
-        if (formularioEvento) {
-            return;
-        }
-
-        const bloque =
-            elementos.btnAgregarEvento
-                ?.closest(".bloque");
-
-        if (!bloque) {
-            return;
-        }
-
-        formularioEvento =
-            document.createElement(
-                "section"
-            );
-
-        formularioEvento.className =
-            "bloque";
-
-        formularioEvento.hidden = true;
-
-        formularioEvento.innerHTML = `
-            <div class="bloque-titulo">
-
-                <div class="bloque-titulo-info">
-
-                    <span class="numero-seccion">
-                        +
-                    </span>
-
-                    <div>
-                        <h2 id="tituloFormularioEventoFifonafe">
-                            Registrar evento FIFONAFE
-                        </h2>
-
-                        <p>
-                            Agrega una actuación al seguimiento
-                            del trámite.
-                        </p>
-                    </div>
-
-                </div>
-
-            </div>
-
-            <form id="formEventoFifonafe">
-
-                <div class="form-grid">
-
-                    <div class="campo">
-
-                        <label for="eventoOrdinal">
-                            Ordinal
-                            <span class="obligatorio">*</span>
-                        </label>
-
-                        <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            id="eventoOrdinal"
-                            required>
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="eventoTipo">
-                            Tipo de evento
-                            <span class="obligatorio">*</span>
-                        </label>
-
-                        <select
-                            id="eventoTipo"
-                            required>
-
-                            <option value="">
-                                Selecciona una opción
-                            </option>
-
-                            ${opcionesTipoEvento()}
-
-                        </select>
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="eventoOrigen">
-                            Origen
-                        </label>
-
-                        <input
-                            type="text"
-                            maxlength="200"
-                            id="eventoOrigen">
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="eventoDestino">
-                            Destino
-                        </label>
-
-                        <input
-                            type="text"
-                            maxlength="200"
-                            id="eventoDestino">
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="eventoNumeroOficio">
-                            Número de oficio
-                        </label>
-
-                        <input
-                            type="text"
-                            maxlength="150"
-                            id="eventoNumeroOficio">
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="eventoFechaOficio">
-                            Fecha de oficio
-                        </label>
-
-                        <input
-                            type="date"
-                            id="eventoFechaOficio">
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="eventoFecha">
-                            Fecha del evento
-                        </label>
-
-                        <input
-                            type="date"
-                            id="eventoFecha">
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="eventoCiclo">
-                            Ciclo de consulta
-                        </label>
-
-                        <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            id="eventoCiclo">
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="eventoConflicto">
-                            ¿Conflicto impide retiro?
-                        </label>
-
-                        <select id="eventoConflicto">
-
-                            <option value="">
-                                Sin definir
-                            </option>
-
-                            <option value="true">
-                                Sí
-                            </option>
-
-                            <option value="false">
-                                No
-                            </option>
-
-                        </select>
-
-                    </div>
-
-                    <div class="campo">
-
-                        <label for="eventoDocumento">
-                            ID de documento
-                        </label>
-
-                        <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            id="eventoDocumento">
-
-                    </div>
-
-                </div>
-
-                <div class="acciones-formulario">
-
-                    <button
-                        type="button"
-                        class="btn-secundario"
-                        id="btnCancelarEventoFifonafe">
-                        Cancelar
-                    </button>
-
-                    <button
-                        type="submit"
-                        class="btn-principal"
-                        id="btnGuardarEventoFifonafe">
-
-                        <i class="bi bi-check-lg"></i>
-                        Guardar evento
-
-                    </button>
-
-                </div>
-
-            </form>
-        `;
-
-        bloque.insertAdjacentElement(
-            "afterend",
-            formularioEvento
-        );
-
-        document
-            .getElementById(
-                "btnCancelarEventoFifonafe"
-            )
-            ?.addEventListener(
-                "click",
-                cerrarFormularioEvento
-            );
-
-        document
-            .getElementById(
-                "formEventoFifonafe"
-            )
-            ?.addEventListener(
-                "submit",
-                guardarEvento
-            );
-    }
-
-    function siguienteOrdinal() {
-        if (!eventos.length) {
-            return 1;
-        }
-
-        return Math.max(
-            ...eventos.map(
-                item =>
-                    Number(
-                        item.ordinal
-                    ) || 0
-            )
-        ) + 1;
-    }
-
-    function limpiarFormularioEvento() {
-        document.getElementById(
-            "formEventoFifonafe"
-        )?.reset();
-
-        const ordinal =
-            document.getElementById(
-                "eventoOrdinal"
-            );
-
-        if (ordinal) {
-            ordinal.disabled = false;
-        }
-
-        idEventoEditando = null;
-    }
-
-    function abrirNuevoEvento() {
-        if (!puedeCapturar) {
-            return;
-        }
-
-        crearFormularioEvento();
-        limpiarFormularioEvento();
-
-        document.getElementById(
-            "eventoOrdinal"
-        ).value =
-            siguienteOrdinal();
-
-        document.getElementById(
-            "tituloFormularioEventoFifonafe"
-        ).textContent =
-            "Registrar evento FIFONAFE";
-
-        formularioEvento.hidden =
-            false;
-
-        formularioEvento.style.display =
-            "";
-
-        formularioEvento.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
-    }
-
-    function abrirEdicionEvento(idEvento) {
-        if (!puedeCapturar) {
-            return;
-        }
-
-        const evento =
-            eventos.find(item =>
-                Number(
-                    item.id_evento_fifonafe
-                ) ===
-                Number(idEvento)
-            );
-
-        if (!evento) {
-            return;
-        }
-
-        crearFormularioEvento();
-        limpiarFormularioEvento();
-
-        idEventoEditando =
-            Number(
-                evento.id_evento_fifonafe
-            );
-
-        const ordinal =
-            document.getElementById(
-                "eventoOrdinal"
-            );
-
-        ordinal.value =
-            evento.ordinal;
-
-        /*
-         * TramiteFifonafeEventoUpdate
-         * no permite cambiar el ordinal.
-         */
-        ordinal.disabled = true;
-
-        document.getElementById(
-            "eventoTipo"
-        ).value =
-            evento.id_tipo_evento ||
-            "";
-
-        document.getElementById(
-            "eventoOrigen"
-        ).value =
-            evento.origen ||
-            "";
-
-        document.getElementById(
-            "eventoDestino"
-        ).value =
-            evento.destino ||
-            "";
-
-        document.getElementById(
-            "eventoNumeroOficio"
-        ).value =
-            evento.numero_oficio ||
-            "";
-
-        document.getElementById(
-            "eventoFechaOficio"
-        ).value =
-            evento.fecha_oficio ||
-            "";
-
-        document.getElementById(
-            "eventoFecha"
-        ).value =
-            evento.fecha_evento ||
-            "";
-
-        document.getElementById(
-            "eventoCiclo"
-        ).value =
-            evento.ciclo_consulta ||
-            "";
-
-        document.getElementById(
-            "eventoConflicto"
-        ).value =
-            evento.conflicto_impide_retiro === null ||
-            evento.conflicto_impide_retiro === undefined
-                ? ""
-                : String(
-                    evento.conflicto_impide_retiro
-                );
-
-        document.getElementById(
-            "eventoDocumento"
-        ).value =
-            evento.id_documento ||
-            "";
-
-        document.getElementById(
-            "tituloFormularioEventoFifonafe"
-        ).textContent =
-            `Editar evento FIFONAFE #${idEventoEditando}`;
-
-        formularioEvento.hidden =
-            false;
-
-        formularioEvento.style.display =
-            "";
-
-        formularioEvento.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
-    }
-
-    function cerrarFormularioEvento() {
-        if (!formularioEvento) {
-            return;
-        }
-
-        limpiarFormularioEvento();
-
-        formularioEvento.hidden =
-            true;
-
-        formularioEvento.style.display =
-            "none";
-    }
-
-
-    /* =====================================================
-                    CONSTRUIR EVENTO
-    ====================================================== */
-
-    function construirDatosEvento() {
-        const idTipo =
-            Number(
-                document.getElementById(
-                    "eventoTipo"
-                ).value
-            );
-
-        if (
-            !Number.isInteger(idTipo) ||
-            idTipo <= 0
-        ) {
-            alert(
-                "Selecciona el tipo de evento."
-            );
-
-            return null;
-        }
-
-        const idDocumento =
-            numeroOpcional(
-                document.getElementById(
-                    "eventoDocumento"
-                )
-            );
-
-        const ciclo =
-            numeroOpcional(
-                document.getElementById(
-                    "eventoCiclo"
-                )
-            );
-
-        if (
-            Number.isNaN(idDocumento) ||
-            Number.isNaN(ciclo)
-        ) {
-            alert(
-                "Revisa el ID del documento y el ciclo de consulta."
-            );
-
-            return null;
-        }
-
-        const numeroOficio =
-            textoOpcional(
-                document.getElementById(
-                    "eventoNumeroOficio"
-                )
-            );
-
-        const fechaOficio =
-            textoOpcional(
-                document.getElementById(
-                    "eventoFechaOficio"
-                )
-            );
-
-        const fechaEvento =
-            textoOpcional(
-                document.getElementById(
-                    "eventoFecha"
-                )
-            );
-
-        /*
-         * Regla de integridad del evento FIFONAFE:
-         * debe existir al menos algún soporte temporal,
-         * de oficio o documental.
-         */
-        if (
-            !numeroOficio &&
-            !fechaOficio &&
-            !fechaEvento &&
-            !idDocumento
-        ) {
-            alert(
-                "El evento necesita al menos número de oficio, fecha de oficio, fecha del evento o un documento."
-            );
-
-            return null;
-        }
-
-        const conflictoValor =
-            document.getElementById(
-                "eventoConflicto"
-            ).value;
-
-        return {
-            id_tipo_evento:
-                idTipo,
-
-            origen:
-                textoOpcional(
-                    document.getElementById(
-                        "eventoOrigen"
-                    )
-                ),
-
-            destino:
-                textoOpcional(
-                    document.getElementById(
-                        "eventoDestino"
-                    )
-                ),
-
-            numero_oficio:
-                numeroOficio,
-
-            fecha_oficio:
-                fechaOficio,
-
-            id_documento:
-                idDocumento,
-
-            ciclo_consulta:
-                ciclo,
-
-            fecha_evento:
-                fechaEvento,
-
-            conflicto_impide_retiro:
-                conflictoValor === ""
-                    ? null
-                    : conflictoValor ===
-                        "true"
-        };
-    }
-
-
-    /* =====================================================
-                        GUARDAR EVENTO
-    ====================================================== */
-
-    async function guardarEvento(event) {
-        event.preventDefault();
-
-        if (!puedeCapturar) {
-            return;
-        }
-
-        const datos =
-            construirDatosEvento();
-
-        if (!datos) {
-            return;
-        }
-
-        const boton =
-            document.getElementById(
-                "btnGuardarEventoFifonafe"
-            );
-
-        boton.disabled = true;
-
-        try {
-            if (idEventoEditando) {
-                /*
-                 * PATCH no lleva ordinal.
-                 */
-                await window.FifonafeAPI
-                    .actualizarEvento(
-                        idEventoEditando,
-                        datos
-                    );
-
-                alert(
-                    "Evento FIFONAFE actualizado correctamente."
-                );
-
-            } else {
-                const ordinal =
-                    Number(
-                        document.getElementById(
-                            "eventoOrdinal"
-                        ).value
-                    );
-
-                if (
-                    !Number.isInteger(ordinal) ||
-                    ordinal <= 0
-                ) {
-                    alert(
-                        "Indica un ordinal válido."
-                    );
-
-                    return;
-                }
-
-                if (
-                    eventos.some(item =>
-                        Number(
-                            item.ordinal
-                        ) === ordinal
-                    )
-                ) {
-                    alert(
-                        `Ya existe un evento con ordinal ${ordinal}.`
-                    );
-
-                    return;
-                }
-
-                await window.FifonafeAPI
-                    .crearEvento(
-                        idFifonafe,
-                        {
-                            ordinal,
-                            ...datos
-                        }
-                    );
-
-                alert(
-                    "Evento FIFONAFE registrado correctamente."
+            if (!idTramite) {
+                throw new Error(
+                    "El backend no devolvió id_tramite_fifonafe al crear el trámite."
                 );
             }
 
-            cerrarFormularioEvento();
+            for (const idAfectacion of idsAfectacion) {
+                await window.FifonafeAPI.agregarAfectacion(
+                    idTramite,
+                    idAfectacion
+                );
+            }
 
+            for (const evento of eventos) {
+                await window.FifonafeAPI.crearEvento(idTramite, {
+                    ordinal: evento.ordinal,
+                    id_tipo_evento: evento.idTipoEvento,
+                    origen: evento.origen,
+                    destino: evento.destino,
+                    numero_oficio: evento.numeroOficio,
+                    fecha_oficio: evento.fechaOficio,
+                    id_documento: evento.idDocumento
+                });
+            }
+
+            alert("Trámite FIFONAFE registrado correctamente.");
+
+            cerrarFormulario();
             await recargar();
 
         } catch (error) {
-            window.ClienteAPI
-                .mostrarErrorAPI(error);
+            window.ClienteAPI.mostrarErrorAPI(error);
 
         } finally {
-            boton.disabled = false;
-        }
-    }
-
-
-    /* =====================================================
-                        ELIMINAR EVENTO
-    ====================================================== */
-
-    async function eliminarEvento(idEvento) {
-        if (!puedeCapturar) {
-            return;
-        }
-
-        const motivo =
-            prompt(
-                "Motivo de la baja del evento:"
-            );
-
-        if (motivo === null) {
-            return;
-        }
-
-        const motivoLimpio =
-            motivo.trim();
-
-        if (motivoLimpio.length < 3) {
-            alert(
-                "El motivo debe tener al menos 3 caracteres."
-            );
-
-            return;
-        }
-
-        const confirmar =
-            confirm(
-                "¿Seguro que deseas dar de baja este evento FIFONAFE?"
-            );
-
-        if (!confirmar) {
-            return;
-        }
-
-        try {
-            await window.FifonafeAPI
-                .eliminarEvento(
-                    idEvento,
-                    motivoLimpio
-                );
-
-            alert(
-                "Evento FIFONAFE dado de baja correctamente."
-            );
-
-            await recargar();
-
-        } catch (error) {
-            window.ClienteAPI
-                .mostrarErrorAPI(error);
-        }
-    }
-
-
-    /* =====================================================
-                    ACCIONES DE EVENTOS
-    ====================================================== */
-
-    elementos.eventosTabla
-        ?.addEventListener(
-            "click",
-            event => {
-                const botonVer =
-                    event.target.closest(
-                        "[data-ver-evento]"
-                    );
-
-                if (botonVer) {
-                    consultarEvento(
-                        botonVer.dataset.verEvento
-                    );
-
-                    return;
-                }
-
-                const botonEditar =
-                    event.target.closest(
-                        "[data-editar-evento]"
-                    );
-
-                if (botonEditar) {
-                    abrirEdicionEvento(
-                        botonEditar.dataset
-                            .editarEvento
-                    );
-
-                    return;
-                }
-
-                const botonEliminar =
-                    event.target.closest(
-                        "[data-eliminar-evento]"
-                    );
-
-                if (botonEliminar) {
-                    eliminarEvento(
-                        botonEliminar.dataset
-                            .eliminarEvento
-                    );
-                }
+            if (botonEnviar) {
+                botonEnviar.disabled = false;
             }
-        );
-
-
-    /* =====================================================
-                        BOTONES
-    ====================================================== */
-
-    elementos.btnEditar
-        ?.addEventListener(
-            "click",
-            abrirEdicion
-        );
-
-    elementos.btnEditarDatos
-        ?.addEventListener(
-            "click",
-            abrirEdicion
-        );
-
-    elementos.btnAgregarEvento
-        ?.addEventListener(
-            "click",
-            abrirNuevoEvento
-        );
-
-    /*
-     * Lo activaremos en el siguiente paso
-     * junto con intervinientes.
-     */
-    if (elementos.btnAgregarAfectacion) {
-        elementos.btnAgregarAfectacion.hidden =
-            true;
-
-        elementos.btnAgregarAfectacion
-            .style.display = "none";
+        }
     }
+
+    elementos.formFifonafe?.addEventListener("submit", guardarTramite);
 
 
     /* =====================================================
                         VOLVER
     ====================================================== */
 
-    elementos.btnVolver
-        ?.addEventListener(
-            "click",
-            () => {
-                window.location.href =
-                    `/pages/fifonafe.html?id_proyecto_nucleo=${encodeURIComponent(
-                        idProyectoNucleo
-                    )}`;
-            }
-        );
+    elementos.btnVolver?.addEventListener("click", () => {
+        window.location.href =
+            `/pages/nucleoAgrario.html?id_proyecto_nucleo=${encodeURIComponent(
+                idProyectoNucleo
+            )}`;
+    });
 
 
     /* =====================================================
@@ -1964,7 +688,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         await recargar();
 
     } catch (error) {
-        window.ClienteAPI
-            .mostrarErrorAPI(error);
+        window.ClienteAPI.mostrarErrorAPI(error);
     }
 });

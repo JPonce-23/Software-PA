@@ -395,6 +395,43 @@
 }
 
 
+.estado-programado {
+
+    background: #d9eaf7;
+
+    color: #1f4e79;
+
+}
+
+
+.estado-completo {
+
+    background: #d9ead3;
+
+    color: #38761d;
+
+}
+
+
+.estado-cancelado {
+
+    background: #f4cccc;
+
+    color: #990000;
+
+}
+
+
+.estado-otro {
+
+    background: #e6e6e6;
+
+    color: #555555;
+
+}
+
+
+
 .tramite-datos {
 
     display: grid;
