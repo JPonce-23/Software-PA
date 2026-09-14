@@ -14,6 +14,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         enlaceEstadoFinanciero:
             document.getElementById("enlaceEstadoFinanciero"),
 
+        enlacePersonas:
+            document.getElementById("enlacePersonas"),
+
         kpiNucleos: document.getElementById("kpiNucleos"),
         kpiParcelasAfectaciones:
             document.getElementById("kpiParcelasAfectaciones"),
@@ -167,6 +170,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (elementos.enlaceEstadoFinanciero) {
             elementos.enlaceEstadoFinanciero.href =
                 `/pages/estadoFinanciero.html?id_proyecto=${encodeURIComponent(
+                    idProyecto
+                )}`;
+        }
+
+        if (elementos.enlacePersonas) {
+            elementos.enlacePersonas.href =
+                `/pages/persona.html?id_proyecto=${encodeURIComponent(
                     idProyecto
                 )}`;
         }
