@@ -7,48 +7,18 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app import auth, models
-from app.database import SessionLocal
 from app.main import app
 from .test_excel_closure_002 import _catalog, _isolated_pn
 
 
 @pytest.fixture(scope="module")
-def api():
-    """Cliente QA autenticado con RBAC de administrador."""
-    session = SessionLocal()
-    admin = session.query(models.Usuario).filter(
-        models.Usuario.rol == "admin", models.Usuario.activo.is_(True)
-    ).first()
-    assert admin is not None
-
-    for wrapper in app.routes:
-        router = getattr(wrapper, "original_router", None)
-        if router is None:
-            continue
-        for route in router.routes:
-            for dependency in route.dependant.dependencies:
-                if isinstance(dependency.call, auth.RoleChecker):
-                    app.dependency_overrides[dependency.call] = lambda admin=admin: admin
-
-    with TestClient(app, raise_server_exceptions=False) as client:
-        def request(method: str, path: str, *, expected: int = 200, **kwargs):
-            response = client.request(method, path, **kwargs)
-            assert response.status_code == expected, f"[{method} {path}] Status {response.status_code}: {response.text}"
-            return response
-
-        yield request
-
-    app.dependency_overrides.clear()
-    session.close()
+def api(transactional_api):
+    return transactional_api["request"]
 
 
 @pytest.fixture(scope="module")
-def target_domain(api):
-    entidad = api("GET", "/api/catalogos/entidades").json()[0]
-    municipio = api(
-        "GET", f"/api/catalogos/municipios?id_entidad={entidad['id_entidad']}"
-    ).json()[0]
-    return {"municipality": municipio}
+def target_domain(transactional_target_domain):
+    return transactional_target_domain
 
 
 def test_007_precision_superficie_siete_decimales(api, target_domain):
@@ -293,14 +263,14 @@ def test_007_linaje_y_estados_antecedente(api, target_domain):
     assert mod_pendiente["id_convenio_padre"] is None
     assert mod_pendiente["estado_antecedente"] == "pendiente_identificar"
 
-    # 3. Derivado sin padre: referido_sin_soporte aceptado con 201
+    # 3. Un modificatorio sin padre conserva referido_sin_soporte.
     mod_referido = api(
         "POST",
         f"/api/afectaciones/{af_id}/convenios",
         expected=201,
         json={
             "tipo_instrumento": "convenio",
-            "tipo_convenio": "superficie_adicional",
+            "tipo_convenio": "modificatorio",
             "consecutivo": 3,
             "efecto_monto": "pendiente",
             "estado_antecedente": "referido_sin_soporte",
@@ -469,13 +439,15 @@ def test_007_reporting_vistas_convenios_api(api, target_domain):
     assert isinstance(periodo_rows, list)
 
 
-def test_007_firma_acreditada_y_periodo_reporting(api, target_domain):
+def test_007_firma_acreditada_y_periodo_reporting(
+    api, target_domain, transactional_api
+):
     """Acredita firma colectiva conforme a fn_convenio_firma_acreditada_007 y valida que fluya al reporte por periodo."""
     project, pn = _isolated_pn(api, target_domain)
     project_id = project["id_proyecto"]
     pn_id = pn["id_proyecto_nucleo"]
 
-    session = SessionLocal()
+    session = transactional_api["session_factory"]()
     try:
         pn_db = session.query(models.ProyectoNucleo).filter_by(id_proyecto_nucleo=pn_id).first()
         nucleo_id = pn_db.id_nucleo
@@ -614,7 +586,7 @@ def test_007_firma_acreditada_y_periodo_reporting(api, target_domain):
         session.close()
 
 
-def test_007_reporting_rbac_aislamiento(api, target_domain):
+def test_007_reporting_rbac_aislamiento(api, target_domain, transactional_api):
     """Verifica que los endpoints de reporting filtren y protejan proyectos no autorizados."""
     from datetime import datetime, timezone
     project_a, pn_a = _isolated_pn(api, target_domain)
@@ -622,7 +594,7 @@ def test_007_reporting_rbac_aislamiento(api, target_domain):
     id_a = project_a["id_proyecto"]
     id_b = project_b["id_proyecto"]
 
-    session = SessionLocal()
+    session = transactional_api["session_factory"]()
     try:
         session.execute(text("SELECT set_config('app.current_user_id', '1', true)"))
         user_vis = models.Usuario(
@@ -649,6 +621,7 @@ def test_007_reporting_rbac_aislamiento(api, target_domain):
         session.refresh(user_vis)
         session.expunge(user_vis)
 
+        previous_overrides = app.dependency_overrides.copy()
         for wrapper in app.routes:
             router = getattr(wrapper, "original_router", None)
             if router:
@@ -673,4 +646,5 @@ def test_007_reporting_rbac_aislamiento(api, target_domain):
                 assert item["id_proyecto"] != id_b
     finally:
         app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
         session.close()

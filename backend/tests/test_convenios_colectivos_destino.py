@@ -17,7 +17,16 @@ from decimal import Decimal
 import uuid
 import pytest
 from sqlalchemy import text
-from app.database import SessionLocal
+
+
+@pytest.fixture(scope="module")
+def api(transactional_api):
+    return transactional_api["request"]
+
+
+@pytest.fixture(scope="module")
+def target_domain(transactional_target_domain):
+    return transactional_target_domain
 
 
 def _catalog(api, name: str) -> dict[str, int]:
@@ -584,7 +593,7 @@ def test_caso_h_anti_producto_cartesiano(api, target_domain):
     assert sum(unique_montos.values()) == Decimal("125000.00")
 
 
-def test_caso_i_baja_logica(api, target_domain):
+def test_caso_i_baja_logica(api, target_domain, transactional_api):
     """Caso I: Baja lógica -> inactivar una AfectacionUnidadAgraria o un Convenio excluye inmediatamente su superficie del reporte del destino."""
     project, pn, _ = _create_isolated_environment(api, target_domain, prefix="CASO-I")
     pn_id = pn["id_proyecto_nucleo"]
@@ -642,7 +651,7 @@ def test_caso_i_baja_logica(api, target_domain):
     assert Decimal(str(rows_post[0]["superficie_ha"])) == Decimal("5.0000000")
 
     # 4. Inactivar el convenio completo en base de datos
-    db = SessionLocal()
+    db = transactional_api["session_factory"]()
     try:
         db.execute(text("SELECT set_config('app.current_user_id', '1', true)"))
         db.execute(

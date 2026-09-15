@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, text
+from sqlalchemy.orm import sessionmaker
 
 
 TEST_DATABASE = "software_pa_test"
@@ -30,16 +31,102 @@ def _assert_isolated_database() -> None:
 
 _assert_isolated_database()
 
-from app import models, schemas
+from app import auth, database, models, schemas
 from app.config import AUTH_SETTINGS
-from app.database import SessionLocal
+from app.database import SessionLocal, engine
 from app.main import app
 from app.services.authentication import hash_password, password_matches
 from app.services.common import set_audit_context
 
 
+@pytest.fixture(scope="session", autouse=True)
+def isolated_upload_root(tmp_path_factory):
+    """Mantiene los archivos generados por pytest fuera de rutas Docker/repo."""
+    previous = os.environ.get("UPLOAD_ROOT")
+    os.environ["UPLOAD_ROOT"] = str(tmp_path_factory.mktemp("uploads"))
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("UPLOAD_ROOT", None)
+        else:
+            os.environ["UPLOAD_ROOT"] = previous
+
+
 def unique(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:10]}"
+
+
+@pytest.fixture(scope="module")
+def transactional_api():
+    """API modular cuyos commits quedan contenidos en un rollback externo."""
+    connection = engine.connect()
+    outer_transaction = connection.begin()
+    isolated_session = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=connection,
+        join_transaction_mode="create_savepoint",
+    )
+
+    with isolated_session() as db:
+        admin = (
+            db.query(models.Usuario)
+            .filter(models.Usuario.rol == "admin", models.Usuario.activo.is_(True))
+            .order_by(models.Usuario.id_usuario)
+            .first()
+        )
+        assert admin is not None
+        db.expunge(admin)
+
+    def override_get_db():
+        db = isolated_session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    previous_get_db = app.dependency_overrides.get(database.get_db)
+    previous_current_user = app.dependency_overrides.get(auth.get_current_user)
+    app.dependency_overrides[database.get_db] = override_get_db
+    app.dependency_overrides[auth.get_current_user] = lambda: admin
+
+    try:
+        with TestClient(app, raise_server_exceptions=False) as test_client:
+            def request(method: str, path: str, *, expected: int = 200, **kwargs):
+                response = test_client.request(method, path, **kwargs)
+                assert response.status_code == expected, (
+                    f"[{method} {path}] Status {response.status_code}: {response.text}"
+                )
+                return response
+
+            yield {
+                "request": request,
+                "connection": connection,
+                "session_factory": isolated_session,
+            }
+    finally:
+        if previous_get_db is None:
+            app.dependency_overrides.pop(database.get_db, None)
+        else:
+            app.dependency_overrides[database.get_db] = previous_get_db
+        if previous_current_user is None:
+            app.dependency_overrides.pop(auth.get_current_user, None)
+        else:
+            app.dependency_overrides[auth.get_current_user] = previous_current_user
+        if outer_transaction.is_active:
+            outer_transaction.rollback()
+        connection.close()
+
+
+@pytest.fixture(scope="module")
+def transactional_target_domain(transactional_api):
+    api = transactional_api["request"]
+    state = api("GET", "/api/catalogos/entidades").json()[0]
+    municipality = api(
+        "GET", f"/api/catalogos/municipios?id_entidad={state['id_entidad']}"
+    ).json()[0]
+    return {"state": state, "municipality": municipality}
 
 
 @pytest.fixture(scope="session")

@@ -806,7 +806,6 @@ class ConvenioCreate(AuditInput):
     tipo_convenio: Literal[
         "cop_original",
         "modificatorio",
-        "superficie_adicional",
         "obras_complementarias",
         "ampliacion",
         "ampliacion_remanente",
@@ -884,7 +883,6 @@ class ConvenioUpdate(AuditInput):
     tipo_convenio: Literal[
         "cop_original",
         "modificatorio",
-        "superficie_adicional",
         "obras_complementarias",
         "ampliacion",
         "ampliacion_remanente",

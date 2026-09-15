@@ -11,6 +11,16 @@ import pytest
 from .test_excel_closure_002 import _catalog, _isolated_pn
 
 
+@pytest.fixture(scope="module")
+def api(transactional_api):
+    return transactional_api["request"]
+
+
+@pytest.fixture(scope="module")
+def target_domain(transactional_target_domain):
+    return transactional_target_domain
+
+
 def _period(api, project_id, indicator, month):
     return api(
         "GET",
@@ -254,8 +264,9 @@ def test_ran_desistimiento_y_correccion_no_duplican_asamblea(api, target_domain)
 
 
 def test_ran_orv_conserva_objetivo_del_nucleo(api, target_domain):
-    nucleus_id = target_domain["nucleus"]["id_nucleo"]
-    pn_id = target_domain["project_nucleus"]["id_proyecto_nucleo"]
+    _, pn = _isolated_pn(api, target_domain)
+    nucleus_id = pn["id_nucleo"]
+    pn_id = pn["id_proyecto_nucleo"]
     existing_orvs = api("GET", f"/api/proyecto-nucleo/{pn_id}/orv").json()
     orv = existing_orvs[0] if existing_orvs else api(
         "POST",
