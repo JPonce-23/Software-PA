@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import text
@@ -48,10 +49,12 @@ def test_fastapi_connection_is_exclusively_runtime() -> None:
 
 def test_database_configuration_never_falls_back_to_owner_variables() -> None:
     isolated_environment = os.environ.copy()
-    isolated_environment.pop("DB_RUNTIME_USER", None)
-    isolated_environment.pop("DB_RUNTIME_PASSWORD", None)
     isolated_environment.update(
         {
+            # Las cadenas vacías impiden que python-dotenv repueble estas
+            # variables al ejecutar la prueba fuera del contenedor.
+            "DB_RUNTIME_USER": "",
+            "DB_RUNTIME_PASSWORD": "",
             "DB_USER": "forbidden_legacy_owner",
             "DB_PASSWORD": "not-a-secret-test-value",
             "POSTGRES_USER": "forbidden_bootstrap_owner",
@@ -60,7 +63,7 @@ def test_database_configuration_never_falls_back_to_owner_variables() -> None:
     )
     result = subprocess.run(
         [sys.executable, "-c", "import app.database"],
-        cwd="/app",
+        cwd=Path(__file__).resolve().parents[1],
         env=isolated_environment,
         capture_output=True,
         text=True,
