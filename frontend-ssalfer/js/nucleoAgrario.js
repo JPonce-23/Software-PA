@@ -176,6 +176,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         btnFifonafe:
             document.getElementById(
                 "btnFifonafe"
+            ),
+
+        btnPersona:
+            document.getElementById(
+                "btnPersonas"
             )
     };
 
@@ -534,5 +539,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     configurarEnlace(
         elementos.btnFifonafe,
         `/pages/fifonafe.html?${queryBase}`
+    );
+
+    configurarEnlace(
+        elementos.btnPersonas,
+        `/pages/persona.html?id_proyecto=${encodeURIComponent(
+            idProyecto
+        )}`
     );
 });
