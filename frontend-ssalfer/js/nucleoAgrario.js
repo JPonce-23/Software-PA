@@ -542,7 +542,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
 
     configurarEnlace(
-        elementos.btnPersonas,
+        elementos.btnPersona,
         `/pages/persona.html?id_proyecto=${encodeURIComponent(
             idProyecto
         )}`
