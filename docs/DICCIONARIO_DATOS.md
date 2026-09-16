@@ -141,11 +141,15 @@ Sensibilización comunitaria y caminamientos técnicos.
 ### 4.1 `parcela` y `parcela_titular`
 La unidad operativa central de la ruta individual.
 
+`Parcela.no_parcela` es el único identificador funcional canónico; no existe un segundo campo de dominio `no_parcela_ppt`. Sus orígenes Excel son `NO. DE PARCELA` / `NO. DE PARCELA PPT`. Los valores fuente individuales se preservan mediante `TrazabilidadFuente` / `ImportacionCelda` (modelo implementado: `ImportacionTabularCelda`), **no en dos columnas de `Parcela`**. Deben conservarse por columna, cuando corresponda, `archivo`, `hoja`, `fila`, `columna`, `valor_original`, `valor_normalizado`, `tratamiento` y `mensajes`; en las celdas de importación, archivo y hoja se obtienen de `ImportacionTabular`.
+
+La resolución del identificador sigue [MODELO_FUNCIONAL.md §6.1](MODELO_FUNCIONAL.md#61-identificador-funcional-canónico-único) y [FUENTES_Y_COBERTURA_EXCEL.md §3.1](FUENTES_Y_COBERTURA_EXCEL.md#31-unicidad-del-identificador-parcelario-no_parcela): equivalencia o diferencia de formato produce un único valor conservando ambos originales; un solo valor presente se utiliza con su procedencia exacta; divergencia sustantiva requiere **REVISAR** y aclaración humana sin crear automáticamente dos parcelas ni asumir prioridad PPT. Sin ambos valores, `no_parcela` puede quedar `NULL` y la ausencia se conserva en trazabilidad/revisión al importar, incluidas las 17 filas auditadas.
+
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
 | `parcela` | `id_parcela` | `INTEGER` | No | PK | Identificador interno de la parcela. | Sistema | `/api/parcelas` |
 | `parcela` | `id_nucleo` | `INTEGER` | No | `nucleo_agrario` | Núcleo agrario al que pertenece. | NÚCLEO | Pertenencia agraria |
-| `parcela` | `no_parcela` | `VARCHAR(80)` | Sí | — | **Único identificador funcional canónico.** | NO. PARCELA / NO. PARCELA PPT | Identificación unívoca |
+| `parcela` | `no_parcela` | `VARCHAR(80)` | Sí | — | **Único identificador funcional canónico.** | NO. DE PARCELA / NO. DE PARCELA PPT | Identificación unívoca |
 | `parcela` | `tipo_parcela` | `VARCHAR(50)` | Sí | — | Ejidal, comunal, infraestructura, etc. | TIPO PARCELA | Clasificación |
 | `parcela` | `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Polígono cartográfico de la parcela. | Shapefile/GeoJSON | Visor cartográfico (opcional) |
 | `parcela_titular` | `id_parcela` | `INTEGER` | No | `parcela.id_parcela` | Parcela correspondiente. | Fila titular | Vínculo de titularidad |
@@ -295,9 +299,11 @@ La unidad operativa central de la ruta individual.
 | `seguimiento_evento` | `id_tipo_evento` | `BIGINT` | No | `catalogo_operativo` | `suspension`, `reapertura`, `cierre`, etc. | Hechos de campo | Transiciones |
 | `seguimiento_evento` | `id_motivo` | `BIGINT` | Sí | `catalogo_operativo` | `expropiacion_directa`, `juicio`, etc. | Motivos Excel | Justificación |
 | `seguimiento_evento` | `fecha_evento` | `DATE` | No | — | Fecha en que ocurrió el suceso. | FECHA EVENTO | Cronología determinista |
-| `trazabilidad_fuente` | `archivo_origen` | `VARCHAR(255)` | No | — | Nombre del libro Excel de origen. | Archivo auditado | Trazabilidad de ingesta |
-| `trazabilidad_fuente` | `hoja_origen` / `columna_origen` | `VARCHAR` | No | — | Coordenadas exactas en el libro Excel. | Hoja / Columna | Auditoría de migración |
+| `trazabilidad_fuente` | `archivo` | `VARCHAR(255)` | No | — | Nombre del libro Excel de origen; conserva la procedencia de cada columna parcelaria. | Archivo auditado | Trazabilidad de ingesta |
+| `trazabilidad_fuente` | `hoja` / `fila` / `columna` | `VARCHAR` / `INTEGER` | Sí | — | Coordenadas exactas de cada valor fuente en el libro Excel. | Hoja / Columna | Auditoría de migración |
 | `trazabilidad_fuente` | `tratamiento` | `VARCHAR(30)` | No | — | `PERSISTIR`, `DERIVAR`, `REVISAR`, etc. | Matriz cobertura | Verificación de integridad |
+| `trazabilidad_fuente` | `valor_original` / `valor_normalizado` | `TEXT` | Sí | — | Valor individual de cada columna fuente y resultado de normalización; no reemplazar el original. | NO. DE PARCELA / NO. DE PARCELA PPT | Auditoría de identidad parcelaria |
+| `trazabilidad_fuente` | `mensajes` | `JSONB` | No | — | Explicaciones de normalización, discrepancias o ausencia de identificador. | Revisión de fuente | Aclaración humana |
 
 ---
 

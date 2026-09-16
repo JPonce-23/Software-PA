@@ -160,19 +160,20 @@ Aplica sobre porciones parceladas con derechos delimitados a favor de ejidatario
 
 ### 6.1 Identificador Funcional Canónico Único
 
-En las fuentes Excel coexisten frecuentemente dos columnas con denominaciones similares:
-- `NO. PARCELA` / `NO PARCELA/SOLAR`
-- `NO. PARCELA PPT`
+Las columnas fuente `NO. DE PARCELA` y `NO. DE PARCELA PPT` (también rotuladas `NO PARCELA`, `NO PARCELA/SOLAR` y `NO PARCELA PPT` según la hoja) conservan valores de origen distintos; no representan dos atributos de dominio.
 
-La auditoría exhaustiva de los datos confirmó que ambas columnas refieren **al mismo identificador funcional de la parcela** según el padrón o el plano del núcleo agrario.
+La evidencia Excel auditada comprende **774 filas individuales**: **300** tienen ambos campos; de esas 300, **299** coinciden tras normalizar espacios y **1** sólo difiere por formato (`P.-666` / `P-666`). Otras **447** tienen únicamente `NO. DE PARCELA PPT`, **10** únicamente `NO. DE PARCELA` y **17** ninguno. **300 + 447 + 10 + 17 = 774**. No existe evidencia de dos identificadores parcelarios funcionalmente independientes.
 
 **Regla obligatoria de modelado:**
 1. Existe un **único identificador funcional canónico**: `Parcela.no_parcela`.
-2. No debe inventarse un segundo campo de dominio independiente (`no_parcela_ppt`) ni un dominio parcelario paralelo.
-3. Tratamiento de trazabilidad:
-   - Si `NO. PARCELA` y `NO. PARCELA PPT` coinciden o sólo uno de ellos tiene valor: se almacena en `no_parcela` y la fuente auxiliar queda como `REFERENCIA`.
-   - Si ambos presentan valores divergentes y contradictorios: se conserva el valor primario, se registra la discrepancia en trazabilidad y se marca como `REVISAR` para aclaración en campo.
-4. Estados de titularidad especiales en Excel (`EN TRÁMITE`, `EN INVESTIGACIÓN`, `SIN ASIGNAR`, `EN CONFLICTO`): Se registran como metadatos de seguimiento o estado del requisito, **sin inventar personas físicas ficticias**.
+2. No debe existir un segundo campo de dominio (`no_parcela_ppt`) ni un dominio parcelario paralelo.
+3. La trazabilidad debe preservar por separado cada columna fuente, cuando corresponda: `archivo`, `hoja`, `fila`, `columna`, `valor_original`, `valor_normalizado`, `tratamiento` y `mensajes`, mediante `TrazabilidadFuente` / `ImportacionCelda` (nombre descriptivo; modelo implementado: `ImportacionTabularCelda`).
+4. Si ambos valores existen y son equivalentes, se produce un solo `no_parcela` y se conservan ambos valores fuente en trazabilidad.
+5. Si sólo uno existe, se utiliza ese valor para `no_parcela` y se conserva su procedencia exacta.
+6. Si la diferencia es meramente de formato, se normaliza al identificador canónico (en el caso auditado, `P.-666` / `P-666` → `P-666`), se conservan ambos originales y **no se crea otra parcela**.
+7. Si en el futuro aparece una divergencia sustantiva, se conservan ambos valores fuente, se marca **REVISAR** y se requiere aclaración humana antes de resolver el identificador. **No se crean automáticamente dos parcelas ni se presupone prioridad universal de ninguna columna, incluida PPT**.
+8. Si ninguno existe, **no se inventa identificador**: `no_parcela` puede permanecer `NULL` conforme al modelo. Para las **17 filas** auditadas en esta situación, la ausencia debe conservarse en trazabilidad/revisión cuando se importe.
+9. Estados de titularidad especiales en Excel (`EN TRÁMITE`, `EN INVESTIGACIÓN`, `SIN ASIGNAR`, `EN CONFLICTO`): se registran como metadatos de seguimiento o estado del requisito, **sin inventar personas físicas ficticias**.
 
 ---
 
