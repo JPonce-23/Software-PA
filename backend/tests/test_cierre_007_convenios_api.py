@@ -486,7 +486,6 @@ def test_007_firma_acreditada_y_periodo_reporting(
                 "id_cargo": cargo_orv,
                 "id_calidad": calidad_integrante,
                 "fecha_inicio": "2026-01-01",
-                "fecha_fin": "2028-12-31",
             },
         )
 

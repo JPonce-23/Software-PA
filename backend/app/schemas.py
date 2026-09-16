@@ -410,6 +410,7 @@ class OrvUpdate(OrvCreate):
 class OrvResponse(OrvCreate, AuditRead):
     id_orv: int
     id_nucleo: int
+    vigente: bool
 
 
 class OrvIntegranteCreate(AuditInput):
@@ -418,11 +419,15 @@ class OrvIntegranteCreate(AuditInput):
     id_cargo: int = Field(gt=0)
     id_calidad: int = Field(gt=0)
     fecha_inicio: date | None = None
-    fecha_fin: date | None = None
+
 
 class OrvIntegranteResponse(OrvIntegranteCreate, AuditRead):
     id_orv_integrante: int
     id_orv: int
+    fecha_fin: date | None = None
+    id_tipo_fin: int | None = None
+    detalle_fin: str | None = None
+    vigente: bool
 
 
 class OrvIntegranteDetailResponse(OrvIntegranteResponse):
@@ -438,7 +443,18 @@ class OrvIntegranteUpdate(AuditInput):
     id_cargo: int | None = Field(default=None, gt=0)
     id_calidad: int | None = Field(default=None, gt=0)
     fecha_inicio: date | None = None
-    fecha_fin: date | None = None
+
+
+class OrvIntegranteFinalizarRequest(BaseModel):
+    fecha_fin: date
+    id_tipo_fin: int = Field(gt=0)
+    detalle_fin: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("detalle_fin")
+    @classmethod
+    def normalizar_detalle_fin(cls, value: str | None) -> str | None:
+        normalized = value.strip() if value else None
+        return normalized or None
 
 
 class PadronHistorialCreate(AuditInput):

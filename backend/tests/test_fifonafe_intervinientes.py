@@ -115,7 +115,7 @@ def _create_member(api, orv_id, person_id, start="2026-01-01", end="2026-12-31")
     organs = _catalog(api, "organo_orv")
     positions = _catalog(api, "cargo_orv")
     qualities = _catalog(api, "calidad_integrante_orv")
-    return api(
+    member = api(
         "POST",
         f"/api/orv/{orv_id}/integrantes",
         expected=201,
@@ -125,9 +125,19 @@ def _create_member(api, orv_id, person_id, start="2026-01-01", end="2026-12-31")
             "id_cargo": positions["presidente"],
             "id_calidad": qualities["propietario"],
             "fecha_inicio": start,
-            "fecha_fin": end,
         },
     ).json()
+    if end is not None:
+        finish_types = _catalog(api, "tipo_fin_orv_integrante")
+        member = api(
+            "POST",
+            f"/api/orv-integrantes/{member['id_orv_integrante']}/finalizar",
+            json={
+                "fecha_fin": end,
+                "id_tipo_fin": finish_types["termino_periodo"],
+            },
+        ).json()
+    return member
 
 
 def _create_event(api, tramite_id, ordinal=1, event_date="2026-06-15", oficio_date=None, **kwargs):

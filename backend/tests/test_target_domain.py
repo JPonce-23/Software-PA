@@ -80,6 +80,17 @@ def test_orv_register_holders_and_geometry_optional(api, target_domain):
             "id_estado_registral": states["inscrita"],
         },
     ).json()
+    existing_members = api("GET", f"/api/orv/{orv['id_orv']}/integrantes").json()
+    active_roles = {
+        (m["id_organo"], m["id_cargo"], m["id_calidad"])
+        for m in existing_members
+        if m.get("activo", True) and m.get("fecha_fin") is None
+    }
+    cargo_id = (
+        positions["secretario"]
+        if (organs["comisariado"], positions["presidente"], qualities["propietario"]) in active_roles
+        else positions["presidente"]
+    )
     member = api(
         "POST",
         f"/api/orv/{orv['id_orv']}/integrantes",
@@ -87,7 +98,7 @@ def test_orv_register_holders_and_geometry_optional(api, target_domain):
         json={
             "id_persona": person["id_persona"],
             "id_organo": organs["comisariado"],
-            "id_cargo": positions["presidente"],
+            "id_cargo": cargo_id,
             "id_calidad": qualities["propietario"],
         },
     ).json()

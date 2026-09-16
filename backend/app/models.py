@@ -1,5 +1,7 @@
 """SQLAlchemy mappings for the ProyectoNucleo target model (migrations 031-033)."""
 
+from datetime import date as date_type
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -21,6 +23,18 @@ from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 
 from .database import Base
+
+
+def is_currently_effective(
+    active: bool, start: date_type | None, end: date_type | None
+) -> bool:
+    """Derive functional validity without persisting a second state flag."""
+    today = date_type.today()
+    return bool(
+        active
+        and (start is None or start <= today)
+        and (end is None or end >= today)
+    )
 
 
 class AuditableMixin:
@@ -358,6 +372,12 @@ class Orv(Base, AuditableMixin):
     estado_registral = relationship("CatalogoOperativo", foreign_keys=[id_estado_registral])
     tramites_ran = relationship("TramiteRan", back_populates="orv", lazy="selectin")
 
+    @property
+    def vigente(self) -> bool:
+        return is_currently_effective(
+            self.activo, self.inicio_vigencia, self.fin_vigencia
+        )
+
 
 class OrvIntegrante(Base, AuditableMixin):
     __tablename__ = "orv_integrante"
@@ -370,12 +390,21 @@ class OrvIntegrante(Base, AuditableMixin):
     id_calidad = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
     fecha_inicio = Column(Date)
     fecha_fin = Column(Date)
+    id_tipo_fin = Column(
+        BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion")
+    )
+    detalle_fin = Column(Text)
 
     orv = relationship("Orv", back_populates="integrantes")
     persona = relationship("Persona", back_populates="participaciones_orv")
     organo = relationship("CatalogoOperativo", foreign_keys=[id_organo])
     cargo_catalogo = relationship("CatalogoOperativo", foreign_keys=[id_cargo])
     calidad = relationship("CatalogoOperativo", foreign_keys=[id_calidad])
+    tipo_fin = relationship("CatalogoOperativo", foreign_keys=[id_tipo_fin])
+
+    @property
+    def vigente(self) -> bool:
+        return is_currently_effective(self.activo, self.fecha_inicio, self.fecha_fin)
 
 
 class PadronHistorial(Base, AuditableMixin):

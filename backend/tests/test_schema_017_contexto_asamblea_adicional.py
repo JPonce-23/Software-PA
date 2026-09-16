@@ -63,6 +63,25 @@ def base_017(api, target_domain):
         },
     ).json()
 
+    # Cohorte explícita para comprobar la normalización sin depender del volumen
+    # histórico acumulado en la base que ejecuta pytest.
+    muestras_ciclo = {}
+    for codigo in ("ADICIONAL", "2A_ADICIONAL"):
+        muestras_ciclo[codigo] = [
+            api(
+                "POST",
+                f"/api/proyecto-nucleo/{pn_id}/asambleas",
+                expected=201,
+                json={
+                    "id_tipo_asamblea": assembly_types["anuencia"],
+                    "id_contexto_asamblea": assembly_contexts["modificatorio"],
+                    "id_tipo_cop_operativo": ciclos[codigo],
+                    "proposito": f"Muestra hermética {codigo} {ordinal}",
+                },
+            ).json()["id_asamblea"]
+            for ordinal in range(1, 4)
+        ]
+
     # Convenio ORIGEN (cop_original) autorizado por asamblea_origen
     convenio_origen = api(
         "POST",
@@ -87,6 +106,7 @@ def base_017(api, target_domain):
         "afectaciones": afectaciones,
         "asamblea_origen": asamblea_origen,
         "convenio_origen": convenio_origen,
+        "muestras_ciclo": muestras_ciclo,
     }
 
 
@@ -331,7 +351,7 @@ def test_caso_4_origen_conserva_cop_original_y_vincula_convenio_cop_original(
     assert conv["tipo_convenio"] == "cop_original"
     assert conv["id_asamblea_autorizacion"] == asam["id_asamblea"]
 
-    # 2. Asambleas de produccion/QA con ciclo ORIGEN conservan cop_original
+    # 2. La Asamblea ORIGEN creada por el fixture conserva cop_original.
     filas_origen = transactional_api["connection"].execute(
         text(
             """
@@ -340,12 +360,13 @@ def test_caso_4_origen_conserva_cop_original_y_vincula_convenio_cop_original(
               FROM asamblea a
               JOIN catalogo_operativo cop ON cop.id_catalogo_opcion = a.id_tipo_cop_operativo
               JOIN catalogo_operativo ctx ON ctx.id_catalogo_opcion = a.id_contexto_asamblea
-             WHERE cop.codigo = 'ORIGEN'
+             WHERE a.id_asamblea = :id_asamblea
             """
         ),
+        {"id_asamblea": asam["id_asamblea"]},
     ).mappings().one()
 
-    assert filas_origen["total"] >= 405
+    assert filas_origen["total"] == 1
     assert filas_origen["total"] == filas_origen["con_cop_original"]
 
 
@@ -358,29 +379,31 @@ def test_caso_5_adicional_y_2a_adicional_ciclos_operacionales_distintos(
     assert "2A_ADICIONAL" in ciclos
     assert ciclos["ADICIONAL"] != ciclos["2A_ADICIONAL"]
 
-    # Verificacion de conteos poblacionales migrados (excluyendo el proyecto de prueba)
+    # Verificación de la cohorte creada explícitamente por este fixture.
+    sample_ids = [
+        *base_017["muestras_ciclo"]["ADICIONAL"],
+        *base_017["muestras_ciclo"]["2A_ADICIONAL"],
+    ]
     conteos = transactional_api["connection"].execute(
         text(
             """
             SELECT cop.codigo AS cop_codigo, ctx.codigo AS ctx_codigo, count(*) AS total
               FROM asamblea a
-              JOIN proyecto_nucleo pn ON pn.id_proyecto_nucleo = a.id_proyecto_nucleo
               JOIN catalogo_operativo cop ON cop.id_catalogo_opcion = a.id_tipo_cop_operativo
               JOIN catalogo_operativo ctx ON ctx.id_catalogo_opcion = a.id_contexto_asamblea
-             WHERE cop.codigo IN ('ADICIONAL', '2A_ADICIONAL')
-               AND pn.id_proyecto <> :test_project_id
+             WHERE a.id_asamblea = ANY(:sample_ids)
              GROUP BY 1, 2
              ORDER BY 1
             """
         ),
-        {"test_project_id": base_017["project_id"]},
+        {"sample_ids": sample_ids},
     ).mappings().all()
 
     por_ciclo = {r["cop_codigo"]: (r["ctx_codigo"], r["total"]) for r in conteos}
     assert por_ciclo["ADICIONAL"][0] == "modificatorio"
-    assert por_ciclo["ADICIONAL"][1] >= 60
+    assert por_ciclo["ADICIONAL"][1] == 3
     assert por_ciclo["2A_ADICIONAL"][0] == "modificatorio"
-    assert por_ciclo["2A_ADICIONAL"][1] >= 30
+    assert por_ciclo["2A_ADICIONAL"][1] == 3
     assert all(r["ctx_codigo"] == "modificatorio" for r in conteos)
 
 

@@ -456,6 +456,51 @@ def create_person(
     return service.create_person(db, data, user)
 
 
+@router.get("/personas/{id_persona}", response_model=schemas.PersonaResponse)
+def get_person(
+    id_persona: int,
+    db: Session = Depends(get_db),
+    _: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    return service.get_person(db, id_persona)
+
+
+@router.patch("/personas/{id_persona}", response_model=schemas.PersonaResponse)
+def update_person(
+    id_persona: int,
+    data: schemas.PersonaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    person = service.get_person(db, id_persona)
+    return service.update_person(db, person, data, user)
+
+
+@router.delete(
+    "/personas/{id_persona}", response_model=schemas.AuthOperationResponse
+)
+def delete_person(
+    id_persona: int,
+    data: schemas.BajaRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    person = service.get_person(db, id_persona)
+    service.deactivate_person(db, person, user, data.motivo)
+    return {"detail": "Persona dada de baja"}
+
+
+@router.post(
+    "/personas/{id_persona}/reactivar", response_model=schemas.PersonaResponse
+)
+def reactivate_person(
+    id_persona: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    return service.reactivate_person(db, id_persona, user)
+
+
 @router.get(
     "/proyecto-nucleo/{id_proyecto_nucleo}/orv",
     response_model=list[schemas.OrvResponse],
@@ -520,33 +565,15 @@ def add_orv_member(
 )
 def list_orv_members(
     id_orv: int,
+    incluir_historico: bool = False,
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     orv = _active_or_404(db, models.Orv, models.Orv.id_orv, id_orv, "ORV no encontrado")
     require_nucleus_access(db, user, orv.id_nucleo)
-    rows = db.query(models.OrvIntegrante, models.Persona).join(
-        models.Persona, models.Persona.id_persona == models.OrvIntegrante.id_persona
-    ).filter(
-        models.OrvIntegrante.id_orv == id_orv,
-        models.OrvIntegrante.activo.is_(True),
-        models.Persona.activo.is_(True),
-    ).order_by(
-        models.OrvIntegrante.id_organo,
-        models.OrvIntegrante.id_cargo,
-        models.Persona.nombre,
-    ).all()
-    return [
-        {
-            **schemas.OrvIntegranteResponse.model_validate(link).model_dump(),
-            "nombre": person.nombre,
-            "apellido_paterno": person.apellido_paterno,
-            "apellido_materno": person.apellido_materno,
-            "telefono": person.telefono,
-            "correo_electronico": person.correo_electronico,
-        }
-        for link, person in rows
-    ]
+    return service.list_orv_members(
+        db, id_orv, include_history=incluir_historico
+    )
 
 
 @router.patch(
@@ -565,7 +592,46 @@ def update_orv_member(
     )
     orv = _active_or_404(db, models.Orv, models.Orv.id_orv, entity.id_orv, "ORV no encontrado")
     require_nucleus_access(db, user, orv.id_nucleo, mode="capture")
-    return service.update_entity(db, entity, data, user)
+    return service.update_orv_member(db, entity, data, user)
+
+
+@router.post(
+    "/orv-integrantes/{id_orv_integrante}/finalizar",
+    response_model=schemas.OrvIntegranteResponse,
+)
+def finalize_orv_member(
+    id_orv_integrante: int,
+    data: schemas.OrvIntegranteFinalizarRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+):
+    return service.finalize_orv_member(db, id_orv_integrante, data, user)
+
+
+@router.delete(
+    "/orv-integrantes/{id_orv_integrante}",
+    response_model=schemas.AuthOperationResponse,
+)
+def delete_orv_member(
+    id_orv_integrante: int,
+    data: schemas.BajaRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    service.deactivate_orv_member(db, id_orv_integrante, user, data.motivo)
+    return {"detail": "Integrante ORV dado de baja"}
+
+
+@router.post(
+    "/orv-integrantes/{id_orv_integrante}/reactivar",
+    response_model=schemas.OrvIntegranteResponse,
+)
+def reactivate_orv_member(
+    id_orv_integrante: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    return service.reactivate_orv_member(db, id_orv_integrante, user)
 
 
 @router.get(
