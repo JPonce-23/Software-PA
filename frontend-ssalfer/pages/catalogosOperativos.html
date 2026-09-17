@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>
+        Catálogos operativos | SSALFER
+    </title>
+
+
+    <link
+        rel="stylesheet"
+        href="/styles/dashboard.css">
+
+    <link
+        rel="stylesheet"
+        href="/styles/catalogosOperativos.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+
+    <link
+        rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button
+        class="btn-menu"
+        type="button"
+        aria-label="Abrir o cerrar menú">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">
+            Usuario
+        </span>
+
+    </div>
+
+
+    <nav class="barra">
+
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+            <div
+                class="proyectos-lista-dinamica"
+                id="proyectosLista">
+            </div>
+
+        </div>
+
+
+        <div class="catalogos-menu-admin">
+
+            <h4>Administración</h4>
+
+            <a href="/pages/usuarios.html">
+                <i class="bi bi-people"></i>
+                <span>Usuarios</span>
+            </a>
+
+            <a
+                href="/pages/catalogosOperativos.html"
+                class="activo">
+                <i class="bi bi-list-check"></i>
+                <span>Catálogos operativos</span>
+            </a>
+
+            <a href="/pages/auditoria.html">
+                <i class="bi bi-journal-text"></i>
+                <span>Auditoría</span>
+            </a>
+
+        </div>
+
+
+        <div class="usuario-panel">
+
+            <button
+                class="usuario-btn"
+                type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">
+                    Nombre usuario
+                </span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank"
+        rel="noopener noreferrer">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                        CONTENIDO
+===================================================== -->
+
+<main
+    class="contenedor catalogos-contenedor">
+
+
+    <section class="catalogos-encabezado">
+
+        <div>
+
+
+            <div class="catalogos-migas">
+
+                <a href="/dashboard.html">
+                    Inicio
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Administración
+                </span>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Catálogos operativos
+                </span>
+
+            </div>
+
+
+            <p class="catalogos-etiqueta">
+                ADMINISTRACIÓN
+            </p>
+
+
+            <h1>
+                Catálogos operativos
+            </h1>
+
+
+            <p class="catalogos-subtitulo">
+
+                Consulta, crea, edita y
+                desactiva las opciones
+                utilizadas por los
+                formularios del sistema.
+
+            </p>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                        MENSAJES
+    ================================================== -->
+
+    <div
+        id="catalogosError"
+        class="catalogos-alerta catalogos-alerta-error"
+        hidden>
+    </div>
+
+
+    <div
+        id="catalogosOk"
+        class="catalogos-alerta catalogos-alerta-ok"
+        hidden>
+    </div>
+
+
+
+    <!-- =================================================
+                        FILTROS
+    ================================================== -->
+
+    <section
+        class="catalogos-panel catalogos-panel-filtros"
+        aria-labelledby="tituloConsultaCatalogo">
+
+
+        <div class="catalogos-panel-titulo">
+
+            <div>
+
+                <p class="catalogos-seccion-etiqueta">
+                    CONSULTA
+                </p>
+
+                <h2 id="tituloConsultaCatalogo">
+                    Selecciona un catálogo
+                </h2>
+
+            </div>
+
+
+            <button
+                id="btnNuevoCatalogo"
+                class="catalogos-btn catalogos-btn-primario"
+                type="button">
+
+                <i class="bi bi-plus-lg"></i>
+
+                Nueva opción
+
+            </button>
+
+        </div>
+
+
+
+        <div class="catalogos-filtros-grid">
+
+
+            <label
+                class="catalogos-campo catalogos-campo-tipo">
+
+                <span>
+                    Tipo de catálogo
+                </span>
+
+
+                <input
+                    id="tipoCatalogo"
+                    type="text"
+                    list="tiposCatalogo"
+                    maxlength="50"
+                    autocomplete="off"
+                    placeholder="Ej. tipo_tenencia">
+
+
+                <datalist id="tiposCatalogo">
+                </datalist>
+
+
+                <small>
+
+                    La lista es una ayuda;
+                    también puedes escribir
+                    un tipo nuevo que exista
+                    en el backend.
+
+                </small>
+
+            </label>
+
+
+
+            <div
+                class="catalogos-campo catalogos-campo-boton">
+
+                <span>
+                    &nbsp;
+                </span>
+
+
+                <button
+                    id="btnCargarCatalogo"
+                    class="catalogos-btn catalogos-btn-secundario"
+                    type="button">
+
+                    <i class="bi bi-arrow-clockwise"></i>
+
+                    Cargar
+
+                </button>
+
+            </div>
+
+
+
+            <label class="catalogos-check">
+
+                <input
+                    id="incluirInactivos"
+                    type="checkbox">
+
+                <span>
+                    Incluir opciones inactivas
+                </span>
+
+            </label>
+
+
+
+            <label
+                class="catalogos-campo catalogos-campo-busqueda">
+
+                <span>
+                    Buscar en resultados
+                </span>
+
+
+                <div class="catalogos-input-icono">
+
+                    <i class="bi bi-search"></i>
+
+
+                    <input
+                        id="busquedaCatalogo"
+                        type="search"
+                        autocomplete="off"
+                        placeholder="Código, nombre, fuente...">
+
+                </div>
+
+            </label>
+
+
+        </div>
+
+
+
+        <p
+            id="catalogoResumen"
+            class="catalogos-resumen">
+
+            Selecciona un tipo de catálogo
+            para consultar sus opciones.
+
+        </p>
+
+
+    </section>
+
+
+
+    <!-- =================================================
+                        TABLA
+    ================================================== -->
+
+    <section
+        class="catalogos-panel"
+        aria-labelledby="tituloOpcionesCatalogo">
+
+
+        <div
+            class="catalogos-panel-titulo catalogos-panel-titulo-tabla">
+
+            <div>
+
+                <p class="catalogos-seccion-etiqueta">
+                    OPCIONES
+                </p>
+
+                <h2 id="tituloOpcionesCatalogo">
+                    Opciones del catálogo
+                </h2>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="catalogos-tabla-wrap">
+
+            <table class="catalogos-tabla">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            ID
+                        </th>
+
+                        <th>
+                            Código
+                        </th>
+
+                        <th>
+                            Nombre
+                        </th>
+
+                        <th>
+                            Descripción
+                        </th>
+
+                        <th>
+                            Orden
+                        </th>
+
+                        <th>
+                            Fuente
+                        </th>
+
+                        <th>
+                            Vigencia
+                        </th>
+
+                        <th>
+                            Estado
+                        </th>
+
+                        <th>
+                            Acciones
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="tablaCatalogos">
+
+                    <tr>
+
+                        <td
+                            colspan="9"
+                            class="catalogos-tabla-estado">
+
+                            Cargando catálogo...
+
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+    </section>
+
+
+
+    <!-- =================================================
+                    ADVERTENCIA
+    ================================================== -->
+
+    <section class="catalogos-nota">
+
+        <i class="bi bi-exclamation-triangle"></i>
+
+
+        <div>
+
+            <strong>
+                Importante sobre la desactivación
+            </strong>
+
+
+            <p>
+
+                El backend actual permite
+                desactivar opciones, pero no
+                expone una operación efectiva
+                de reactivación.
+
+                Desactiva únicamente opciones
+                que realmente deban dejar de
+                utilizarse.
+
+            </p>
+
+        </div>
+
+    </section>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+<!-- =====================================================
+                MODAL CREAR / EDITAR
+===================================================== -->
+
+<div
+    id="modalCatalogo"
+    class="catalogos-modal"
+    hidden>
+
+
+    <section
+        class="catalogos-modal-dialogo"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalCatalogoTitulo">
+
+
+        <div class="catalogos-modal-header">
+
+            <div>
+
+                <p class="catalogos-seccion-etiqueta">
+                    CATÁLOGO OPERATIVO
+                </p>
+
+                <h2 id="modalCatalogoTitulo">
+                    Nueva opción de catálogo
+                </h2>
+
+            </div>
+
+
+            <button
+                class="catalogos-modal-cerrar"
+                type="button"
+                data-cerrar-catalogos-modal="catalogo"
+                aria-label="Cerrar">
+
+                <i class="bi bi-x-lg"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <form
+            id="formCatalogo"
+            class="catalogos-formulario">
+
+
+            <input
+                id="catalogoModo"
+                type="hidden"
+                value="crear">
+
+
+            <input
+                id="catalogoId"
+                type="hidden">
+
+
+
+            <div
+                id="catalogoModalError"
+                class="catalogos-alerta catalogos-alerta-error"
+                hidden>
+            </div>
+
+
+
+            <div class="catalogos-form-grid">
+
+
+                <label class="catalogos-campo">
+
+                    <span>
+                        Tipo de catálogo *
+                    </span>
+
+
+                    <input
+                        id="campoTipoCatalogo"
+                        type="text"
+                        maxlength="50"
+                        required
+                        autocomplete="off"
+                        placeholder="tipo_tenencia">
+
+
+                    <small>
+
+                        El tipo no puede
+                        modificarse después de
+                        crear la opción.
+
+                    </small>
+
+                </label>
+
+
+
+                <label class="catalogos-campo">
+
+                    <span>
+                        Código *
+                    </span>
+
+
+                    <input
+                        id="campoCodigoCatalogo"
+                        type="text"
+                        maxlength="80"
+                        pattern="[A-Za-z0-9][A-Za-z0-9_-]*"
+                        required
+                        autocomplete="off"
+                        placeholder="ejido">
+
+
+                    <small>
+
+                        Letras, números, guion
+                        y guion bajo.
+
+                        El código es inmutable.
+
+                    </small>
+
+                </label>
+
+
+
+                <label
+                    class="catalogos-campo catalogos-form-span-2">
+
+                    <span>
+                        Nombre *
+                    </span>
+
+
+                    <input
+                        id="catalogoNombre"
+                        type="text"
+                        minlength="1"
+                        maxlength="250"
+                        required
+                        autocomplete="off"
+                        placeholder="Nombre visible de la opción">
+
+                </label>
+
+
+
+                <label
+                    class="catalogos-campo catalogos-form-span-2">
+
+                    <span>
+                        Descripción
+                    </span>
+
+
+                    <textarea
+                        id="catalogoDescripcion"
+                        rows="3"
+                        placeholder="Descripción funcional de la opción"></textarea>
+
+                </label>
+
+
+
+                <label class="catalogos-campo">
+
+                    <span>
+                        Orden
+                    </span>
+
+
+                    <input
+                        id="catalogoOrden"
+                        type="number"
+                        step="1"
+                        value="0">
+
+                </label>
+
+
+
+                <label class="catalogos-campo">
+
+                    <span>
+                        Fuente
+                    </span>
+
+
+                    <input
+                        id="catalogoFuente"
+                        type="text"
+                        maxlength="250"
+                        autocomplete="off"
+                        placeholder="Modelo operativo, RAN, Ley Agraria...">
+
+                </label>
+
+
+
+                <label class="catalogos-campo">
+
+                    <span>
+                        Vigencia inicial
+                    </span>
+
+
+                    <input
+                        id="catalogoVigenciaInicio"
+                        type="date">
+
+                </label>
+
+
+
+                <label class="catalogos-campo">
+
+                    <span>
+                        Vigencia final
+                    </span>
+
+
+                    <input
+                        id="catalogoVigenciaFin"
+                        type="date">
+
+                </label>
+
+
+
+                <label
+                    class="catalogos-campo catalogos-form-span-2">
+
+                    <span>
+                        Observaciones
+                    </span>
+
+
+                    <textarea
+                        id="catalogoObservaciones"
+                        rows="3"
+                        placeholder="Observaciones de auditoría o contexto"></textarea>
+
+
+                    <small id="catalogoObservacionesAyuda">
+
+                        Las observaciones se
+                        almacenan al crear la
+                        opción.
+
+                    </small>
+
+                </label>
+
+
+            </div>
+
+
+
+            <div class="catalogos-modal-acciones">
+
+
+                <button
+                    class="catalogos-btn catalogos-btn-secundario"
+                    type="button"
+                    data-cerrar-catalogos-modal="catalogo">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    id="btnGuardarCatalogo"
+                    class="catalogos-btn catalogos-btn-primario"
+                    type="submit">
+
+                    Crear opción
+
+                </button>
+
+
+            </div>
+
+
+        </form>
+
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+                    MODAL DESACTIVAR
+===================================================== -->
+
+<div
+    id="modalBajaCatalogo"
+    class="catalogos-modal"
+    hidden>
+
+
+    <section
+        class="catalogos-modal-dialogo catalogos-modal-dialogo-baja"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tituloBajaCatalogo">
+
+
+        <div class="catalogos-modal-header">
+
+            <div>
+
+                <p
+                    class="catalogos-seccion-etiqueta catalogos-texto-peligro">
+
+                    ACCIÓN SENSIBLE
+
+                </p>
+
+
+                <h2 id="tituloBajaCatalogo">
+                    Desactivar opción
+                </h2>
+
+            </div>
+
+
+            <button
+                class="catalogos-modal-cerrar"
+                type="button"
+                data-cerrar-catalogos-modal="baja"
+                aria-label="Cerrar">
+
+                <i class="bi bi-x-lg"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <form
+            id="formBajaCatalogo"
+            class="catalogos-formulario">
+
+
+            <input
+                id="bajaCatalogoId"
+                type="hidden">
+
+
+
+            <div
+                id="bajaCatalogoError"
+                class="catalogos-alerta catalogos-alerta-error"
+                hidden>
+            </div>
+
+
+
+            <div class="catalogos-baja-advertencia">
+
+                <i class="bi bi-exclamation-octagon"></i>
+
+
+                <div>
+
+                    <strong id="bajaCatalogoNombre">
+                        Opción
+                    </strong>
+
+
+                    <p>
+
+                        La API actual no ofrece
+                        una reactivación efectiva.
+
+                        Esta opción dejará de
+                        aparecer en las consultas
+                        normales de catálogos.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+
+            <label class="catalogos-campo">
+
+                <span>
+                    Motivo de baja *
+                </span>
+
+
+                <textarea
+                    id="bajaCatalogoMotivo"
+                    rows="4"
+                    maxlength="500"
+                    required
+                    placeholder="Explica por qué se desactiva esta opción"></textarea>
+
+            </label>
+
+
+
+            <div class="catalogos-modal-acciones">
+
+
+                <button
+                    class="catalogos-btn catalogos-btn-secundario"
+                    type="button"
+                    data-cerrar-catalogos-modal="baja">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    id="btnConfirmarBajaCatalogo"
+                    class="catalogos-btn catalogos-btn-peligro"
+                    type="submit">
+
+                    Desactivar opción
+
+                </button>
+
+
+            </div>
+
+
+        </form>
+
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+                        SCRIPTS
+===================================================== -->
+
+<script src="/js/env.js"></script>
+
+<script src="/js/config.js"></script>
+
+<script src="/js/api/cliente.js"></script>
+
+<script src="/js/api/auth.js"></script>
+
+<script src="/js/api/proyectos.js"></script>
+
+<script src="/js/api/catalogosOperativos.js"></script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/catalogosOperativos.js"></script>
+
+
+</body>
+
+</html>

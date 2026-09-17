@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Parcela | SSALFER</title>
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/parcela.css">
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+===================================================== -->
+
+<aside class="aside">
+
+    <button class="btn-menu" type="button">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+    <nav class="barra">
+
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <div class="usuario-panel">
+
+            <button class="usuario-btn" type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+===================================================== -->
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Sistema SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank"
+        rel="noopener noreferrer">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+
+<!-- =====================================================
+                    CONTENIDO PRINCIPAL
+===================================================== -->
+
+<main class="contenedor">
+
+
+    <!-- =================================================
+                        ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+        <div>
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Proyectos
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <a id="enlaceNucleo" href="#">
+                    Núcleo agrario
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Parcela
+                </span>
+
+            </div>
+
+
+            <p class="etiqueta">
+                DERECHOS INDIVIDUALES
+            </p>
+
+
+            <h1>
+                Ficha de Parcela
+            </h1>
+
+
+            <p class="subtitulo">
+                Consulta y administra la información de la parcela
+                y las personas titulares de sus derechos.
+            </p>
+
+        </div>
+
+
+        <div class="acciones-header">
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnEditarParcela">
+
+                <i class="bi bi-pencil"></i>
+
+                Editar parcela
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    INFORMACIÓN DE PARCELA
+    ================================================== -->
+
+    <section class="tarjeta bloque-parcela">
+
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-bounding-box"></i>
+
+                <h2>
+                    Información de la parcela
+                </h2>
+
+            </div>
+
+
+            <span
+                class="estado-registro"
+                id="estadoParcela">
+
+                Registrada
+
+            </span>
+
+        </div>
+
+
+        <div class="datos-grid">
+
+
+            <!-- TIPO -->
+
+            <div class="dato">
+
+                <span>
+                    Tipo de parcela
+                </span>
+
+                <strong id="tipoParcela">
+                    Individual
+                </strong>
+
+            </div>
+
+
+            <!-- NÚMERO -->
+
+            <div class="dato">
+
+                <span>
+                    Número / clave de parcela
+                </span>
+
+                <strong id="numeroParcela">
+                    PAR-001
+                </strong>
+
+            </div>
+
+
+            <!-- CERTIFICADO -->
+
+            <div class="dato">
+
+                <span>
+                    Certificado parcelario
+                </span>
+
+                <strong id="certificadoParcelario">
+                    —
+                </strong>
+
+            </div>
+
+
+            <!-- FOLIO -->
+
+            <div class="dato">
+
+                <span>
+                    Folio de derechos
+                </span>
+
+                <strong id="folioDerechos">
+                    —
+                </strong>
+
+            </div>
+
+
+            <!-- VIGENCIA -->
+
+            <div class="dato">
+
+                <span>
+                    Constancia de vigencia
+                </span>
+
+                <strong id="constanciaVigencia">
+                    —
+                </strong>
+
+            </div>
+
+
+        </div>
+
+
+        <div class="bloque-accion">
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnEditarDatosParcela">
+
+                <i class="bi bi-pencil"></i>
+
+                Editar información
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+                    TITULARES
+    ================================================== -->
+
+    <section class="tarjeta">
+
+
+        <div class="seccion-titulo">
+
+            <div>
+
+                <i class="bi bi-people"></i>
+
+                <div>
+
+                    <h2>
+                        Titulares
+                    </h2>
+
+                    <p class="descripcion-seccion">
+                        Personas relacionadas con los derechos
+                        de esta parcela.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <span
+                class="contador-registros"
+                id="contadorTitulares">
+
+                0 titulares
+
+            </span>
+
+        </div>
+
+
+
+        <!-- =============================================
+                    LISTA DE TITULARES
+        ============================================== -->
+
+        <div
+            id="titularesContainer"
+            class="titulares-container">
+
+
+            <!-- =========================================
+                    TITULAR DEMOSTRATIVO
+            ========================================== -->
+
+            <article
+                class="titular"
+                data-titular>
+
+
+                <div class="titular-icono">
+
+                    <i class="bi bi-person"></i>
+
+                </div>
+
+
+                <div class="titular-datos">
+
+                    <h3>
+                        Persona demostrativa
+                    </h3>
+
+                    <span>
+                        Tipo de derecho:
+                        Titular
+                    </span>
+
+                    <span>
+                        Participación:
+                        100%
+                    </span>
+
+                </div>
+
+
+                <div class="titular-vigencia">
+
+                    <span>
+                        Inicio:
+                        —
+                    </span>
+
+                    <span>
+                        Fin:
+                        —
+                    </span>
+
+                </div>
+
+
+            </article>
+
+
+        </div>
+
+
+
+        <!-- =============================================
+                    ESTADO VACÍO
+        ============================================== -->
+
+        <div
+            id="sinTitulares"
+            class="sin-registros"
+            hidden>
+
+            <i class="bi bi-person-x"></i>
+
+            <p>
+                No hay titulares registrados.
+            </p>
+
+            <span>
+                Agrega una persona para relacionarla
+                con esta parcela.
+            </span>
+
+        </div>
+
+
+
+        <!-- =============================================
+                    ACCIÓN
+        ============================================== -->
+
+        <div class="bloque-accion">
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnAgregarTitular">
+
+                <i class="bi bi-person-plus"></i>
+
+                Agregar titular
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+</main>
+
+
+
+<!-- =====================================================
+                MODAL — AGREGAR TITULAR
+===================================================== -->
+
+<div
+    class="modal"
+    id="modalTitular"
+    hidden>
+
+
+    <div
+        class="modal-contenido"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tituloModalTitular">
+
+
+        <div class="modal-header">
+
+            <div>
+
+                <p class="etiqueta">
+                    NUEVO TITULAR
+                </p>
+
+                <h2 id="tituloModalTitular">
+                    Agregar titular
+                </h2>
+
+                <p>
+                    Relaciona una persona existente con
+                    los derechos de esta parcela.
+                </p>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="btn-cerrar-modal"
+                id="btnCerrarModal"
+                aria-label="Cerrar">
+
+                <i class="bi bi-x-lg"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <form id="formTitular">
+
+
+            <div class="form-grid">
+
+
+                <!-- =====================================
+                        PERSONA
+                ====================================== -->
+
+                <div class="campo campo-completo">
+
+                    <label for="idPersona">
+
+                        Persona
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <div class="selector-persona">
+
+                        <select
+                            id="idPersona"
+                            name="id_persona"
+                            required>
+
+                            <option value="">
+                                Seleccionar persona
+                            </option>
+
+                        </select>
+
+
+                        <button
+                            type="button"
+                            class="btn-secundario"
+                            id="btnNuevaPersona">
+
+                            <i class="bi bi-person-plus"></i>
+
+                            Nueva persona
+
+                        </button>
+
+                    </div>
+
+
+                    <small>
+                        Selecciona una persona previamente
+                        registrada en el proyecto.
+                    </small>
+
+                </div>
+
+
+
+                <!-- =====================================
+                        TIPO DE DERECHO
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="tipoDerecho">
+
+                        Tipo de derecho
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="tipoDerecho"
+                        name="tipo_derecho"
+                        maxlength="50"
+                        required
+                        placeholder="Ej. Titular">
+
+                    <small>
+                        Máximo 50 caracteres.
+                    </small>
+
+                </div>
+
+
+
+                <!-- =====================================
+                    PARTICIPACIÓN
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="porcentajeParticipacion">
+
+                        Porcentaje de participación
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="number"
+                        id="porcentajeParticipacion"
+                        name="porcentaje_participacion"
+                        min="0.01"
+                        max="100"
+                        step="0.01"
+                        placeholder="Ej. 50">
+
+                    <small>
+                        Valor mayor a 0 y hasta 100%.
+                    </small>
+
+                </div>
+
+
+
+                <!-- =====================================
+                        FECHA INICIO
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="fechaInicio">
+
+                        Fecha de inicio
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="date"
+                        id="fechaInicio"
+                        name="fecha_inicio">
+
+                </div>
+
+
+
+                <!-- =====================================
+                        FECHA FIN
+                ====================================== -->
+
+                <div class="campo">
+
+                    <label for="fechaFin">
+
+                        Fecha de fin
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="date"
+                        id="fechaFin"
+                        name="fecha_fin">
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =========================================
+                        AVISO PERSONA
+            ========================================== -->
+
+            <div class="aviso-identidad">
+
+                <i class="bi bi-info-circle"></i>
+
+                <p>
+                    El titular debe corresponder a una persona
+                    previamente registrada en el proyecto.
+                </p>
+
+            </div>
+
+
+
+            <!-- =========================================
+                        ACCIONES
+            ========================================== -->
+
+            <div class="acciones-formulario">
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelarTitular">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Agregar titular
+
+                </button>
+
+            </div>
+
+
+        </form>
+
+    </div>
+
+</div>
+
+
+
+<!-- =====================================================
+                        FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/parcela.js"></script>
+
+
+</body>
+
+</html>

@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>Reportes FIFONAFE | SSALFER</title>
+
+    <link
+        rel="stylesheet"
+        href="/styles/dashboard.css">
+
+    <link
+        rel="stylesheet"
+        href="/styles/reportesFifonafe.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <link
+        rel="icon"
+        type="image/png"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+</head>
+
+<body>
+
+<aside class="aside">
+
+    <button
+        class="btn-menu"
+        type="button"
+        aria-label="Abrir o cerrar menú">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">
+            Usuario
+        </span>
+
+    </div>
+
+
+    <nav class="barra">
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+            <div
+                class="proyectos-lista-dinamica"
+                id="proyectosLista">
+            </div>
+
+        </div>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Reportes
+            </h4>
+
+
+            <a href="/pages/reporteAvancePeriodo.html">
+
+                <i class="bi bi-bar-chart-line"></i>
+
+                <span>
+                    Avance por periodo
+                </span>
+
+            </a>
+
+
+            <a href="/pages/reportesConvenios.html">
+
+                <i class="bi bi-file-earmark-text"></i>
+
+                <span>
+                    Convenios
+                </span>
+
+            </a>
+
+
+            <a
+                href="/pages/reportesFifonafe.html"
+                class="activo">
+
+                <i class="bi bi-bank"></i>
+
+                <span>
+                    FIFONAFE
+                </span>
+
+            </a>
+
+        </div>
+
+
+        <div class="usuario-panel">
+
+            <button
+                class="usuario-btn"
+                type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">
+                    Usuario
+                </span>
+
+                <i class="bi bi-chevron-up"></i>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="/dashboard.html">
+
+                    <i class="bi bi-house"></i>
+
+                    Dashboard
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Procuraduría Agraria">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+<main class="contenedor fif-reportes-contenedor">
+
+
+    <nav
+        class="migas"
+        aria-label="Breadcrumb">
+
+        <a href="/dashboard.html">
+            Proyectos
+        </a>
+
+        <i class="bi bi-chevron-right"></i>
+
+        <span>
+            Reportes
+        </span>
+
+        <i class="bi bi-chevron-right"></i>
+
+        <span>
+            FIFONAFE
+        </span>
+
+    </nav>
+
+
+    <section class="fif-reportes-encabezado">
+
+        <div>
+
+            <p class="fif-reportes-eyebrow">
+                Reportes
+            </p>
+
+
+            <h1>
+                Reportes FIFONAFE
+            </h1>
+
+
+            <p class="fif-reportes-subtitulo">
+
+                Consulta la cobertura operativa
+                del flujo FIFONAFE y el indicador
+                institucional anual de solicitudes
+                resueltas positivamente.
+
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <div
+        id="fifReportesError"
+        class="fif-reportes-alerta fif-reportes-alerta-error"
+        hidden>
+    </div>
+
+
+    <div
+        id="fifReportesInfo"
+        class="fif-reportes-alerta fif-reportes-alerta-info"
+        hidden>
+    </div>
+
+
+    <section class="fif-reportes-nota">
+
+        <i class="bi bi-info-circle"></i>
+
+
+        <p id="fifReporteNota">
+
+            La cobertura permite identificar
+            solicitudes completas, pendientes
+            y problemas de soporte.
+
+            No debe interpretarse como un total
+            definitivo cuando existen pendientes
+            o actuaciones sin soporte.
+
+        </p>
+
+    </section>
+
+
+    <div
+        class="fif-reportes-tabs"
+        role="tablist"
+        aria-label="Tipo de reporte FIFONAFE">
+
+
+        <button
+            class="fif-reportes-tab activo"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            data-fif-reporte="cobertura">
+
+            <i class="bi bi-clipboard-data"></i>
+
+            Cobertura
+
+        </button>
+
+
+        <button
+            class="fif-reportes-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-fif-reporte="indicador">
+
+            <i class="bi bi-percent"></i>
+
+            Indicador institucional
+
+        </button>
+
+
+    </div>
+
+
+    <section
+        class="fif-reportes-card"
+        aria-labelledby="fifTituloFiltros">
+
+
+        <div class="fif-reportes-card-header">
+
+            <div>
+
+                <h2 id="fifTituloFiltros">
+                    Filtros de cobertura
+                </h2>
+
+
+                <p id="fifDescripcionFiltros">
+
+                    Filtra por proyecto y ámbito.
+                    Ambos filtros son opcionales.
+
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <form
+            id="formReportesFifonafe"
+            class="fif-reportes-filtros">
+
+
+            <label class="fif-reportes-campo">
+
+                <span>
+                    Proyecto
+                </span>
+
+
+                <select id="fifFiltroProyecto">
+
+                    <option value="">
+                        Todos los proyectos autorizados
+                    </option>
+
+                </select>
+
+            </label>
+
+
+            <label
+                id="fifGrupoAmbito"
+                class="fif-reportes-campo">
+
+                <span>
+                    Ámbito
+                </span>
+
+
+                <select id="fifFiltroAmbito">
+
+                    <option value="">
+                        Todos
+                    </option>
+
+                    <option value="colectivo">
+                        Colectivo
+                    </option>
+
+                    <option value="individual">
+                        Individual
+                    </option>
+
+                </select>
+
+            </label>
+
+
+            <label
+                id="fifGrupoAnio"
+                class="fif-reportes-campo"
+                hidden>
+
+                <span>
+                    Año
+                </span>
+
+
+                <input
+                    id="fifFiltroAnio"
+                    type="number"
+                    min="2000"
+                    max="2200"
+                    step="1"
+                    placeholder="Ej. 2026">
+
+            </label>
+
+
+            <div class="fif-reportes-filtros-acciones">
+
+
+                <button
+                    id="btnLimpiarFifReportes"
+                    class="fif-reportes-btn fif-reportes-btn-secundario"
+                    type="button">
+
+                    <i class="bi bi-eraser"></i>
+
+                    Limpiar filtros
+
+                </button>
+
+
+                <button
+                    id="btnConsultarFifReportes"
+                    class="fif-reportes-btn fif-reportes-btn-primario"
+                    type="submit">
+
+                    <i class="bi bi-search"></i>
+
+                    Consultar reporte
+
+                </button>
+
+
+            </div>
+
+
+        </form>
+
+    </section>
+
+
+    <section
+        id="fifReportesResumen"
+        class="fif-reportes-resumen"
+        aria-label="Resumen del reporte">
+    </section>
+
+
+    <section
+        class="fif-reportes-card"
+        aria-labelledby="fifTituloResultados">
+
+
+        <div class="fif-reportes-card-header">
+
+            <div>
+
+                <h2 id="fifTituloResultados">
+                    Cobertura FIFONAFE
+                </h2>
+
+
+                <p id="fifSubtituloResultados">
+
+                    Cobertura de solicitudes
+                    por proyecto y ámbito.
+
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="fif-reportes-herramientas">
+
+
+            <label
+                class="fif-reportes-campo fif-reportes-busqueda">
+
+                <span>
+                    Buscar en resultados
+                </span>
+
+
+                <div class="fif-reportes-input-icono">
+
+                    <i class="bi bi-search"></i>
+
+
+                    <input
+                        id="busquedaFifReportes"
+                        type="search"
+                        autocomplete="off"
+                        placeholder="Proyecto, ámbito, año...">
+
+                </div>
+
+            </label>
+
+
+            <button
+                id="btnExportarFifReportes"
+                class="fif-reportes-btn fif-reportes-btn-secundario"
+                type="button"
+                disabled>
+
+                <i class="bi bi-file-earmark-spreadsheet"></i>
+
+                Exportar CSV
+
+            </button>
+
+
+        </div>
+
+
+        <div class="fif-reportes-tabla-meta">
+
+
+            <span
+                id="totalFifReportes"
+                class="fif-reportes-total">
+
+                0 registro(s)
+
+            </span>
+
+
+            <label
+                class="fif-reportes-por-pagina"
+                for="porPaginaFifReportes">
+
+                Filas por página
+
+
+                <select id="porPaginaFifReportes">
+
+                    <option value="25">
+                        25
+                    </option>
+
+                    <option
+                        value="50"
+                        selected>
+                        50
+                    </option>
+
+                    <option value="100">
+                        100
+                    </option>
+
+                    <option value="200">
+                        200
+                    </option>
+
+                </select>
+
+            </label>
+
+
+        </div>
+
+
+        <div class="fif-reportes-tabla-wrap">
+
+            <table class="fif-reportes-tabla">
+
+                <thead id="theadFifReportes">
+                </thead>
+
+
+                <tbody id="tbodyFifReportes">
+
+                    <tr>
+
+                        <td class="fif-reportes-tabla-estado">
+
+                            Cargando reporte...
+
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <div class="fif-reportes-paginacion">
+
+
+            <button
+                id="btnAnteriorFifReportes"
+                class="fif-reportes-btn fif-reportes-btn-secundario"
+                type="button"
+                disabled>
+
+                <i class="bi bi-chevron-left"></i>
+
+                Anterior
+
+            </button>
+
+
+            <span id="paginaFifReportes">
+                Página 1 de 1
+            </span>
+
+
+            <button
+                id="btnSiguienteFifReportes"
+                class="fif-reportes-btn fif-reportes-btn-secundario"
+                type="button"
+                disabled>
+
+                Siguiente
+
+                <i class="bi bi-chevron-right"></i>
+
+            </button>
+
+
+        </div>
+
+
+    </section>
+
+
+</main>
+
+
+<footer class="footer">
+    SSALFER
+</footer>
+
+
+<script src="/js/env.js"></script>
+
+<script src="/js/config.js"></script>
+
+<script src="/js/api/cliente.js"></script>
+
+<script src="/js/api/auth.js"></script>
+
+<script src="/js/api/proyectos.js"></script>
+
+<script src="/js/api/reportes.js"></script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/reportesFifonafe.js"></script>
+
+
+</body>
+</html>

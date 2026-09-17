@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Gestión de Padrones | SSALFER</title>
+
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/padrones.css">
+
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =================================================
+                        ASIDE
+================================================== -->
+
+<aside class="aside">
+
+
+    <button class="btn-menu">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+
+    <nav class="barra">
+
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+
+        <div class="usuario-panel">
+
+
+            <button class="usuario-btn">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+
+        </div>
+
+
+    </nav>
+
+
+</aside>
+
+
+
+
+<!-- =================================================
+                        HEADER
+================================================== -->
+
+<header class="header">
+
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+
+</header>
+
+
+
+
+<!-- =================================================
+                    CONTENIDO PRINCIPAL
+================================================== -->
+
+<main
+    class="contenedor"
+    data-proyecto-nucleo-id="">
+
+
+
+    <!-- =================================================
+                        ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+
+        <div>
+
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Inicio
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Gestión de padrones
+                </span>
+
+            </div>
+
+
+
+            <span class="etiqueta">
+
+                PADRÓN AGRARIO
+
+            </span>
+
+
+
+            <h1>
+
+                Gestión de padrones
+
+            </h1>
+
+
+
+            <p class="subtitulo">
+
+                Consulta el historial de padrones registrados
+                y agrega nuevas actualizaciones del núcleo agrario.
+
+            </p>
+
+
+        </div>
+
+
+
+        <div class="acciones-header">
+
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnVolver">
+
+                <i class="bi bi-arrow-left"></i>
+
+                Volver
+
+            </button>
+
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnNuevoPadron">
+
+                <i class="bi bi-plus-lg"></i>
+
+                Nuevo padrón
+
+            </button>
+
+
+        </div>
+
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    INFORMACIÓN DEL NÚCLEO
+    ================================================== -->
+
+    <section class="bloque">
+
+
+        <div class="bloque-titulo">
+
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+
+                    01
+
+                </span>
+
+
+                <div>
+
+                    <h2>
+
+                        Núcleo agrario
+
+                    </h2>
+
+
+                    <p>
+
+                        Contexto al que pertenecen los padrones registrados.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+
+        <div class="datos-grid">
+
+
+            <div class="dato">
+
+                <span>
+                    Núcleo agrario
+                </span>
+
+                <strong id="nombreNucleo">
+
+                    —
+
+                </strong>
+
+            </div>
+
+
+
+            <div class="dato">
+
+                <span>
+                    Proyecto
+                </span>
+
+                <strong id="nombreProyecto">
+
+                    —
+
+                </strong>
+
+            </div>
+
+
+
+            <div class="dato">
+
+                <span>
+                    Total de padrones registrados
+                </span>
+
+                <strong id="totalPadrones">
+
+                    0
+
+                </strong>
+
+            </div>
+
+
+
+            <div class="dato">
+
+                <span>
+                    Padrón más reciente
+                </span>
+
+                <strong id="padronReciente">
+
+                    —
+
+                </strong>
+
+            </div>
+
+
+        </div>
+
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    HISTORIAL DE PADRONES
+================================================== -->
+
+    <section class="bloque">
+
+
+        <div class="bloque-titulo">
+
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+
+                    02
+
+                </span>
+
+
+                <div>
+
+                    <h2>
+
+                        Historial de padrones
+
+                    </h2>
+
+
+                    <p>
+
+                        Registros históricos asociados al núcleo agrario.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <span class="estado-secundario">
+
+                <span id="totalPadronesTabla">
+
+                    0
+
+                </span>
+
+                &nbsp;registros
+
+            </span>
+
+
+        </div>
+
+
+
+        <div class="tabla-contenedor">
+
+
+            <table>
+
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Identificador
+                        </th>
+
+                        <th>
+                            Fecha del padrón
+                        </th>
+
+                        <th>
+                            Ejidatarios / comuneros
+                        </th>
+
+                        <th>
+                            Fuente
+                        </th>
+
+                        <th>
+                            Documento
+                        </th>
+
+                        <th>
+                            Acción
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="padronesTabla">
+
+
+                    <tr>
+
+                        <td
+                            colspan="6"
+                            class="tabla-vacia">
+
+                            No hay padrones registrados.
+
+                        </td>
+
+                    </tr>
+
+
+                </tbody>
+
+
+            </table>
+
+
+        </div>
+
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    FORMULARIO NUEVO PADRÓN
+    ================================================== -->
+
+    <section
+        class="bloque formulario-bloque"
+        id="formularioPadron"
+        hidden>
+
+
+        <div class="bloque-titulo">
+
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+
+                    03
+
+                </span>
+
+
+                <div>
+
+                    <h2>
+
+                        Registrar nuevo padrón
+
+                    </h2>
+
+
+                    <p>
+
+                        Agrega una nueva versión del padrón
+                        al historial del núcleo.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+
+        <form
+            id="formPadron"
+            novalidate>
+
+
+            <div class="form-grid">
+
+
+                <!-- Fecha -->
+
+                <div class="campo">
+
+                    <label for="fechaPadron">
+
+                        Fecha del padrón
+
+                    </label>
+
+
+                    <input
+                        type="date"
+                        id="fechaPadron"
+                        name="fecha_padron">
+
+
+                    <small>
+
+                        Indica la fecha correspondiente al padrón,
+                        si se encuentra disponible.
+
+                    </small>
+
+                </div>
+
+
+
+                <!-- Cantidad -->
+
+                <div class="campo">
+
+                    <label for="numeroEjidatarios">
+
+                        Ejidatarios / comuneros
+
+                    </label>
+
+
+                    <input
+                        type="number"
+                        id="numeroEjidatarios"
+                        name="numero_ejidatarios_comuneros"
+                        min="0"
+                        step="1"
+                        placeholder="Ej. 125">
+
+
+                    <small>
+
+                        Cantidad registrada en el padrón.
+
+                    </small>
+
+                </div>
+
+
+
+                <!-- Fuente -->
+
+                <div class="campo campo-completo">
+
+                    <label for="fuente">
+
+                        Fuente
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="fuente"
+                        name="fuente"
+                        maxlength="250"
+                        placeholder="Ej. Documento proporcionado por la representación">
+
+                </div>
+
+
+
+                <!-- Documento -->
+
+                <div class="campo campo-completo">
+
+                    <label for="idDocumento">
+
+                        Documento asociado
+
+                    </label>
+
+
+                    <select
+                        id="idDocumento"
+                        name="id_documento">
+
+
+                        <option value="">
+
+                            Selecciona un documento
+
+                        </option>
+
+
+                        <!--
+                            Las opciones se cargarán posteriormente
+                            desde el catálogo/documentos disponibles.
+                        -->
+
+
+                    </select>
+
+
+                    <small>
+
+                        Opcional. Selecciona un documento que
+                        ya se encuentre registrado en el sistema.
+
+                    </small>
+
+                </div>
+
+
+            </div>
+
+
+
+
+            <!-- =================================================
+                            AVISO
+            ================================================== -->
+
+            <div class="aviso-identidad">
+
+                <i class="bi bi-info-circle"></i>
+
+
+                <p>
+
+                    Para registrar el padrón debes proporcionar
+                    al menos la fecha del padrón o la cantidad
+                    de ejidatarios y comuneros.
+
+                </p>
+
+            </div>
+
+
+
+
+            <!-- =================================================
+                            ACCIONES FORMULARIO
+            ================================================== -->
+
+            <div class="formulario-acciones">
+
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelarPadron">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Guardar padrón
+
+                </button>
+
+
+            </div>
+
+
+        </form>
+
+
+    </section>
+
+
+</main>
+
+
+
+
+<!-- =================================================
+                        FOOTER
+================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/padrones.js"></script>
+
+
+</body>
+
+</html>

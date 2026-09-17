@@ -1,0 +1,1910 @@
+:root {
+
+    --verde: #286B30;
+    --verde-oscuro: #17462c;
+    --verde-claro: #3F7C47;
+
+    --gris: #dedede;
+    --gris-claro: #eeecec;
+    --girs-oscuro: #A8A8A8;
+    --blanco: #ffffff;
+    --tarjeta: #f8f8f8;
+
+    --sombra: 0 3px 10px rgba(0, 0, 0, .20);
+
+}
+
+
+* {
+
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+
+    font-family: Arial, Helvetica, sans-serif;
+
+}
+
+
+html,
+body {
+
+    min-height: 100%;
+
+}
+
+
+body {
+
+    min-height: 100vh;
+
+    display: grid;
+
+    grid-template-columns: 280px 1fr;
+
+    grid-template-rows: 100px 1fr 40px;
+
+    grid-template-areas:
+
+        "aside header"
+
+        "aside contenedor"
+
+        "aside footer";
+
+    background-color: var(--blanco);
+
+    transition: grid-template-columns .3s ease;
+
+}
+
+
+/* =========================================================
+        ASIDE
+========================================================= */
+
+.aside {
+
+    grid-area: aside;
+
+    min-width: 0;
+
+    min-height: 100vh;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    padding: 20px 15px;
+
+    background:
+        linear-gradient(
+            to bottom,
+            var(--verde-claro),
+            var(--verde),
+            var(--verde-oscuro)
+        );
+
+    color: white;
+
+    box-shadow:
+        0 4px 10px rgba(107, 73, 40, 0.8);
+
+    transition:
+        width .3s ease,
+        padding .3s ease;
+
+    overflow: hidden;
+
+}
+
+
+/* =========================================================
+        BOTÓN DEL MENÚ
+========================================================= */
+
+.btn-menu {
+
+    align-self: flex-start;
+
+    border: none;
+
+    background: none;
+
+    color: white;
+
+    font-size: 25px;
+
+    cursor: pointer;
+
+}
+
+
+/* =========================================================
+        LOGO
+========================================================= */
+
+.logo-aside img {
+
+    width: 150px;
+
+    max-width: 100%;
+
+}
+
+
+/* =========================================================
+        BIENVENIDA
+========================================================= */
+
+.bienvenida {
+
+    text-align: center;
+
+    margin: 20px 0;
+
+}
+
+
+.bienvenida h3 {
+
+    font-size: 1.4rem;
+
+}
+
+
+.bienvenida span {
+
+    font-size: 1rem;
+
+}
+
+
+/* =========================================================
+        BARRA DE NAVEGACIÓN
+========================================================= */
+
+.barra {
+
+    width: 100%;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 25px;
+
+    flex: 1;
+
+}
+
+
+.barra a {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    padding: 10px;
+
+    border-radius: 8px;
+
+    color: white;
+
+    text-decoration: none;
+
+    transition: .2s;
+
+}
+
+
+.barra a:hover {
+
+    background: white;
+
+    color: var(--verde);
+
+    transform: translateY(-3px);
+
+}
+
+
+.barra .activo {
+
+    background: white;
+
+    color: var(--verde);
+
+}
+
+
+.proyectos {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+
+}
+
+
+.proyectos h4 {
+
+    font-size: 1rem;
+
+}
+
+
+.proyectos-lista-dinamica {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+
+}
+
+
+.proyectos-lista-vacia {
+
+    font-size: 0.85rem;
+
+    opacity: 0.7;
+
+    padding: 4px 8px;
+
+}
+
+
+.lista-proyectos-dashboard {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 25px;
+
+}
+
+
+.dashboard-acciones {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+}
+
+
+.dashboard-acciones .btn-secundario {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 8px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    padding: 9px 15px;
+
+    cursor: pointer;
+
+    transition: .2s;
+
+    text-decoration: none;
+
+    background: #eeeeee;
+
+    color: #555;
+
+}
+
+
+.dashboard-acciones .btn-secundario:hover {
+
+    background: #dddddd;
+
+}
+
+
+.mensaje-error {
+
+    color: #b3261e;
+
+    background: #fdecea;
+
+    border: 1px solid #f3c0bb;
+
+    border-radius: 8px;
+
+    padding: 10px 14px;
+
+    font-size: 0.85rem;
+
+    margin: 0 0 16px;
+
+}
+
+
+/* =========================================================
+        PANEL DE USUARIO
+========================================================= */
+
+.usuario-panel {
+
+    margin-top: auto;
+
+    width: 100%;
+
+}
+
+
+.usuario-btn {
+
+    width: 100%;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 10px;
+
+    background: none;
+
+    border: none;
+
+    color: white;
+
+    cursor: pointer;
+
+    font-size: 1rem;
+
+}
+
+
+.opciones-usuario {
+
+    display: none;
+
+    margin-top: 15px;
+
+}
+
+
+.opciones-usuario a {
+
+    font-size: .9rem;
+
+}
+
+
+.opciones-usuario.mostrar {
+
+    display: block;
+
+}
+
+
+/* =========================================================
+        HEADER
+========================================================= */
+
+.header {
+
+    grid-area: header;
+
+    min-width: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding: 15px 40px;
+
+    background-color: var(--gris);
+
+    box-shadow: inset var(--sombra);
+
+}
+
+
+.logo-ssalfer {
+
+    display: flex;
+
+    flex-direction: column;
+
+}
+
+
+.logo-ssalfer img:first-child {
+
+    width: 250px;
+
+}
+
+
+.logo-ssalfer img:last-child {
+
+    width: 250px;
+
+}
+
+
+.logo-pa img {
+
+    width: 75px;
+    height: auto;
+    transition: .2s;
+
+}
+
+
+.logo-pa img:hover {
+
+    transform: scale(1.05);
+
+}
+
+
+/* =========================================================
+        MAIN
+========================================================= */
+
+.contenedor {
+
+    grid-area: contenedor;
+
+    min-width: 0;
+
+    padding: 25px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 25px;
+
+    overflow-y: auto;
+
+}
+
+
+/* =========================================================
+        TARJETAS
+========================================================= */
+
+.tarjeta {
+
+    width: 100%;
+
+    background: var(--gris-claro);
+
+    border-radius: 12px;
+
+    box-shadow: var(--sombra);
+
+    padding: 25px;
+
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease;
+
+}
+
+
+.tarjeta:hover {
+
+    transform: translateY(-5px);
+
+    box-shadow:
+        0 6px 15px rgba(0, 0, 0, .22);
+
+}
+
+
+.tarjeta a {
+
+    display: block;
+
+    width: 100%;
+
+    text-decoration: none;
+
+    color: #555;
+
+}
+
+
+.tarjeta h3 {
+
+    text-align: center;
+
+    color: var(--verde);
+
+    font-size: 1.7rem;
+
+    margin-bottom: 25px;
+
+}
+
+
+/* =========================================================
+        RESUMEN DE LA TARJETA
+========================================================= */
+
+.resumen {
+
+    width: 100%;
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(6, minmax(0, 1fr));
+
+    gap: 20px;
+
+}
+
+
+.resumen div {
+
+    min-width: 0;
+
+    text-align: center;
+
+    display: flex;
+
+    flex-direction: column;
+
+    justify-content: flex-start;
+
+    align-items: center;
+
+    padding: 5px;
+
+}
+
+
+.resumen strong {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 100%;
+
+    min-height: 45px;
+
+    font-size: .95rem;
+
+    line-height: 1.25;
+
+    color: #555;
+
+}
+
+
+.resumen p {
+
+    margin-top: 10px;
+
+    font-size: 1.5rem;
+
+    font-weight: bold;
+
+    color: var(--verde);
+
+    line-height: 1.2;
+
+}
+
+
+/* =========================================================
+        ENCABEZADO DEL PROYECTO
+========================================================= */
+
+.proyecto-header {
+
+    width: 100%;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    margin-bottom: 0;
+
+}
+
+
+.proyecto-header h1 {
+
+    color: #111;
+
+    font-size: 2rem;
+
+    margin-bottom: 2px;
+
+}
+
+
+.proyecto-header p {
+
+    color: #111;
+
+    font-size: 1rem;
+
+}
+
+
+.proyecto-header strong {
+
+    font-weight: bold;
+
+}
+
+
+/* =========================================================
+        TARJETAS DEL PROYECTO
+========================================================= */
+
+.tarjetas-proyecto {
+
+    width: 100%;
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 5px;
+
+}
+
+
+/* =========================================================
+        TARJETA INDIVIDUAL DEL PROYECTO
+========================================================= */
+
+.tarjetas-proyecto .tarjeta {
+
+    min-width: 0;
+
+    min-height: 145px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    justify-content: center;
+
+    align-items: center;
+
+    text-align: center;
+
+}
+
+
+.tarjetas-proyecto .tarjeta h3 {
+
+    margin-bottom: 18px;
+
+    font-size: 1.7rem;
+
+}
+
+
+.tarjetas-proyecto .tarjeta p {
+
+    margin: 0;
+
+    color: var(--verde);
+
+    font-size: 2rem;
+
+    font-weight: bold;
+
+}
+
+
+.tarjetas-proyecto .tarjeta small {
+
+    display: block;
+
+    margin-top: 8px;
+
+    color: #555;
+
+    font-size: .9rem;
+
+}
+
+
+/* =========================================================
+        ENLACES DE LAS TARJETAS
+========================================================= */
+
+.tarjetas-proyecto .tarjeta a {
+
+    height: 100%;
+
+    display: flex;
+
+    flex-direction: column;
+
+    justify-content: center;
+
+    align-items: center;
+
+    text-align: center;
+
+}
+
+
+/* =========================================================
+        EXPANSIÓN AL COLAPSAR EL ASIDE
+========================================================= */
+
+body:has(.aside.collapsed) .tarjetas-proyecto {
+
+    gap: 25px;
+
+}
+
+
+body:has(.aside.collapsed) .tarjetas-proyecto .tarjeta {
+
+    min-height: 180px;
+
+    padding: 30px;
+
+}
+
+
+body:has(.aside.collapsed) .tarjetas-proyecto .tarjeta h3 {
+
+    font-size: 2rem;
+
+}
+
+
+body:has(.aside.collapsed) .tarjetas-proyecto .tarjeta p {
+
+    font-size: 2.5rem;
+
+}
+
+
+body:has(.aside.collapsed) .tarjetas-proyecto .tarjeta small {
+
+    font-size: 1rem;
+
+}
+
+
+/* =========================================================
+        RESPONSIVE
+========================================================= */
+
+@media (max-width: 900px) {
+
+    .tarjetas-proyecto {
+
+        grid-template-columns: 1fr;
+
+    }
+
+}
+
+
+@media (max-width: 650px) {
+
+    .proyecto-header h1 {
+
+        font-size: 1.6rem;
+
+    }
+
+
+    .tarjetas-proyecto {
+
+        grid-template-columns: 1fr;
+
+        gap: 15px;
+
+    }
+
+
+    .tarjetas-proyecto .tarjeta {
+
+        min-height: 140px;
+
+    }
+
+}
+
+
+/* =========================================================
+        FOOTER
+========================================================= */
+
+.footer {
+
+    grid-area: footer;
+
+    min-width: 0;
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    align-items: center;
+
+    padding-right: 25px;
+
+    background: var(--gris);
+
+    font-size: .85rem;
+
+    box-shadow: inset var(--sombra);
+
+}
+
+
+/* =========================================================
+        SIDEBAR CERRADO
+========================================================= */
+
+.aside.collapsed {
+
+    width: 90px;
+
+    padding-left: 10px;
+
+    padding-right: 10px;
+
+}
+
+
+.aside.collapsed span,
+.aside.collapsed h3,
+.aside.collapsed h4 {
+
+    display: none;
+
+}
+
+
+.aside.collapsed .barra a {
+
+    justify-content: center;
+
+}
+
+
+.aside.collapsed .logo-aside img {
+
+    width: 55px;
+
+}
+
+
+.aside.collapsed .bienvenida {
+
+    display: none;
+
+}
+
+
+.aside.collapsed .usuario-btn {
+
+    justify-content: center;
+
+}
+
+
+/* =========================================================
+        EXPANSIÓN DEL CONTENIDO AL COLAPSAR ASIDE
+========================================================= */
+
+body:has(.aside.collapsed) {
+
+    grid-template-columns: 90px 1fr;
+
+}
+
+
+body:has(.aside.collapsed) .contenedor {
+
+    padding-left: 30px;
+
+    padding-right: 30px;
+
+}
+
+
+body:has(.aside.collapsed) .tarjeta {
+
+    padding: 30px;
+
+}
+
+
+body:has(.aside.collapsed) .tarjeta h3 {
+
+    font-size: 1.9rem;
+
+}
+
+
+body:has(.aside.collapsed) .resumen {
+
+    gap: 30px;
+
+}
+
+
+body:has(.aside.collapsed) .resumen strong {
+
+    font-size: 1rem;
+
+}
+
+
+body:has(.aside.collapsed) .resumen p {
+
+    font-size: 1.8rem;
+
+}
+
+
+/* =========================================================
+        RESPONSIVE
+========================================================= */
+
+@media (max-width: 1200px) {
+
+    .resumen {
+
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+
+    }
+
+}
+
+
+@media (max-width: 1000px) {
+
+    body {
+
+        grid-template-columns: 90px 1fr;
+
+    }
+
+
+    .aside {
+
+        width: 90px;
+
+    }
+
+
+    .aside span,
+    .aside h3,
+    .aside h4 {
+
+        display: none;
+
+    }
+
+
+    .aside .barra a {
+
+        justify-content: center;
+
+    }
+
+
+    .aside .logo-aside img {
+
+        width: 55px;
+
+    }
+
+
+    .aside .bienvenida {
+
+        display: none;
+
+    }
+
+
+    .resumen {
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+    }
+
+
+    .tarjeta {
+
+        padding: 20px;
+
+    }
+
+}
+
+
+@media (max-width: 650px) {
+
+    body {
+
+        display: block;
+
+    }
+
+
+    .aside {
+
+        position: fixed;
+
+        z-index: 1000;
+
+        width: 100%;
+
+        min-height: auto;
+
+        height: auto;
+
+    }
+
+
+    .header {
+
+        margin-top: 100px;
+
+    }
+
+
+    .contenedor {
+
+        padding: 15px;
+
+    }
+
+
+    .resumen {
+
+        grid-template-columns: 1fr;
+
+        gap: 15px;
+
+    }
+
+
+    .tarjeta {
+
+        padding: 20px;
+
+    }
+
+
+    .tarjeta h3 {
+
+        font-size: 1.4rem;
+
+    }
+
+
+    .resumen p {
+
+        font-size: 1.4rem;
+
+    }
+
+
+    .footer {
+
+        position: static;
+
+        padding: 10px;
+
+        justify-content: center;
+
+        text-align: center;
+
+    }
+
+}
+
+
+
+
+/* =========================================================
+        NÚCLEOS AGRARIOS
+========================================================= */
+
+.seccion-nucleos {
+
+    margin-top: 25px;
+
+}
+
+
+.seccion-nucleos-header {
+
+    margin-bottom: 22px;
+
+}
+
+
+.etiqueta-nucleos {
+
+    color: var(--verde);
+
+    font-size: .75rem;
+
+    font-weight: bold;
+
+    letter-spacing: 1.5px;
+
+    margin-bottom: 5px;
+
+}
+
+
+.seccion-nucleos h2 {
+
+    color: var(--verde);
+
+    font-size: 1.6rem;
+
+    margin-bottom: 6px;
+
+}
+
+
+.seccion-nucleos-header p:last-child {
+
+    color: #777;
+
+    font-size: .9rem;
+
+}
+
+
+.nucleos-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 15px;
+
+}
+
+
+.tarjeta-nucleo {
+
+    display: grid;
+
+    grid-template-columns:
+        auto minmax(0, 1fr) auto;
+
+    align-items: center;
+
+    gap: 15px;
+
+    padding: 18px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 10px;
+
+    background: white;
+
+    color: #444;
+
+    text-decoration: none;
+
+    transition: .2s;
+
+}
+
+
+.tarjeta-nucleo:hover {
+
+    border-color: var(--verde);
+
+    transform: translateY(-3px);
+
+    box-shadow: var(--sombra);
+
+}
+
+
+.nucleo-icono {
+
+    width: 48px;
+
+    height: 48px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border-radius: 8px;
+
+    background: #e7f0e8;
+
+    color: var(--verde);
+
+    font-size: 1.3rem;
+
+}
+
+
+.nucleo-info {
+
+    min-width: 0;
+
+}
+
+
+.nucleo-info span {
+
+    display: block;
+
+    color: #888;
+
+    font-size: .75rem;
+
+    margin-bottom: 3px;
+
+}
+
+
+.nucleo-info h3 {
+
+    color: #333;
+
+    font-size: 1rem;
+
+    margin-bottom: 4px;
+
+}
+
+
+.nucleo-info p {
+
+    color: #777;
+
+    font-size: .82rem;
+
+}
+
+
+.nucleo-resumen {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+
+    text-align: right;
+
+}
+
+
+.nucleo-resumen span {
+
+    color: var(--verde);
+
+    font-size: .78rem;
+
+    font-weight: bold;
+
+}
+
+
+.nucleo-flecha {
+
+    color: #999;
+
+    font-size: 1rem;
+
+}
+
+
+/* =========================================================
+        DASHBOARD - TARJETAS CON GRÁFICAS CIRCULARES
+========================================================= */
+
+.lista-proyectos-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+
+/* Tarjeta principal por proyecto */
+
+.tarjeta-dashboard-proyecto {
+    width: 100%;
+
+    padding: 22px 24px;
+
+    background: #ffffff;
+
+    border-radius: 10px;
+
+    box-shadow:
+        0 4px 10px
+        rgba(0, 0, 0, .14);
+
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease;
+}
+
+
+.tarjeta-dashboard-proyecto:hover {
+    transform: translateY(-3px);
+
+    box-shadow:
+        0 7px 18px
+        rgba(0, 0, 0, .17);
+}
+
+
+.tarjeta-dashboard-proyecto > a {
+    display: block;
+
+    color: inherit;
+
+    text-decoration: none;
+}
+
+
+/* =========================================================
+        NOMBRE DEL PROYECTO
+========================================================= */
+
+.dashboard-proyecto-titulo {
+    margin: 0 0 20px;
+
+    color: #064b16;
+
+    font-size: 1.7rem;
+    font-weight: 800;
+
+    text-align: center;
+}
+
+
+/* =========================================================
+        CONTENIDO DE LA TARJETA
+========================================================= */
+
+.dashboard-proyecto-contenido {
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(180px, 1fr))
+        minmax(170px, .85fr);
+
+    align-items: center;
+
+    gap: 24px;
+}
+
+
+/* =========================================================
+        BLOQUE DE INDICADOR
+========================================================= */
+
+.dashboard-indicador {
+    min-width: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+}
+
+
+.dashboard-indicador-datos {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 7px;
+}
+
+
+.dashboard-indicador-titulo {
+    color: #666;
+
+    font-size: .86rem;
+    font-weight: 400;
+
+    line-height: 1.2;
+}
+
+
+.dashboard-indicador-secundario {
+    color: #747474;
+
+    font-size: .8rem;
+
+    line-height: 1.25;
+}
+
+
+.dashboard-indicador-secundario strong {
+    margin-left: 4px;
+
+    color: #07501a;
+
+    font-size: .96rem;
+}
+
+
+/* =========================================================
+        GRÁFICA TIPO DONA
+========================================================= */
+
+.dashboard-dona {
+    /*
+        --porcentaje se establece desde JS:
+
+        style="--porcentaje: 79"
+
+        --color-grafica puede cambiar
+        por cada indicador.
+    */
+
+    --porcentaje: 0;
+    --color-grafica: #006b35;
+    --color-restante: #d9efe5;
+
+    position: relative;
+
+    width: 78px;
+    height: 78px;
+
+    flex: 0 0 78px;
+
+    display: grid;
+
+    place-items: center;
+
+    border-radius: 50%;
+
+    background:
+        conic-gradient(
+            var(--color-grafica)
+                calc(var(--porcentaje) * 1%),
+
+            var(--color-restante) 0
+        );
+}
+
+
+/*
+    Centro blanco para convertir
+    el pastel en una dona.
+*/
+
+.dashboard-dona::before {
+    content: "";
+
+    position: absolute;
+
+    width: 62px;
+    height: 62px;
+
+    border-radius: 50%;
+
+    background: #ffffff;
+}
+
+
+/*
+    Valor que aparece en el centro.
+*/
+
+.dashboard-dona-valor {
+    position: relative;
+
+    z-index: 1;
+
+    color: #111;
+
+    font-size: 1.15rem;
+    font-weight: 800;
+
+    line-height: 1;
+}
+
+
+/* =========================================================
+        VARIANTES DE COLOR
+========================================================= */
+
+.dashboard-dona-verde {
+    --color-grafica: #006b35;
+    --color-restante: #d5eee2;
+}
+
+
+.dashboard-dona-amarilla {
+    --color-grafica: #c98b00;
+    --color-restante: #ffe4a7;
+}
+
+
+.dashboard-dona-azul {
+    --color-grafica: #002b59;
+    --color-restante: #cdeafb;
+}
+
+
+/* =========================================================
+        INFORMACIÓN GENERAL DEL PROYECTO
+========================================================= */
+
+.dashboard-proyecto-detalles {
+    grid-column: 1 / -1;
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 8px 28px;
+
+    padding-top: 14px;
+
+    border-top: 1px solid #ebeeee;
+}
+
+
+.dashboard-proyecto-detalles span {
+    color: #737373;
+
+    font-size: .8rem;
+}
+
+
+.dashboard-proyecto-detalles strong {
+    margin-left: 4px;
+
+    color: #07501a;
+
+    font-size: .9rem;
+}
+
+
+/* =========================================================
+        FECHA / CORTE
+========================================================= */
+
+.dashboard-corte {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 12px;
+}
+
+
+.dashboard-corte-icono {
+    width: 76px;
+    height: 76px;
+
+    flex: 0 0 76px;
+
+    display: grid;
+
+    place-items: center;
+
+    border-radius: 50%;
+
+    background: #d9f2e8;
+
+    color: #006b35;
+
+    font-size: 2rem;
+}
+
+
+.dashboard-corte-texto {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 3px;
+}
+
+
+.dashboard-corte-texto span {
+    color: #777;
+
+    font-size: .85rem;
+}
+
+
+.dashboard-corte-texto strong {
+    color: #064b16;
+
+    font-size: 1rem;
+
+    line-height: 1.25;
+}
+
+
+/* =========================================================
+        ESTADO SIN PORCENTAJE
+========================================================= */
+
+.dashboard-dona-sin-dato {
+    --porcentaje: 0;
+
+    --color-grafica: #d8dddd;
+    --color-restante: #d8dddd;
+}
+
+
+.dashboard-dona-sin-dato
+.dashboard-dona-valor {
+    color: #777;
+
+    font-size: .82rem;
+}
+
+
+/* =========================================================
+        RESPONSIVE
+========================================================= */
+
+@media (max-width: 1250px) {
+
+    .dashboard-proyecto-contenido {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(220px, 1fr)
+            );
+    }
+
+
+    .dashboard-corte {
+        justify-content: flex-start;
+    }
+
+}
+
+
+@media (max-width: 700px) {
+
+    .tarjeta-dashboard-proyecto {
+        padding: 20px 16px;
+    }
+
+
+    .dashboard-proyecto-contenido {
+        grid-template-columns: 1fr;
+
+        gap: 20px;
+    }
+
+
+    .dashboard-indicador {
+        justify-content: flex-start;
+    }
+
+
+    .dashboard-proyecto-titulo {
+        font-size: 1.35rem;
+    }
+
+
+    .dashboard-proyecto-detalles {
+        flex-direction: column;
+
+        gap: 7px;
+    }
+
+}
+
+
+/* =========================================================
+        NÚCLEOS AL COLAPSAR ASIDE
+========================================================= */
+
+body:has(.aside.collapsed) .nucleos-grid {
+
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+}
+
+
+body:has(.aside.collapsed) .tarjeta-nucleo {
+
+    padding: 22px;
+
+}
+
+
+body:has(.aside.collapsed) .nucleo-info h3 {
+
+    font-size: 1.1rem;
+
+}
+
+
+/* =========================================================
+        RESPONSIVE
+========================================================= */
+
+@media (max-width: 900px) {
+
+    .nucleos-grid {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    body:has(.aside.collapsed) .nucleos-grid {
+
+        grid-template-columns: 1fr;
+
+    }
+
+}
+
+
+@media (max-width: 650px) {
+
+    .tarjeta-nucleo {
+
+        grid-template-columns:
+            auto minmax(0, 1fr) auto;
+
+    }
+
+
+    .nucleo-resumen {
+
+        display: none;
+
+    }
+
+}
+
+
+
+
+
+/* =====================================================
+            AVANCE DEL PROYECTO - DASHBOARD
+===================================================== */
+
+.dashboard-proyecto-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 20px;
+}
+
+.dashboard-proyecto-cabecera h3 {
+    margin-bottom: 4px;
+}
+
+.dashboard-proyecto-clave {
+    margin: 0;
+    opacity: 0.7;
+}
+
+.dashboard-avance {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.dashboard-avance small {
+    font-weight: 600;
+    text-align: center;
+}
+
+.dashboard-dona {
+    --porcentaje: 0;
+
+    width: 92px;
+    height: 92px;
+
+    position: relative;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 50%;
+
+    background:
+        conic-gradient(
+            #237436 calc(var(--porcentaje) * 1%),
+            #e4e7e5 0
+        );
+}
+
+.dashboard-dona::before {
+    content: "";
+
+    position: absolute;
+    inset: 11px;
+
+    border-radius: 50%;
+
+    background: #ffffff;
+}
+
+.dashboard-dona-valor {
+    position: relative;
+    z-index: 1;
+
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.dashboard-dona-sin-dato {
+    background: #e4e7e5;
+}
+
+@media (max-width: 650px) {
+
+    .dashboard-proyecto-cabecera {
+        align-items: flex-start;
+    }
+
+    .dashboard-dona {
+        width: 76px;
+        height: 76px;
+    }
+
+    .dashboard-dona::before {
+        inset: 9px;
+    }
+}

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Estado Financiero</title>
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+    <link rel="stylesheet" href="/styles/estadoFinanciero.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+    >
+
+    <link
+        rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png"
+    >
+
+</head>
+
+
+<body>
+
+
+    <!-- =====================================================
+                            ASIDE
+    ====================================================== -->
+
+    <aside class="aside">
+
+        <button
+            class="btn-menu"
+            id="btnMenu"
+            type="button"
+            aria-label="Contraer menú"
+        >
+            <i class="bi bi-list"></i>
+        </button>
+
+
+        <div class="logo-aside">
+
+            <img
+                src="/img/LOGOS VERDE/IMAGOTIPO.png"
+                alt="Logo SSALFER"
+            >
+
+        </div>
+
+
+        <div class="bienvenida">
+
+            <h3>Bienvenido</h3>
+
+            <span class="js-usuario-nombre">Nombre usuario</span>
+
+        </div>
+
+
+        <nav class="barra">
+
+            <a href="/dashboard.html">
+
+                <i class="bi bi-grid"></i>
+
+                <span>Todos los proyectos</span>
+
+            </a>
+
+
+            <div class="proyectos">
+
+                <h4>
+                    <span>Proyectos</span>
+                </h4>
+
+
+                <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+            </div>
+
+
+            <a href="#">
+
+                <i class="bi bi-map"></i>
+
+                <span>Ver mapa</span>
+
+            </a>
+
+        </nav>
+
+
+        <!-- =================================================
+                        USUARIO
+        ================================================== -->
+
+        <div class="usuario-panel">
+
+            <button
+                class="usuario-btn"
+                id="usuarioBtn"
+                type="button"
+            >
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+                <i
+                    class="bi bi-chevron-down"
+                    id="usuarioIcon"
+                ></i>
+
+            </button>
+
+
+            <ul
+                class="opciones-usuario"
+                id="opcionesUsuario"
+            >
+
+                <li>
+
+                    <a href="#">
+
+                        <i class="bi bi-lock"></i>
+
+                        <span>Cambiar contraseña</span>
+
+                    </a>
+
+                </li>
+
+
+                <li>
+
+                    <a href="#">
+
+                        <i class="bi bi-box-arrow-left"></i>
+
+                        <span>Cerrar sesión</span>
+
+                    </a>
+
+                </li>
+
+            </ul>
+
+        </div>
+
+    </aside>
+
+
+
+    <!-- =====================================================
+                            HEADER
+    ====================================================== -->
+
+    <header class="header">
+
+        <div class="logo-ssalfer">
+
+            <img
+                src="/img/LOGOS VERDE/SSALFER.png"
+                alt="SSALFER"
+            >
+
+            <img
+                src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+                alt="Sistema SSALFER"
+            >
+
+        </div>
+
+
+        <div class="logo-pa">
+
+            <a
+                href="https://www.gob.mx/pa"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Procuraduría Agraria"
+            >
+
+                <img
+                    src="/img/LOGOS VERDE/palogo-2.png"
+                    alt="Procuraduría Agraria"
+                >
+
+            </a>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- =====================================================
+                            MAIN
+    ====================================================== -->
+
+    <main class="contenedor-financiero">
+
+
+        <div id="mensajeError" class="mensaje-error" hidden></div>
+
+
+        <!-- =================================================
+                        ENCABEZADO
+        ================================================== -->
+
+        <section class="encabezado-financiero">
+
+            <div>
+
+                <div class="migas">
+                    <a href="/dashboard.html">Proyectos</a>
+                    <i class="bi bi-chevron-right"></i>
+                    <a id="enlaceProyecto" href="/dashboard.html">Proyecto</a>
+                    <i class="bi bi-chevron-right"></i>
+                    <span>Estado financiero</span>
+                </div>
+
+                <h1 id="nombreProyectoTitulo">Estado financiero</h1>
+
+                <p>
+                    Reporte generado el <strong id="fechaGeneracion">—</strong>
+                    a partir de los indicadores registrados en el sistema.
+                </p>
+
+            </div>
+
+            <a id="btnExportarCsv" class="btn-secundario" href="#">
+                <i class="bi bi-download"></i>
+                Exportar CSV de este proyecto
+            </a>
+
+        </section>
+
+
+
+        <!-- =================================================
+                        KPIs
+        ================================================== -->
+
+        <section class="resumen-financiero" id="tarjetasKpi">
+
+            <div class="tarjeta">
+                <h3>Convenios registrados</h3>
+                <p id="kpiConvenios">—</p>
+                <small>Cantidad reportada en el periodo más reciente</small>
+            </div>
+
+            <div class="tarjeta">
+                <h3>Valor declarado en convenios</h3>
+                <p id="kpiValorConvenios">—</p>
+                <small>Suma de valores declarados por convenio</small>
+            </div>
+
+            <div class="tarjeta">
+                <h3>Indemnizaciones</h3>
+                <p id="kpiIndemnizaciones">—</p>
+                <small>Realizadas sobre lo programado</small>
+            </div>
+
+            <div class="tarjeta">
+                <h3>Pagos registrados</h3>
+                <p id="kpiPagos">—</p>
+                <small>Monto acumulado de pagos</small>
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    AVANCE DE PERIODO
+        ================================================== -->
+
+        <section class="tarjeta seccion-tabla">
+
+            <h2>Avance de periodo</h2>
+            <p>Programado vs. realizado por indicador, según <code>/reportes/avance-periodo</code>.</p>
+
+            <div class="tabla-contenedor">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Indicador</th>
+                            <th>Ámbito</th>
+                            <th>Año</th>
+                            <th>Mes</th>
+                            <th>Trimestre</th>
+                            <th>Programado</th>
+                            <th>Realizado</th>
+                            <th>Superficie (ha)</th>
+                            <th>Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaAvancePeriodo">
+                        <tr><td colspan="9">Cargando…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                VALORES DECLARADOS DE CONVENIOS
+        ================================================== -->
+
+        <section class="tarjeta seccion-tabla">
+
+            <h2>Valores declarados de convenios</h2>
+            <p>Según <code>/reportes/convenios/valores-declarados</code>.</p>
+
+            <div class="tabla-contenedor">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Convenio</th>
+                            <th>Concepto</th>
+                            <th>Tipo de convenio</th>
+                            <th>Valor declarado</th>
+                            <th>Fecha del instrumento</th>
+                            <th>Firma acreditada</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaValoresDeclarados">
+                        <tr><td colspan="6">Cargando…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                COBERTURA DE IMPACTOS DE CONVENIOS
+        ================================================== -->
+
+        <section class="tarjeta seccion-tabla">
+
+            <h2>Cobertura de impactos de convenios</h2>
+            <p>Según <code>/reportes/convenios/cobertura-impactos</code>.</p>
+
+            <div class="tabla-contenedor">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ámbito</th>
+                            <th>Concepto</th>
+                            <th>Universo</th>
+                            <th>Clasificados</th>
+                            <th>Pendientes</th>
+                            <th>Sin firma acreditada</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaCoberturaImpactos">
+                        <tr><td colspan="6">Cargando…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                    FIFONAFE — COBERTURA
+        ================================================== -->
+
+        <section class="tarjeta seccion-tabla">
+
+            <h2>FIFONAFE — cobertura</h2>
+            <p>Según <code>/reportes/fifonafe/cobertura</code>.</p>
+
+            <div class="tabla-contenedor">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ámbito</th>
+                            <th>Universo de solicitudes</th>
+                            <th>Recibidas/acreditadas</th>
+                            <th>Consulta sin ciclo</th>
+                            <th>Respuestas sin soporte</th>
+                            <th>Actuaciones sin soporte</th>
+                            <th>Completos</th>
+                            <th>Pendientes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaFifonafeCobertura">
+                        <tr><td colspan="8">Cargando…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+
+    </main>
+
+
+
+    <!-- =====================================================
+                            FOOTER
+    ====================================================== -->
+
+    <footer class="footer">
+
+        <p>
+
+            &copy; 2026 Procuraduría Agraria.
+            Todos los derechos reservados.
+
+        </p>
+
+    </footer>
+
+
+
+    <script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+    <script src="/js/estadoFinanciero.js"></script>
+
+
+</body>
+
+</html>

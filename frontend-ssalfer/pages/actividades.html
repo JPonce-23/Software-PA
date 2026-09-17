@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Actividades de campo | SSALFER</title>
+
+
+    <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/actividades.css">
+
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+
+    <link rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+</head>
+
+
+<body>
+
+
+<!-- =================================================
+                        ASIDE
+================================================== -->
+
+<aside class="aside">
+
+
+    <button class="btn-menu">
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">Usuario</span>
+
+    </div>
+
+
+
+    <nav class="barra">
+
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+
+            <div class="proyectos-lista-dinamica" id="proyectosLista"></div>
+
+        </div>
+
+
+
+        <a href="#">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+
+        <div class="usuario-panel">
+
+
+            <button class="usuario-btn">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">Nombre usuario</span>
+
+            </button>
+
+
+
+            <div class="opciones-usuario">
+
+                <a href="#">
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a href="#">
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+            </div>
+
+
+        </div>
+
+
+    </nav>
+
+
+</aside>
+
+
+
+
+<!-- =================================================
+                        HEADER
+================================================== -->
+
+<header class="header">
+
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank">
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+
+</header>
+
+
+
+
+<!-- =================================================
+                    CONTENIDO PRINCIPAL
+================================================== -->
+
+<main
+    class="contenedor"
+    data-proyecto-nucleo-id="">
+
+
+
+    <!-- =================================================
+                        ENCABEZADO
+    ================================================== -->
+
+    <section class="pagina-header">
+
+
+        <div>
+
+
+            <div class="migas">
+
+                <a href="/dashboard.html">
+                    Inicio
+                </a>
+
+                <i class="bi bi-chevron-right"></i>
+
+                <span>
+                    Actividades de campo
+                </span>
+
+            </div>
+
+
+
+            <span class="etiqueta">
+
+                SEGUIMIENTO EN CAMPO
+
+            </span>
+
+
+
+            <h1>
+
+                Actividades de campo
+
+            </h1>
+
+
+
+            <p class="subtitulo">
+
+                Registra y consulta las actividades realizadas
+                durante el seguimiento del núcleo agrario.
+
+            </p>
+
+
+        </div>
+
+
+
+        <div class="acciones-header">
+
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnVolver">
+
+                <i class="bi bi-arrow-left"></i>
+
+                Volver
+
+            </button>
+
+
+            <button
+                type="button"
+                class="btn-principal"
+                id="btnNuevaActividad">
+
+                <i class="bi bi-plus-lg"></i>
+
+                Nueva actividad
+
+            </button>
+
+
+        </div>
+
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    RESUMEN
+    ================================================== -->
+
+    <section class="bloque">
+
+
+        <div class="bloque-titulo">
+
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+
+                    01
+
+                </span>
+
+
+                <div>
+
+                    <h2>
+
+                        Resumen de actividades
+
+                    </h2>
+
+
+                    <p>
+
+                        Vista general de las actividades registradas
+                        para este núcleo.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+
+        <div class="datos-grid">
+
+
+            <div class="dato">
+
+                <span>
+                    Total de actividades
+                </span>
+
+                <strong id="totalActividades">
+
+                    0
+
+                </strong>
+
+            </div>
+
+
+
+            <div class="dato">
+
+                <span>
+                    Sensibilizaciones
+                </span>
+
+                <strong id="totalSensibilizaciones">
+
+                    0
+
+                </strong>
+
+            </div>
+
+
+
+            <div class="dato">
+
+                <span>
+                    Caminamientos
+                </span>
+
+                <strong id="totalCaminamientos">
+
+                    0
+
+                </strong>
+
+            </div>
+
+
+
+            <div class="dato">
+
+                <span>
+                    Última actividad
+                </span>
+
+                <strong id="ultimaActividad">
+
+                    —
+
+                </strong>
+
+            </div>
+
+
+        </div>
+
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    FILTROS
+    ================================================== -->
+
+    <section class="bloque filtros-bloque">
+
+
+        <div class="bloque-titulo">
+
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+
+                    02
+
+                </span>
+
+
+                <div>
+
+                    <h2>
+
+                        Actividades registradas
+
+                    </h2>
+
+
+                    <p>
+
+                        Consulta las actividades de campo
+                        registradas para el núcleo.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+
+        <div class="filtros">
+
+
+            <div class="campo">
+
+                <label for="filtroTipo">
+
+                    Tipo de actividad
+
+                </label>
+
+
+                <select id="filtroTipo">
+
+
+                    <option value="">
+
+                        Todas las actividades
+
+                    </option>
+
+
+                    <option value="sensibilizacion">
+
+                        Sensibilización
+
+                    </option>
+
+
+                    <option value="caminamiento">
+
+                        Caminamiento
+
+                    </option>
+
+
+                </select>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="btn-secundario"
+                id="btnLimpiarFiltro">
+
+                <i class="bi bi-x-lg"></i>
+
+                Limpiar filtro
+
+            </button>
+
+
+        </div>
+
+
+        <div class="tabla-contenedor">
+
+
+            <table>
+
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Fecha
+                        </th>
+
+                        <th>
+                            Tipo
+                        </th>
+
+                        <th>
+                            Contexto
+                        </th>
+
+                        <th>
+                            Afectación
+                        </th>
+
+                        <th>
+                            Responsable
+                        </th>
+
+                        <th>
+                            Resultado
+                        </th>
+
+                        <th>
+                            Acción
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="actividadesTabla">
+
+
+                    <tr>
+
+                        <td
+                            colspan="7"
+                            class="tabla-vacia">
+
+                            No hay actividades registradas.
+
+                        </td>
+
+                    </tr>
+
+
+                </tbody>
+
+
+            </table>
+
+
+        </div>
+
+
+    </section>
+
+
+
+
+    <!-- =================================================
+                    NUEVA ACTIVIDAD
+    ================================================== -->
+
+    <section
+        class="bloque formulario-bloque"
+        id="formularioActividad"
+        hidden>
+
+
+        <div class="bloque-titulo">
+
+
+            <div class="bloque-titulo-info">
+
+                <span class="numero-seccion">
+
+                    03
+
+                </span>
+
+
+                <div>
+
+                    <h2>
+
+                        Registrar actividad de campo
+
+                    </h2>
+
+
+                    <p>
+
+                        Captura la actividad programada o realizada
+                        durante el seguimiento.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+
+        <form
+            id="formActividad"
+            novalidate>
+
+
+            <div class="form-grid">
+
+
+                <!-- =================================================
+                            TIPO DE ACTIVIDAD
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="tipoActividad">
+
+                        Tipo de actividad
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <select
+                        id="tipoActividad"
+                        name="tipo_actividad"
+                        required>
+
+
+                        <option value="">
+
+                            Selecciona una opción
+
+                        </option>
+
+
+                        <option value="sensibilizacion">
+
+                            Sensibilización
+
+                        </option>
+
+
+                        <option value="caminamiento">
+
+                            Caminamiento
+
+                        </option>
+
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- =================================================
+                            CONTEXTO
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="contextoActividad">
+
+                        Contexto de la actividad
+
+                    </label>
+
+
+                    <select
+                        id="contextoActividad"
+                        name="contexto_actividad">
+
+
+                        <option value="general">
+
+                            General
+
+                        </option>
+
+
+                        <option value="superficie_adicional">
+
+                            Superficie adicional
+
+                        </option>
+
+
+                        <option value="obras_complementarias">
+
+                            Obras complementarias
+
+                        </option>
+
+
+                        <option value="transversal">
+
+                            Transversal
+
+                        </option>
+
+
+                        <option value="otro">
+
+                            Otro
+
+                        </option>
+
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- =================================================
+                            AFECTACIÓN
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="afectacionActividad">
+
+                        Afectación relacionada
+
+                    </label>
+
+
+                    <select
+                        id="afectacionActividad"
+                        name="id_afectacion">
+
+
+                        <option value="">
+
+                            Actividad general del núcleo
+
+                        </option>
+
+
+                        <!--
+                            Las afectaciones se cargarán
+                            posteriormente desde:
+
+                            GET
+                            /proyecto-nucleo/{id_proyecto_nucleo}/afectaciones
+                        -->
+
+
+                    </select>
+
+
+                    <small>
+
+                        Déjalo vacío si la actividad corresponde
+                        al núcleo en general.
+
+                    </small>
+
+                </div>
+
+
+
+                <!-- =================================================
+                            TIPO COP
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="tipoCop">
+
+                        Tipo de COP
+
+                    </label>
+
+
+                    <select
+                        id="tipoCop"
+                        name="id_tipo_cop_operativo">
+
+
+                        <option value="">
+
+                            Selecciona una opción
+
+                        </option>
+
+
+                        <!--
+                            Catálogo dinámico:
+
+                            tipo_cop_operativo
+                        -->
+
+
+                    </select>
+
+
+                    <small>
+
+                        Opcional. Se mostrará cuando exista
+                        información disponible para el registro.
+
+                    </small>
+
+                </div>
+
+
+
+                <!-- =================================================
+                            FECHA PROGRAMADA
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="fechaProgramada">
+
+                        Fecha programada
+
+                    </label>
+
+
+                    <input
+                        type="date"
+                        id="fechaProgramada"
+                        name="fecha_programada">
+
+                </div>
+
+
+
+                <!-- =================================================
+                            FECHA REALIZADA
+                ================================================== -->
+
+                <div class="campo">
+
+                    <label for="fechaRealizada">
+
+                        Fecha realizada
+
+                    </label>
+
+
+                    <input
+                        type="date"
+                        id="fechaRealizada"
+                        name="fecha_realizada">
+
+                </div>
+
+
+
+                <!-- =================================================
+                            RESPONSABLE
+                ================================================== -->
+
+                <div class="campo campo-completo">
+
+                    <label for="responsable">
+
+                        Responsable
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="responsable"
+                        name="responsable"
+                        maxlength="300"
+                        placeholder="Nombre de la persona responsable">
+
+                </div>
+
+
+
+                <!-- =================================================
+                            RESULTADO
+                ================================================== -->
+
+                <div class="campo campo-completo">
+
+                    <label for="resultado">
+
+                        Resultado / observaciones
+
+                    </label>
+
+
+                    <textarea
+                        id="resultado"
+                        name="resultado"
+                        rows="5"
+                        placeholder="Describe brevemente el resultado de la actividad."></textarea>
+
+
+                </div>
+
+
+            </div>
+
+
+
+
+            <!-- =================================================
+                            AVISO
+            ================================================== -->
+
+            <div class="aviso-identidad">
+
+                <i class="bi bi-clipboard-check"></i>
+
+
+                <p>
+
+                    Si la actividad aún no se realiza, registra únicamente
+                    la fecha programada.
+
+                </p>
+
+            </div>
+
+
+
+
+            <!-- =================================================
+                        MENSAJE
+            ================================================== -->
+
+            <div
+                id="mensajeFormulario"
+                class="mensaje-formulario">
+
+            </div>
+
+
+
+
+            <!-- =================================================
+                        ACCIONES
+            ================================================== -->
+
+            <div class="formulario-acciones">
+
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnCancelarActividad">
+
+                    Cancelar
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal">
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Guardar actividad
+
+                </button>
+
+
+            </div>
+
+
+        </form>
+
+
+    </section>
+
+
+
+
+</main>
+
+
+
+
+<!-- =================================================
+                        FOOTER
+================================================== -->
+
+<footer class="footer">
+
+    <p>
+
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+
+    </p>
+
+</footer>
+
+
+
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script src="/js/api/catalogos.js"></script>
+<script src="/js/api/proyectos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/personas.js"></script>
+<script src="/js/api/orv.js"></script>
+<script src="/js/api/padrones.js"></script>
+<script src="/js/api/actividades.js"></script>
+<script src="/js/api/parcelas.js"></script>
+<script src="/js/api/unidadesAgrarias.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/api/seguimiento.js"></script>
+<script src="/js/api/asambleas.js"></script>
+<script src="/js/api/tramitesRan.js"></script>
+<script src="/js/api/convenios.js"></script>
+<script src="/js/api/fifonafe.js"></script>
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/indemnizacion.js"></script>
+<script src="/js/api/reportes.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    window.AuthAPI.requerirSesion();
+});
+</script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/actividades.js"></script>
+
+
+</body>
+
+</html>

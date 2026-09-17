@@ -1,0 +1,713 @@
+.avance-contenedor {
+    padding: 32px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 22px;
+
+    min-width: 0;
+}
+
+
+.avance-encabezado {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-start;
+
+    gap: 24px;
+}
+
+
+.avance-eyebrow {
+    margin: 0 0 5px;
+
+    color: var(--verde);
+
+    font-size: .78rem;
+    font-weight: 800;
+
+    letter-spacing: .08em;
+
+    text-transform: uppercase;
+}
+
+
+.avance-encabezado h1 {
+    margin: 0;
+
+    color: #212529;
+
+    font-size: clamp(
+        1.8rem,
+        3vw,
+        2.5rem
+    );
+}
+
+
+.avance-subtitulo {
+    max-width: 820px;
+
+    margin: 8px 0 0;
+
+    color: #60656a;
+
+    line-height: 1.5;
+}
+
+
+/* =====================================================
+                        ALERTAS
+===================================================== */
+
+.avance-alerta {
+    padding: 13px 16px;
+
+    border: 1px solid transparent;
+    border-radius: 9px;
+
+    line-height: 1.4;
+}
+
+
+.avance-alerta-error {
+    color: #842029;
+
+    background: #f8d7da;
+
+    border-color: #f5c2c7;
+}
+
+
+.avance-alerta-info {
+    color: #055160;
+
+    background: #cff4fc;
+
+    border-color: #b6effb;
+}
+
+
+.avance-nota {
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 12px;
+
+    padding: 15px 17px;
+
+    border: 1px solid #d8e4da;
+    border-radius: 10px;
+
+    background: #f5faf6;
+
+    color: #34443a;
+
+    line-height: 1.45;
+}
+
+
+.avance-nota i {
+    margin-top: 1px;
+
+    color: var(--verde);
+
+    font-size: 1.25rem;
+}
+
+
+.avance-nota p {
+    margin: 0;
+
+    font-size: .88rem;
+}
+
+
+/* =====================================================
+                        CARDS
+===================================================== */
+
+.avance-card {
+    min-width: 0;
+
+    padding: 22px;
+
+    border: 1px solid #e1e5e7;
+    border-radius: 14px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 2px 9px
+        rgba(0, 0, 0, .06);
+}
+
+
+.avance-card-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-start;
+
+    gap: 18px;
+
+    margin-bottom: 20px;
+}
+
+
+.avance-card-header h2 {
+    margin: 0;
+
+    color: #252a2e;
+
+    font-size: 1.3rem;
+}
+
+
+.avance-card-header p {
+    margin: 5px 0 0;
+
+    color: #6a7075;
+
+    font-size: .87rem;
+
+    line-height: 1.45;
+}
+
+
+/* =====================================================
+                        FILTROS
+===================================================== */
+
+.avance-filtros {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(0, 1fr)
+        );
+
+    gap: 16px;
+}
+
+
+.avance-campo {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+    min-width: 0;
+}
+
+
+.avance-campo label,
+.avance-campo > span {
+    color: #343a40;
+
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+
+.avance-campo input,
+.avance-campo select {
+    width: 100%;
+
+    min-height: 42px;
+
+    padding: 9px 11px;
+
+    border: 1px solid #cfd4d8;
+    border-radius: 8px;
+
+    background: #ffffff;
+
+    color: #212529;
+
+    font: inherit;
+
+    outline: none;
+}
+
+
+.avance-campo input:focus,
+.avance-campo select:focus {
+    border-color: var(--verde);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(40, 107, 48, .12);
+}
+
+
+.avance-filtros-acciones {
+    grid-column: 1 / -1;
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    padding-top: 4px;
+}
+
+
+/* =====================================================
+                        BOTONES
+===================================================== */
+
+.avance-btn {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+
+    min-height: 39px;
+
+    padding: 9px 14px;
+
+    border: 1px solid transparent;
+    border-radius: 8px;
+
+    font: inherit;
+
+    font-size: .87rem;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        background .15s,
+        transform .15s,
+        border-color .15s;
+}
+
+
+.avance-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+
+.avance-btn:disabled {
+    opacity: .55;
+
+    cursor: not-allowed;
+}
+
+
+.avance-btn-primario {
+    color: #ffffff;
+
+    background: var(--verde);
+
+    border-color: var(--verde);
+}
+
+
+.avance-btn-primario:hover:not(:disabled) {
+    background: var(--verde-oscuro);
+}
+
+
+.avance-btn-secundario {
+    color: #30363b;
+
+    background: #ffffff;
+
+    border-color: #c8ced3;
+}
+
+
+.avance-btn-secundario:hover:not(:disabled) {
+    background: #f4f6f7;
+}
+
+
+/* =====================================================
+                        KPIs
+===================================================== */
+
+.avance-resumen {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            5,
+            minmax(0, 1fr)
+        );
+
+    gap: 14px;
+}
+
+
+.avance-kpi {
+    min-width: 0;
+
+    padding: 17px;
+
+    border: 1px solid #e1e5e7;
+    border-radius: 12px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0, 0, 0, .05);
+}
+
+
+.avance-kpi span {
+    display: block;
+
+    margin-bottom: 7px;
+
+    color: #697076;
+
+    font-size: .76rem;
+    font-weight: 800;
+
+    text-transform: uppercase;
+
+    letter-spacing: .04em;
+}
+
+
+.avance-kpi strong {
+    display: block;
+
+    color: #243029;
+
+    font-size: clamp(
+        1.25rem,
+        2vw,
+        1.7rem
+    );
+
+    overflow-wrap: anywhere;
+}
+
+
+/* =====================================================
+                    HERRAMIENTAS
+===================================================== */
+
+.avance-herramientas {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-end;
+
+    gap: 16px;
+
+    margin-bottom: 15px;
+}
+
+
+.avance-busqueda {
+    width: min(
+        480px,
+        100%
+    );
+}
+
+
+.avance-tabla-meta {
+    display: flex;
+
+    align-items: center;
+
+    gap: 14px;
+
+    margin-bottom: 12px;
+}
+
+
+.avance-total {
+    color: #5f656a;
+
+    font-size: .86rem;
+    font-weight: 700;
+
+    white-space: nowrap;
+}
+
+
+.avance-por-pagina {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    color: #5d6368;
+
+    font-size: .82rem;
+
+    white-space: nowrap;
+}
+
+
+.avance-por-pagina select {
+    padding: 6px 8px;
+
+    border: 1px solid #cfd4d8;
+    border-radius: 7px;
+
+    background: #ffffff;
+
+    color: #30363b;
+
+    font: inherit;
+}
+
+
+/* =====================================================
+                        TABLA
+===================================================== */
+
+.avance-tabla-wrap {
+    width: 100%;
+
+    overflow-x: auto;
+
+    border: 1px solid #e3e6e8;
+    border-radius: 10px;
+}
+
+
+.avance-tabla {
+    width: 100%;
+
+    min-width: 1900px;
+
+    border-collapse: collapse;
+
+    background: #ffffff;
+}
+
+
+.avance-tabla th,
+.avance-tabla td {
+    padding: 11px 12px;
+
+    border-bottom:
+        1px solid #e9ecef;
+
+    vertical-align: top;
+
+    text-align: left;
+
+    font-size: .82rem;
+}
+
+
+.avance-tabla th {
+    position: sticky;
+
+    top: 0;
+
+    z-index: 1;
+
+    background:
+        var(--verde-oscuro);
+
+    color: #ffffff;
+
+    font-weight: 700;
+
+    white-space: nowrap;
+}
+
+
+.avance-tabla tbody tr:hover {
+    background: #f7faf7;
+}
+
+
+.avance-tabla tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+
+.avance-tabla-estado {
+    padding: 30px !important;
+
+    color: #6c757d;
+
+    text-align: center !important;
+}
+
+
+.avance-numero {
+    text-align: right !important;
+
+    font-variant-numeric:
+        tabular-nums;
+
+    white-space: nowrap;
+}
+
+
+.avance-indicador {
+    min-width: 180px;
+
+    font-weight: 700;
+
+    color: #354139;
+}
+
+
+/* =====================================================
+                        BADGES
+===================================================== */
+
+.avance-badge {
+    display: inline-flex;
+
+    align-items: center;
+
+    padding: 4px 8px;
+
+    border-radius: 999px;
+
+    font-size: .74rem;
+    font-weight: 800;
+
+    white-space: nowrap;
+
+    text-transform: capitalize;
+}
+
+
+.avance-badge-neutro {
+    color: #4e565c;
+
+    background: #e9ecef;
+}
+
+
+.avance-badge-colectivo {
+    color: #235c37;
+
+    background: #dcefe1;
+}
+
+
+.avance-badge-individual {
+    color: #174f6a;
+
+    background: #dbeef6;
+}
+
+
+/* =====================================================
+                        PAGINACIÓN
+===================================================== */
+
+.avance-paginacion {
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    gap: 12px;
+
+    margin-top: 16px;
+}
+
+
+.avance-paginacion span {
+    min-width: 130px;
+
+    color: #565d62;
+
+    text-align: center;
+
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+
+/* =====================================================
+                        RESPONSIVE
+===================================================== */
+
+@media (max-width: 1200px) {
+
+    .avance-filtros {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+
+    .avance-resumen {
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(0, 1fr)
+            );
+    }
+
+}
+
+
+@media (max-width: 760px) {
+
+    .avance-contenedor {
+        padding: 20px 14px;
+    }
+
+
+    .avance-card-header,
+    .avance-herramientas {
+        flex-direction: column;
+
+        align-items: stretch;
+    }
+
+
+    .avance-filtros,
+    .avance-resumen {
+        grid-template-columns: 1fr;
+    }
+
+
+    .avance-filtros-acciones {
+        flex-direction:
+            column-reverse;
+    }
+
+
+    .avance-filtros-acciones
+    .avance-btn,
+    .avance-herramientas
+    .avance-btn {
+        width: 100%;
+    }
+
+
+    .avance-tabla-meta {
+        justify-content:
+            space-between;
+
+        flex-wrap: wrap;
+    }
+
+
+    .avance-paginacion {
+        flex-wrap: wrap;
+    }
+
+}

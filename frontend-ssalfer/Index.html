@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOGIN SSALFER</title>
+    <link rel="stylesheet" href="/styles/login.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    <link rel="icon" type="image/png" sizes="40x40" href="/img/LOGOS VERDE/IMAGOTIPO.png">
+</head>
+<body>
+
+<div class="contenedor">
+
+    <div class="encabezado">
+        <img src="/img/LOGOS VERDE/palogo-2.png" alt="">
+    </div>
+
+    <form class="formulario" id="formLogin" novalidate>
+
+        <div class="titulo">
+            <h2>Inicio de sesión</h2>
+        </div>
+
+        <p id="errorLogin" class="error-login" hidden></p>
+
+        <div class="usuario">
+            <label for="usuario">Usuario </label>
+            <div class="input-icon">
+                <i class="bi bi-person-fill"></i>
+                <input type="email" name="usuario" id="usuario" placeholder="usuario@pa.gob.mx" required autocomplete="username">
+            </div>
+        </div>
+
+        <div class="password">
+            <label for="password">Contraseña </label>
+            <div class="input-icon">
+                <i class="bi bi-lock-fill"></i>
+                <input class="input-password" type="password" name="password" id="password" placeholder="**********" required autocomplete="current-password">
+            </div>
+        </div>
+
+        <button class="boton" type="submit" id="btnLogin">Iniciar sesión</button>
+
+    </form>
+
+    <aside class="aside">
+        <img class="imagotipo" src="/img/LOGOS VERDE/IMAGOTIPO.png" alt="Logo SSALFER">
+        <img class="logotipo" src="/img/LOGOS VERDE/SSALFER.png" alt="Siglas">
+        <img class="nombre" src="/img/LOGOS VERDE/NOMBRE_LOGO.png" alt="Nombre">
+    </aside>
+
+    <h5>DGAOPR</h5>
+    <p class="dgaopr">Dirección General de Apoyo al Ordenamiento de la Propiedad Rural</p>
+</div>
+
+<footer class="footer">
+    <p>&copy; 2026 Procuraduría Agraria. Todos los derechos reservados. </p>
+</footer>
+
+<script src="/js/env.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api/cliente.js"></script>
+<script src="/js/api/auth.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    const form = document.getElementById("formLogin");
+    const errorLogin = document.getElementById("errorLogin");
+    const btnLogin = document.getElementById("btnLogin");
+
+    // Si ya hay una sesión activa, saltar directo al dashboard.
+    window.AuthAPI.obtenerSesionActual()
+        .then(() => { window.location.href = "/dashboard.html"; })
+        .catch(() => { /* sin sesión: se queda en el login, es lo esperado */ });
+
+    form.addEventListener("submit", async (event) => {
+
+        event.preventDefault();
+
+        errorLogin.hidden = true;
+
+        const usuario = document.getElementById("usuario").value.trim();
+        const password = document.getElementById("password").value;
+
+        if (!usuario || !password) {
+
+            errorLogin.textContent = "Ingresa tu usuario y tu contraseña.";
+            errorLogin.hidden = false;
+            return;
+
+        }
+
+        btnLogin.disabled = true;
+        btnLogin.textContent = "Ingresando...";
+
+        try {
+
+            await window.AuthAPI.login(usuario, password);
+
+            window.location.href = "/dashboard.html";
+
+        } catch (error) {
+
+            window.ClienteAPI.mostrarErrorAPI(error, errorLogin);
+
+        } finally {
+
+            btnLogin.disabled = false;
+            btnLogin.textContent = "Iniciar sesión";
+
+        }
+
+    });
+
+});
+</script>
+
+</body>
+</html>

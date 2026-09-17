@@ -1,0 +1,526 @@
+/* =========================================================
+        FORMULARIO NUEVO PROYECTO
+========================================================= */
+
+.formulario-proyecto {
+
+    width: 100%;
+    max-width: 1100px;
+
+    margin: 0 auto;
+
+    background: var(--tarjeta);
+
+    border-radius: 12px;
+
+    box-shadow: var(--sombra);
+
+    padding: 30px;
+
+}
+
+
+/* =========================================================
+        ENCABEZADO
+========================================================= */
+
+.formulario-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-start;
+
+    margin-bottom: 30px;
+
+}
+
+
+.formulario-header h1 {
+
+    color: var(--verde);
+
+    font-size: 1.8rem;
+
+    margin-top: 8px;
+
+    margin-bottom: 8px;
+
+}
+
+
+.formulario-header p {
+
+    color: #666;
+
+    font-size: .95rem;
+
+}
+
+
+.ruta {
+
+    display: inline-block;
+
+    color: #777;
+
+    font-size: .85rem;
+
+}
+
+
+/* =========================================================
+        FIELDSETS
+========================================================= */
+
+.formulario-proyecto fieldset {
+
+    border: 1px solid #d5d5d5;
+
+    border-radius: 10px;
+
+    padding: 25px;
+
+    margin-bottom: 25px;
+
+}
+
+
+.formulario-proyecto legend {
+
+    padding: 0 10px;
+
+    color: var(--verde);
+
+    font-size: 1.05rem;
+
+    font-weight: bold;
+
+}
+
+
+/* =========================================================
+        CAMPOS
+========================================================= */
+
+.campo {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.campo:last-child {
+
+    margin-bottom: 0;
+
+}
+
+
+.campo label {
+
+    color: #444;
+
+    font-size: .95rem;
+
+    font-weight: bold;
+
+}
+
+
+.campo label span {
+
+    color: #b3261e;
+
+}
+
+
+.campo input,
+.campo textarea {
+
+    width: 100%;
+
+    padding: 11px 13px;
+
+    border: 1px solid #c8c8c8;
+
+    border-radius: 7px;
+
+    background: white;
+
+    color: #333;
+
+    font-size: .95rem;
+
+    outline: none;
+
+    transition:
+        border-color .2s ease,
+        box-shadow .2s ease;
+
+}
+
+
+.campo input {
+
+    min-height: 42px;
+
+}
+
+
+.campo textarea {
+
+    resize: vertical;
+
+    min-height: 100px;
+
+    line-height: 1.4;
+
+}
+
+
+.campo input:focus,
+.campo textarea:focus {
+
+    border-color: var(--verde);
+
+    box-shadow:
+        0 0 0 3px rgba(40, 107, 48, .12);
+
+}
+
+
+.campo input::placeholder,
+.campo textarea::placeholder {
+
+    color: #999;
+
+}
+
+
+/* =========================================================
+        INFORMACIÓN DE AYUDA
+========================================================= */
+
+.campo small {
+
+    color: #777;
+
+    font-size: .8rem;
+
+    line-height: 1.4;
+
+}
+
+
+/* =========================================================
+        CAMPOS DE FECHA
+========================================================= */
+
+.campos-fecha {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 25px;
+
+}
+
+
+/* =========================================================
+        AVISO
+========================================================= */
+
+.aviso-formulario {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 12px;
+
+    margin-bottom: 25px;
+
+    padding: 15px 18px;
+
+    border-radius: 8px;
+
+    background: #eef5ef;
+
+    color: #4f5f51;
+
+    font-size: .9rem;
+
+    line-height: 1.5;
+
+}
+
+
+.aviso-formulario i {
+
+    color: var(--verde);
+
+    font-size: 1.15rem;
+
+    flex-shrink: 0;
+
+    margin-top: 2px;
+
+}
+
+
+.aviso-formulario p {
+
+    margin: 0;
+
+}
+
+
+/* =========================================================
+        ACCIONES
+========================================================= */
+
+.acciones-formulario {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    align-items: center;
+
+    gap: 12px;
+
+    padding-top: 5px;
+
+}
+
+
+/* =========================================================
+        BOTÓN SECUNDARIO
+========================================================= */
+
+.btn-secundario {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 8px;
+
+    padding: 10px 18px;
+
+    border: 1px solid #bdbdbd;
+
+    border-radius: 7px;
+
+    background: white;
+
+    color: #555;
+
+    text-decoration: none;
+
+    cursor: pointer;
+
+    font-size: .9rem;
+
+    transition: .2s ease;
+
+}
+
+
+.btn-secundario:hover {
+
+    background: #eeeeee;
+
+    transform: translateY(-2px);
+
+}
+
+
+/* =========================================================
+        BOTÓN PRINCIPAL
+========================================================= */
+
+.btn-principal {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 8px;
+
+    padding: 10px 18px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    background: var(--verde);
+
+    color: white;
+
+    cursor: pointer;
+
+    font-size: .9rem;
+
+    transition: .2s ease;
+
+}
+
+
+.btn-principal:hover {
+
+    background: var(--verde-oscuro);
+
+    transform: translateY(-2px);
+
+}
+
+
+.btn-principal:active,
+.btn-secundario:active {
+
+    transform: translateY(0);
+
+}
+
+
+/* =========================================================
+        VALIDACIÓN VISUAL
+========================================================= */
+
+.campo input.invalido,
+.campo textarea.invalido {
+
+    border-color: #b3261e;
+
+    box-shadow:
+        0 0 0 3px rgba(179, 38, 30, .10);
+
+}
+
+
+.mensaje-error {
+
+    display: none;
+
+    color: #b3261e;
+
+    font-size: .8rem;
+
+}
+
+
+.mensaje-error.mostrar {
+
+    display: block;
+
+}
+
+
+/* =========================================================
+        SIDEBAR COLAPSADO
+========================================================= */
+
+/*
+    Cuando el aside se colapsa, el dashboard.css
+    reduce automáticamente la primera columna del grid.
+
+    Aquí solamente aprovechamos el espacio adicional.
+*/
+
+body:has(.aside.collapsed) .formulario-proyecto {
+
+    max-width: 1200px;
+
+    padding: 35px;
+
+}
+
+
+/* =========================================================
+        RESPONSIVE
+========================================================= */
+
+@media (max-width: 900px) {
+
+    .formulario-proyecto {
+
+        padding: 25px;
+
+    }
+
+
+    .campos-fecha {
+
+        grid-template-columns: 1fr;
+
+        gap: 0;
+
+    }
+
+}
+
+
+@media (max-width: 650px) {
+
+    .contenedor {
+
+        padding: 15px;
+
+    }
+
+
+    .formulario-proyecto {
+
+        padding: 20px;
+
+        border-radius: 10px;
+
+    }
+
+
+    .formulario-header h1 {
+
+        font-size: 1.5rem;
+
+    }
+
+
+    .formulario-proyecto fieldset {
+
+        padding: 18px;
+
+    }
+
+
+    .acciones-formulario {
+
+        flex-direction: column-reverse;
+
+        align-items: stretch;
+
+    }
+
+
+    .btn-principal,
+    .btn-secundario {
+
+        width: 100%;
+
+    }
+
+}
