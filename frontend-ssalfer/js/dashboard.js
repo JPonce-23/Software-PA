@@ -819,7 +819,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 )}
 
                                 <small>
-                                    Avance de metas
+                                    Avance del proyecto
                                 </small>
 
                             </div>
