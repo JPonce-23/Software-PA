@@ -44,6 +44,25 @@
     }
 
 
+    async function cambiarContrasena(
+        contrasenaActual,
+        contrasenaNueva
+    ) {
+
+        return post(
+            "/auth/cambiar-contrasena",
+            {
+                contrasena_actual:
+                    contrasenaActual,
+
+                contrasena_nueva:
+                    contrasenaNueva
+            }
+        );
+
+    }
+
+
     /**
      * Llamar al inicio de cada página protegida (dashboard.html y todo lo
      * que cuelga de pages/). Si no hay sesión válida, redirige al login.
@@ -73,37 +92,104 @@
     }
 
 
-    document.addEventListener("click", async function (evento) {
+    document.addEventListener(
+        "click",
+        async function (evento) {
 
-        const enlace = evento.target.closest("a");
+            const enlace =
+                evento.target.closest("a");
 
-        if (!enlace) {
-            return;
+
+            if (!enlace) {
+
+                return;
+
+            }
+
+
+            const texto =
+                enlace.textContent
+                    .trim()
+                    .toLowerCase();
+
+
+            const accion =
+                enlace.dataset.action;
+
+
+            /* =================================================
+                        CAMBIAR CONTRASEÑA
+            ================================================== */
+
+            const esCambioContrasena =
+                accion ===
+                    "cambiar-contrasena" ||
+                texto.includes(
+                    "cambiar contraseña"
+                );
+
+
+            if (esCambioContrasena) {
+
+                evento.preventDefault();
+
+
+                window.location.href =
+                    "/pages/cambiarContrasena.html";
+
+
+                return;
+
+            }
+
+
+            /* =================================================
+                            CERRAR SESIÓN
+            ================================================== */
+
+            const esLogout =
+                accion ===
+                    "logout" ||
+                texto.includes(
+                    "cerrar sesión"
+                );
+
+
+            if (!esLogout) {
+
+                return;
+
+            }
+
+
+            evento.preventDefault();
+
+
+            try {
+
+                await logout();
+
+
+                window.location.href =
+                    "/Index.html";
+
+
+            } catch (error) {
+
+                console.error(
+                    "No se pudo cerrar la sesión:",
+                    error
+                );
+
+
+                alert(
+                    "No se pudo cerrar la sesión. Intenta nuevamente."
+                );
+
+            }
+
         }
-
-        const esLogout =
-            enlace.dataset.action === "logout" ||
-            enlace.textContent.trim().toLowerCase().includes("cerrar sesión");
-
-        if (!esLogout) {
-            return;
-        }
-
-        evento.preventDefault();
-
-        try {
-
-            await logout();
-            window.location.href = "/Index.html";
-
-        } catch (error) {
-
-            console.error("No se pudo cerrar la sesión:", error);
-            alert("No se pudo cerrar la sesión. Intenta nuevamente.");
-
-        }
-
-    });
+    );
 
 
 
@@ -112,6 +198,7 @@
         obtenerSesionActual,
         logout,
         logoutTodas,
+        cambiarContrasena,
         requerirSesion
     };
 

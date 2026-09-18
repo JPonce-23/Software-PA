@@ -250,14 +250,13 @@
         <div>
 
             <strong>
-                Registro compartido del proyecto
+                Registro de personas
             </strong>
 
             <p>
-                Una persona puede participar en distintos
-                núcleos y módulos del mismo proyecto. Por eso
-                se registra una sola vez y posteriormente se
-                reutiliza mediante su ID.
+                Las personas se registran desde el contexto del proyecto
+                y posteriormente pueden ser referenciadas por otros
+                módulos del sistema mediante su identificador.
             </p>
 
         </div>
@@ -287,36 +286,81 @@
         </div>
 
 
-        <div class="busqueda-persona">
+        <!-- =================================================
+                CONSULTAR PERSONA
+        ================================================== -->
 
-            <div class="campo">
+        <section class="tarjeta">
 
-                <label for="busqueda">
+            <div class="seccion-titulo">
 
-                    Nombre o CURP
+                <div>
 
-                </label>
+                    <i class="bi bi-search"></i>
 
-                <input
-                    type="search"
-                    id="busqueda"
-                    placeholder="Buscar por nombre o CURP...">
+                    <h2>
+                        Consultar persona
+                    </h2>
+
+                </div>
 
             </div>
 
 
-            <button
-                type="button"
-                class="btn-secundario"
-                id="btnLimpiarBusqueda">
+            <div class="busqueda-persona">
 
-                <i class="bi bi-x-circle"></i>
+                <div class="campo">
 
-                Limpiar
+                    <label for="busqueda">
+                        ID de persona
+                    </label>
 
-            </button>
+                    <input
+                        type="number"
+                        id="busqueda"
+                        min="1"
+                        step="1"
+                        placeholder="Ej. 15"
+                    >
 
-        </div>
+                </div>
+
+
+                <button
+                    type="button"
+                    class="btn-principal"
+                    id="btnConsultarPersona"
+                >
+
+                    <i class="bi bi-search"></i>
+
+                    Consultar
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="btn-secundario"
+                    id="btnLimpiarBusqueda"
+                >
+
+                    <i class="bi bi-x-circle"></i>
+
+                    Limpiar
+
+                </button>
+
+            </div>
+
+
+            <small>
+                El backend actual permite consultar una persona
+                mediante su ID. La búsqueda por nombre o CURP
+                requiere todavía un endpoint de búsqueda.
+            </small>
+
+        </section>
 
     </section>
 
@@ -335,7 +379,7 @@
                 <i class="bi bi-people"></i>
 
                 <h2>
-                    Directorio de personas
+                    Personas consultadas
                 </h2>
 
             </div>
@@ -357,54 +401,6 @@
             class="personas-container">
 
 
-            <!-- =========================================
-                        PERSONA DEMOSTRATIVA
-            ========================================== -->
-
-            <article
-                class="persona"
-                data-persona>
-
-
-                <div class="persona-icono">
-
-                    <i class="bi bi-person"></i>
-
-                </div>
-
-
-                <div class="persona-datos">
-
-                    <h3>
-                        Persona demostrativa
-                    </h3>
-
-                    <span>
-                        CURP: Pendiente
-                    </span>
-
-                    <span>
-                        Teléfono: Pendiente
-                    </span>
-
-                    <span>
-                        Correo: Pendiente
-                    </span>
-
-                </div>
-
-
-                <div class="persona-estado">
-
-                    <span class="estado-identidad incompleta">
-                        Identidad incompleta
-                    </span>
-
-                </div>
-
-            </article>
-
-
         </div>
 
 
@@ -424,8 +420,7 @@
             </p>
 
             <span>
-                Utiliza "Nueva persona" para registrar
-                la primera.
+                Consulta una persona por su ID o registra una nueva.
             </span>
 
         </div>

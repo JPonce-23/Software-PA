@@ -179,9 +179,27 @@ async function request(
 
             cuerpoFinal = new URLSearchParams(cuerpo).toString();
 
+        } else if (
+            typeof FormData !== "undefined" &&
+            cuerpo instanceof FormData
+        ) {
+
+            /*
+            * IMPORTANTE:
+            * No establecer Content-Type manualmente.
+            *
+            * El navegador genera automáticamente:
+            *
+            * multipart/form-data; boundary=...
+            *
+            * incluyendo el boundary correcto para el archivo.
+            */
+            cuerpoFinal = cuerpo;
+
         } else {
 
-            encabezados["Content-Type"] = "application/json";
+            encabezados["Content-Type"] =
+                "application/json";
 
             cuerpoFinal = JSON.stringify(cuerpo);
 

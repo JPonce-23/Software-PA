@@ -17,6 +17,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         enlacePersonas:
             document.getElementById("enlacePersonas"),
 
+        enlaceGestionGeoespacial:
+            document.getElementById("enlaceGestionGeoespacial"),
+
         kpiNucleos: document.getElementById("kpiNucleos"),
         kpiParcelasAfectaciones:
             document.getElementById("kpiParcelasAfectaciones"),
@@ -180,6 +183,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                     idProyecto
                 )}`;
         }
+
+
+        if (elementos.enlaceGestionGeoespacial) {
+            elementos.enlaceGestionGeoespacial.href =
+                `/pages/gestionGeoespacial.html?id_proyecto=${encodeURIComponent(
+                    idProyecto
+                )}`;
+        }
+
+
     }
 
     /* =====================================================

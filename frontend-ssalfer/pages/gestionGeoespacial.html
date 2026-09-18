@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Gestión geoespacial | SSALFER</title>
+
+
+    <!-- ESTILOS GENERALES -->
+
+    <link
+        rel="stylesheet"
+        href="/styles/dashboard.css"
+    >
+
+
+    <!-- ESTILOS DEL MÓDULO GIS -->
+
+    <link
+        rel="stylesheet"
+        href="/styles/gestionGeoespacial.css"
+    >
+
+
+    <!-- BOOTSTRAP ICONS -->
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+    >
+
+
+    <!-- FAVICON -->
+
+    <link
+        rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png"
+    >
+
+</head>
+
+
+<body>
+
+
+    <!-- =====================================================
+                            ASIDE
+    ====================================================== -->
+
+    <aside class="aside">
+
+        <button
+            class="btn-menu"
+            type="button"
+            aria-label="Contraer menú"
+        >
+
+            <i class="bi bi-list"></i>
+
+        </button>
+
+
+        <div class="logo-aside">
+
+            <img
+                src="/img/LOGOS VERDE/IMAGOTIPO.png"
+                alt="Logo SSALFER"
+            >
+
+        </div>
+
+
+        <div class="bienvenida">
+
+            <h3>
+                Bienvenido
+            </h3>
+
+            <span class="js-usuario-nombre">
+                Usuario
+            </span>
+
+        </div>
+
+
+        <nav class="barra">
+
+
+            <!-- TODOS LOS PROYECTOS -->
+
+            <a href="/dashboard.html">
+
+                <i class="bi bi-train-front"></i>
+
+                <span>
+                    Todos los proyectos
+                </span>
+
+            </a>
+
+
+            <!-- PROYECTOS -->
+
+            <div class="proyectos">
+
+                <h4>
+                    Proyectos
+                </h4>
+
+
+                <div
+                    class="proyectos-lista-dinamica"
+                    id="proyectosLista"
+                ></div>
+
+
+                <a href="/pages/nuevoProyecto.html">
+
+                    <i class="bi bi-plus-circle"></i>
+
+                    <span>
+                        Nuevo proyecto
+                    </span>
+
+                </a>
+
+            </div>
+
+
+            <!-- ADMINISTRACIÓN -->
+
+            <div
+                class="proyectos js-admin-only"
+                hidden
+            >
+
+                <h4>
+                    Administración
+                </h4>
+
+
+                <a href="/pages/usuarios.html">
+
+                    <i class="bi bi-people"></i>
+
+                    <span>
+                        Usuarios
+                    </span>
+
+                </a>
+
+
+                <a href="/pages/catalogosOperativos.html">
+
+                    <i class="bi bi-list-check"></i>
+
+                    <span>
+                        Catálogos operativos
+                    </span>
+
+                </a>
+
+
+                <a href="/pages/auditoria.html">
+
+                    <i class="bi bi-journal-text"></i>
+
+                    <span>
+                        Auditoría
+                    </span>
+
+                </a>
+
+            </div>
+
+
+            <!-- GEOESPACIAL -->
+
+            <div class="proyectos">
+
+                <h4>
+                    Información geoespacial
+                </h4>
+
+
+                <a href="/pages/mapa.html">
+
+                    <i class="bi bi-map"></i>
+
+                    <span>
+                        Ver mapa
+                    </span>
+
+                </a>
+
+
+                <a
+                    href="/pages/gestionGeoespacial.html"
+                    class="activo"
+                    aria-current="page"
+                >
+
+                    <i class="bi bi-layers"></i>
+
+                    <span>
+                        Gestión geoespacial
+                    </span>
+
+                </a>
+
+            </div>
+
+
+            <!-- USUARIO -->
+
+            <div class="usuario-panel">
+
+                <button
+                    class="usuario-btn"
+                    type="button"
+                    aria-label="Abrir opciones de usuario"
+                >
+
+                    <i class="bi bi-person-circle"></i>
+
+                    <span class="js-usuario-nombre">
+                        Usuario
+                    </span>
+
+                    <i class="bi bi-chevron-up"></i>
+
+                </button>
+
+
+                <div class="opciones-usuario">
+
+                    <a href="/pages/usuarios.html">
+
+                        <i class="bi bi-people"></i>
+
+                        Usuarios y permisos
+
+                    </a>
+
+
+                    <a
+                        href="#"
+                        data-action="logout"
+                    >
+
+                        <i class="bi bi-box-arrow-left"></i>
+
+                        Cerrar sesión
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </nav>
+
+    </aside>
+
+
+
+    <!-- =====================================================
+                            HEADER
+    ====================================================== -->
+
+    <header class="header">
+
+        <div class="logo-ssalfer">
+
+            <img
+                src="/img/LOGOS VERDE/SSALFER.png"
+                alt="SSALFER"
+            >
+
+            <img
+                src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+                alt="Nombre SSALFER"
+            >
+
+        </div>
+
+
+        <a
+            class="logo-pa"
+            href="https://www.gob.mx/pa"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Procuraduría Agraria"
+        >
+
+            <img
+                src="/img/PA_LOGO_FIN.png"
+                alt="Procuraduría Agraria"
+            >
+
+        </a>
+
+    </header>
+
+
+
+    <!-- =====================================================
+                        CONTENIDO PRINCIPAL
+    ====================================================== -->
+
+    <main class="contenedor geoespacial-pagina">
+
+
+        <!-- =================================================
+                         ENCABEZADO
+        ================================================== -->
+
+        <section class="geoespacial-encabezado">
+
+            <div>
+
+                <p class="geoespacial-etiqueta">
+                    GESTIÓN GEOESPACIAL
+                </p>
+
+                <h1>
+                    Importación de información geográfica
+                </h1>
+
+                <p>
+                    Carga, valida y confirma información
+                    geoespacial asociada a los proyectos de
+                    SSALFER.
+                </p>
+
+            </div>
+
+
+            <div class="geoespacial-encabezado-acciones">
+
+                <button
+                    id="btnCrearImportacion"
+                    class="btn-principal"
+                    type="button"
+                >
+
+                    <i class="bi bi-plus-circle"></i>
+
+                    Crear una importación
+
+                </button>
+
+                
+                    href="/pages/mapa.html"
+                    class="btn-secundario"
+                >
+
+                    <i class="bi bi-map"></i>
+
+                    Ver mapa
+
+                </a>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                           MENSAJES
+        ================================================== -->
+
+        <div
+            id="geoespacialMensajeError"
+            class="mensaje mensaje-error"
+            role="alert"
+            hidden
+        ></div>
+
+
+        <div
+            id="geoespacialMensajeExito"
+            class="mensaje mensaje-exito"
+            role="status"
+            hidden
+        ></div>
+
+
+        <div
+            id="geoespacialMensajeInformativo"
+            class="mensaje mensaje-informativo"
+            role="status"
+            hidden
+        ></div>
+
+
+
+        <!-- =================================================
+                    SELECCIÓN DEL PROYECTO
+        ================================================== -->
+
+        <section class="geoespacial-proyecto">
+
+            <div class="geoespacial-proyecto-texto">
+
+                <span class="geoespacial-subtitulo">
+                    PROYECTO DE TRABAJO
+                </span>
+
+                <h2>
+                    Selecciona un proyecto
+                </h2>
+
+                <p>
+                    La información importada quedará vinculada
+                    al proyecto seleccionado.
+                </p>
+
+            </div>
+
+
+            <div class="campo geoespacial-proyecto-selector">
+
+                <label for="selectorProyectoGeoespacial">
+                    Proyecto
+                </label>
+
+                <select
+                    id="selectorProyectoGeoespacial"
+                    required
+                >
+
+                    <option value="">
+                        Selecciona un proyecto
+                    </option>
+
+                </select>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                       FLUJO DE TRABAJO
+        ================================================== -->
+
+        <section class="geoespacial-flujo">
+
+            <div class="geoespacial-paso activo">
+
+                <span class="geoespacial-paso-numero">
+                    1
+                </span>
+
+                <div>
+
+                    <strong>
+                        Cargar
+                    </strong>
+
+                    <span>
+                        Selecciona el archivo GIS
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <i class="bi bi-chevron-right"></i>
+
+
+            <div class="geoespacial-paso">
+
+                <span class="geoespacial-paso-numero">
+                    2
+                </span>
+
+                <div>
+
+                    <strong>
+                        Previsualizar
+                    </strong>
+
+                    <span>
+                        Revisa la validación
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <i class="bi bi-chevron-right"></i>
+
+
+            <div class="geoespacial-paso">
+
+                <span class="geoespacial-paso-numero">
+                    3
+                </span>
+
+                <div>
+
+                    <strong>
+                        Confirmar
+                    </strong>
+
+                    <span>
+                        Incorpora a PostGIS
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <i class="bi bi-chevron-right"></i>
+
+
+            <div class="geoespacial-paso">
+
+                <span class="geoespacial-paso-numero">
+                    4
+                </span>
+
+                <div>
+
+                    <strong>
+                        Consultar
+                    </strong>
+
+                    <span>
+                        Visualiza en el mapa
+                    </span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+                       ÁREA PRINCIPAL
+        ================================================== -->
+
+        <div class="geoespacial-layout">
+
+
+            <!-- =============================================
+                           NUEVA CARGA
+            ============================================== -->
+
+            <section class="geoespacial-card geoespacial-carga" id="seccionNuevaImportacion" hidden>
+
+                <div class="geoespacial-card-encabezado">
+
+                    <div>
+
+                        <span class="geoespacial-subtitulo">
+                            NUEVA IMPORTACIÓN
+                        </span>
+
+                        <h2>
+                            Cargar información geográfica
+                        </h2>
+
+                    </div>
+
+                    <button id="btnCerrarImportacion" class="btn-icono" type="button" title="Cerrar" aria-label="Cerrar formulario de importación">
+
+                        <i class="bi bi-x-lg"></i>
+                    
+                    </button>
+
+                </div>
+
+
+                <form
+                    id="formImportacionGeoespacial"
+                    enctype="multipart/form-data"
+                >
+
+
+                    <!-- OBJETIVO -->
+
+                    <div class="campo">
+
+                        <label for="tipoObjetivoGeoespacial">
+                            Tipo de información
+                        </label>
+
+
+                        <select
+                            id="tipoObjetivoGeoespacial"
+                            name="tipo_objetivo"
+                            required
+                        >
+
+                            <option value="trazo_proyecto">
+                                Trazo del proyecto
+                            </option>
+
+                            <option value="nucleo_agrario">
+                                Núcleo agrario
+                            </option>
+
+                            <option value="parcela">
+                                Parcela
+                            </option>
+
+                        </select>
+
+
+                        <small>
+                            Indica qué tipo de geometría contiene
+                            el archivo.
+                        </small>
+
+                    </div>
+
+
+
+                    <!-- FUENTE -->
+
+                    <div class="campo">
+
+                        <label for="fuenteGeoespacial">
+                            Fuente cartográfica
+                        </label>
+
+
+                        <input
+                            id="fuenteGeoespacial"
+                            name="fuente"
+                            type="text"
+                            maxlength="255"
+                            placeholder="Ej. Levantamiento QGIS 2026"
+                            required
+                        >
+
+
+                        <small>
+                            Describe la procedencia de la
+                            información cargada.
+                        </small>
+
+                    </div>
+
+
+
+                    <!-- FECHA DE FUENTE -->
+
+                    <div class="campo">
+
+                        <label for="fechaFuenteGeoespacial">
+                            Fecha de la fuente
+                        </label>
+
+
+                        <input
+                            id="fechaFuenteGeoespacial"
+                            name="fecha_fuente"
+                            type="date"
+                        >
+
+                    </div>
+
+
+
+                    <!-- MAPEO DE DESTINO -->
+
+                    <div
+                        id="grupoMapeoDestino"
+                        class="campo campo-mapeo"
+                        hidden
+                    >
+
+                        <label for="campoIdDestino">
+                            Campo identificador en el archivo
+                        </label>
+
+
+                        <input
+                            id="campoIdDestino"
+                            type="text"
+                            autocomplete="off"
+                            placeholder="Ej. id_parcela"
+                        >
+
+
+                        <small id="ayudaMapeoDestino">
+                            Para núcleos y parcelas, el archivo
+                            debe contener un campo que permita
+                            relacionar cada geometría con su
+                            registro en SSALFER.
+                        </small>
+
+                    </div>
+
+
+
+                    <!-- ARCHIVO -->
+
+                    <div class="campo">
+
+                        <label for="archivoGeoespacial">
+                            Archivo geoespacial
+                        </label>
+
+
+                        <label
+                            class="geoespacial-dropzone"
+                            for="archivoGeoespacial"
+                            id="zonaArchivoGeoespacial"
+                        >
+
+                            <i class="bi bi-cloud-arrow-up"></i>
+
+
+                            <strong>
+                                Selecciona un archivo
+                            </strong>
+
+
+                            <span>
+                                GeoJSON, KML, GeoPackage o
+                                Shapefile ZIP
+                            </span>
+
+
+                            <small>
+                                Haz clic para buscar el archivo
+                                en tu equipo.
+                            </small>
+
+                        </label>
+
+
+                        <input
+                            id="archivoGeoespacial"
+                            name="archivo"
+                            class="geoespacial-input-archivo"
+                            type="file"
+                            accept=".geojson,.json,.kml,.gpkg,.zip"
+                            required
+                        >
+
+                    </div>
+
+
+
+                    <!-- ARCHIVO SELECCIONADO -->
+
+                    <div
+                        id="archivoSeleccionado"
+                        class="geoespacial-archivo-seleccionado"
+                        hidden
+                    >
+
+                        <i class="bi bi-file-earmark-zip"></i>
+
+
+                        <div>
+
+                            <strong id="archivoSeleccionadoNombre">
+                                —
+                            </strong>
+
+                            <span id="archivoSeleccionadoTamano">
+                                —
+                            </span>
+
+                        </div>
+
+
+                        <button
+                            id="btnQuitarArchivo"
+                            type="button"
+                            aria-label="Quitar archivo seleccionado"
+                        >
+
+                            <i class="bi bi-x-lg"></i>
+
+                        </button>
+
+                    </div>
+
+
+
+                    <!-- AVISO -->
+
+                    <div class="geoespacial-aviso">
+
+                        <i class="bi bi-info-circle"></i>
+
+                        <p>
+                            El archivo no modifica inmediatamente
+                            la cartografía vigente. Primero será
+                            procesado y enviado a previsualización.
+                            La información sólo se incorporará a
+                            PostGIS después de una confirmación
+                            explícita.
+                        </p>
+
+                    </div>
+
+
+
+                    <!-- SUBMIT -->
+
+                    <button
+                        id="btnPrepararImportacion"
+                        class="btn-principal geoespacial-btn-principal"
+                        type="submit"
+                    >
+
+                        <i class="bi bi-search"></i>
+
+                        Preparar previsualización
+
+                    </button>
+
+                </form>
+
+            </section>
+
+
+
+            <!-- =============================================
+                      IMPORTACIONES DEL PROYECTO
+            ============================================== -->
+
+            <section class="geoespacial-card geoespacial-historial">
+
+                <div class="geoespacial-card-encabezado">
+
+                    <div>
+
+                        <span class="geoespacial-subtitulo">
+                            HISTORIAL
+                        </span>
+
+                        <h2>
+                            Importaciones del proyecto
+                        </h2>
+
+                    </div>
+
+
+                    <button
+                        id="btnActualizarImportaciones"
+                        class="btn-icono"
+                        type="button"
+                        title="Actualizar"
+                        aria-label="Actualizar importaciones"
+                    >
+
+                        <i class="bi bi-arrow-clockwise"></i>
+
+                    </button>
+
+                </div>
+
+
+
+                <!-- ESTADO VACÍO -->
+
+                <div
+                    id="importacionesVacio"
+                    class="geoespacial-vacio"
+                >
+
+                    <i class="bi bi-folder2-open"></i>
+
+                    <strong>
+                        Selecciona un proyecto
+                    </strong>
+
+                    <p>
+                        Aquí aparecerán sus importaciones
+                        geoespaciales.
+                    </p>
+
+                </div>
+
+
+
+                <!-- LISTA -->
+
+                <div
+                    id="listaImportaciones"
+                    class="geoespacial-lista-importaciones"
+                    hidden
+                ></div>
+
+            </section>
+
+        </div>
+
+
+
+        <!-- =================================================
+                         PREVISUALIZACIÓN
+        ================================================== -->
+
+        <section
+            id="seccionPrevisualizacion"
+            class="geoespacial-card geoespacial-preview"
+            hidden
+        >
+
+            <div class="geoespacial-card-encabezado">
+
+                <div>
+
+                    <span class="geoespacial-subtitulo">
+                        PREVISUALIZACIÓN
+                    </span>
+
+                    <h2 id="previewNombreArchivo">
+                        Archivo geoespacial
+                    </h2>
+
+                </div>
+
+
+                <span
+                    id="previewEstado"
+                    class="geoespacial-estado"
+                >
+                    —
+                </span>
+
+            </div>
+
+
+
+            <!-- INFORMACIÓN DEL ARCHIVO -->
+
+            <div class="geoespacial-preview-datos">
+
+                <div>
+
+                    <span>
+                        Formato
+                    </span>
+
+                    <strong id="previewFormato">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Tipo
+                    </span>
+
+                    <strong id="previewObjetivo">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        CRS original
+                    </span>
+
+                    <strong id="previewCrsOriginal">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        CRS destino
+                    </span>
+
+                    <strong id="previewCrsDestino">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Fuente
+                    </span>
+
+                    <strong id="previewFuente">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Fecha de fuente
+                    </span>
+
+                    <strong id="previewFechaFuente">
+                        —
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- HASH -->
+
+            <div class="geoespacial-hash">
+
+                <span>
+                    SHA-256
+                </span>
+
+                <code id="previewSha256">
+                    —
+                </code>
+
+            </div>
+
+
+
+            <!-- ESTADÍSTICAS -->
+
+            <div class="geoespacial-estadisticas">
+
+                <div>
+
+                    <span>
+                        Features
+                    </span>
+
+                    <strong id="previewTotal">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Válidos
+                    </span>
+
+                    <strong id="previewValidos">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Advertencias
+                    </span>
+
+                    <strong id="previewAdvertencias">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Errores
+                    </span>
+
+                    <strong id="previewErrores">
+                        —
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Importados
+                    </span>
+
+                    <strong id="previewImportados">
+                        —
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- TABLA FEATURES -->
+
+            <div class="geoespacial-tabla-contenedor">
+
+                <table class="geoespacial-tabla">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                #
+                            </th>
+
+                            <th>
+                                Capa
+                            </th>
+
+                            <th>
+                                Geometría
+                            </th>
+
+                            <th>
+                                Estado
+                            </th>
+
+                            <th>
+                                Advertencias / errores
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody id="tablaFeaturesGeoespaciales">
+
+                    </tbody>
+
+                </table>
+
+
+                <div
+                    id="featuresVacio"
+                    class="geoespacial-vacio"
+                    hidden
+                >
+
+                    <i class="bi bi-bounding-box"></i>
+
+                    <strong>
+                        No hay features para mostrar
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- CONFIRMACIÓN -->
+
+            <div
+                id="bloqueConfirmacionImportacion"
+                class="geoespacial-confirmacion"
+            >
+
+                <div>
+
+                    <h3>
+                        Confirmar incorporación
+                    </h3>
+
+                    <p>
+                        Al confirmar, las geometrías válidas
+                        serán incorporadas a la información
+                        geoespacial del proyecto.
+                    </p>
+
+                </div>
+
+
+                <label
+                    id="contenedorAceptarAdvertencias"
+                    class="geoespacial-check"
+                    hidden
+                >
+
+                    <input
+                        id="aceptarAdvertencias"
+                        type="checkbox"
+                    >
+
+                    <span>
+                        He revisado y acepto las advertencias
+                        identificadas.
+                    </span>
+
+                </label>
+
+
+                <div class="geoespacial-confirmacion-acciones">
+
+                    <button
+                        id="btnConfirmarImportacion"
+                        class="btn-principal"
+                        type="button"
+                        disabled
+                    >
+
+                        <i class="bi bi-check-circle"></i>
+
+                        Confirmar importación
+
+                    </button>
+
+
+                    <a
+                        id="btnVerProyectoMapa"
+                        class="btn-secundario"
+                        href="/pages/mapa.html"
+                        hidden
+                    >
+
+                        <i class="bi bi-map"></i>
+
+                        Ver en mapa
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+    </main>
+
+
+
+    <!-- =====================================================
+                         JAVASCRIPT
+    ====================================================== -->
+
+    <script src="/js/env.js"></script>
+
+    <script src="/js/config.js"></script>
+
+
+    <!-- CLIENTE API -->
+
+    <script src="/js/api/cliente.js"></script>
+
+    <script src="/js/api/auth.js"></script>
+
+    <script src="/js/api/proyectos.js"></script>
+
+
+    <!-- PROTECCIÓN DE SESIÓN -->
+
+    <script>
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            () => {
+
+                window.AuthAPI.requerirSesion();
+
+            }
+        );
+
+    </script>
+
+
+    <!-- COMPORTAMIENTO GENERAL DEL ASIDE -->
+
+    <script src="/js/dashboard.js"></script>
+
+
+    <!-- LÓGICA DEL MÓDULO -->
+
+    <script src="/js/gestionGeoespacial.js"></script>
+
+</body>
+
+</html>

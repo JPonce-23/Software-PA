@@ -500,30 +500,6 @@
 
 
 
-                <!-- Fin vigencia -->
-
-                <div class="campo">
-
-                    <label for="finVigencia">
-
-                        Fin de vigencia
-
-                        <span class="opcional">
-                            Opcional
-                        </span>
-
-                    </label>
-
-
-                    <input
-                        type="date"
-                        id="finVigencia"
-                        name="fin_vigencia">
-
-                </div>
-
-
-
                 <!-- Estatus fuente -->
 
                 <div class="campo campo-completo">
@@ -920,30 +896,6 @@
                 </div>
 
 
-
-                <!-- Fecha fin -->
-
-                <div class="campo">
-
-                    <label for="fechaFinIntegrante">
-
-                        Fin de participación
-
-                        <span class="opcional">
-                            Opcional
-                        </span>
-
-                    </label>
-
-
-                    <input
-                        type="date"
-                        id="fechaFinIntegrante"
-                        name="fecha_fin">
-
-                </div>
-
-
             </div>
 
 
@@ -975,6 +927,162 @@
         </form>
 
     </section>
+
+
+
+    <!-- =================================================
+                FINALIZAR INTEGRANTE
+================================================== -->
+
+        <section
+            class="tarjeta formulario-integrante"
+            id="formularioFinalizarIntegrante"
+            hidden
+        >
+
+            <div class="formulario-header">
+
+                <div>
+
+                    <h2>
+                        Finalizar participación
+                    </h2>
+
+                    <p id="descripcionFinalizarIntegrante">
+                        Registra la finalización de la participación
+                        del integrante seleccionado.
+                    </p>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="btn-cerrar"
+                    id="btnCerrarFinalizarIntegrante"
+                >
+
+                    <i class="bi bi-x-lg"></i>
+
+                </button>
+
+            </div>
+
+
+            <form id="formFinalizarIntegrante">
+
+                <div class="form-grid">
+
+
+                    <div class="campo">
+
+                        <label for="fechaFinParticipacion">
+
+                            Fecha de finalización
+
+                            <span class="obligatorio">
+                                *
+                            </span>
+
+                        </label>
+
+
+                        <input
+                            type="date"
+                            id="fechaFinParticipacion"
+                            name="fecha_fin"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="campo">
+
+                        <label for="tipoFinIntegrante">
+
+                            Motivo de finalización
+
+                            <span class="obligatorio">
+                                *
+                            </span>
+
+                        </label>
+
+
+                        <select
+                            id="tipoFinIntegrante"
+                            name="id_tipo_fin"
+                            required
+                        >
+
+                            <option value="">
+                                Selecciona una opción
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="campo campo-completo">
+
+                        <label for="detalleFinIntegrante">
+
+                            Detalle
+
+                            <span class="opcional">
+                                Opcional
+                            </span>
+
+                        </label>
+
+
+                        <textarea
+                            id="detalleFinIntegrante"
+                            name="detalle_fin"
+                            maxlength="2000"
+                            rows="4"
+                            placeholder="Describe la finalización cuando sea necesario"
+                        ></textarea>
+
+                        <small>
+                            Si seleccionas "Otro", el detalle es obligatorio.
+                        </small>
+
+                    </div>
+
+
+                </div>
+
+
+                <div class="acciones-formulario">
+
+                    <button
+                        type="button"
+                        class="btn-secundario"
+                        id="btnCancelarFinalizarIntegrante"
+                    >
+                        Cancelar
+                    </button>
+
+
+                    <button
+                        type="submit"
+                        class="btn-principal"
+                    >
+
+                        <i class="bi bi-check-circle"></i>
+
+                        Finalizar participación
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </section>
 
 
 </main>

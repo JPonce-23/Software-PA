@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+
+    <title>
+        Cambiar contraseña | SSALFER
+    </title>
+
+
+    <link
+        rel="stylesheet"
+        href="/styles/dashboard.css"
+    >
+
+
+    <link
+        rel="stylesheet"
+        href="/styles/cambiarContrasena.css"
+    >
+
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+    >
+
+
+    <link
+        rel="icon"
+        type="image/png"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png"
+    >
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+                        ASIDE
+====================================================== -->
+
+<aside class="aside">
+
+
+    <button
+        class="btn-menu"
+        type="button"
+        aria-label="Abrir o cerrar menú"
+    >
+
+        <i class="bi bi-list"></i>
+
+    </button>
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER"
+        >
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">
+            Usuario
+        </span>
+
+    </div>
+
+
+    <nav class="barra">
+
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+            <div
+                class="proyectos-lista-dinamica"
+                id="proyectosLista"
+            ></div>
+
+        </div>
+
+
+        <a href="/pages/mapa.html">
+
+            <i class="bi bi-map"></i>
+
+            <span>
+                Ver mapa
+            </span>
+
+        </a>
+
+
+        <!-- USUARIO -->
+
+        <div class="usuario-panel">
+
+
+            <button
+                class="usuario-btn"
+                type="button"
+            >
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">
+                    Usuario
+                </span>
+
+                <i class="bi bi-chevron-up"></i>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+
+                <a
+                    id="enlaceUsuarios"
+                    href="/pages/usuarios.html"
+                    hidden
+                >
+
+                    <i class="bi bi-people"></i>
+
+                    Usuarios y permisos
+
+                </a>
+
+
+                <a
+                    href="/pages/cambiarContrasena.html"
+                    data-action="cambiar-contrasena"
+                >
+
+                    <i class="bi bi-lock"></i>
+
+                    Cambiar contraseña
+
+                </a>
+
+
+                <a
+                    href="#"
+                    data-action="logout"
+                >
+
+                    <i class="bi bi-box-arrow-left"></i>
+
+                    Cerrar sesión
+
+                </a>
+
+
+            </div>
+
+        </div>
+
+
+    </nav>
+
+</aside>
+
+
+
+<!-- =====================================================
+                        HEADER
+====================================================== -->
+
+<header class="header">
+
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER"
+        >
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER"
+        >
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Procuraduría Agraria"
+    >
+
+        <img
+            src="/img/LOGOS VERDE/palogo-2.png"
+            alt="Procuraduría Agraria"
+        >
+
+    </a>
+
+
+</header>
+
+
+
+<!-- =====================================================
+                        CONTENIDO
+====================================================== -->
+
+<main class="contenedor cambio-contrasena-pagina">
+
+
+    <nav
+        class="cambio-migas"
+        aria-label="Breadcrumb"
+    >
+
+        <a href="/dashboard.html">
+            Inicio
+        </a>
+
+        <i class="bi bi-chevron-right"></i>
+
+        <span>
+            Cambiar contraseña
+        </span>
+
+    </nav>
+
+
+
+    <section class="cambio-encabezado">
+
+
+        <p class="cambio-etiqueta">
+            CUENTA
+        </p>
+
+
+        <h1>
+            Cambiar contraseña
+        </h1>
+
+
+        <p>
+            Actualiza la contraseña de tu cuenta de acceso a SSALFER.
+        </p>
+
+
+    </section>
+
+
+
+    <div
+        id="mensajeCambioError"
+        class="cambio-mensaje cambio-mensaje-error"
+        role="alert"
+        hidden
+    ></div>
+
+
+    <div
+        id="mensajeCambioExito"
+        class="cambio-mensaje cambio-mensaje-exito"
+        role="status"
+        hidden
+    ></div>
+
+
+
+    <section class="cambio-tarjeta">
+
+
+        <div class="cambio-tarjeta-header">
+
+
+            <div class="cambio-icono">
+
+                <i class="bi bi-shield-lock"></i>
+
+            </div>
+
+
+            <div>
+
+                <h2>
+                    Seguridad de la cuenta
+                </h2>
+
+                <p>
+                    Ingresa tu contraseña actual y define una nueva.
+                </p>
+
+            </div>
+
+
+        </div>
+
+
+
+        <form
+            id="formCambiarContrasena"
+            novalidate
+        >
+
+
+            <div class="cambio-form-grid">
+
+
+                <!-- CONTRASEÑA ACTUAL -->
+
+                <div class="cambio-campo">
+
+
+                    <label for="contrasenaActual">
+
+                        Contraseña actual
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="password"
+                        id="contrasenaActual"
+                        name="contrasena_actual"
+                        autocomplete="current-password"
+                        required
+                    >
+
+
+                </div>
+
+
+
+                <!-- NUEVA CONTRASEÑA -->
+
+                <div class="cambio-campo">
+
+
+                    <label for="contrasenaNueva">
+
+                        Nueva contraseña
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="password"
+                        id="contrasenaNueva"
+                        name="contrasena_nueva"
+                        autocomplete="new-password"
+                        minlength="8"
+                        required
+                    >
+
+
+                    <small>
+                        Debe tener al menos 8 caracteres,
+                        una letra y un número.
+                    </small>
+
+
+                </div>
+
+
+
+                <!-- CONFIRMACIÓN -->
+
+                <div class="cambio-campo">
+
+
+                    <label for="confirmarContrasena">
+
+                        Confirmar nueva contraseña
+
+                        <span class="obligatorio">
+                            *
+                        </span>
+
+                    </label>
+
+
+                    <input
+                        type="password"
+                        id="confirmarContrasena"
+                        autocomplete="new-password"
+                        minlength="8"
+                        required
+                    >
+
+
+                </div>
+
+
+            </div>
+
+
+
+            <div class="cambio-aviso">
+
+
+                <i class="bi bi-info-circle"></i>
+
+
+                <p>
+
+                    Al cambiar tu contraseña se cerrarán las
+                    sesiones activas de tu cuenta. Tendrás que
+                    iniciar sesión nuevamente.
+
+                </p>
+
+
+            </div>
+
+
+
+            <div class="cambio-acciones">
+
+
+                <a
+                    href="/dashboard.html"
+                    class="btn-secundario"
+                >
+
+                    Cancelar
+
+                </a>
+
+
+                <button
+                    type="submit"
+                    class="btn-principal"
+                    id="btnGuardarContrasena"
+                >
+
+                    <i class="bi bi-check-lg"></i>
+
+                    Cambiar contraseña
+
+                </button>
+
+
+            </div>
+
+
+        </form>
+
+
+    </section>
+
+
+</main>
+
+
+
+<!-- =====================================================
+                        FOOTER
+====================================================== -->
+
+<footer class="footer">
+
+    <p>
+        &copy; 2026 Procuraduría Agraria.
+        Todos los derechos reservados.
+    </p>
+
+</footer>
+
+
+
+<!-- =====================================================
+                        SCRIPTS
+====================================================== -->
+
+<script src="/js/env.js"></script>
+
+<script src="/js/config.js"></script>
+
+<script src="/js/api/cliente.js"></script>
+
+<script src="/js/api/auth.js"></script>
+
+<script src="/js/api/proyectos.js"></script>
+
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/cambiarContrasena.js"></script>
+
+
+</body>
+
+</html>

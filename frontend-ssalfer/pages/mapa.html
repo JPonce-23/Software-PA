@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Mapa del proyecto | SSALFER</title>
+
+    <link
+        rel="stylesheet"
+        href="/styles/dashboard.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/styles/mapa.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <link
+        rel="icon"
+        type="image/png"
+        sizes="40x40"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png"
+    >
+
+</head>
+
+
+<body>
+
+
+    <!-- =====================================================
+                            ASIDE
+    ====================================================== -->
+
+    <aside class="aside">
+
+        <button
+            class="btn-menu"
+            type="button"
+            aria-label="Contraer menú"
+        >
+            <i class="bi bi-list"></i>
+        </button>
+
+
+        <div class="logo-aside">
+
+            <img
+                src="/img/LOGOS VERDE/IMAGOTIPO.png"
+                alt="Logo SSALFER"
+            >
+
+        </div>
+
+
+        <div class="bienvenida">
+
+            <h3>Bienvenido</h3>
+
+            <span class="js-usuario-nombre">
+                Usuario
+            </span>
+
+        </div>
+
+
+        <nav class="barra">
+
+
+            <!-- TODOS LOS PROYECTOS -->
+
+            <a href="/dashboard.html">
+
+                <i class="bi bi-train-front"></i>
+
+                <span>
+                    Todos los proyectos
+                </span>
+
+            </a>
+
+
+            <!-- PROYECTOS -->
+
+            <div class="proyectos">
+
+                <h4>
+                    Proyectos
+                </h4>
+
+                <div
+                    class="proyectos-lista-dinamica"
+                    id="proyectosLista"
+                ></div>
+
+
+                <a href="/pages/nuevoProyecto.html">
+
+                    <i class="bi bi-plus-circle"></i>
+
+                    <span>
+                        Nuevo proyecto
+                    </span>
+
+                </a>
+
+            </div>
+
+
+            <!-- ADMINISTRACIÓN -->
+
+            <div
+                class="proyectos js-admin-only"
+                hidden
+            >
+
+                <h4>
+                    Administración
+                </h4>
+
+                <a href="/pages/usuarios.html">
+                    <i class="bi bi-people"></i>
+                    <span>Usuarios</span>
+                </a>
+
+                <a href="/pages/catalogosOperativos.html">
+                    <i class="bi bi-list-check"></i>
+                    <span>Catálogos operativos</span>
+                </a>
+
+                <a href="/pages/auditoria.html">
+                    <i class="bi bi-journal-text"></i>
+                    <span>Auditoría</span>
+                </a>
+
+            </div>
+
+
+            <!-- MAPA -->
+
+            <a
+                href="/pages/mapa.html"
+                class="activo"
+                aria-current="page"
+            >
+
+                <i class="bi bi-map"></i>
+
+                <span>
+                    Ver mapa
+                </span>
+
+            </a>
+
+
+            <!-- USUARIO -->
+
+            <div class="usuario-panel">
+
+                <button
+                    class="usuario-btn"
+                    type="button"
+                    aria-label="Abrir opciones de usuario"
+                >
+
+                    <i class="bi bi-person-circle"></i>
+
+                    <span class="js-usuario-nombre">
+                        Usuario
+                    </span>
+
+                    <i class="bi bi-chevron-up"></i>
+
+                </button>
+
+
+                <div class="opciones-usuario">
+
+                    <a href="/pages/usuarios.html">
+
+                        <i class="bi bi-people"></i>
+
+                        Usuarios y permisos
+
+                    </a>
+
+
+                    <a
+                        href="#"
+                        data-action="logout"
+                    >
+
+                        <i class="bi bi-box-arrow-left"></i>
+
+                        Cerrar sesión
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </nav>
+
+    </aside>
+
+
+
+    <!-- =====================================================
+                            HEADER
+    ====================================================== -->
+
+    <header class="header">
+
+        <div class="logo-ssalfer">
+
+            <img
+                src="/img/LOGOS VERDE/SSALFER.png"
+                alt="SSALFER"
+            >
+
+            <img
+                src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+                alt="Nombre SSALFER"
+            >
+
+        </div>
+
+
+        <a
+            class="logo-pa"
+            href="https://www.gob.mx/pa"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Procuraduría Agraria"
+        >
+
+            <img
+                src="/img/PA_LOGO_FIN.png"
+                alt="Procuraduría Agraria"
+            >
+
+        </a>
+
+    </header>
+
+
+
+    <!-- =====================================================
+                        CONTENIDO PRINCIPAL
+    ====================================================== -->
+
+    <main class="contenedor mapa-pagina">
+
+
+        <!-- ENCABEZADO DEL MAPA -->
+
+        <section class="mapa-encabezado">
+
+            <div>
+
+                <p class="mapa-etiqueta">
+                    CONSULTA GEOESPACIAL
+                </p>
+
+                <h1 id="tituloMapa">
+                    Mapa del proyecto
+                </h1>
+
+                <p id="descripcionMapa">
+                    Selecciona un proyecto para consultar su trazo vigente,
+                    núcleos agrarios, parcelas e información administrativa
+                    relacionada.
+                </p>
+
+            </div>
+
+
+            <div class="mapa-selector-contenedor">
+
+                <label for="selectorProyectoMapa">
+                    Proyecto
+                </label>
+
+                <select id="selectorProyectoMapa">
+
+                    <option value="">
+                        Selecciona un proyecto
+                    </option>
+
+                </select>
+
+            </div>
+
+        </section>
+
+
+        <!-- MENSAJES -->
+
+        <div
+            id="mapaMensajeError"
+            class="mensaje-error"
+            role="alert"
+            hidden
+        ></div>
+
+
+        <div
+            id="mapaMensajeInformativo"
+            class="mapa-mensaje-informativo"
+            role="status"
+            hidden
+        ></div>
+
+
+        <!-- BARRA DE CONTEXTO -->
+
+        <section
+            id="mapaContextoProyecto"
+            class="mapa-contexto-proyecto"
+            hidden
+        >
+
+            <div>
+
+                <span class="mapa-contexto-etiqueta">
+                    PROYECTO SELECCIONADO
+                </span>
+
+                <strong id="mapaContextoNombreProyecto">
+                    —
+                </strong>
+
+            </div>
+
+
+            <div class="mapa-contexto-acciones">
+
+                <a
+                    id="enlaceFichaProyectoMapa"
+                    class="btn-secundario"
+                    href="#"
+                    hidden
+                >
+
+                    <i class="bi bi-folder2-open"></i>
+
+                    Ver información general
+
+                </a>
+
+
+                <a
+                    id="enlaceGestionGeoespacialMapa"
+                    class="btn-secundario"
+                    href="#"
+                    hidden
+                >
+
+                    <i class="bi bi-layers"></i>
+
+                    Gestionar cartografía
+
+                </a>
+
+            </div>
+
+        </section>
+
+
+        <!-- ÁREA PRINCIPAL DEL VISOR -->
+
+        <div class="mapa-layout">
+
+
+            <!-- CONTROLES / CAPAS -->
+
+            <section
+                class="mapa-panel mapa-panel-capas"
+                aria-labelledby="tituloCapasMapa"
+            >
+
+                <h2 id="tituloCapasMapa">
+                    Capas
+                </h2>
+
+                <p>
+                    Activa o desactiva la información geográfica visible.
+                </p>
+
+
+                <div class="mapa-lista-capas">
+
+                    <label class="mapa-opcion-capa">
+
+                        <input
+                            id="capaTrazos"
+                            type="checkbox"
+                            checked
+                        >
+
+                        <span>
+                            <i class="bi bi-bezier2"></i>
+                            Trazos del proyecto
+                        </span>
+
+                    </label>
+
+
+                    <label class="mapa-opcion-capa">
+
+                        <input
+                            id="capaNucleos"
+                            type="checkbox"
+                            checked
+                        >
+
+                        <span>
+                            <i class="bi bi-bounding-box-circles"></i>
+                            Núcleos agrarios
+                        </span>
+
+                    </label>
+
+
+                    <label class="mapa-opcion-capa">
+
+                        <input
+                            id="capaParcelas"
+                            type="checkbox"
+                            checked
+                        >
+
+                        <span>
+                            <i class="bi bi-grid-3x3"></i>
+                            Parcelas
+                        </span>
+
+                    </label>
+
+                </div>
+
+
+                <div class="mapa-leyenda">
+
+                    <h3>
+                        Información mostrada
+                    </h3>
+
+                    <p>
+                        El visor representa únicamente las geometrías vigentes
+                        registradas para el proyecto seleccionado.  
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <!-- MAPA LEAFLET -->
+
+            <section
+                class="mapa-visor-contenedor"
+                aria-label="Mapa geográfico de proyectos"
+            >
+
+                <div
+                    id="mapaEstadoCarga"
+                    class="mapa-estado-carga"
+                    role="status"
+                >
+
+                    <i class="bi bi-arrow-repeat"></i>
+
+                    <div
+                        id="mapaEstadoCarga"
+                        class="mapa-estado-carga"
+                        role="status"
+                    >
+
+                        <i class="bi bi-map"></i>
+
+                        <span>
+                            Selecciona un proyecto para consultar su información geográfica.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="mapa"
+                    class="mapa-visor"
+                    aria-label="Mapa interactivo"
+                ></div>
+
+            </section>
+
+
+            <!-- DETALLE DE LA SELECCIÓN -->
+
+            <section
+                class="mapa-panel mapa-panel-detalle"
+                aria-labelledby="tituloDetalleMapa"
+            >
+
+                <h2 id="tituloDetalleMapa">
+                    Detalle
+                </h2>
+
+
+                <div id="mapaDetalleVacio">
+
+                    <i class="bi bi-cursor"></i>
+
+                    <p>
+                        Selecciona una geometría del mapa para consultar
+                        su información.
+                    </p>
+
+                </div>
+
+                <div
+                    id="mapaDetalleContenido"
+                    hidden
+                >
+
+                    <span
+                        id="mapaDetalleTipo"
+                        class="mapa-detalle-tipo"
+                    ></span>
+
+                    <h3 id="mapaDetalleNombre">
+                        —
+                    </h3>
+
+
+                    <dl id="mapaDetalleDatos"></dl>
+
+                    <div
+                        id="mapaDetalleTitulares"
+                        class="mapa-detalle-titulares"
+                        hidden
+                    >
+
+                        <h4>
+                            Titulares
+                        </h4>
+
+                        <div id="mapaDetalleListaTitulares">
+                        </div>
+
+                    </div>
+
+
+                    <div class="mapa-detalle-acciones">
+
+                        <a
+                            id="mapaDetalleEnlacePrincipal"
+                            class="btn-principal"
+                            href="#"
+                            hidden
+                        >
+
+                            Ver información
+
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+
+    
+        <!-- RESUMEN DEL PROYECTO SELECCIONADO -->
+
+        <section
+            id="mapaResumenProyecto"
+            class="mapa-resumen-proyecto"
+            aria-labelledby="tituloResumenProyecto"
+            hidden
+        >
+
+            <div class="mapa-resumen-header">
+
+                <div>
+
+                    <p class="mapa-etiqueta">
+                        RESUMEN DEL PROYECTO
+                    </p>
+
+                    <h2 id="tituloResumenProyecto">
+                        Proyecto
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="mapa-resumen-grid">
+
+
+                <!-- SUPERFICIE -->
+
+                <article
+                    id="resumenSuperficieAfectada"
+                    class="mapa-resumen-tarjeta"
+                    hidden
+                >
+
+                    <i class="bi bi-bounding-box"></i>
+
+                    <span>
+                        Superficie afectada
+                    </span>
+
+                    <strong id="valorSuperficieAfectada">
+                    </strong>
+
+                </article>
+
+
+                <!-- NÚCLEOS -->
+
+                <article
+                    id="resumenNucleos"
+                    class="mapa-resumen-tarjeta"
+                    hidden
+                >
+
+                    <i class="bi bi-bounding-box-circles"></i>
+
+                    <span>
+                        Núcleos agrarios
+                    </span>
+
+                    <strong id="valorNucleos">
+                    </strong>
+
+                </article>
+
+
+                <!-- PARCELAS -->
+
+                <article
+                    id="resumenParcelas"
+                    class="mapa-resumen-tarjeta"
+                    hidden
+                >
+
+                    <i class="bi bi-grid-3x3"></i>
+
+                    <span>
+                        Parcelas registradas
+                    </span>
+
+                    <strong id="valorParcelas">
+                    </strong>
+
+                </article>
+
+
+                <!-- AFECTACIONES -->
+
+                <article
+                    id="resumenAfectaciones"
+                    class="mapa-resumen-tarjeta"
+                    hidden
+                >
+
+                    <i class="bi bi-exclamation-diamond"></i>
+
+                    <span>
+                        Afectaciones registradas
+                    </span>
+
+                    <strong id="valorAfectaciones">
+                    </strong>
+
+                </article>
+
+
+            </div>
+
+        </section>
+
+
+    </main>
+
+
+
+    <!-- =====================================================
+                            FOOTER
+    ====================================================== -->
+
+    <footer class="footer">
+
+        <p>
+            &copy; 2026 Procuraduría Agraria.
+            Todos los derechos reservados.
+        </p>
+
+    </footer>
+
+
+
+    <!-- =====================================================
+                            SCRIPTS
+    ====================================================== -->
+
+    <script src="/js/env.js"></script>
+    <script src="/js/config.js"></script>
+
+    <script src="/js/api/cliente.js"></script>
+    <script src="/js/api/auth.js"></script>
+    <script src="/js/api/proyectos.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            window.AuthAPI.requerirSesion();
+        });
+    </script>
+
+    <!--
+        dashboard.js se reutiliza para sesión, usuario, proyectos del Aside,
+        colapsado del menú y navegación común. Su bloque de dashboard no se
+        ejecuta porque esta página no contiene listaProyectosDashboard.
+    -->
+    <script src="/js/dashboard.js"></script>
+
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    ></script>
+
+    <!-- Se implementará en la siguiente etapa -->
+    <script src="/js/mapa.js"></script>
+
+</body>
+
+</html>

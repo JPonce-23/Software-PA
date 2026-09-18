@@ -243,6 +243,322 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
+
+
+    /* =====================================================
+        NAVEGACIÓN COMÚN DEL SIDEBAR
+====================================================== */
+
+function configurarMenuCuenta() {
+
+    document
+        .querySelectorAll(
+            ".opciones-usuario"
+        )
+        .forEach(
+            menu => {
+
+                const enlaces =
+                    Array.from(
+                        menu.querySelectorAll(
+                            "a"
+                        )
+                    );
+
+
+                /* =========================================
+                    CAMBIAR CONTRASEÑA
+                ========================================== */
+
+                let enlaceContrasena =
+                    enlaces.find(
+                        enlace =>
+                            enlace.dataset.action ===
+                                "cambiar-contrasena" ||
+                            enlace
+                                .textContent
+                                .trim()
+                                .toLowerCase()
+                                .includes(
+                                    "cambiar contraseña"
+                                )
+                    );
+
+
+                if (!enlaceContrasena) {
+
+                    enlaceContrasena =
+                        document.createElement(
+                            "a"
+                        );
+
+
+                    enlaceContrasena.innerHTML = `
+                        <i class="bi bi-lock"></i>
+                        Cambiar contraseña
+                    `;
+
+
+                    menu.appendChild(
+                        enlaceContrasena
+                    );
+
+                }
+
+
+                enlaceContrasena.href =
+                    "/pages/cambiarContrasena.html";
+
+
+                enlaceContrasena.dataset.action =
+                    "cambiar-contrasena";
+
+
+
+                /* =========================================
+                    CERRAR SESIÓN
+                ========================================== */
+
+                let enlaceLogout =
+                    enlaces.find(
+                        enlace =>
+                            enlace.dataset.action ===
+                                "logout" ||
+                            enlace
+                                .textContent
+                                .trim()
+                                .toLowerCase()
+                                .includes(
+                                    "cerrar sesión"
+                                )
+                    );
+
+
+                if (!enlaceLogout) {
+
+                    enlaceLogout =
+                        document.createElement(
+                            "a"
+                        );
+
+
+                    enlaceLogout.innerHTML = `
+                        <i class="bi bi-box-arrow-left"></i>
+                        Cerrar sesión
+                    `;
+
+
+                    menu.appendChild(
+                        enlaceLogout
+                    );
+
+                }
+
+
+                enlaceLogout.href =
+                    "#";
+
+
+                enlaceLogout.dataset.action =
+                    "logout";
+
+
+                /*
+                 * Las dos opciones deben quedar juntas.
+                 */
+
+                enlaceContrasena
+                    .insertAdjacentElement(
+                        "afterend",
+                        enlaceLogout
+                    );
+
+            }
+        );
+
+}
+
+
+
+/* =====================================================
+            ACCESO AL MAPA
+====================================================== */
+
+function configurarAccesoMapa() {
+
+    const ruta =
+        window.location.pathname
+            .toLowerCase()
+            .replace(
+                /\/$/,
+                ""
+            );
+
+
+    const esDashboard =
+        ruta.endsWith(
+            "/dashboard.html"
+        );
+
+
+    const esFichaProyecto =
+        ruta.endsWith(
+            "/pages/fichaproyecto.html"
+        );
+
+
+    const esMapa =
+        ruta.endsWith(
+            "/pages/mapa.html"
+        );
+
+
+    const accesoPermitido =
+        esDashboard ||
+        esFichaProyecto ||
+        esMapa;
+
+
+    /*
+     * Sólo actuamos sobre enlaces del sidebar.
+     *
+     * No ocultamos botones internos que puedan llamarse
+     * de forma parecida.
+     */
+
+    document
+        .querySelectorAll(
+            ".barra a"
+        )
+        .forEach(
+            enlace => {
+
+                const texto =
+                    enlace
+                        .textContent
+                        .trim()
+                        .toLowerCase();
+
+
+                const href =
+                    (
+                        enlace.getAttribute(
+                            "href"
+                        ) ||
+                        ""
+                    )
+                        .toLowerCase();
+
+
+                const esEnlaceMapa =
+                    texto.includes(
+                        "ver mapa"
+                    ) ||
+                    href.includes(
+                        "/pages/mapa.html"
+                    );
+
+
+                if (!esEnlaceMapa) {
+
+                    return;
+
+                }
+
+
+                /*
+                 * En páginas internas:
+                 *
+                 * núcleo, parcela, ORV, unidades,
+                 * afectaciones, convenios, personas, etc.
+                 *
+                 * no mostramos el acceso al mapa.
+                 */
+
+                if (!accesoPermitido) {
+
+                    enlace.hidden =
+                        true;
+
+
+                    return;
+
+                }
+
+
+                enlace.hidden =
+                    false;
+
+
+                /*
+                 * Desde la ficha del proyecto abrimos
+                 * directamente ese proyecto en el mapa.
+                 */
+
+                if (esFichaProyecto) {
+
+                    const parametros =
+                        new URLSearchParams(
+                            window.location.search
+                        );
+
+
+                    const idProyecto =
+                        Number(
+                            parametros.get(
+                                "id"
+                            )
+                        );
+
+
+                    enlace.href =
+                        Number.isInteger(
+                            idProyecto
+                        ) &&
+                        idProyecto > 0
+
+                            ? (
+                                `/pages/mapa.html?id_proyecto=${encodeURIComponent(
+                                    idProyecto
+                                )}`
+                            )
+
+                            : "/pages/mapa.html";
+
+
+                    return;
+
+                }
+
+
+                /*
+                 * Desde Dashboard entra sin proyecto
+                 * seleccionado.
+                 */
+
+                enlace.href =
+                    "/pages/mapa.html";
+
+            }
+        );
+
+}
+
+
+
+/* =====================================================
+            CONFIGURACIÓN COMÚN
+====================================================== */
+
+configurarMenuCuenta();
+
+configurarAccesoMapa();
+
+
+
+
+
+
     /* =====================================================
             SESIÓN REAL DEL USUARIO
     ====================================================== */

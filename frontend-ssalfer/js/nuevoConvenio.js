@@ -201,10 +201,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             "Modificatorio"
         ],
         [
-            "superficie_adicional",
-            "Superficie adicional"
-        ],
-        [
             "obras_complementarias",
             "Obras complementarias"
         ]
@@ -468,35 +464,61 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function actualizarReglasPadre() {
+
         const tipo =
             elementos
                 .tipoConvenio
                 .value;
 
-        const requierePadre =
-            !esColectiva() &&
+
+        const esDerivado =
+            elementos
+                .tipoInstrumento
+                .value ===
+                "convenio" &&
             [
                 "modificatorio",
+                "obras_complementarias",
                 "ampliacion",
                 "ampliacion_remanente"
             ].includes(
                 tipo
             );
 
+
+        /*
+        * El backend permite que un instrumento derivado
+        * todavía no tenga identificado su antecedente.
+        *
+        * Por eso el convenio padre es opcional.
+        */
+
         elementos
             .idConvenioPadre
             .required =
-            requierePadre;
+            false;
 
-        if (
-            tipo ===
-            "cop_original"
-        ) {
+
+        elementos
+            .idConvenioPadre
+            .disabled =
+            !esDerivado;
+
+
+        /*
+        * COP original y otros instrumentos
+        * no deben conservar un padre seleccionado.
+        */
+
+        if (!esDerivado) {
+
             elementos
                 .idConvenioPadre
                 .value =
                 "";
+
         }
+
     }
 
     /* =====================================================
@@ -1558,22 +1580,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         ) {
             return (
                 "La modalidad 'Otra' requiere descripción."
-            );
-        }
-
-        if (
-            !esColectiva() &&
-            [
-                "modificatorio",
-                "ampliacion",
-                "ampliacion_remanente"
-            ].includes(
-                payload.tipo_convenio
-            ) &&
-            !payload.id_convenio_padre
-        ) {
-            return (
-                `El convenio individual ${payload.tipo_convenio} requiere un convenio padre.`
             );
         }
 

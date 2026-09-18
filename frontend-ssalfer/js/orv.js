@@ -55,7 +55,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         cargoOrv: document.getElementById("cargoOrv"),
         calidadIntegrante: document.getElementById("calidadIntegrante"),
         fechaInicioIntegrante: document.getElementById("fechaInicioIntegrante"),
-        fechaFinIntegrante: document.getElementById("fechaFinIntegrante")
+
+        formularioFinalizarIntegrante: document.getElementById("formularioFinalizarIntegrante"),
+        formFinalizarIntegrante: document.getElementById("formFinalizarIntegrante"),
+        descripcionFinalizarIntegrante: document.getElementById("descripcionFinalizarIntegrante"),
+        fechaFinParticipacion: document.getElementById("fechaFinParticipacion"),
+        tipoFinIntegrante: document.getElementById("tipoFinIntegrante"),
+        detalleFinIntegrante: document.getElementById("detalleFinIntegrante"),
+        btnCerrarFinalizarIntegrante: document.getElementById("btnCerrarFinalizarIntegrante"),
+        btnCancelarFinalizarIntegrante: document.getElementById("btnCancelarFinalizarIntegrante")
     };
 
     const tituloFormularioOrv =
@@ -80,12 +88,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     let idOrvEditando = null;
     let idIntegranteEditando = null;
 
+    let idIntegranteFinalizando = null;
+
     let puedeCapturar = false;
 
     let estadosRegistrales = [];
     let organos = [];
     let cargos = [];
     let calidades = [];
+
+    let tiposFinIntegrante = [];
+    let tipoFinPorId = new Map();
 
     let estadoPorId = new Map();
     let organoPorId = new Map();
@@ -229,21 +242,61 @@ document.addEventListener("DOMContentLoaded", async () => {
             estadosRegistrales,
             organos,
             cargos,
-            calidades
+            calidades,
+            tiposFinIntegrante
         ] = await Promise.all([
+
             window.CatalogosAPI.obtenerOperativo(
                 "estado_registral_orv"
             ),
+
             window.CatalogosAPI.obtenerOperativo(
                 "organo_orv"
             ),
+
             window.CatalogosAPI.obtenerOperativo(
                 "cargo_orv"
             ),
+
             window.CatalogosAPI.obtenerOperativo(
                 "calidad_integrante_orv"
+            ),
+
+            window.CatalogosAPI.obtenerOperativo(
+                "tipo_fin_orv_integrante"
             )
+
         ]);
+
+        tiposFinIntegrante =
+            Array.isArray(tiposFinIntegrante)
+                ? tiposFinIntegrante.filter(
+                    item =>
+                        item.codigo !==
+                        "sin_clasificar"
+                )
+                : [];
+
+
+        tipoFinPorId =
+            new Map(
+                tiposFinIntegrante.map(
+                    item => [
+                        Number(
+                            item.id_catalogo_opcion
+                        ),
+                        item
+                    ]
+                )
+            );
+
+
+        llenarCatalogo(
+            elementos.tipoFinIntegrante,
+            tiposFinIntegrante,
+            "Selecciona una opción"
+        );
+
 
         estadosRegistrales =
             Array.isArray(estadosRegistrales)
@@ -323,24 +376,24 @@ document.addEventListener("DOMContentLoaded", async () => {
                         ORV
     ====================================================== */
 
-    async function cargarOrvs() {
-        try {
-            const respuesta =
-                await window.OrvAPI.listarPorProyectoNucleo(
-                    idProyectoNucleo
-                );
+        async function cargarOrvs() {
+            try {
+                const respuesta =
+                    await window.OrvAPI.listarPorProyectoNucleo(
+                        idProyectoNucleo
+                    );
 
-            orvs =
-                Array.isArray(respuesta)
-                    ? respuesta
-                    : [];
+                orvs =
+                    Array.isArray(respuesta)
+                        ? respuesta
+                        : [];
 
-            mostrarOrvs();
+                mostrarOrvs();
 
-        } catch (error) {
-            window.ClienteAPI.mostrarErrorAPI(error);
+            } catch (error) {
+                window.ClienteAPI.mostrarErrorAPI(error);
+            }
         }
-    }
 
     function mostrarOrvs() {
         elementos.orvLista
@@ -549,7 +602,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function obtenerDatosOrv() {
+
         return {
+
             numero_orv:
                 textoOpcional(
                     elementos.numeroOrv
@@ -576,24 +631,30 @@ document.addEventListener("DOMContentLoaded", async () => {
                         elementos.estadoRegistral.value
                     )
                     : null
+
         };
+
     }
 
     function validarOrv(datos) {
+
         if (
             datos.inicio_vigencia &&
             datos.fin_vigencia &&
             datos.fin_vigencia <
                 datos.inicio_vigencia
         ) {
+
             alert(
                 "La fecha de fin de vigencia no puede ser anterior al inicio."
             );
 
             return false;
+
         }
 
         return true;
+
     }
 
     elementos.formOrv?.addEventListener(
@@ -698,6 +759,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     elementos.orvLista?.addEventListener(
         "click",
         event => {
+
             const botonEditar =
                 event.target.closest(
                     "[data-editar-orv]"
@@ -772,8 +834,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             integrantes.length > 0;
 
         integrantes.forEach(integrante => {
+
+            const estaFinalizado =
+                Boolean(
+                    integrante.fecha_fin
+                );
+
+
             const fila =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             fila.className =
                 "integrante-item";
@@ -811,27 +882,58 @@ document.addEventListener("DOMContentLoaded", async () => {
                     </div>
 
                     <small>
-                        Participación:
+                        Vigencia:
                         ${escaparHTML(
                             integrante.fecha_inicio || "—"
                         )}
                         a
                         ${escaparHTML(
-                            integrante.fecha_fin || "—"
+                            integrante.fecha_fin ||
+                            "Vigente"
                         )}
                     </small>
+
+
+                    <span>
+                        Estado:
+                        <strong>
+                            ${
+                                estaFinalizado
+                                    ? "Finalizado"
+                                    : "Vigente"
+                            }
+                        </strong>
+                    </span>
                 </div>
 
                 ${
                     puedeCapturar
                         ? `
-                            <button
-                                type="button"
-                                class="btn-secundario"
-                                data-editar-integrante="${integrante.id_orv_integrante}">
-                                <i class="bi bi-pencil"></i>
-                                Editar
-                            </button>
+                            <div class="integrante-acciones">
+
+                                <button
+                                    type="button"
+                                    class="btn-secundario"
+                                    data-editar-integrante="${integrante.id_orv_integrante}">
+                                    <i class="bi bi-pencil"></i>
+                                    Editar
+                                </button>
+
+                                ${
+                                    !integrante.fecha_fin
+                                        ? `
+                                            <button
+                                                type="button"
+                                                class="btn-secundario"
+                                                data-finalizar-integrante="${integrante.id_orv_integrante}">
+                                                <i class="bi bi-check-circle"></i>
+                                                Finalizar
+                                            </button>
+                                        `
+                                        : ""
+                                }
+
+                            </div>
                         `
                         : ""
                 }
@@ -925,9 +1027,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         elementos.fechaInicioIntegrante.value =
             integrante.fecha_inicio || "";
 
-        elementos.fechaFinIntegrante.value =
-            integrante.fecha_fin || "";
-
         /*
          * El backend no permite cambiar la persona
          * de un integrante existente.
@@ -959,10 +1058,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function obtenerDatosIntegrante() {
+
         return {
+
             id_persona:
                 Number(
-                    elementos.idPersonaIntegrante.value
+                    elementos
+                        .idPersonaIntegrante
+                        .value
                 ),
 
             id_organo:
@@ -983,13 +1086,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             fecha_inicio:
                 textoOpcional(
                     elementos.fechaInicioIntegrante
-                ),
-
-            fecha_fin:
-                textoOpcional(
-                    elementos.fechaFinIntegrante
                 )
+
         };
+
     }
 
     function validarIntegrante(datos) {
@@ -1011,19 +1111,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         ) {
             alert(
                 "Selecciona órgano, cargo y calidad."
-            );
-
-            return false;
-        }
-
-        if (
-            datos.fecha_inicio &&
-            datos.fecha_fin &&
-            datos.fecha_fin <
-                datos.fecha_inicio
-        ) {
-            alert(
-                "La fecha de fin no puede ser anterior al inicio."
             );
 
             return false;
@@ -1067,10 +1154,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             datos.id_calidad,
 
                         fecha_inicio:
-                            datos.fecha_inicio,
-
-                        fecha_fin:
-                            datos.fecha_fin
+                            datos.fecha_inicio
                     };
 
                     await window.OrvAPI.actualizarIntegrante(
@@ -1165,6 +1249,320 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
 
 
+    function limpiarFormularioFinalizarIntegrante() {
+
+        elementos
+            .formFinalizarIntegrante
+            ?.reset();
+
+
+        idIntegranteFinalizando =
+            null;
+
+    }
+
+
+    function abrirFinalizarIntegrante(
+        id
+    ) {
+
+        if (!puedeCapturar) {
+
+            return;
+
+        }
+
+
+        const integrante =
+            integrantes.find(
+                item =>
+                    Number(
+                        item.id_orv_integrante
+                    ) ===
+                    Number(id)
+            );
+
+
+        if (!integrante) {
+
+            return;
+
+        }
+
+
+        if (integrante.fecha_fin) {
+
+            alert(
+                "La participación de este integrante ya está finalizada."
+            );
+
+            return;
+
+        }
+
+
+        idIntegranteFinalizando =
+            Number(
+                integrante.id_orv_integrante
+            );
+
+
+        if (
+            elementos
+                .descripcionFinalizarIntegrante
+        ) {
+
+            elementos
+                .descripcionFinalizarIntegrante
+                .textContent =
+                `Finaliza la participación de ${nombrePersona(
+                    integrante
+                )}.`;
+
+        }
+
+
+        mostrarFormulario(
+            elementos
+                .formularioFinalizarIntegrante,
+            true
+        );
+
+
+        elementos
+            .formularioFinalizarIntegrante
+            ?.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+
+    }
+
+
+
+    elementos
+    .formFinalizarIntegrante
+    ?.addEventListener(
+        "submit",
+        async event => {
+
+            event.preventDefault();
+
+
+            if (
+                !puedeCapturar ||
+                !idIntegranteFinalizando
+            ) {
+
+                return;
+
+            }
+
+
+            const fechaFin =
+                elementos
+                    .fechaFinParticipacion
+                    ?.value;
+
+
+            const idTipoFin =
+                Number(
+                    elementos
+                        .tipoFinIntegrante
+                        ?.value
+                );
+
+
+            const detalle =
+                elementos
+                    .detalleFinIntegrante
+                    ?.value
+                    .trim() ||
+                null;
+
+
+            if (!fechaFin) {
+
+                alert(
+                    "Indica la fecha de finalización."
+                );
+
+                return;
+
+            }
+
+
+            if (
+                !Number.isInteger(
+                    idTipoFin
+                ) ||
+                idTipoFin <= 0
+            ) {
+
+                alert(
+                    "Selecciona el motivo de finalización."
+                );
+
+                return;
+
+            }
+
+
+            const tipoFin =
+                tipoFinPorId.get(
+                    idTipoFin
+                );
+
+
+            if (
+                tipoFin?.codigo ===
+                    "otro" &&
+                !detalle
+            ) {
+
+                alert(
+                    'El motivo "Otro" requiere un detalle.'
+                );
+
+                return;
+
+            }
+
+
+            const integrante =
+                integrantes.find(
+                    item =>
+                        Number(
+                            item.id_orv_integrante
+                        ) ===
+                        idIntegranteFinalizando
+                );
+
+
+            if (
+                integrante?.fecha_inicio &&
+                fechaFin <
+                    integrante.fecha_inicio
+            ) {
+
+                alert(
+                    "La fecha de finalización no puede ser anterior a la fecha de inicio."
+                );
+
+                return;
+
+            }
+
+
+            const botonGuardar =
+                elementos
+                    .formFinalizarIntegrante
+                    ?.querySelector(
+                        '[type="submit"]'
+                    );
+
+
+            if (botonGuardar) {
+
+                botonGuardar.disabled =
+                    true;
+
+            }
+
+
+            try {
+
+                await window.OrvAPI
+                    .finalizarIntegrante(
+                        idIntegranteFinalizando,
+                        {
+                            fecha_fin:
+                                fechaFin,
+
+                            id_tipo_fin:
+                                idTipoFin,
+
+                            detalle_fin:
+                                detalle
+                        }
+                    );
+
+
+                alert(
+                    "Participación finalizada correctamente."
+                );
+
+
+                limpiarFormularioFinalizarIntegrante();
+
+
+                mostrarFormulario(
+                    elementos
+                        .formularioFinalizarIntegrante,
+                    false
+                );
+
+
+                await cargarIntegrantes();
+
+            } catch (error) {
+
+                window.ClienteAPI
+                    .mostrarErrorAPI(
+                        error
+                    );
+
+            } finally {
+
+                if (botonGuardar) {
+
+                    botonGuardar.disabled =
+                        false;
+
+                }
+
+            }
+
+        }
+    );
+
+
+    elementos
+    .btnCerrarFinalizarIntegrante
+    ?.addEventListener(
+        "click",
+        () => {
+
+            limpiarFormularioFinalizarIntegrante();
+
+            mostrarFormulario(
+                elementos
+                    .formularioFinalizarIntegrante,
+                false
+            );
+
+        }
+    );
+
+
+elementos
+    .btnCancelarFinalizarIntegrante
+    ?.addEventListener(
+        "click",
+        () => {
+
+            limpiarFormularioFinalizarIntegrante();
+
+            mostrarFormulario(
+                elementos
+                    .formularioFinalizarIntegrante,
+                false
+            );
+
+        }
+    );
+
+
     /* =====================================================
                         BOTONES
     ====================================================== */
@@ -1230,16 +1628,55 @@ document.addEventListener("DOMContentLoaded", async () => {
     elementos.integrantesLista?.addEventListener(
         "click",
         event => {
-            const boton =
+
+
+            /* =================================================
+                        FINALIZAR INTEGRANTE
+            ================================================== */
+
+            const botonFinalizar =
+                event.target.closest(
+                    "[data-finalizar-integrante]"
+                );
+
+
+            if (botonFinalizar) {
+
+                abrirFinalizarIntegrante(
+                    botonFinalizar
+                        .dataset
+                        .finalizarIntegrante
+                );
+
+
+                return;
+
+            }
+
+
+            /* =================================================
+                        EDITAR INTEGRANTE
+            ================================================== */
+
+            const botonEditar =
                 event.target.closest(
                     "[data-editar-integrante]"
                 );
 
-            if (!boton) return;
+
+            if (!botonEditar) {
+
+                return;
+
+            }
+
 
             abrirEdicionIntegrante(
-                boton.dataset.editarIntegrante
+                botonEditar
+                    .dataset
+                    .editarIntegrante
             );
+
         }
     );
 

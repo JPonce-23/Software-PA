@@ -1,0 +1,239 @@
+.cambio-contrasena-pagina {
+    max-width: 1050px;
+    margin: 0 auto;
+    padding-bottom: 60px;
+}
+
+
+/* =====================================================
+                    BREADCRUMB
+===================================================== */
+
+.cambio-migas {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 26px;
+    font-size: 0.9rem;
+}
+
+.cambio-migas a {
+    color: #286b30;
+    text-decoration: none;
+}
+
+.cambio-migas a:hover {
+    text-decoration: underline;
+}
+
+.cambio-migas i {
+    font-size: 0.75rem;
+    opacity: 0.55;
+}
+
+
+/* =====================================================
+                    ENCABEZADO
+===================================================== */
+
+.cambio-encabezado {
+    margin-bottom: 28px;
+}
+
+.cambio-etiqueta {
+    margin: 0 0 7px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    color: #286b30;
+}
+
+.cambio-encabezado h1 {
+    margin: 0 0 8px;
+}
+
+.cambio-encabezado p:last-child {
+    margin: 0;
+    color: #5d665f;
+}
+
+
+/* =====================================================
+                        TARJETA
+===================================================== */
+
+.cambio-tarjeta {
+    max-width: 720px;
+    background: #fff;
+    border: 1px solid #dfe5e0;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.05);
+}
+
+.cambio-tarjeta-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 22px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid #edf0ed;
+}
+
+.cambio-tarjeta-header h2 {
+    margin: 0 0 4px;
+    font-size: 1.2rem;
+}
+
+.cambio-tarjeta-header p {
+    margin: 0;
+    color: #626b64;
+}
+
+.cambio-icono {
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: #eef5ef;
+    color: #286b30;
+    font-size: 1.35rem;
+}
+
+
+/* =====================================================
+                        FORMULARIO
+===================================================== */
+
+.cambio-form-grid {
+    display: grid;
+    gap: 20px;
+}
+
+.cambio-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.cambio-campo label {
+    font-weight: 600;
+}
+
+.cambio-campo input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #cfd7d1;
+    border-radius: 8px;
+    padding: 11px 12px;
+    font: inherit;
+    background: #fff;
+}
+
+.cambio-campo input:focus {
+    outline: 2px solid rgba(40, 107, 48, 0.15);
+    border-color: #286b30;
+}
+
+.cambio-campo small {
+    color: #687169;
+    line-height: 1.45;
+}
+
+.obligatorio {
+    color: #9b1c31;
+}
+
+
+/* =====================================================
+                        AVISO
+===================================================== */
+
+.cambio-aviso {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    padding: 14px 16px;
+    border-radius: 9px;
+    background: #f5f7f5;
+    color: #49534b;
+}
+
+.cambio-aviso i {
+    color: #286b30;
+    margin-top: 2px;
+}
+
+.cambio-aviso p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+
+/* =====================================================
+                        MENSAJES
+===================================================== */
+
+.cambio-mensaje {
+    max-width: 720px;
+    box-sizing: border-box;
+    padding: 13px 16px;
+    margin-bottom: 18px;
+    border-radius: 9px;
+}
+
+.cambio-mensaje-error {
+    background: #fff0f2;
+    border: 1px solid #e6b6be;
+    color: #86192c;
+}
+
+.cambio-mensaje-exito {
+    background: #eff8f0;
+    border: 1px solid #b9d9bd;
+    color: #245e2a;
+}
+
+
+/* =====================================================
+                        ACCIONES
+===================================================== */
+
+.cambio-acciones {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    margin-top: 26px;
+}
+
+
+/* =====================================================
+                        RESPONSIVE
+===================================================== */
+
+@media (max-width: 700px) {
+
+    .cambio-tarjeta {
+        padding: 20px;
+    }
+
+    .cambio-tarjeta-header {
+        align-items: flex-start;
+    }
+
+    .cambio-acciones {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .cambio-acciones a,
+    .cambio-acciones button {
+        width: 100%;
+        box-sizing: border-box;
+        justify-content: center;
+        text-align: center;
+    }
+
+}

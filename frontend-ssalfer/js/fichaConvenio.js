@@ -204,10 +204,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             modificatorio:
                 "Modificatorio",
-
-            superficie_adicional:
-                "Superficie adicional",
-
+                
             obras_complementarias:
                 "Obras complementarias",
 
