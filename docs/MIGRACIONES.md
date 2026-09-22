@@ -1,8 +1,8 @@
 # Gestión de Migraciones de Base de Datos — SOFTWARE-PA
 
 > **Autoridad:** Documentación canónica del versionado del esquema de base de datos en PostgreSQL 15 / PostGIS.  
-> **Esquema ejecutable vigente:** **015** (`GET /health` reporta `{"status": "ok", "schema": 15}`).  
-> **Siguiente migración disponible:** **016**.
+> **Esquema ejecutable vigente:** **019** (`GET /health` reporta el máximo registrado en `schema_migrations`).
+> **Siguiente migración disponible:** **020**.
 
 ---
 
@@ -13,13 +13,13 @@
 2. **Verificación de integridad por Checksum:**  
    El runner oficial (`backend/scripts/run_migrations.sh`) calcula el hash criptográfico SHA-256 de cada archivo `.sql`. Si un archivo ya registrado en `public.schema_migrations` sufre alteraciones en su contenido, el proceso de arranque se detiene de inmediato con error.
 3. **Evolución Forward-Only:**  
-   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** (comenzando en `016`). No se modifican los archivos históricos `001` a `015`.
+   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** (comenzando en `020`). No se modifican los archivos históricos `001` a `019`.
 4. **Instalación limpia:**  
-   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `015_exclusion_proyectos_inactivos.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
+   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `019_catalogo_nucleos_ran.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
 
 ---
 
-## 2. Inventario Canónico de Migraciones Vigentes (001–015)
+## 2. Inventario Canónico de Migraciones Vigentes (001–019)
 
 | Versión | Archivo SQL | Checksum SHA-256 Verificado | Propósito y Contenido Principal |
 |---|---|---|---|
@@ -38,6 +38,10 @@
 | **013** | `013_pagos_en_reporting.sql` | `315194e6daa7b8bffd27c8d678b6e86c0486eaf851f58aba3722e90e19a37eef` | Representación canónica de pagos en reporting (`vw_hito_seguimiento`, `vw_reporte_avance_periodo`, `vw_dashboard_kpi`) a través de la cadena `Pago → Indemnizacion → Afectacion → ProyectoNucleo → Proyecto`. |
 | **014** | `014_convenios_colectivos_por_destino.sql` | `0ac8df3e32cc5bb7a103a314160fa4b6b392d9e5e041af3aaa74c0cda9aeceab` | Read-model `vw_convenio_colectivo_destino` con granularidad `id_convenio + destino_superficie`. Separa superficie física de superficie declarada y establece que `monto_declarado` es un atributo **NO ADITIVO**. |
 | **015** | `015_exclusion_proyectos_inactivos.sql` | `4e5d7fa8926f8026923146d3a0695d933bb43e9bb5f8c71ef8f9ecd9bae4b422` | Corrección forward-only de read-models para excluir estrictamente proyectos con `activo IS NOT TRUE` de `vw_reporte_snapshot_actual`, `vw_hito_seguimiento`, `vw_reporte_avance_periodo`, `vw_dashboard_kpi` y `vw_convenio_colectivo_destino`. |
+| **016** | `016_normalizacion_convenio_superficie_adicional.sql` | `246eb8247d1f3256e40453afa5f5d13d09586d90f0d3e599680ed8865160c810` | Normaliza la representación de convenios y superficies adicionales. |
+| **017** | `017_normalizar_contexto_asamblea_adicional.sql` | `7fe91d37c1724291f0bf3fa47ba58d6afff8c062e6c44d527b14ea025fa36282` | Normaliza el contexto de asambleas relacionadas con superficies adicionales. |
+| **018** | `018_orv_persona_ciclo_vida.sql` | `2fb5676b52d902b636b3941490ea71a8044a791764b2913a18b6a905d9ddfea3` | Formaliza el ciclo de vida de integrantes ORV y protege las relaciones activas de personas. |
+| **019** | `019_catalogo_nucleos_ran.sql` | `6769168eb11b2773b4e8e42f9409ccbbfbe986984f69895a562fe17c29f03b04` | Convierte la coincidencia municipio/tenencia/nombre en índice de búsqueda no único y establece la identidad externa única `fuente_datos + id_nucleo_fuente`; exige procedencia completa para filas RAN/PHINA. No carga el CSV ni altera `ProyectoNucleo`. |
 
 ---
 
@@ -94,3 +98,23 @@ SELECT version, nombre, aplicada_en
 FROM public.schema_migrations 
 ORDER BY version::integer DESC;
 ```
+
+### 3.4 Catálogo nacional RAN/PHINA
+
+La migración 019 prepara la identidad del catálogo maestro, pero no carga datos. El importador `backend/scripts/import_catalogo_nucleos_ran.py` lee el CSV oficial como Windows-1252, calcula SHA-256, cruza la clave municipal INEGI y resuelve la tenencia por código de catálogo. El modo predeterminado es dry-run:
+
+```bash
+docker compose exec -T -e DB_NAME=software_pa_test backend \
+  python scripts/import_catalogo_nucleos_ran.py /app/ruta/catalogo.csv \
+  --dry-run --expected-database software_pa_test
+```
+
+Sólo después de obtener cero errores y cero municipios sin correspondencia puede usarse `--apply`. La aplicación exige nombrar la base esperada y un usuario activo responsable de auditoría:
+
+```bash
+docker compose exec -T -e DB_NAME=software_pa_test backend \
+  python scripts/import_catalogo_nucleos_ran.py /app/ruta/catalogo.csv \
+  --apply --expected-database software_pa_test --actor-user-id ID_USUARIO
+```
+
+La carga es transaccional e idempotente, conserva `id_nucleo` en actualizaciones y no elimina núcleos ausentes de archivos posteriores. El catálogo mejora la identificación maestra de `NucleoAgrario`; no reemplaza el vínculo operativo Excel-First de `ProyectoNucleo`.

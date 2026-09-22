@@ -1,7 +1,7 @@
 # Diccionario de Datos — SOFTWARE-PA
 
 > **Autoridad:** Especificación canónica del modelo físico y lógico de datos de SOFTWARE-PA.  
-> **Validación:** Verificado contra `backend/app/models.py`, migraciones vigentes `001–015` y read-models de base de datos en PostgreSQL 15 / PostGIS.
+> **Validación:** Verificado contra `backend/app/models.py`, migraciones vigentes `001–019` y read-models de base de datos en PostgreSQL 15 / PostGIS.
 
 ---
 
@@ -63,16 +63,20 @@ Proyecto estratégico o ferroviario amparado por las tareas de liberación de v�
 | `fecha_fin_estimada` | `DATE` | Sí | — | Fecha meta de culminación. | Cronograma | Trazabilidad |
 
 ### 2.4 `nucleo_agrario`
-Núcleo agrario (ejido o comunidad) sujeto al régimen de propiedad social.
+Catálogo maestro nacional de núcleos agrarios (ejidos y comunidades). Su identidad interna permanece en `id_nucleo`; para el catálogo RAN/PHINA, la `cve_unica` oficial se almacena físicamente en `id_nucleo_fuente` y se identifica junto con `fuente_datos = 'RAN_PHINA_CATALOGO_NUCLEOS'`. No existe una columna física `clave_ran`. `ProyectoNucleo` continúa siendo el vínculo operativo con cada proyecto, conforme al principio Excel-First.
 
 | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|
-| `id_nucleo` | `INTEGER` | No | PK | Identificador primario del núcleo agrario. | Sistema | `/api/nucleos` |
+| `id_nucleo` | `INTEGER` | No | PK | Identificador interno estable del núcleo agrario. | Sistema | `/api/nucleos` |
 | `id_municipio` | `INTEGER` | No | `municipio.id_municipio` | Municipio registral del núcleo. | MUNICIPIO | Agrupación geográfica |
 | `nombre_nucleo` | `VARCHAR(300)` | No | — | Nombre oficial según PHINA/RAN. | NÚCLEO AGRARIO | Búsquedas y visualización |
-| `clave_ran` | `VARCHAR(50)` | Sí | — | Clave única de registro en el RAN. | Registro RAN | Trazabilidad institucional |
 | `id_tipo_tenencia` | `BIGINT` | No | `catalogo_operativo` | Modalidad (`ejido` o `comunidad`). | E/C | Bifurcación funcional |
-| `comunidad_indigena`| `BOOLEAN` | No | Default `false` | Característica indígena registrada. | COMUNIDAD INDÍGENA | Condición operativa (no terminal) |
+| `comunidad_indigena`| `BOOLEAN` | Sí | Triestado | `NULL` indica no capturado; no se infiere del tipo de tenencia. | COMUNIDAD INDÍGENA | Condición operativa (no terminal) |
+| `fuente_datos` | `VARCHAR(120)` | Sí | Identidad externa | Código estable de procedencia; para este catálogo usa `RAN_PHINA_CATALOGO_NUCLEOS`. | RAN/PHINA | Trazabilidad institucional |
+| `id_entidad_fuente` | `VARCHAR(120)` | Sí | — | Valor `scncve_edo` conservado desde la fuente RAN. | RAN/PHINA | Conciliación territorial |
+| `id_municipio_fuente` | `VARCHAR(120)` | Sí | — | Valor `scncve_mun` conservado desde la fuente RAN. | RAN/PHINA | Conciliación territorial |
+| `id_nucleo_fuente` | `VARCHAR(120)` | Sí | Identidad externa | Para RAN contiene `cve_unica` como texto, sin interpretar su estructura. Es único junto con `fuente_datos` cuando ambos existen. | RAN/PHINA | Identidad oficial |
+| `alcance_identidad_fuente` | `VARCHAR(20)` | Sí | — | Para el catálogo RAN se usa `nacional`. | RAN/PHINA | Alcance de identidad |
 | `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Perímetro del núcleo agrario. | Cartografía | Visor cartográfico de apoyo |
 
 ### 2.5 `proyecto_nucleo`
