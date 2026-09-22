@@ -1070,6 +1070,104 @@
         }
       }
     },
+    "/api/catalogos/nucleos": {
+      "get": {
+        "summary": "List Ran Nuclei Catalog",
+        "operationId": "list_ran_nuclei_catalog_api_catalogos_nucleos_get",
+        "parameters": [
+          {
+            "name": "id_entidad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id Entidad"
+            }
+          },
+          {
+            "name": "id_municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id Municipio"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NucleoRanCatalogoResponse"
+                  },
+                  "title": "Response List Ran Nuclei Catalog Api Catalogos Nucleos Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/catalogos/operativos/{tipo_catalogo}": {
       "get": {
         "summary": "List Operational Catalog",
@@ -16486,6 +16584,72 @@
           "id_nucleo"
         ],
         "title": "NucleoAgrarioResponse"
+      },
+      "NucleoRanCatalogoResponse": {
+        "properties": {
+          "id_nucleo": {
+            "type": "integer",
+            "title": "Id Nucleo"
+          },
+          "nombre_nucleo": {
+            "type": "string",
+            "title": "Nombre Nucleo"
+          },
+          "id_tipo_tenencia": {
+            "type": "integer",
+            "title": "Id Tipo Tenencia"
+          },
+          "codigo_tipo_tenencia": {
+            "type": "string",
+            "enum": [
+              "ejido",
+              "comunidad"
+            ],
+            "title": "Codigo Tipo Tenencia"
+          },
+          "tipo_tenencia": {
+            "type": "string",
+            "enum": [
+              "Ejido",
+              "Comunidad"
+            ],
+            "title": "Tipo Tenencia"
+          },
+          "id_municipio": {
+            "type": "integer",
+            "title": "Id Municipio"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "id_entidad": {
+            "type": "integer",
+            "title": "Id Entidad"
+          },
+          "entidad": {
+            "type": "string",
+            "title": "Entidad"
+          },
+          "id_nucleo_fuente": {
+            "type": "string",
+            "title": "Id Nucleo Fuente"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_nucleo",
+          "nombre_nucleo",
+          "id_tipo_tenencia",
+          "codigo_tipo_tenencia",
+          "tipo_tenencia",
+          "id_municipio",
+          "municipio",
+          "id_entidad",
+          "entidad",
+          "id_nucleo_fuente"
+        ],
+        "title": "NucleoRanCatalogoResponse"
       },
       "NucleoAgrarioUpdate": {
         "properties": {

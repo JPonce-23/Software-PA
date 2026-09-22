@@ -67,12 +67,22 @@ Para toda petición `POST`, `PUT`, `PATCH` o `DELETE` bajo `/api/`:
 
 ## 3. Dominio Territorial y Operativo
 
-### 3.1 Proyecto y Asignaciones
+### 3.1 Catálogo nacional de núcleos agrarios RAN
+
+- `GET /api/catalogos/nucleos`: consulta acotada del catálogo nacional PHINA/RAN para usuarios con rol de lectura (`admin`, `operador`, `visualizador` o `geografo`).
+- Filtros opcionales: `id_entidad`, `id_municipio` y `q` (coincidencia parcial por nombre normalizado sin distinguir mayúsculas/minúsculas).
+- `limit` es opcional, vale `20` por defecto y admite de `1` a `100`.
+- Sólo devuelve núcleos activos cuya `fuente_datos` es `RAN_PHINA_CATALOGO_NUCLEOS`; excluye altas manuales, seeds y QA.
+- `id_entidad`, `entidad`, `id_municipio` y `municipio` se resuelven por las llaves foráneas internas `nucleo_agrario → municipio → entidad_federativa`.
+- El orden es estable por nombre normalizado y `id_nucleo`.
+- Cada registro expone: `id_nucleo`, `nombre_nucleo`, `id_tipo_tenencia`, `codigo_tipo_tenencia`, `tipo_tenencia`, `id_municipio`, `municipio`, `id_entidad`, `entidad` e `id_nucleo_fuente`.
+
+### 3.2 Proyecto y Asignaciones
 - `GET/POST /api/proyectos`: Administración de proyectos estratégicos.
 - `GET/POST /api/proyectos/{id_proyecto}/nucleos`: Asocia un núcleo agrario al proyecto, creando la relación `ProyectoNucleo`.
 - `GET/POST /api/proyectos/{id_proyecto}/usuarios`: Asigna operadores a proyectos (`UsuarioProyecto`). Los usuarios no administradores sólo pueden consultar recursos de proyectos que tienen asignados y cuyo proyecto permanezca activo (`activo = true`).
 
-### 3.2 ProyectoNucleo
+### 3.3 ProyectoNucleo
 - Al crear o actualizar un `ProyectoNucleo`, los campos administrados incluyen:
   - `id_residencia`: Llave foránea hacia residencia regional de la PA.
   - `total_cops_planeados`: Meta numérica entera de convenios esperados.
@@ -84,7 +94,7 @@ Para toda petición `POST`, `PUT`, `PATCH` o `DELETE` bajo `/api/`:
   - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/responsables`: Brigadistas y enlaces institucionales. Edición en `PATCH /api/responsables/{id_responsable}`.
   - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/padrones`: Registro del padrón agrario oficial. Edición en `PATCH /api/padrones/{id_padron}`.
 
-### 3.3 Parcelas y Derechos Individuales
+### 3.4 Parcelas y Derechos Individuales
 - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/parcelas`: Consulta y alta parcelaria dentro del proyecto-núcleo.
 - `GET/PATCH /api/parcelas/{id_parcela}`: Consulta y actualización de datos de la parcela.
 - `PATCH /api/parcelas/{id_parcela}/geometria`: Carga y actualización de geometría poligonal opcional.
@@ -92,18 +102,18 @@ Para toda petición `POST`, `PUT`, `PATCH` o `DELETE` bajo `/api/`:
 - **Regla canónica:** La parcela se identifica exclusivamente mediante `no_parcela`. **No existen en el contrato API los campos `no_parcela_ppt` ni `numero_parcela_ppt`**.
 - La geometría (`geometria_poligono`) es opcional y su ausencia no restringe ninguna operación de negocio.
 
-### 3.4 Actividades de Campo
+### 3.5 Actividades de Campo
 - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/actividades`: Registra sensibilizaciones y caminamientos del proyecto-núcleo.
 - `PATCH /api/actividades/{id_actividad}`: Actualiza metadatos y resultado de la actividad.
 - `tipo_actividad` admite únicamente `sensibilizacion` o `caminamiento`.
 - Parámetros clave: `id_proyecto_nucleo`, `id_tipo_cop_operativo`, `fecha_programada`, `fecha_realizada`, `responsable`, `resultado`.
 
-### 3.5 Asambleas y Convocatorias (Ruta Colectiva)
+### 3.6 Asambleas y Convocatorias (Ruta Colectiva)
 - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/asambleas`: Consulta y crea la entidad colectiva de asamblea. Requiere `id_tipo_asamblea`, `id_tipo_cop_operativo`, `proposito`, `resultado` y opcionalmente una lista inicial de `convocatorias`.
 - `PATCH /api/asambleas/{id_asamblea}`: Actualiza exclusivamente los metadatos de la asamblea.
 - **Gestión de convocatorias hijas:** Se gestionan a través de `GET/POST /api/asambleas/{id_asamblea}/convocatorias`. Cada convocatoria contiene `ordinal` (1, 2, ...), `fecha_expedicion`, `fecha_programada`, `fecha_realizacion` y su `id_resultado` (`celebrada`, `no_verificativo`, `cancelada`, etc.). Edición individual en `PATCH /api/convocatorias/{id_convocatoria}`.
 
-### 3.6 Convenios de Ocupación Previa (COP)
+### 3.7 Convenios de Ocupación Previa (COP)
 - `GET/POST /api/afectaciones/{id_afectacion}/convenios`: Consulta y alta de convenios asociados a la afectación.
 - `GET/PATCH /api/convenios/{id_convenio}`: Consulta y actualización de metadatos directos del convenio. **Rechaza colecciones anidadas**; las afectaciones y comparecientes se gestionan en sus endpoints hijos:
   - `GET/POST /api/convenios/{id_convenio}/afectaciones`: Asocia afectaciones y define el efecto (`adicion`, `sustitucion`, `correccion`, `sin_cambio`, `pendiente`). Edición en `PATCH /api/convenio-afectaciones/{id_convenio_afectacion}`.

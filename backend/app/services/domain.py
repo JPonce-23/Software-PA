@@ -27,6 +27,70 @@ from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_c
 
 
 T = TypeVar("T")
+RAN_NUCLEI_SOURCE = "RAN_PHINA_CATALOGO_NUCLEOS"
+
+
+def list_ran_nuclei_catalog(
+    db: Session,
+    *,
+    state_id: int | None = None,
+    municipality_id: int | None = None,
+    name_query: str | None = None,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Return the bounded national RAN nuclei catalog as an API projection."""
+    tenure = models.CatalogoOperativo
+    query = (
+        db.query(
+            models.NucleoAgrario.id_nucleo.label("id_nucleo"),
+            models.NucleoAgrario.nombre_nucleo.label("nombre_nucleo"),
+            models.NucleoAgrario.id_tipo_tenencia.label("id_tipo_tenencia"),
+            tenure.codigo.label("codigo_tipo_tenencia"),
+            tenure.nombre.label("tipo_tenencia"),
+            models.Municipio.id_municipio.label("id_municipio"),
+            models.Municipio.nombre.label("municipio"),
+            models.EntidadFederativa.id_entidad.label("id_entidad"),
+            models.EntidadFederativa.nombre.label("entidad"),
+            models.NucleoAgrario.id_nucleo_fuente.label("id_nucleo_fuente"),
+        )
+        .join(
+            models.Municipio,
+            models.Municipio.id_municipio == models.NucleoAgrario.id_municipio,
+        )
+        .join(
+            models.EntidadFederativa,
+            models.EntidadFederativa.id_entidad == models.Municipio.id_entidad,
+        )
+        .join(
+            tenure,
+            tenure.id_catalogo_opcion == models.NucleoAgrario.id_tipo_tenencia,
+        )
+        .filter(
+            models.NucleoAgrario.activo.is_(True),
+            models.NucleoAgrario.fuente_datos == RAN_NUCLEI_SOURCE,
+            tenure.tipo_catalogo == "tipo_tenencia",
+            tenure.codigo.in_(("ejido", "comunidad")),
+        )
+    )
+    if state_id is not None:
+        query = query.filter(models.Municipio.id_entidad == state_id)
+    if municipality_id is not None:
+        query = query.filter(models.NucleoAgrario.id_municipio == municipality_id)
+    if name_query is not None:
+        normalized_query = name_query.strip().lower()
+        if not normalized_query:
+            return []
+        query = query.filter(
+            func.lower(func.btrim(models.NucleoAgrario.nombre_nucleo)).contains(
+                normalized_query,
+                autoescape=True,
+            )
+        )
+    rows = query.order_by(
+        func.lower(func.btrim(models.NucleoAgrario.nombre_nucleo)),
+        models.NucleoAgrario.id_nucleo,
+    ).limit(limit).all()
+    return [dict(row._mapping) for row in rows]
 
 
 def require_catalog_option(

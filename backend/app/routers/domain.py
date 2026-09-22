@@ -60,6 +60,27 @@ def list_municipalities(
 
 
 @router.get(
+    "/catalogos/nucleos",
+    response_model=list[schemas.NucleoRanCatalogoResponse],
+)
+def list_ran_nuclei_catalog(
+    id_entidad: int | None = Query(default=None, gt=0),
+    id_municipio: int | None = Query(default=None, gt=0),
+    q: str | None = Query(default=None, min_length=1, max_length=300),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    return service.list_ran_nuclei_catalog(
+        db,
+        state_id=id_entidad,
+        municipality_id=id_municipio,
+        name_query=q,
+        limit=limit,
+    )
+
+
+@router.get(
     "/catalogos/operativos/{tipo_catalogo}",
     response_model=list[schemas.CatalogoOperativoResponse],
 )
