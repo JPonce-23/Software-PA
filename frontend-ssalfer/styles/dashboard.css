@@ -1910,6 +1910,372 @@ body:has(.aside.collapsed) .nucleo-info h3 {
 }
 
 
+
+/* =========================================================
+   DASHBOARD EJECUTIVO POR PROYECTO
+========================================================= */
+
+.tarjeta-dashboard-ejecutivo {
+    padding: 16px 18px;
+}
+
+.tarjeta-dashboard-ejecutivo > a {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.dashboard-proyecto-cabecera-ejecutiva {
+    margin-bottom: 0;
+}
+
+.dashboard-proyecto-cabecera-ejecutiva h3 {
+    margin: 0 0 2px;
+    text-align: left;
+    font-size: 1.32rem;
+    line-height: 1.1;
+}
+
+.dashboard-proyecto-clave {
+    margin: 0;
+    font-size: .78rem;
+}
+
+.dashboard-resumen-etiqueta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 27px;
+    padding: 4px 10px;
+    border: 1px solid #d5e4d8;
+    border-radius: 999px;
+    background: #f7fbf8;
+    color: var(--verde-oscuro);
+    font-size: .68rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Indicadores principales */
+
+.dashboard-kpis-principales {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+    margin: 0;
+}
+
+.dashboard-kpi-ejecutivo {
+    min-width: 0;
+    min-height: 104px;
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    align-items: center;
+    gap: 9px;
+    padding: 11px;
+    border: 1px solid #e1e8e3;
+    border-radius: 11px;
+    background: #ffffff;
+}
+
+.dashboard-kpi-icono {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: #e8f3ea;
+    color: var(--verde);
+    font-size: 1.05rem;
+}
+
+.dashboard-kpi-ejecutivo > div {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.dashboard-kpi-etiqueta {
+    color: #555;
+    font-size: .74rem;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.dashboard-kpi-valor {
+    margin-top: 3px;
+    color: var(--verde);
+    font-size: 1.56rem;
+    line-height: 1;
+}
+
+.dashboard-kpi-ejecutivo small {
+    margin-top: 5px;
+    color: #727272;
+    font-size: .64rem;
+    line-height: 1.2;
+}
+
+/* Bloques gráficos */
+
+.dashboard-graficas-grid {
+    display: grid;
+    grid-template-columns: minmax(190px, .72fr) minmax(340px, 1.45fr);
+    gap: 9px;
+    margin: 0;
+}
+
+.dashboard-panel-grafica {
+    min-width: 0;
+    min-height: 104px;
+    padding: 11px 13px;
+    border: 1px solid #e1e8e3;
+    border-radius: 11px;
+    background: #ffffff;
+}
+
+.dashboard-panel-encabezado {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.dashboard-panel-encabezado h4 {
+    margin: 0;
+    color: #3f3f3f;
+    font-size: .78rem;
+    line-height: 1.15;
+}
+
+.dashboard-panel-encabezado p {
+    margin-top: 2px;
+    color: #777;
+    font-size: .62rem;
+    line-height: 1.2;
+}
+
+/* Avance de asambleas */
+
+.dashboard-asambleas-grafica {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 11px;
+}
+
+.dashboard-panel-asambleas .dashboard-dona {
+    width: 66px;
+    height: 66px;
+    flex: 0 0 66px;
+}
+
+.dashboard-panel-asambleas .dashboard-dona::before {
+    inset: 8px;
+    width: auto;
+    height: auto;
+}
+
+.dashboard-panel-asambleas .dashboard-dona-valor {
+    font-size: .88rem;
+}
+
+.dashboard-asambleas-detalle {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.dashboard-asambleas-detalle > strong {
+    color: var(--verde-oscuro);
+    font-size: .92rem;
+    line-height: 1.1;
+}
+
+.dashboard-asambleas-detalle > span {
+    margin-top: 2px;
+    color: #666;
+    font-size: .68rem;
+    line-height: 1.2;
+}
+
+/* Comparativo de montos */
+
+.dashboard-panel-montos {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto 1fr auto;
+    column-gap: 15px;
+    align-items: start;
+}
+
+.dashboard-panel-montos .dashboard-panel-encabezado {
+    grid-column: 1 / -1;
+}
+
+.dashboard-monto-fila {
+    min-width: 0;
+}
+
+.dashboard-monto-fila + .dashboard-monto-fila {
+    margin-top: 0;
+}
+
+.dashboard-monto-encabezado {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    margin-bottom: 5px;
+}
+
+.dashboard-monto-encabezado span {
+    color: #555;
+    font-size: .66rem;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.dashboard-monto-encabezado strong {
+    color: #333;
+    font-size: .78rem;
+    line-height: 1.15;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.dashboard-monto-barra {
+    width: 100%;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #edf0f2;
+}
+
+.dashboard-monto-relleno {
+    display: block;
+    width: var(--ancho-barra, 0%);
+    height: 100%;
+    border-radius: inherit;
+    transition: width .35s ease;
+}
+
+.dashboard-monto-relleno-90 {
+    background: #c58a10;
+}
+
+.dashboard-monto-relleno-100 {
+    background: #173a63;
+}
+
+.dashboard-monto-fila > small {
+    display: block;
+    margin-top: 4px;
+    color: #777;
+    font-size: .59rem;
+    line-height: 1.15;
+}
+
+.dashboard-montos-nota {
+    grid-column: 1 / -1;
+    margin: 7px 0 0;
+    padding-top: 5px;
+    border-top: 1px solid #edf0ee;
+    color: #777;
+    font-size: .57rem;
+    line-height: 1.2;
+}
+
+/*
+ * Escritorio ancho: una sola línea ejecutiva por proyecto.
+ * Esto permite ver aproximadamente cuatro proyectos en una pantalla
+ * de escritorio alta, como en el mockup de referencia.
+ */
+@media (min-width: 1280px) {
+
+    .lista-proyectos-dashboard {
+        gap: 10px;
+    }
+
+    .tarjeta-dashboard-ejecutivo {
+        padding: 13px 16px;
+    }
+
+    .tarjeta-dashboard-ejecutivo > a {
+        grid-template-columns: minmax(430px, .9fr) minmax(560px, 1.25fr);
+        grid-template-rows: auto auto;
+        column-gap: 10px;
+        row-gap: 8px;
+    }
+
+    .dashboard-proyecto-cabecera-ejecutiva {
+        grid-column: 1 / -1;
+    }
+
+    .dashboard-kpis-principales {
+        grid-column: 1;
+        min-width: 0;
+    }
+
+    .dashboard-graficas-grid {
+        grid-column: 2;
+        min-width: 0;
+    }
+}
+
+/* Portátiles y tablets: dos bloques, sin forzar tamaños ilegibles. */
+@media (max-width: 1279px) {
+
+    .dashboard-graficas-grid {
+        grid-template-columns: minmax(190px, .8fr) minmax(320px, 1.35fr);
+    }
+}
+
+@media (max-width: 900px) {
+
+    .dashboard-kpis-principales {
+        grid-template-columns: repeat(3, minmax(120px, 1fr));
+        overflow-x: auto;
+        padding-bottom: 2px;
+    }
+
+    .dashboard-graficas-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 650px) {
+
+    .tarjeta-dashboard-ejecutivo {
+        padding: 13px;
+    }
+
+    .dashboard-kpis-principales {
+        grid-template-columns: 1fr;
+        overflow: visible;
+    }
+
+    .dashboard-kpi-ejecutivo {
+        min-height: 86px;
+    }
+
+    .dashboard-panel-montos {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-panel-montos .dashboard-panel-encabezado,
+    .dashboard-montos-nota {
+        grid-column: 1;
+    }
+
+    .dashboard-monto-fila + .dashboard-monto-fila {
+        margin-top: 10px;
+    }
+}
+
+
 /* =========================================================
    EASTER EGG 2026 — TREN SSALFER
 ========================================================= */
@@ -1917,6 +2283,53 @@ body:has(.aside.collapsed) .nucleo-info h3 {
 .easter-egg-2026 {
     cursor: pointer;
     user-select: none;
+}
+
+.easter-egg-contador {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 22px;
+    height: 22px;
+    margin-left: 7px;
+    padding: 0 6px;
+
+    position: relative;
+    z-index: 100000;
+
+    border: 1px solid rgba(20, 105, 58, 0.22);
+    border-radius: 999px;
+
+    background: rgba(232, 245, 236, 0.96);
+    color: #176b3a;
+
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
+
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.08);
+    vertical-align: middle;
+}
+
+.easter-egg-contador[hidden] {
+    display: none;
+}
+
+.easter-egg-contador.pulso {
+    animation: easterContadorPulso 180ms ease-out;
+}
+
+@keyframes easterContadorPulso {
+    0% {
+        transform: scale(0.82);
+        opacity: 0.55;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 

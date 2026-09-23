@@ -114,131 +114,178 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    /*
-     * Calcula un avance general usando las metas
-     * programadas y realizadas del año más reciente.
-     *
-     * Si no existen metas programadas, devuelve null
-     * para mostrar "—" y no inventar un 0 %.
-     */
-    function calcularAvanceProyecto(
+    function formatearEntero(valor) {
+
+        const numero = Number(valor);
+
+        if (!Number.isFinite(numero)) {
+            return "—";
+        }
+
+        return numero.toLocaleString(
+            "es-MX",
+            { maximumFractionDigits: 0 }
+        );
+    }
+
+
+    function formatearMoneda(valor) {
+
+        const numero = Number(valor);
+
+        if (!Number.isFinite(numero)) {
+            return "—";
+        }
+
+        return numero.toLocaleString(
+            "es-MX",
+            {
+                style: "currency",
+                currency: "MXN",
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }
+        );
+    }
+
+
+    function obtenerFilasKpiProyecto(
         kpis,
-        idProyecto
+        idProyecto,
+        indicador
     ) {
 
-        const filasProyecto =
-            (Array.isArray(kpis) ? kpis : [])
-                .filter(
-                    fila =>
-                        Number(
-                            fila.id_proyecto
-                        ) ===
-                        Number(idProyecto)
-                );
+        return (Array.isArray(kpis) ? kpis : [])
+            .filter(
+                fila =>
+                    Number(fila.id_proyecto) === Number(idProyecto) &&
+                    fila.indicador === indicador
+            );
+    }
 
-        if (
-            filasProyecto.length === 0
-        ) {
+
+    function sumarCampoKpi(
+        kpis,
+        idProyecto,
+        indicador,
+        campo
+    ) {
+
+        const filas =
+            obtenerFilasKpiProyecto(
+                kpis,
+                idProyecto,
+                indicador
+            );
+
+        if (filas.length === 0) {
             return null;
         }
 
+        return filas.reduce(
+            (total, fila) => {
 
-        const anios =
-            filasProyecto
-                .map(
-                    fila =>
-                        Number(fila.anio)
-                )
-                .filter(
-                    Number.isFinite
-                );
+                const valor = Number(fila[campo]);
 
-
-        const ultimoAnio =
-            anios.length
-                ? Math.max(...anios)
-                : null;
+                return Number.isFinite(valor)
+                    ? total + valor
+                    : total;
+            },
+            0
+        );
+    }
 
 
-        const filasPeriodo =
-            ultimoAnio === null
-                ? filasProyecto
-                : filasProyecto.filter(
-                    fila =>
-                        Number(
-                            fila.anio
-                        ) ===
-                        ultimoAnio
-                );
+    function porcentajeDeAvance(
+        realizado,
+        total
+    ) {
 
-
-        const filasConMeta =
-            filasPeriodo.filter(
-                fila => {
-
-                    const programado =
-                        Number(
-                            fila.programado
-                        );
-
-                    const realizado =
-                        Number(
-                            fila.realizado
-                        );
-
-                    return (
-                        Number.isFinite(
-                            programado
-                        ) &&
-                        programado > 0 &&
-                        Number.isFinite(
-                            realizado
-                        )
-                    );
-                }
-            );
-
+        const numeroRealizado = Number(realizado);
+        const numeroTotal = Number(total);
 
         if (
-            filasConMeta.length === 0
+            !Number.isFinite(numeroRealizado) ||
+            !Number.isFinite(numeroTotal) ||
+            numeroTotal <= 0
         ) {
             return null;
         }
-
-
-        const totalProgramado =
-            filasConMeta.reduce(
-                (total, fila) =>
-                    total +
-                    Number(
-                        fila.programado
-                    ),
-                0
-            );
-
-
-        const totalRealizado =
-            filasConMeta.reduce(
-                (total, fila) =>
-                    total +
-                    Number(
-                        fila.realizado
-                    ),
-                0
-            );
-
-
-        if (
-            totalProgramado <= 0
-        ) {
-            return null;
-        }
-
 
         return (
-            totalRealizado /
-            totalProgramado
+            numeroRealizado /
+            numeroTotal
         ) * 100;
+    }
+
+
+    function resumirValorConvenio(
+        valores,
+        idProyecto,
+        concepto
+    ) {
+
+        const filas =
+            (Array.isArray(valores) ? valores : [])
+                .filter(
+                    fila =>
+                        Number(fila.id_proyecto) === Number(idProyecto) &&
+                        fila.concepto === concepto &&
+                        Number.isFinite(Number(fila.valor_declarado))
+                );
+
+        if (filas.length === 0) {
+            return {
+                total: null,
+                convenios: 0
+            };
+        }
+
+        const idsConvenio = new Set();
+
+        const total = filas.reduce(
+            (acumulado, fila) => {
+
+                idsConvenio.add(
+                    Number(fila.id_convenio)
+                );
+
+                return acumulado +
+                    Number(fila.valor_declarado);
+            },
+            0
+        );
+
+        return {
+            total,
+            convenios: idsConvenio.size
+        };
+    }
+
+
+    function anchoBarraComparativa(
+        valor,
+        maximo
+    ) {
+
+        const numero = Number(valor);
+        const referencia = Number(maximo);
+
+        if (
+            !Number.isFinite(numero) ||
+            !Number.isFinite(referencia) ||
+            referencia <= 0
+        ) {
+            return 0;
+        }
+
+        return Math.min(
+            100,
+            Math.max(
+                0,
+                (numero / referencia) * 100
+            )
+        );
     }
 
 
@@ -923,6 +970,48 @@ configurarAccesoMapa();
 
             /*
              * =============================
+             * VALORES DECLARADOS DE CONVENIOS
+             * =============================
+             *
+             * Se usa el endpoint existente de reporting.
+             * Los conceptos 90 % y 100 % son universos
+             * paralelos y pueden tener distinta cobertura.
+             */
+
+            let valoresConveniosDeclarados = [];
+
+
+            if (
+                window.ReportesAPI &&
+                typeof window.ReportesAPI
+                    .obtenerConveniosValoresDeclarados === "function"
+            ) {
+
+                try {
+
+                    const respuestaValores =
+                        await window.ReportesAPI
+                            .obtenerConveniosValoresDeclarados();
+
+
+                    valoresConveniosDeclarados =
+                        Array.isArray(respuestaValores)
+                            ? respuestaValores
+                            : [];
+
+
+                } catch (error) {
+
+                    console.warn(
+                        "No fue posible cargar los valores declarados de convenios.",
+                        error
+                    );
+                }
+            }
+
+
+            /*
+             * =============================
              * CSV
              * =============================
              */
@@ -1030,46 +1119,73 @@ configurarAccesoMapa();
                         : [];
 
 
-                const totalParcelas =
-                    listaNucleos.reduce(
-                        (total, nucleo) =>
-                            total +
-                            Number(
-                                nucleo.total_parcelas ||
-                                0
-                            ),
-                        0
-                    );
-
-
-                const totalAfectaciones =
-                    listaNucleos.reduce(
-                        (total, nucleo) =>
-                            total +
-                            Number(
-                                nucleo.total_afectaciones ||
-                                0
-                            ),
-                        0
-                    );
-
-
-                const superficieAfectada =
-                    listaNucleos.reduce(
-                        (total, nucleo) =>
-                            total +
-                            Number(
-                                nucleo.superficie_afectada_ha ||
-                                0
-                            ),
-                        0
-                    );
-
-
-                const avanceProyecto =
-                    calcularAvanceProyecto(
+                const totalAsambleasAnuencia =
+                    sumarCampoKpi(
                         kpisDashboard,
-                        proyecto.id_proyecto
+                        proyecto.id_proyecto,
+                        "asambleas",
+                        "programado"
+                    );
+
+
+                const asambleasCelebradas =
+                    sumarCampoKpi(
+                        kpisDashboard,
+                        proyecto.id_proyecto,
+                        "asambleas",
+                        "realizado"
+                    );
+
+
+                const copsFormalizados =
+                    sumarCampoKpi(
+                        kpisDashboard,
+                        proyecto.id_proyecto,
+                        "cop_colectivos",
+                        "realizado"
+                    );
+
+
+                const porcentajeAsambleas =
+                    porcentajeDeAvance(
+                        asambleasCelebradas,
+                        totalAsambleasAnuencia
+                    );
+
+
+                const monto90 =
+                    resumirValorConvenio(
+                        valoresConveniosDeclarados,
+                        proyecto.id_proyecto,
+                        "monto_90_declarado"
+                    );
+
+
+                const monto100 =
+                    resumirValorConvenio(
+                        valoresConveniosDeclarados,
+                        proyecto.id_proyecto,
+                        "monto_100_declarado"
+                    );
+
+
+                const maximoMonto = Math.max(
+                    Number(monto90.total) || 0,
+                    Number(monto100.total) || 0
+                );
+
+
+                const anchoMonto90 =
+                    anchoBarraComparativa(
+                        monto90.total,
+                        maximoMonto
+                    );
+
+
+                const anchoMonto100 =
+                    anchoBarraComparativa(
+                        monto100.total,
+                        maximoMonto
                     );
 
 
@@ -1080,7 +1196,7 @@ configurarAccesoMapa();
 
 
                 articulo.className =
-                    "tarjeta";
+                    "tarjeta tarjeta-dashboard-ejecutivo";
 
 
                 const nombreProyecto =
@@ -1097,16 +1213,29 @@ configurarAccesoMapa();
                     );
 
 
+                const detalleMonto90 =
+                    monto90.total === null
+                        ? "Sin dato disponible"
+                        : `${formatearEntero(monto90.convenios)} convenios con dato`;
+
+
+                const detalleMonto100 =
+                    monto100.total === null
+                        ? "Sin dato disponible"
+                        : `${formatearEntero(monto100.convenios)} convenios con dato`;
+
+
                 articulo.innerHTML = `
 
                     <a
                         href="/pages/fichaProyecto.html?id=${encodeURIComponent(
                             proyecto.id_proyecto
                         )}"
+                        aria-label="Abrir ficha del proyecto ${nombreProyecto}"
                     >
 
                         <div
-                            class="dashboard-proyecto-cabecera"
+                            class="dashboard-proyecto-cabecera dashboard-proyecto-cabecera-ejecutiva"
                         >
 
                             <div>
@@ -1116,85 +1245,277 @@ configurarAccesoMapa();
                                 </h3>
 
                                 <p
-                                    class="
-                                        dashboard-proyecto-clave
-                                    "
+                                    class="dashboard-proyecto-clave"
                                 >
                                     ${claveProyecto}
                                 </p>
 
                             </div>
 
-
-                            <div
-                                class="dashboard-avance"
+                            <span
+                                class="dashboard-resumen-etiqueta"
                             >
-
-                                ${crearGraficaDona(
-                                    avanceProyecto
-                                )}
-
-                                <small>
-                                    Avance del proyecto
-                                </small>
-
-                            </div>
+                                Resumen general
+                            </span>
 
                         </div>
 
 
                         <section
-                            class="resumen"
+                            class="dashboard-kpis-principales"
+                            aria-label="Indicadores principales del proyecto"
                         >
 
-                            <div>
+                            <div
+                                class="dashboard-kpi-ejecutivo"
+                            >
 
-                                <strong>
-                                    Núcleos vinculados
-                                </strong>
+                                <span
+                                    class="dashboard-kpi-icono"
+                                    aria-hidden="true"
+                                >
+                                    <i class="bi bi-geo-alt-fill"></i>
+                                </span>
 
-                                <p>
-                                    ${listaNucleos.length}
-                                </p>
+                                <div>
 
-                            </div>
+                                    <span
+                                        class="dashboard-kpi-etiqueta"
+                                    >
+                                        Núcleos agrarios
+                                    </span>
 
+                                    <strong
+                                        class="dashboard-kpi-valor"
+                                    >
+                                        ${formatearEntero(listaNucleos.length)}
+                                    </strong>
 
-                            <div>
+                                    <small>
+                                        Vinculados al proyecto
+                                    </small>
 
-                                <strong>
-                                    Parcelas registradas
-                                </strong>
-
-                                <p>
-                                    ${totalParcelas}
-                                </p>
-
-                            </div>
-
-
-                            <div>
-
-                                <strong>
-                                    Afectaciones
-                                </strong>
-
-                                <p>
-                                    ${totalAfectaciones}
-                                </p>
+                                </div>
 
                             </div>
 
 
-                            <div>
+                            <div
+                                class="dashboard-kpi-ejecutivo"
+                            >
 
-                                <strong>
-                                    Superficie afectada
-                                </strong>
+                                <span
+                                    class="dashboard-kpi-icono"
+                                    aria-hidden="true"
+                                >
+                                    <i class="bi bi-people-fill"></i>
+                                </span>
 
-                                <p>
-                                    ${superficieAfectada.toFixed(2)}
-                                    ha
+                                <div>
+
+                                    <span
+                                        class="dashboard-kpi-etiqueta"
+                                    >
+                                        Asambleas de anuencia
+                                    </span>
+
+                                    <strong
+                                        class="dashboard-kpi-valor"
+                                    >
+                                        ${formatearEntero(totalAsambleasAnuencia)}
+                                    </strong>
+
+                                    <small>
+                                        ${formatearEntero(asambleasCelebradas)} celebradas
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                class="dashboard-kpi-ejecutivo"
+                            >
+
+                                <span
+                                    class="dashboard-kpi-icono"
+                                    aria-hidden="true"
+                                >
+                                    <i class="bi bi-file-earmark-check-fill"></i>
+                                </span>
+
+                                <div>
+
+                                    <span
+                                        class="dashboard-kpi-etiqueta"
+                                    >
+                                        COPs formalizados
+                                    </span>
+
+                                    <strong
+                                        class="dashboard-kpi-valor"
+                                    >
+                                        ${formatearEntero(copsFormalizados)}
+                                    </strong>
+
+                                    <small>
+                                        Con fecha de firma registrada
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+                        </section>
+
+
+                        <section
+                            class="dashboard-graficas-grid"
+                            aria-label="Gráficas del resumen del proyecto"
+                        >
+
+                            <div
+                                class="dashboard-panel-grafica dashboard-panel-asambleas"
+                            >
+
+                                <div
+                                    class="dashboard-panel-encabezado"
+                                >
+
+                                    <div>
+                                        <h4>
+                                            Asambleas de anuencia
+                                        </h4>
+
+                                        <p>
+                                            Celebradas / registradas
+                                        </p>
+                                    </div>
+
+                                </div>
+
+                                <div
+                                    class="dashboard-asambleas-grafica"
+                                >
+
+                                    ${crearGraficaDona(
+                                        porcentajeAsambleas
+                                    )}
+
+                                    <div
+                                        class="dashboard-asambleas-detalle"
+                                    >
+
+                                        <strong>
+                                            ${formatearEntero(asambleasCelebradas)} de ${formatearEntero(totalAsambleasAnuencia)}
+                                        </strong>
+
+                                        <span>
+                                            asambleas celebradas
+                                        </span>
+
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                class="dashboard-panel-grafica dashboard-panel-montos"
+                            >
+
+                                <div
+                                    class="dashboard-panel-encabezado"
+                                >
+
+                                    <div>
+                                        <h4>
+                                            Convenios — montos declarados
+                                        </h4>
+
+                                        <p>
+                                            90 % vs 100 %
+                                        </p>
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    class="dashboard-monto-fila"
+                                >
+
+                                    <div
+                                        class="dashboard-monto-encabezado"
+                                    >
+                                        <span>
+                                            Convenio monto 90 %
+                                        </span>
+
+                                        <strong>
+                                            ${formatearMoneda(monto90.total)}
+                                        </strong>
+                                    </div>
+
+                                    <div
+                                        class="dashboard-monto-barra"
+                                        role="img"
+                                        aria-label="Monto 90 por ciento: ${escaparHTML(formatearMoneda(monto90.total))}"
+                                    >
+                                        <span
+                                            class="dashboard-monto-relleno dashboard-monto-relleno-90"
+                                            style="--ancho-barra: ${anchoMonto90}%"
+                                        ></span>
+                                    </div>
+
+                                    <small>
+                                        ${escaparHTML(detalleMonto90)}
+                                    </small>
+
+                                </div>
+
+
+                                <div
+                                    class="dashboard-monto-fila"
+                                >
+
+                                    <div
+                                        class="dashboard-monto-encabezado"
+                                    >
+                                        <span>
+                                            Convenio monto 100 %
+                                        </span>
+
+                                        <strong>
+                                            ${formatearMoneda(monto100.total)}
+                                        </strong>
+                                    </div>
+
+                                    <div
+                                        class="dashboard-monto-barra"
+                                        role="img"
+                                        aria-label="Monto 100 por ciento: ${escaparHTML(formatearMoneda(monto100.total))}"
+                                    >
+                                        <span
+                                            class="dashboard-monto-relleno dashboard-monto-relleno-100"
+                                            style="--ancho-barra: ${anchoMonto100}%"
+                                        ></span>
+                                    </div>
+
+                                    <small>
+                                        ${escaparHTML(detalleMonto100)}
+                                    </small>
+
+                                </div>
+
+
+                                <p
+                                    class="dashboard-montos-nota"
+                                >
+                                    Cobertura distinta por concepto; consulte el número de convenios bajo cada barra.
                                 </p>
 
                             </div>
@@ -1504,15 +1825,88 @@ configurarAccesoMapa();
     const easterEggTren =
         document.getElementById("easterEggTren");
 
+    const easterEggContador = (() => {
+
+        if (!easterEgg2026) {
+            return null;
+        }
+
+        const contador =
+            document.createElement("span");
+
+        contador.className =
+            "easter-egg-contador";
+
+        contador.hidden = true;
+
+        contador.setAttribute(
+            "aria-live",
+            "polite"
+        );
+
+        contador.setAttribute(
+            "aria-label",
+            "Contador secreto"
+        );
+
+        easterEgg2026.insertAdjacentElement(
+            "afterend",
+            contador
+        );
+
+        return contador;
+    })();
+
     let clicsEasterEgg = 0;
 
     let temporizadorEasterEgg = null;
 
     let easterEggActivo = false;
 
-    function reiniciarContadorEasterEgg() {
+    function mostrarContadorEasterEgg() {
+
+        if (!easterEggContador) {
+            return;
+        }
+
+        easterEggContador.textContent =
+            String(clicsEasterEgg);
+
+        easterEggContador.hidden = false;
+
+        easterEggContador.classList.remove(
+            "pulso"
+        );
+
+        void easterEggContador.offsetWidth;
+
+        easterEggContador.classList.add(
+            "pulso"
+        );
+    }
+
+    function ocultarContadorEasterEgg() {
+
+        if (!easterEggContador) {
+            return;
+        }
+
+        easterEggContador.hidden = true;
+        easterEggContador.textContent = "";
+        easterEggContador.classList.remove(
+            "pulso"
+        );
+    }
+
+    function reiniciarContadorEasterEgg(
+        ocultarContador = true
+    ) {
 
         clicsEasterEgg = 0;
+
+        if (ocultarContador) {
+            ocultarContadorEasterEgg();
+        }
 
         if (temporizadorEasterEgg) {
 
@@ -1535,7 +1929,16 @@ configurarAccesoMapa();
 
         easterEggActivo = true;
 
-        reiniciarContadorEasterEgg();
+        /*
+         * Conservamos el 8 visible un instante
+         * mientras inicia la animación del tren.
+         */
+        reiniciarContadorEasterEgg(false);
+
+        window.setTimeout(
+            ocultarContadorEasterEgg,
+            650
+        );
 
         /*
         * Quitamos la clase primero para permitir
@@ -1585,6 +1988,8 @@ configurarAccesoMapa();
             }
 
             clicsEasterEgg += 1;
+
+            mostrarContadorEasterEgg();
 
             /*
             * Si pasan 3 segundos sin otro clic,
