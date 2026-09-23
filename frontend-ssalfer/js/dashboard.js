@@ -1492,4 +1492,122 @@ configurarAccesoMapa();
         }
     );
 
+
+
+    /* =====================================================
+    EASTER EGG — 2026
+    ===================================================== */
+
+    const easterEgg2026 =
+        document.getElementById("easterEgg2026");
+
+    const easterEggTren =
+        document.getElementById("easterEggTren");
+
+    let clicsEasterEgg = 0;
+
+    let temporizadorEasterEgg = null;
+
+    let easterEggActivo = false;
+
+    function reiniciarContadorEasterEgg() {
+
+        clicsEasterEgg = 0;
+
+        if (temporizadorEasterEgg) {
+
+            clearTimeout(
+                temporizadorEasterEgg
+            );
+
+            temporizadorEasterEgg = null;
+        }
+    }
+
+    function activarEasterEgg() {
+
+        if (
+            !easterEggTren ||
+            easterEggActivo
+        ) {
+            return;
+        }
+
+        easterEggActivo = true;
+
+        reiniciarContadorEasterEgg();
+
+        /*
+        * Quitamos la clase primero para permitir
+        * que la animación pueda ejecutarse nuevamente
+        * si el usuario descubre el huevo otra vez.
+        */
+        easterEggTren.classList.remove(
+            "activo"
+        );
+
+        void easterEggTren.offsetWidth;
+
+        easterEggTren.classList.add(
+            "activo"
+        );
+
+        easterEggTren.setAttribute(
+            "aria-hidden",
+            "false"
+        );
+
+        window.setTimeout(
+            () => {
+
+                easterEggTren.classList.remove(
+                    "activo"
+                );
+
+                easterEggTren.setAttribute(
+                    "aria-hidden",
+                    "true"
+                );
+
+                easterEggActivo = false;
+
+            },
+            9200
+        );
+    }
+
+    easterEgg2026?.addEventListener(
+        "click",
+        () => {
+
+            if (easterEggActivo) {
+                return;
+            }
+
+            clicsEasterEgg += 1;
+
+            /*
+            * Si pasan 3 segundos sin otro clic,
+            * la secuencia vuelve a comenzar.
+            */
+            if (temporizadorEasterEgg) {
+
+                clearTimeout(
+                    temporizadorEasterEgg
+                );
+            }
+
+            temporizadorEasterEgg =
+                window.setTimeout(
+                    reiniciarContadorEasterEgg,
+                    3000
+                );
+
+            if (clicsEasterEgg >= 8) {
+
+                activarEasterEgg();
+            }
+        }
+    );
+
 });
