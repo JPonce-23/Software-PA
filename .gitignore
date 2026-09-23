@@ -46,3 +46,6 @@ backend/excel.xlsx
 backend/check_schema.py
 backend/extract.py
 ssalfer-deploy.bundle
+
+# Artefactos locales de migración controlada
+/data/importacion/
