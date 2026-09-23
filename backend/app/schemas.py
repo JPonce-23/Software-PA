@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .passwords import is_within_bcrypt_limit
+
 
 Role = Literal["admin", "operador", "visualizador", "geografo"]
 Ambito = Literal["colectivo", "individual"]
@@ -110,7 +112,7 @@ class UsuarioCreate(UsuarioBase):
 def validar_politica_contrasena(value: str) -> str:
     if (
         len(value) < 8
-        or len(value.encode("utf-8")) > 72
+        or not is_within_bcrypt_limit(value)
         or not any(char.isalpha() for char in value)
         or not any(char.isdigit() for char in value)
     ):
@@ -144,7 +146,7 @@ class ChangeOwnPasswordRequest(BaseModel):
     @field_validator("contrasena_actual")
     @classmethod
     def validar_contrasena_actual(cls, value: str) -> str:
-        if len(value.encode("utf-8")) > 72:
+        if not is_within_bcrypt_limit(value):
             raise ValueError("La contraseña actual no puede superar 72 bytes UTF-8")
         return value
 
@@ -408,6 +410,7 @@ class OrvUpdate(OrvCreate):
 class OrvResponse(OrvCreate, AuditRead):
     id_orv: int
     id_nucleo: int
+    vigente: bool
 
 
 class OrvIntegranteCreate(AuditInput):
@@ -416,11 +419,15 @@ class OrvIntegranteCreate(AuditInput):
     id_cargo: int = Field(gt=0)
     id_calidad: int = Field(gt=0)
     fecha_inicio: date | None = None
-    fecha_fin: date | None = None
+
 
 class OrvIntegranteResponse(OrvIntegranteCreate, AuditRead):
     id_orv_integrante: int
     id_orv: int
+    fecha_fin: date | None = None
+    id_tipo_fin: int | None = None
+    detalle_fin: str | None = None
+    vigente: bool
 
 
 class OrvIntegranteDetailResponse(OrvIntegranteResponse):
@@ -436,7 +443,18 @@ class OrvIntegranteUpdate(AuditInput):
     id_cargo: int | None = Field(default=None, gt=0)
     id_calidad: int | None = Field(default=None, gt=0)
     fecha_inicio: date | None = None
-    fecha_fin: date | None = None
+
+
+class OrvIntegranteFinalizarRequest(BaseModel):
+    fecha_fin: date
+    id_tipo_fin: int = Field(gt=0)
+    detalle_fin: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("detalle_fin")
+    @classmethod
+    def normalizar_detalle_fin(cls, value: str | None) -> str | None:
+        normalized = value.strip() if value else None
+        return normalized or None
 
 
 class PadronHistorialCreate(AuditInput):
@@ -613,37 +631,7 @@ class UnidadAgrariaBase(BaseModel):
     motivo_revision: str | None = None
 
 class UnidadAgrariaCreate(UnidadAgrariaBase, AuditInput):
-
-    @model_validator(mode="after")
-    def validar_dato_identificador(self):
-        referencia = (
-            self.referencia_alfanumerica.strip()
-            if self.referencia_alfanumerica
-            else ""
-        )
-
-        detalle = (
-            self.detalle.strip()
-            if self.detalle
-            else ""
-        )
-
-        tiene_dato = any([
-            self.id_tipo_gestion is not None,
-            self.id_destino_superficie is not None,
-            self.id_parcela is not None,
-            bool(referencia),
-            bool(detalle),
-        ])
-
-        if not tiene_dato:
-            raise ValueError(
-                "Debe indicar al menos uno de estos datos: "
-                "tipo de gestión, destino de superficie, parcela, "
-                "referencia alfanumérica o detalle"
-            )
-
-        return self
+    pass
 
 class UnidadAgrariaUpdate(BaseModel):
     id_tipo_tierra: int | None = Field(default=None, gt=0)
@@ -834,7 +822,6 @@ class ConvenioCreate(AuditInput):
     tipo_convenio: Literal[
         "cop_original",
         "modificatorio",
-        "superficie_adicional",
         "obras_complementarias",
         "ampliacion",
         "ampliacion_remanente",
@@ -912,7 +899,6 @@ class ConvenioUpdate(AuditInput):
     tipo_convenio: Literal[
         "cop_original",
         "modificatorio",
-        "superficie_adicional",
         "obras_complementarias",
         "ampliacion",
         "ampliacion_remanente",
@@ -1063,6 +1049,12 @@ class TramiteRanCreate(AuditInput):
         return self
 
 
+class TramiteRanUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fecha_programada_ingreso: date | None = None
+
+
 class TramiteRanResponse(TramiteRanCreate, AuditRead):
     id_tramite_ran: int
     id_proyecto_nucleo: int | None = None
@@ -1145,10 +1137,40 @@ RolIntervinienteFifonafe = Literal[
 
 
 class TramiteFifonafeIntervinienteCreate(AuditInput):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "required": ["id_orv_integrante"],
+                        "properties": {
+                            "id_orv_integrante": {"not": {"type": "null"}}
+                        },
+                    },
+                    "then": {
+                        "required": ["id_evento_fifonafe"],
+                        "properties": {
+                            "id_evento_fifonafe": {"not": {"type": "null"}}
+                        },
+                    },
+                }
+            ]
+        },
+    )
+
     id_persona: int = Field(gt=0)
     rol: RolIntervinienteFifonafe
     id_evento_fifonafe: int | None = Field(default=None, gt=0)
     id_orv_integrante: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def validar_orv_evento(self):
+        if self.id_orv_integrante is not None and self.id_evento_fifonafe is None:
+            raise ValueError(
+                "La acreditación de integrante ORV requiere especificar un evento FIFONAFE (id_evento_fifonafe)"
+            )
+        return self
 
 
 class TramiteFifonafeIntervinienteResponse(
@@ -1523,6 +1545,32 @@ class ConvenioCoberturaImpactoResponse(ORMModel):
     clasificados: int
     pendientes: int
     sin_firma_acreditada: int
+
+
+class ConvenioColectivoDestinoResponse(ORMModel):
+    id_proyecto: int
+    id_entidad: int
+    id_proyecto_nucleo: int
+    id_convenio: int
+    id_asamblea: int | None = None
+    ambito: str
+    tipo_convenio: str | None = None
+    tipo_cop_operativo: str | None = None
+    destino_superficie: str | None = None
+    superficie_ha: Decimal | None = None
+    superficie_declarada_ha: Decimal | None = None
+    monto_declarado: Decimal | None = Field(
+        default=None,
+        description=(
+            "Monto económico declarado del instrumento (c.monto_100). Es un atributo descriptivo "
+            "NO ADITIVO que pertenece al convenio completo y no representa el monto del destino. "
+            "Para agregados económicos oficiales debe contarse una sola vez por id_convenio."
+        ),
+    )
+    fecha_firma: date | None = None
+    anio: int | None = None
+    mes: int | None = None
+    trimestre: int | None = None
 
 
 class BitacoraResponse(ORMModel):

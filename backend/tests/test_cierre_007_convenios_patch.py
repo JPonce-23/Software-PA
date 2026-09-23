@@ -1,52 +1,18 @@
 """Regresión aislada del contrato PATCH de Convenio previo a la migración 007."""
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app import auth, models
-from app.database import SessionLocal
-from app.main import app
 from .test_excel_closure_002 import _catalog, _isolated_pn
 
 
 @pytest.fixture(scope="module")
-def api():
-    """Cliente QA sin credenciales externas; conserva RBAC de acceso como admin real."""
-    session = SessionLocal()
-    admin = session.query(models.Usuario).filter(
-        models.Usuario.rol == "admin", models.Usuario.activo.is_(True)
-    ).first()
-    assert admin is not None
-
-    for wrapper in app.routes:
-        router = getattr(wrapper, "original_router", None)
-        if router is None:
-            continue
-        for route in router.routes:
-            for dependency in route.dependant.dependencies:
-                if isinstance(dependency.call, auth.RoleChecker):
-                    app.dependency_overrides[dependency.call] = lambda admin=admin: admin
-
-    with TestClient(app, raise_server_exceptions=False) as client:
-        def request(method: str, path: str, *, expected: int = 200, **kwargs):
-            response = client.request(method, path, **kwargs)
-            assert response.status_code == expected, response.text
-            return response
-
-        yield request
-
-    app.dependency_overrides.clear()
-    session.close()
+def api(transactional_api):
+    return transactional_api["request"]
 
 
 @pytest.fixture(scope="module")
-def target_domain(api):
-    """Dominio mínimo propio: evita compartir fixtures/overrides con otras regresiones."""
-    entidad = api("GET", "/api/catalogos/entidades").json()[0]
-    municipio = api(
-        "GET", f"/api/catalogos/municipios?id_entidad={entidad['id_entidad']}"
-    ).json()[0]
-    return {"municipality": municipio}
+def target_domain(transactional_target_domain):
+    return transactional_target_domain
 
 
 def test_patch_convenio_rechaza_comparecientes_y_endpoints_hijos_funcionan(
@@ -109,6 +75,18 @@ def test_patch_convenio_rechaza_comparecientes_y_endpoints_hijos_funcionan(
         expected=201,
         json={"tipo_instrumento": "convenio", "tipo_convenio": "cop_original"},
     ).json()
+
+    # El tipo juridico legado tampoco puede reintroducirse mediante PATCH.
+    api(
+        "PATCH",
+        f"/api/convenios/{convenio['id_convenio']}",
+        expected=422,
+        json={"tipo_convenio": "superficie_adicional"},
+    )
+    assert api("GET", f"/api/convenios/{convenio['id_convenio']}").json()[
+        "tipo_convenio"
+    ] == "cop_original"
+
     compareciente_payload = {
         "id_persona": persona["id_persona"],
         "id_parcela_titular": titular["id_parcela_titular"],

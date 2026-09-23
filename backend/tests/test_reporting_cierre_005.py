@@ -4,6 +4,16 @@ import pytest
 from .test_excel_closure_002 import _catalog, _isolated_pn, _dashboard
 
 
+@pytest.fixture(scope="module")
+def api(transactional_api):
+    return transactional_api["request"]
+
+
+@pytest.fixture(scope="module")
+def target_domain(transactional_target_domain):
+    return transactional_target_domain
+
+
 def _get_periodic(api, project_id, **params):
     query_parts = [f"id_proyecto={project_id}"]
     for key, val in params.items():
@@ -455,24 +465,47 @@ def test_caso_o_colectivo_vs_individual(api, target_domain):
 
 
 def test_caso_p_tipos_convenio_distinguibles(api, target_domain):
-    """CASO P: Verificar que cop_original, modificatorio, superficie_adicional, obras_complementarias,
-    ampliacion y ampliacion_remanente son distinguibles y no aparecen todos como otros_instrumentos."""
+    """CASO P: la dimension juridica se separa del indicador de superficie adicional."""
     project, pn = _isolated_pn(api, target_domain)
     pn_id = pn["id_proyecto_nucleo"]
     cop = _catalog(api, "tipo_cop_operativo")
 
-    # Colectivo: cop_original, modificatorio, superficie_adicional, obras_complementarias
+    # Colectivo juridico: cop_original, modificatorio y obras_complementarias.
     aff_col = api("POST", f"/api/proyecto-nucleo/{pn_id}/afectaciones", expected=201, json={
         "tipo_afectacion": "colectivo", "id_tipo_cop_operativo": cop["ORIGEN"]
     }).json()
     cop_col = api("POST", f"/api/afectaciones/{aff_col['id_afectacion']}/convenios", expected=201, json={
         "tipo_convenio": "cop_original", "fecha_firma": "2026-07-01", "consecutivo": 1
     }).json()
-    for idx, t in enumerate(["modificatorio", "superficie_adicional", "obras_complementarias"]):
+    for idx, t in enumerate(["modificatorio", "obras_complementarias"]):
         api("POST", f"/api/afectaciones/{aff_col['id_afectacion']}/convenios", expected=201, json={
             "tipo_convenio": t, "fecha_firma": f"2026-07-{idx+2:02d}",
             "id_convenio_padre": cop_col["id_convenio"], "consecutivo": idx + 2
         })
+
+    # ADICIONAL y 2A_ADICIONAL son ciclos operativos de modificatorios. Ambos
+    # conservan el indicador historico superficie_adicional sin usar consecutivo.
+    for idx, codigo in enumerate(["ADICIONAL", "2A_ADICIONAL"], start=1):
+        aff_adicional = api(
+            "POST",
+            f"/api/proyecto-nucleo/{pn_id}/afectaciones",
+            expected=201,
+            json={
+                "tipo_afectacion": "colectivo",
+                "id_tipo_cop_operativo": cop[codigo],
+            },
+        ).json()
+        api(
+            "POST",
+            f"/api/afectaciones/{aff_adicional['id_afectacion']}/convenios",
+            expected=201,
+            json={
+                "tipo_convenio": "modificatorio",
+                "fecha_firma": f"2026-07-{idx + 4:02d}",
+                "id_convenio_padre": cop_col["id_convenio"],
+                "consecutivo": idx + 10,
+            },
+        )
 
     # Individual: cop_original, ampliacion, ampliacion_remanente
     aff_ind = api("POST", f"/api/proyecto-nucleo/{pn_id}/afectaciones", expected=201, json={
@@ -502,14 +535,22 @@ def test_caso_p_tipos_convenio_distinguibles(api, target_domain):
     rep = _get_periodic(api, project["id_proyecto"], anio=2026, mes=7)
     tipos_encontrados = {r["tipo_convenio"] for r in rep if r["tipo_convenio"]}
     expected_types = {
-        "cop_original", "modificatorio", "superficie_adicional",
-        "obras_complementarias", "ampliacion", "ampliacion_remanente"
+        "cop_original", "modificatorio", "obras_complementarias",
+        "ampliacion", "ampliacion_remanente"
     }
     assert expected_types <= tipos_encontrados
+    assert "superficie_adicional" not in tipos_encontrados
 
-    # Ninguno debe reportar indicador 'otros_instrumentos'
+    # El KPI historico se conserva y ningun tipo cae en otros_instrumentos.
     indicadores = {r["indicador"] for r in rep}
+    assert "superficie_adicional" in indicadores
     assert "otros_instrumentos" not in indicadores
+
+    superficie_rows = [r for r in rep if r["indicador"] == "superficie_adicional"]
+    assert {r["tipo_cop_operativo"] for r in superficie_rows} == {
+        "ADICIONAL", "2A_ADICIONAL"
+    }
+    assert {r["tipo_convenio"] for r in superficie_rows} == {"modificatorio"}
 
 
 def test_caso_q_tipos_cop_distinguibles(api, target_domain):

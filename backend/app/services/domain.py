@@ -5,6 +5,7 @@ from typing import Any, TypeVar
 
 from fastapi import HTTPException
 from geoalchemy2.elements import WKTElement
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -343,6 +344,73 @@ def create_person(
     return _persist(db, entity, user.id_usuario, "La persona ya existe")
 
 
+def get_person(db: Session, person_id: int) -> models.Persona:
+    person = db.query(models.Persona).filter(
+        models.Persona.id_persona == person_id,
+        models.Persona.activo.is_(True),
+    ).first()
+    if person is None:
+        raise HTTPException(status_code=404, detail="Persona no encontrada")
+    return person
+
+
+def update_person(
+    db: Session,
+    person: models.Persona,
+    data: schemas.PersonaUpdate,
+    user: models.Usuario,
+) -> models.Persona:
+    return _update(db, person, data, user.id_usuario)
+
+
+def deactivate_person(
+    db: Session, person: models.Persona, user: models.Usuario, reason: str
+) -> None:
+    # This is deliberately a separate statement: under READ COMMITTED, once a
+    # concurrent relation releases the same DB advisory lock, the following
+    # query receives a fresh snapshot and cannot miss the committed relation.
+    db.execute(
+        text(
+            "SELECT pg_advisory_xact_lock("
+            "hashtextextended('software-pa:persona-relaciones:' || :person_id, 0))"
+        ),
+        {"person_id": str(person.id_persona)},
+    )
+    has_active_relations = db.execute(
+        text("SELECT fn_persona_tiene_relaciones_activas(:person_id)"),
+        {"person_id": person.id_persona},
+    ).scalar_one()
+    if has_active_relations:
+        raise HTTPException(
+            status_code=409,
+            detail="La persona mantiene relaciones activas y no puede darse de baja",
+        )
+    logical_delete(db, person, user.id_usuario, reason)
+
+
+def reactivate_person(
+    db: Session, person_id: int, user: models.Usuario
+) -> models.Persona:
+    person = db.query(models.Persona).filter(
+        models.Persona.id_persona == person_id
+    ).with_for_update().first()
+    if person is None:
+        raise HTTPException(status_code=404, detail="Persona no encontrada")
+    if person.activo:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="La persona ya está activa")
+    set_audit_context(db, user.id_usuario)
+    person.activo = True
+    person.fecha_baja = None
+    person.id_usuario_baja = None
+    person.motivo_baja = None
+    person.actualizado_en = datetime.now(timezone.utc)
+    person.actualizado_por = user.id_usuario
+    commit_or_conflict(db, "No fue posible reactivar la persona")
+    db.refresh(person)
+    return person
+
+
 def create_orv(
     db: Session,
     project_nucleus_id: int,
@@ -406,7 +474,185 @@ def add_orv_member(
         **data.model_dump(exclude={"observaciones"}),
         **_audit_values(user.id_usuario, data),
     )
-    return _persist(db, entity, user.id_usuario, "El integrante de ORV ya existe")
+    return _persist(
+        db,
+        entity,
+        user.id_usuario,
+        "El cargo ORV se duplica o traslapa con otra participación activa",
+    )
+
+
+def update_orv_member(
+    db: Session,
+    entity: models.OrvIntegrante,
+    data: schemas.OrvIntegranteUpdate,
+    user: models.Usuario,
+) -> models.OrvIntegrante:
+    values = data.model_dump(exclude_unset=True, exclude={"observaciones"})
+    catalog_types = {
+        "id_organo": "organo_orv",
+        "id_cargo": "cargo_orv",
+        "id_calidad": "calidad_integrante_orv",
+    }
+    for field, catalog_type in catalog_types.items():
+        if field in values:
+            values[field] = require_catalog_option(
+                db, catalog_type, option_id=values[field], required=True
+            ).id_catalogo_opcion
+    set_audit_context(db, user.id_usuario)
+    for key, value in values.items():
+        setattr(entity, key, value)
+    entity.actualizado_en = datetime.now(timezone.utc)
+    entity.actualizado_por = user.id_usuario
+    commit_or_conflict(
+        db, "El cargo ORV se duplica, traslapa o contiene fechas inválidas"
+    )
+    db.refresh(entity)
+    return entity
+
+
+def _lock_orv_member(db: Session, member_id: int) -> models.OrvIntegrante | None:
+    return db.query(models.OrvIntegrante).filter(
+        models.OrvIntegrante.id_orv_integrante == member_id
+    ).with_for_update().first()
+
+
+def finalize_orv_member(
+    db: Session,
+    member_id: int,
+    data: schemas.OrvIntegranteFinalizarRequest,
+    user: models.Usuario,
+) -> models.OrvIntegrante:
+    entity = _lock_orv_member(db, member_id)
+    if entity is None or not entity.activo:
+        raise HTTPException(status_code=404, detail="Integrante ORV no encontrado")
+    orv = db.query(models.Orv).filter(
+        models.Orv.id_orv == entity.id_orv,
+        models.Orv.activo.is_(True),
+    ).first()
+    if orv is None:
+        raise HTTPException(status_code=404, detail="ORV no encontrado")
+    require_nucleus_access(db, user, orv.id_nucleo, mode="capture")
+    if entity.fecha_fin is not None:
+        raise HTTPException(status_code=409, detail="La participación ORV ya está finalizada")
+    if entity.fecha_inicio is not None and data.fecha_fin < entity.fecha_inicio:
+        raise HTTPException(
+            status_code=422,
+            detail="La fecha de fin no puede ser anterior a la fecha de inicio",
+        )
+    finish_type = require_catalog_option(
+        db,
+        "tipo_fin_orv_integrante",
+        option_id=data.id_tipo_fin,
+        required=True,
+    )
+    if finish_type.codigo == "sin_clasificar":
+        raise HTTPException(
+            status_code=422,
+            detail="sin_clasificar se reserva para datos históricos migrados",
+        )
+    if finish_type.codigo == "otro" and not data.detalle_fin:
+        raise HTTPException(
+            status_code=422,
+            detail="El tipo de finalización otro requiere detalle",
+        )
+    set_audit_context(db, user.id_usuario)
+    entity.fecha_fin = data.fecha_fin
+    entity.id_tipo_fin = finish_type.id_catalogo_opcion
+    entity.detalle_fin = data.detalle_fin
+    entity.actualizado_en = datetime.now(timezone.utc)
+    entity.actualizado_por = user.id_usuario
+    commit_or_conflict(db, "La finalización del integrante ORV no es válida")
+    db.refresh(entity)
+    return entity
+
+
+def deactivate_orv_member(
+    db: Session,
+    member_id: int,
+    user: models.Usuario,
+    reason: str,
+) -> None:
+    entity = _lock_orv_member(db, member_id)
+    if entity is None or not entity.activo:
+        raise HTTPException(status_code=404, detail="Integrante ORV no encontrado")
+    logical_delete(db, entity, user.id_usuario, reason)
+
+
+def reactivate_orv_member(
+    db: Session, member_id: int, user: models.Usuario
+) -> models.OrvIntegrante:
+    entity = _lock_orv_member(db, member_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Integrante ORV no encontrado")
+    if entity.activo:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="El integrante ORV ya está activo")
+    orv = db.query(models.Orv).filter(
+        models.Orv.id_orv == entity.id_orv,
+        models.Orv.activo.is_(True),
+    ).first()
+    if orv is None:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="El ORV no está administrativamente activo")
+    set_audit_context(db, user.id_usuario)
+    entity.activo = True
+    entity.fecha_baja = None
+    entity.id_usuario_baja = None
+    entity.motivo_baja = None
+    entity.actualizado_en = datetime.now(timezone.utc)
+    entity.actualizado_por = user.id_usuario
+    commit_or_conflict(
+        db, "La reactivación traslapa con otra participación ORV activa"
+    )
+    db.refresh(entity)
+    return entity
+
+
+def current_validity_expression(model: Any, start: Any, end: Any):
+    """SQL equivalent of models.is_currently_effective using CURRENT_DATE."""
+    return and_(
+        model.activo.is_(True),
+        or_(start.is_(None), start <= func.current_date()),
+        or_(end.is_(None), end >= func.current_date()),
+    )
+
+
+def list_orv_members(
+    db: Session, orv_id: int, *, include_history: bool
+) -> list[dict[str, Any]]:
+    query = db.query(models.OrvIntegrante, models.Persona).join(
+        models.Persona,
+        models.Persona.id_persona == models.OrvIntegrante.id_persona,
+    ).filter(
+        models.OrvIntegrante.id_orv == orv_id,
+        models.OrvIntegrante.activo.is_(True),
+        models.Persona.activo.is_(True),
+    )
+    if not include_history:
+        query = query.filter(
+            current_validity_expression(
+                models.OrvIntegrante,
+                models.OrvIntegrante.fecha_inicio,
+                models.OrvIntegrante.fecha_fin,
+            )
+        )
+    rows = query.order_by(
+        models.OrvIntegrante.id_organo,
+        models.OrvIntegrante.id_cargo,
+        models.Persona.nombre,
+    ).all()
+    return [
+        {
+            **schemas.OrvIntegranteResponse.model_validate(link).model_dump(),
+            "nombre": person.nombre,
+            "apellido_paterno": person.apellido_paterno,
+            "apellido_materno": person.apellido_materno,
+            "telefono": person.telefono,
+            "correo_electronico": person.correo_electronico,
+        }
+        for link, person in rows
+    ]
 
 
 def create_register(
@@ -935,6 +1181,97 @@ def add_fifonafe_affectation(
     )
 
 
+def validate_fifonafe_interviniente(
+    db: Session,
+    procedure: models.TramiteFifonafe,
+    data: schemas.TramiteFifonafeIntervinienteCreate,
+) -> None:
+    # 1. Si se proporciona id_orv_integrante, debe existir id_evento_fifonafe
+    if data.id_orv_integrante is not None and data.id_evento_fifonafe is None:
+        raise HTTPException(
+            status_code=422,
+            detail="La acreditación de integrante ORV requiere especificar un evento FIFONAFE (id_evento_fifonafe)",
+        )
+
+    # 2. Validar persona activa
+    person = db.query(models.Persona).filter(
+        models.Persona.id_persona == data.id_persona,
+        models.Persona.activo.is_(True),
+    ).first()
+    if person is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Persona inexistente o inactiva",
+        )
+
+    # 3. Validar evento FIFONAFE si se especifica
+    event = None
+    event_date = None
+    if data.id_evento_fifonafe is not None:
+        event = db.query(models.TramiteFifonafeEvento).filter(
+            models.TramiteFifonafeEvento.id_evento_fifonafe == data.id_evento_fifonafe,
+            models.TramiteFifonafeEvento.activo.is_(True),
+        ).first()
+        if event is None or event.id_tramite_fifonafe != procedure.id_tramite_fifonafe:
+            raise HTTPException(
+                status_code=409,
+                detail="Evento ajeno o inactivo",
+            )
+        event_date = event.fecha_evento or event.fecha_oficio
+
+    # 4. Validar ORV / integrante si se especifica
+    if data.id_orv_integrante is not None:
+        if event is None or event_date is None:
+            raise HTTPException(
+                status_code=409,
+                detail="La representación ORV histórica requiere un acto FIFONAFE con fecha de negocio",
+            )
+
+        member = db.query(models.OrvIntegrante).filter(
+            models.OrvIntegrante.id_orv_integrante == data.id_orv_integrante,
+            models.OrvIntegrante.activo.is_(True),
+        ).first()
+        if member is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: integrante inactivo o inexistente",
+            )
+
+        if member.id_persona != data.id_persona:
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: la persona no coincide",
+            )
+
+        orv = db.query(models.Orv).filter(
+            models.Orv.id_orv == member.id_orv,
+            models.Orv.activo.is_(True),
+        ).first()
+        if orv is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: ORV inactivo o inexistente",
+            )
+
+        pn = db.query(models.ProyectoNucleo).filter(
+            models.ProyectoNucleo.id_proyecto_nucleo == procedure.id_proyecto_nucleo,
+            models.ProyectoNucleo.activo.is_(True),
+        ).first()
+        if pn is None or pn.id_nucleo != orv.id_nucleo:
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: núcleo agrario incompatible",
+            )
+
+        if (member.fecha_inicio is not None and member.fecha_inicio > event_date) or (
+            member.fecha_fin is not None and member.fecha_fin < event_date
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Integrante ORV no acredita persona, nucleo o vigencia a la fecha del acto: fuera de vigencia a la fecha del acto",
+            )
+
+
 def add_fifonafe_interviniente(
     db: Session,
     procedure_id: int,
@@ -942,6 +1279,7 @@ def add_fifonafe_interviniente(
     user: models.Usuario,
 ) -> models.TramiteFifonafeInterviniente:
     procedure = require_fifonafe_access(db, user, procedure_id, mode="capture")
+    validate_fifonafe_interviniente(db, procedure, data)
     entity = models.TramiteFifonafeInterviniente(
         id_tramite_fifonafe=procedure.id_tramite_fifonafe,
         **data.model_dump(exclude={"observaciones"}),

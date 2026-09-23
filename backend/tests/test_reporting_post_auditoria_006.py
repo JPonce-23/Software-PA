@@ -33,7 +33,8 @@ def test_006_openapi_exposes_snapshot_filters():
 def test_006_asamblea_preserva_cada_cop(api, target_domain, codigo):
     project, pn = _isolated_pn(api, target_domain)
     cop, tipos, contextos, resultados = (_catalog(api, x) for x in ("tipo_cop_operativo", "tipo_asamblea", "contexto_asamblea", "resultado_convocatoria"))
-    api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/asambleas", expected=201, json={"id_tipo_asamblea": tipos["anuencia"], "id_contexto_asamblea": contextos["cop_original"], "id_tipo_cop_operativo": cop[codigo], "convocatorias": [{"ordinal": 1, "fecha_programada": "2026-03-10", "fecha_realizacion": "2026-03-10", "id_resultado": resultados["celebrada"]}]})
+    ctx = contextos["modificatorio"] if codigo in ("ADICIONAL", "2A_ADICIONAL") else contextos["cop_original"]
+    api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/asambleas", expected=201, json={"id_tipo_asamblea": tipos["anuencia"], "id_contexto_asamblea": ctx, "id_tipo_cop_operativo": cop[codigo], "convocatorias": [{"ordinal": 1, "fecha_programada": "2026-03-10", "fecha_realizacion": "2026-03-10", "id_resultado": resultados["celebrada"]}]})
     rows = _periodo(api, project["id_proyecto"], anio=2026, mes=3, indicador="asambleas", tipo_cop_operativo=codigo)
     assert len(rows) == 1 and rows[0]["programado"] == rows[0]["realizado"] == rows[0]["cantidad"] == 1
 
@@ -53,7 +54,8 @@ def test_006_retiro_y_ran_no_se_mezclan(api, target_domain):
 def test_006_ran_acta_cop_ingreso_reingreso_e_inscripcion(api, target_domain, codigo):
     project, pn = _isolated_pn(api, target_domain)
     cop, tipos, contextos, resultados, events = (_catalog(api, x) for x in ("tipo_cop_operativo", "tipo_asamblea", "contexto_asamblea", "resultado_convocatoria", "tipo_evento_ran"))
-    a = api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/asambleas", expected=201, json={"id_tipo_asamblea":tipos["anuencia"],"id_contexto_asamblea":contextos["cop_original"],"id_tipo_cop_operativo":cop[codigo],"convocatorias":[{"ordinal":1,"fecha_programada":"2026-02-01","fecha_realizacion":"2026-02-01","id_resultado":resultados["celebrada"]}]}).json()
+    ctx = contextos["modificatorio"] if codigo in ("ADICIONAL", "2A_ADICIONAL") else contextos["cop_original"]
+    a = api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/asambleas", expected=201, json={"id_tipo_asamblea":tipos["anuencia"],"id_contexto_asamblea":ctx,"id_tipo_cop_operativo":cop[codigo],"convocatorias":[{"ordinal":1,"fecha_programada":"2026-02-01","fecha_realizacion":"2026-02-01","id_resultado":resultados["celebrada"]}]}).json()
     api("POST", "/api/tramites-ran", expected=201, json={"id_asamblea":a["id_asamblea"],"fecha_programada_ingreso":"2026-02-10","eventos":[{"ordinal":1,"id_tipo_evento":events["ingreso"],"fecha_evento":"2026-03-01"},{"ordinal":2,"id_tipo_evento":events["reingreso"],"fecha_evento":"2026-05-01"},{"ordinal":3,"id_tipo_evento":events["inscripcion"],"fecha_evento":"2026-06-01"}]})
     ingreso = _periodo(api, project["id_proyecto"], indicador="ingreso_ran_acta", tipo_cop_operativo=codigo)
     ins = _periodo(api, project["id_proyecto"], indicador="inscripcion_ran_acta", tipo_cop_operativo=codigo)

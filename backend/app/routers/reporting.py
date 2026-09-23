@@ -365,6 +365,59 @@ def reporte_convenios_cobertura_impactos(
 
 
 @router.get(
+    "/reportes/convenios/colectivos-destino",
+    response_model=list[schemas.ConvenioColectivoDestinoResponse],
+)
+@router.get(
+    "/reportes/convenios/destinos",
+    response_model=list[schemas.ConvenioColectivoDestinoResponse],
+    include_in_schema=False,
+)
+def reporte_convenios_colectivos_destino(
+    id_proyecto: int | None = None,
+    id_entidad: int | None = Query(default=None, gt=0),
+    id_proyecto_nucleo: int | None = Query(default=None, gt=0),
+    id_convenio: int | None = Query(default=None, gt=0),
+    id_asamblea: int | None = Query(default=None, gt=0),
+    tipo_convenio: str | None = None,
+    tipo_cop_operativo: str | None = None,
+    destino_superficie: str | None = None,
+    anio: int | None = Query(default=None, ge=2000, le=2200),
+    mes: int | None = Query(default=None, ge=1, le=12),
+    trimestre: int | None = Query(default=None, ge=1, le=4),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    query = db.query(models.ConvenioColectivoDestino)
+    if id_proyecto is not None:
+        require_project_access(db, user, id_proyecto)
+        query = query.filter(models.ConvenioColectivoDestino.id_proyecto == id_proyecto)
+    else:
+        query = query.filter(
+            models.ConvenioColectivoDestino.id_proyecto.in_(authorized_project_ids(db, user))
+        )
+    for field, value in (
+        (models.ConvenioColectivoDestino.id_entidad, id_entidad),
+        (models.ConvenioColectivoDestino.id_proyecto_nucleo, id_proyecto_nucleo),
+        (models.ConvenioColectivoDestino.id_convenio, id_convenio),
+        (models.ConvenioColectivoDestino.id_asamblea, id_asamblea),
+        (models.ConvenioColectivoDestino.tipo_convenio, tipo_convenio),
+        (models.ConvenioColectivoDestino.tipo_cop_operativo, tipo_cop_operativo),
+        (models.ConvenioColectivoDestino.destino_superficie, destino_superficie),
+        (models.ConvenioColectivoDestino.anio, anio),
+        (models.ConvenioColectivoDestino.mes, mes),
+        (models.ConvenioColectivoDestino.trimestre, trimestre),
+    ):
+        if value is not None:
+            query = query.filter(field == value)
+    return query.order_by(
+        models.ConvenioColectivoDestino.id_proyecto,
+        models.ConvenioColectivoDestino.id_convenio,
+        models.ConvenioColectivoDestino.destino_superficie.nulls_last(),
+    ).all()
+
+
+@router.get(
     "/reportes/fifonafe/cobertura",
     response_model=list[schemas.FifonafeCoberturaResponse],
 )

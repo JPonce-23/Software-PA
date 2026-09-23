@@ -1,62 +1,54 @@
-# Documentación SOFTWARE-PA
+# Índice de Documentación Canónica — SOFTWARE-PA
 
-> Fecha de actualización: 2026-08-25.
+> **Árbol documental consolidado de SOFTWARE-PA.**  
+> Este repositorio cuenta con una documentación pequeña, clara, verificable y estrictamente alineada con el código fuente y la base de datos real (esquema **015**).
 
-## Fuentes locales no versionadas
+---
 
-`fuentes_locales/excel/*.xlsx`
+## 1. Documentos Canónicos del Repositorio
 
-Estos archivos son fuentes operativas de consulta y conciliación. No forman parte del producto, no deben subirse a GitHub y están excluidos por `.gitignore` mediante `fuentes_locales/`.
+El árbol de documentación técnica y funcional vigente se compone exclusivamente de los siguientes documentos en `docs/`:
 
-Ver `docs/fuentes_locales.md`.
+1. **[MODELO_FUNCIONAL.md](MODELO_FUNCIONAL.md):**  
+   **Documento canónico del modelo funcional.** Define el propósito del sistema, el alcance sobre propiedad social, el principio *Excel-first*, la estructura jerárquica (`Proyecto → ProyectoNucleo → Núcleo Agrario`), la bifurcación estricta entre derechos colectivos y derechos individuales, los procedimientos ante RAN y FIFONAFE, la cadena financiera de pagos, los eventos de seguimiento, las reglas geoespaciales y las decisiones funcionales pendientes.
 
-## Fuentes literales versionadas
+2. **[FUENTES_Y_COBERTURA_EXCEL.md](FUENTES_Y_COBERTURA_EXCEL.md):**  
+   **Matriz de cobertura funcional de columnas, bloques, relaciones, comportamientos y excepciones relevantes observadas en los Excel.** Documenta los cinco libros Excel auditados (clasificando los cuatro operativos y señalando `BD-PA_v2-geo(1).xlsx` / `BD-PA_v2-geo.xlsx` como referencia/prototipo de modelado sin autoridad operativa sobre liberación), define los tratamientos de ingeniería (`PERSISTIR`, `DERIVAR`, `REFERENCIA`, `DOCUMENTAR`, `REVISAR`, `NO IMPLEMENTAR`) y detalla la correspondencia funcional hacia el modelo de datos.
 
-- `docs/contexto/estructura_datos_propiedad_social_fuente.md`
-- `docs/contexto/flujo_liberacion_propiedad_social_fuente.md`
+3. **[ARQUITECTURA.md](ARQUITECTURA.md):**  
+   **Arquitectura técnica del sistema.** Describe lo que existe e interactúa hoy en el repositorio: stack tecnológico (FastAPI, PostgreSQL 15/PostGIS, React 19, Docker), separación backend/frontend vía REST HTTP JSON, autenticación por cookies seguras, protección CSRF, autorización por proyecto (`UsuarioProyecto`), auditoría append-only, subsistema documental, motor de eventos y arquitectura de reporting en dos capas.
 
-Son transcripciones/fuentes literales. No se reescriben para coincidir con la arquitectura técnica.
+4. **[DICCIONARIO_DATOS.md](DICCIONARIO_DATOS.md):**  
+   **Diccionario de datos físico y lógico.** Especifica de forma exhaustiva las tablas de dominio, campos, tipos de datos PostgreSQL, nulabilidad, llaves foráneas, restricciones, catálogos operativos y vistas de reporting (read-models), verificado contra `backend/app/models.py` y las migraciones vigentes.
 
-## Modelo funcional objetivo canónico
+5. **[MIGRACIONES.md](MIGRACIONES.md):**  
+   **Gestión del esquema de base de datos.** Detalla el historial inmutable de las migraciones `001` a `015`, sus hashes criptográficos SHA-256 verificados, el esquema activo (**015**), el procedimiento oficial de ejecución mediante `run_migrations.sh` y la política forward-only (siguiente migración: `016`).
 
-- `docs/ALCANCE_FUNCIONAL_EXCEL.md`
-- `docs/Description.md`
-- `docs/Descripción proceso.md`
-- `docs/requirements.md`
-- `docs/contexto/contexto_funcional_liberacion_propiedad_social_v2.md`
+6. **[API.md](API.md):**  
+   **Contrato de integración backend/frontend.** Define la interacción cliente-servidor, endpoints de autenticación y sesiones, reglas no expresadas directamente en OpenAPI (catálogos dinámicos, semántica de hitos RAN, no aditividad de montos multidestino, precisión de 7 decimales), administración de usuarios y estados de salud del servicio.
 
-`docs/ALCANCE_FUNCIONAL_EXCEL.md` es la **autoridad canónica del alcance funcional**: define qué fuentes tienen autoridad y cómo deben interpretarse. No sustituye a los Excel como fuente de datos.
+7. **[openapi.json](openapi.json):**  
+   **Contrato OpenAPI 3.1.0 formal.** Archivo exportado automáticamente desde FastAPI que describe la firma de todas las rutas, parámetros y esquemas JSON del backend vigente. *No debe editarse manualmente.*
 
-Los Excel operativos locales son la **fuente funcional primaria del contenido operativo**: determinan qué datos se capturan, qué relaciones se conservan, qué eventos o cambios se historizan, qué excepciones se representan, qué indicadores se calculan y qué reportes debe generar el sistema.
+---
 
-`docs/Descripción proceso.md` sigue siendo el **documento canónico del proceso/modelo funcional**, siempre subordinado al contrato de alcance definido en `docs/ALCANCE_FUNCIONAL_EXCEL.md`. `docs/Description.md`, `docs/requirements.md` y `docs/contexto/contexto_funcional_liberacion_propiedad_social_v2.md` documentan el modelo funcional vigente bajo esa misma subordinación.
+## 2. Precedencia Documental y Jerarquía de Autoridad
 
-Regla invariable: **SOFTWARE-PA debe demostrar correspondencia con el modelo operativo Excel, no correspondencia exhaustiva con el Derecho Agrario mexicano.**
+En caso de divergencia conceptual o técnica entre artefactos, rige la siguiente jerarquía de precedencia:
 
-El flujograma y las fuentes institucionales son fuentes interpretativas. La legislación, reglamentos, lineamientos, presentaciones, RAN, FIFONAFE, INDAABIN, INPI y demás documentos institucionales pueden explicar conceptos, pero no generan automáticamente módulos, tablas, pantallas, estados, etapas, procesos ni requisitos.
-
-La implementación técnica vigente describe lo construido, pero no puede ampliar el dominio por sí sola. `docs/historico/*` sirve como antecedente y trazabilidad; no tiene autoridad funcional vigente.
-
-## Diseño técnico objetivo canónico
-
-- `docs/design.md`
-- `docs/propuestas/2026-08-25-diseno-reestructuracion-bd.md`
-- `docs/propuestas/2026-08-24-matriz-trazabilidad-excel-modelo.md`
-
-`docs/propuestas/2026-08-25-diseno-reestructuracion-bd.md` es el **DISEÑO TÉCNICO CANÓNICO** implementado por las migraciones 031-033; la migración 034 separa owner y runtime sin cambiar ese dominio. Si existe una contradicción con una propuesta anterior, prevalece el diseño del 25 de agosto. Cualquier propuesta no incluida en esta sección sirve sólo como antecedente y no es normativa para la implementación.
-
-## Implementación real actual
-
-- `docs/Arquitectura_Actual.md`
-- `docs/Diccionario_Datos_SSALFER.md`
-- `backend/`
-- `frontend/`
-- `backend/db/migrations/`
-
-Estos documentos y artefactos describen la implementación vigente del esquema 035 y se validan conjuntamente. La operación owner/runtime se documenta en `docs/migraciones.md`.
-
-## Históricos
-
-- `docs/historico/*`
-
-Sirven como memoria de decisiones y trabajos previos. Los documentos históricos **NO son fuente normativa para implementar**.
+```text
+1. Archivos Excel operativos + docs/MODELO_FUNCIONAL.md
+   └── Determinan el alcance funcional, datos a capturar y reglas de negocio.
+       │
+2. docs/FUENTES_Y_COBERTURA_EXCEL.md
+   └── Demuestra la trazabilidad y tratamiento de cada dato de fuente.
+       │
+3. Código ejecutable backend + migraciones 001–015
+   └── Define la realidad técnica en ejecución.
+       │
+4. docs/ARQUITECTURA.md + docs/DICCIONARIO_DATOS.md
+   └── Documentan la implementación del sistema y la estructura de datos.
+       │
+5. docs/API.md + docs/openapi.json
+   └── Gobiernan la integración y consumo entre interfaces.
+```

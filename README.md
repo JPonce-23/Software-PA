@@ -96,7 +96,7 @@ bootstrap y migraciones, y `DB_RUNTIME_USER`/`DB_RUNTIME_PASSWORD` para
 FastAPI. El backend no recibe las credenciales owner. En un volumen existente,
 recrear el contenedor sólo actualiza su entorno: no vuelve a ejecutar
 `docker-entrypoint-initdb.d`. El Baseline V1 y la provisión posterior se
-documentan en [docs/migraciones.md](docs/migraciones.md).
+documentan en [docs/MIGRACIONES.md](docs/MIGRACIONES.md).
 
 ### Bootstrap del primer administrador
 
@@ -178,10 +178,11 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 ## Base de datos, migraciones y datos iniciales
 
 Una instalación vacía aplica directamente
-`backend/db/migrations/001_baseline_v1.sql`. El baseline crea PostGIS, 51
-tablas funcionales, constraints, funciones, triggers, índices, cuatro vistas
-de SOFTWARE-PA y catálogos estructurales. No contiene `bien_afectado` ni
-columnas o sincronizaciones exclusivamente legacy.
+`backend/db/migrations/001_baseline_v1.sql`. El baseline crea PostGIS, la
+estructura base de tablas de dominio y soporte (52 tablas físicas iniciales),
+constraints, funciones, triggers, índices, cuatro vistas de SOFTWARE-PA y
+catálogos estructurales. No contiene `bien_afectado` ni columnas o
+sincronizaciones exclusivamente legacy.
 
 `backend/db/init/001_bootstrap_roles.sh` provisiona por variables de entorno
 el rol `software_pa_app` y el LOGIN runtime. Después,
@@ -189,7 +190,7 @@ el rol `software_pa_app` y el LOGIN runtime. Después,
 contraseñas no forman parte del SQL.
 
 La secuencia exacta, las comprobaciones para bases existentes y los comandos de
-respaldo están documentados en [docs/migraciones.md](docs/migraciones.md).
+respaldo están documentados en [docs/MIGRACIONES.md](docs/MIGRACIONES.md).
 
 Resumen para una instalación nueva:
 
@@ -297,12 +298,25 @@ docker compose exec frontend \
 Todos los servicios deben aparecer activos y saludables, sin reinicios
 constantes.
 
+## Documentación del proyecto
+
+La documentación técnica y funcional canónica reside en el directorio [`docs/`](docs/README.md):
+
+- [Índice y precedencia documental](docs/README.md)
+- [Modelo funcional objetivo](docs/MODELO_FUNCIONAL.md)
+- [Fuentes y cobertura Excel](docs/FUENTES_Y_COBERTURA_EXCEL.md)
+- [Arquitectura del sistema](docs/ARQUITECTURA.md)
+- [Diccionario de datos](docs/DICCIONARIO_DATOS.md)
+- [Gestión de migraciones](docs/MIGRACIONES.md)
+- [Contrato de API](docs/API.md)
+- [Especificación OpenAPI 3.1.0](docs/openapi.json)
+
 ## Reglas de colaboración
 
 - No trabajar directamente en la rama `main`.
 - Crear una rama por tarea, por ejemplo `feature/nombre-tarea`.
 - Usar commits descriptivos (`feat:`, `fix:`, `docs:`, entre otros).
-- Documentar en `docs/` las decisiones importantes de arquitectura.
+- Mantener la documentación canónica en `docs/` sincronizada con el código.
 
 ## Autores
 

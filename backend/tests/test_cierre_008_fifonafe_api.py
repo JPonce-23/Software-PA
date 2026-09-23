@@ -238,7 +238,7 @@ def test_fifonafe_representacion_orv_historica_y_externa(api, target_domain):
     member = api("POST", f"/api/orv/{orv['id_orv']}/integrantes", expected=201,
                  json={"id_persona": person["id_persona"], "id_organo": organs["comisariado"],
                        "id_cargo": positions["presidente"], "id_calidad": qualities["propietario"],
-                       "fecha_inicio": "2026-01-01", "fecha_fin": "2026-12-31"}).json()
+                       "fecha_inicio": "2026-01-01"}).json()
     tramite = api("POST", f"/api/proyecto-nucleo/{pn_id}/fifonafe", expected=201,
                   json={"ids_afectacion": [target_domain["individual"][0]["id_afectacion"]]}).json()
     event = _event(api, tramite["id_tramite_fifonafe"], tipos_evento["diferimiento_retiro"], 1,
