@@ -244,9 +244,10 @@ Tablas Transaccionales
   - `trazo_proyecto.geometria_linea`: Línea legacy del proyecto ferroviario (`MULTILINESTRING`), conservada temporalmente para los endpoints y el mapa actuales.
   - `nucleo_agrario.geometria_poligono`: Perímetro del núcleo agrario (`MULTIPOLYGON`).
   - `parcela.geometria_poligono`: Polígono parcelario opcional (`MULTIPOLYGON`).
-- **Pipeline de Importación Geoespacial:**  
-  Permite cargar archivos GeoJSON/Shapefile mediante un flujo controlado en tres fases:
+- **Pipeline legacy de importación geoespacial:**
+  Conserva GeoJSON/KML/GeoPackage/ZIP Shapefile y sus objetivos anteriores mediante un flujo controlado en tres fases:
   1. Carga del archivo y análisis de metadatos (`importacion_archivo`).
   2. Extracción y validación topológica de cada feature (`importacion_feature`).
   3. Previsualización y confirmación explícita del usuario (`confirmacion_explicita = true`) antes de impactar las capas de producción.
+- **Importación oficial DDV:** `POST /api/proyectos/{id_proyecto}/geoespacial/ddv/importaciones` acepta sólo GeoPackage de una capa con CRS identificable y polígonos. GDAL reproyecta a EPSG:4326 cuando corresponde; PostGIS valida y sólo intenta `ST_MakeValid` en geometrías inválidas, dejando advertencia y razón. El staging conserva atributos, transformaciones, errores y usuario. La confirmación reutiliza la ruta existente y, tras bloquear importación y proyecto, crea una nueva versión DDV y desmarca la anterior dentro de una transacción. `/mapa` permanece en `trazo_proyecto` durante esta fase.
 - **Directriz arquitectónica rectora:** La geometría es estrictamente de apoyo visual y consulta. **Ninguna validación espacial condiciona la captura administrativa de una afectación ni sustituye la superficie administrativa capturada (`superficie_ha` / `superficie_afectada_ha`) de un convenio o afectación**.

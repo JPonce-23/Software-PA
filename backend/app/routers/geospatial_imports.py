@@ -3,7 +3,7 @@
 import json
 from datetime import date
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -33,6 +33,33 @@ def list_imports(
         models.ImportacionArchivo.id_proyecto == id_proyecto,
         models.ImportacionArchivo.activo.is_(True),
     ).order_by(models.ImportacionArchivo.fecha_carga.desc()).offset(skip).limit(limit).all()
+
+
+@router.post(
+    "/proyectos/{id_proyecto}/geoespacial/ddv/importaciones",
+    response_model=schemas.ImportacionArchivoResponse,
+    status_code=201,
+)
+async def stage_ddv_import(
+    id_proyecto: int,
+    request: Request,
+    fuente: str = Form(...),
+    fecha_fuente: date | None = Form(default=None),
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(GIS_ROLES)),
+):
+    fields = [key for key, _ in (await request.form()).multi_items()]
+    if sorted(fields) != sorted(set(fields)) or set(fields) - {
+        "fuente", "fecha_fuente", "archivo"
+    }:
+        raise HTTPException(
+            status_code=422,
+            detail="El DDV solo admite archivo, fuente y fecha_fuente",
+        )
+    return await service.stage_ddv_import(
+        db, id_proyecto, fuente, fecha_fuente, archivo, user
+    )
 
 
 @router.post(

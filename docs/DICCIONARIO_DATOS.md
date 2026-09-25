@@ -1,7 +1,7 @@
 # Diccionario de Datos — SOFTWARE-PA
 
 > **Autoridad:** Especificación canónica del modelo físico y lógico de datos de SOFTWARE-PA.  
-> **Validación:** Verificado contra `backend/app/models.py`, migraciones vigentes `001–020` y read-models de base de datos en PostgreSQL 15 / PostGIS.
+> **Validación:** Verificado contra `backend/app/models.py`, migraciones vigentes `001–021` y read-models de base de datos en PostgreSQL 15 / PostGIS.
 
 ---
 
@@ -77,6 +77,10 @@ DDV cartográfico canónico ligado directamente a `proyecto`. Admite historial d
 | `fecha_fuente` | `DATE` | Sí | — | Fecha declarada de la fuente. | Cartografía | Trazabilidad |
 
 Incluye las columnas estándar de auditoría y baja lógica descritas en §1. Esta fase no sustituye superficies administrativas ni cambia los endpoints de trazo y mapa.
+
+### 2.3.2 Staging de importación DDV
+
+`importacion_archivo.tipo_objetivo = 'derecho_via_proyecto'` identifica el flujo estricto de GeoPackage. En este objetivo, `formato_detectado = 'gpkg'`, `mapeo` y `opciones_mapeo` son objetos vacíos, `id_perfil` es nulo y `crs_destino = 'EPSG:4326'`. `importacion_archivo` conserva nombre del archivo, tamaño, SHA-256, fuente, fecha, CRS original, capa en el reporte, contadores, usuario y fechas. `importacion_feature` conserva índice, capa, atributos originales, geometría normalizada, estado, errores, advertencias, transformaciones y, tras confirmar, `registro_destino_id` hacia el DDV del mismo proyecto. Una reparación válida registra `GEOMETRIA_REPARADA` y requiere aceptación explícita; una geometría irrecuperable queda en error. El staging no modifica `derecho_via_proyecto` ni entidades administrativas.
 
 ### 2.4 `nucleo_agrario`
 Catálogo maestro nacional de núcleos agrarios (ejidos y comunidades). Su identidad interna permanece en `id_nucleo`; para el catálogo RAN/PHINA, la `cve_unica` oficial se almacena físicamente en `id_nucleo_fuente` y se identifica junto con `fuente_datos = 'RAN_PHINA_CATALOGO_NUCLEOS'`. No existe una columna física `clave_ran`. `ProyectoNucleo` continúa siendo el vínculo operativo con cada proyecto, conforme al principio Excel-First.

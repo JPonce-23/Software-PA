@@ -1,8 +1,8 @@
 # Gestión de Migraciones de Base de Datos — SOFTWARE-PA
 
 > **Autoridad:** Documentación canónica del versionado del esquema de base de datos en PostgreSQL 15 / PostGIS.  
-> **Esquema ejecutable vigente:** **020** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base).
-> **Siguiente migración disponible:** **021**.
+> **Esquema ejecutable vigente:** **021** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base).
+> **Siguiente migración disponible:** **022**.
 
 ---
 
@@ -13,13 +13,13 @@
 2. **Verificación de integridad por Checksum:**  
    El runner oficial (`backend/scripts/run_migrations.sh`) calcula el hash criptográfico SHA-256 de cada archivo `.sql`. Si un archivo ya registrado en `public.schema_migrations` sufre alteraciones en su contenido, el proceso de arranque se detiene de inmediato con error.
 3. **Evolución Forward-Only:**  
-   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** (comenzando en `021`). No se modifican los archivos históricos `001` a `020`.
+   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** (comenzando en `022`). No se modifican los archivos históricos `001` a `021`.
 4. **Instalación limpia:**  
-   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `020_derecho_via_proyecto.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
+   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `021_importacion_ddv_gpkg.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
 
 ---
 
-## 2. Inventario Canónico de Migraciones Vigentes (001–020)
+## 2. Inventario Canónico de Migraciones Vigentes (001–021)
 
 | Versión | Archivo SQL | Checksum SHA-256 Verificado | Propósito y Contenido Principal |
 |---|---|---|---|
@@ -43,6 +43,7 @@
 | **018** | `018_orv_persona_ciclo_vida.sql` | `2fb5676b52d902b636b3941490ea71a8044a791764b2913a18b6a905d9ddfea3` | Formaliza el ciclo de vida de integrantes ORV y protege las relaciones activas de personas. |
 | **019** | `019_catalogo_nucleos_ran.sql` | `6769168eb11b2773b4e8e42f9409ccbbfbe986984f69895a562fe17c29f03b04` | Convierte la coincidencia municipio/tenencia/nombre en índice de búsqueda no único y establece la identidad externa única `fuente_datos + id_nucleo_fuente`; exige procedencia completa para filas RAN/PHINA. No carga el CSV ni altera `ProyectoNucleo`. |
 | **020** | `020_derecho_via_proyecto.sql` | `3662cc9ce0ed2e63095b7a873616356aa965e94b1b34e9f651ffd5396452dc09` | Crea el DDV poligonal `MULTIPOLYGON` 4326 por proyecto, con versiones históricas, una sola versión `es_vigente`, auditoría y baja lógica. Conserva `trazo_proyecto` como legacy. |
+| **021** | `021_importacion_ddv_gpkg.sql` | `16f63229569574f078105423a1a914c1621b6662150dfc090124f60817b719f6` | Amplía el staging a `derecho_via_proyecto`, exige GPKG sin mapeo para este objetivo y valida el destino DDV por proyecto; conserva los objetivos legacy. |
 
 ---
 
@@ -89,7 +90,7 @@ Respuesta esperada:
 ```json
 {
   "status": "ok",
-  "schema": 20
+  "schema": 21
 }
 ```
 
@@ -122,4 +123,8 @@ La carga es transaccional e idempotente, conserva `id_nucleo` en actualizaciones
 
 ### 3.5 Derecho de Vía poligonal
 
-La migración 020 agrega `derecho_via_proyecto` sin migrar ni eliminar `trazo_proyecto`. Para cada proyecto se conservan versiones numeradas; `es_vigente` selecciona como máximo una. Al promover una versión, la operación debe desmarcar la anterior y marcar la nueva dentro de la misma transacción. Una versión que deja de estar vigente conserva `activo = true`; `activo = false` corresponde exclusivamente a baja lógica con usuario, fecha y motivo. La geometría obligatoria debe ser un `MULTIPOLYGON` válido y no vacío en SRID 4326. Esta fase no expone endpoints ni modifica `/mapa`.
+La migración 020 agrega `derecho_via_proyecto` sin migrar ni eliminar `trazo_proyecto`. Para cada proyecto se conservan versiones numeradas; `es_vigente` selecciona como máximo una. Al promover una versión, la operación debe desmarcar la anterior y marcar la nueva dentro de la misma transacción. Una versión que deja de estar vigente conserva `activo = true`; `activo = false` corresponde exclusivamente a baja lógica con usuario, fecha y motivo. La geometría obligatoria debe ser un `MULTIPOLYGON` válido y no vacío en SRID 4326.
+
+### 3.6 Importación DDV GeoPackage
+
+La migración 021 habilita el objetivo `derecho_via_proyecto` en las tablas de staging existentes. Impone `formato_detectado = 'gpkg'`, mapeos vacíos y destino EPSG:4326 sólo para este objetivo; los objetivos legacy conservan su contrato. El endpoint `POST /api/proyectos/{id_proyecto}/geoespacial/ddv/importaciones` recibe exclusivamente `archivo` `.gpkg`, `fuente` y `fecha_fuente` opcional. El preflight exige driver GeoPackage, una capa, features y CRS identificable. Los GET de importación/features y `POST /api/importaciones/{id_importacion}/confirmar` se reutilizan para preview y confirmación. La confirmación bloquea importación y proyecto, une las geometrías poligonales en un MultiPolygon y actualiza las versiones DDV en una transacción. Las advertencias de reparación exigen `aceptar_advertencias = true`; los errores impiden confirmar. `/mapa` y `trazo_proyecto` siguen usando su flujo legacy.
