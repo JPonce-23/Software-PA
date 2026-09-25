@@ -209,6 +209,7 @@ class Proyecto(Base, AuditableMixin):
 
     nucleos = relationship("ProyectoNucleo", back_populates="proyecto", lazy="selectin")
     trazos = relationship("TrazoProyecto", back_populates="proyecto", lazy="selectin")
+    derechos_via = relationship("DerechoViaProyecto", back_populates="proyecto")
     asignaciones = relationship(
         "UsuarioProyecto", back_populates="proyecto", lazy="selectin"
     )
@@ -1150,6 +1151,29 @@ class TrazoProyecto(Base, AuditableMixin):
     fecha_vigencia_fin = Column(Date)
 
     proyecto = relationship("Proyecto", back_populates="trazos")
+
+
+class DerechoViaProyecto(Base, AuditableMixin):
+    __tablename__ = "derecho_via_proyecto"
+    __table_args__ = (
+        UniqueConstraint(
+            "id_proyecto", "version", name="uq_derecho_via_proyecto_version"
+        ),
+    )
+
+    id_derecho_via = Column(Integer, primary_key=True)
+    id_proyecto = Column(
+        Integer, ForeignKey("proyecto.id_proyecto"), nullable=False
+    )
+    version = Column(Integer, nullable=False)
+    es_vigente = Column(Boolean, nullable=False, default=False, server_default="false")
+    geometria_poligono = Column(
+        Geometry("MULTIPOLYGON", srid=4326), nullable=False
+    )
+    fuente = Column(String(250), nullable=False)
+    fecha_fuente = Column(Date)
+
+    proyecto = relationship("Proyecto", back_populates="derechos_via")
 
 
 class PerfilMapeoImportacion(Base, AuditableMixin):

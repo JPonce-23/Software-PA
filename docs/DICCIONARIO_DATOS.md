@@ -1,7 +1,7 @@
 # Diccionario de Datos — SOFTWARE-PA
 
 > **Autoridad:** Especificación canónica del modelo físico y lógico de datos de SOFTWARE-PA.  
-> **Validación:** Verificado contra `backend/app/models.py`, migraciones vigentes `001–019` y read-models de base de datos en PostgreSQL 15 / PostGIS.
+> **Validación:** Verificado contra `backend/app/models.py`, migraciones vigentes `001–020` y read-models de base de datos en PostgreSQL 15 / PostGIS.
 
 ---
 
@@ -61,6 +61,22 @@ Proyecto estratégico o ferroviario amparado por las tareas de liberación de v�
 | `descripcion` | `TEXT` | Sí | — | Alcance y notas descriptivas. | Notas | Interfaz |
 | `fecha_inicio` | `DATE` | Sí | — | Fecha de arranque institucional del proyecto. | Calendario | Trazabilidad |
 | `fecha_fin_estimada` | `DATE` | Sí | — | Fecha meta de culminación. | Cronograma | Trazabilidad |
+
+### 2.3.1 `derecho_via_proyecto`
+
+DDV cartográfico canónico ligado directamente a `proyecto`. Admite historial de versiones y como máximo una versión vigente por proyecto. `es_vigente` expresa vigencia cartográfica; `activo` expresa baja lógica. Una versión anterior conserva `activo = true` al ser sustituida. `trazo_proyecto` (`MULTILINESTRING`) permanece como estructura legacy para consumidores actuales.
+
+| Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen | Uso |
+|---|---|---|---|---|---|---|
+| `id_derecho_via` | `INTEGER` | No | PK | Identificador de la versión. | Sistema | Auditoría |
+| `id_proyecto` | `INTEGER` | No | `proyecto.id_proyecto` | Proyecto propietario del DDV. | Proyecto | Alcance |
+| `version` | `INTEGER` | No | `UNIQUE(id_proyecto, version)`, `> 0` | Versión secuencial por proyecto. | Captura cartográfica | Historial |
+| `es_vigente` | `BOOLEAN` | No | Índice único parcial por proyecto; default `false` | Marca la versión cartográfica vigente; requiere `activo = true`. | Promoción explícita | Consulta futura |
+| `geometria_poligono` | `geometry(MULTIPOLYGON,4326)` | No | GiST; no vacía y válida | Polígono del Derecho de Vía. | Cartografía | Consulta espacial futura |
+| `fuente` | `VARCHAR(250)` | No | No vacía | Procedencia de la geometría. | Cartografía | Trazabilidad |
+| `fecha_fuente` | `DATE` | Sí | — | Fecha declarada de la fuente. | Cartografía | Trazabilidad |
+
+Incluye las columnas estándar de auditoría y baja lógica descritas en §1. Esta fase no sustituye superficies administrativas ni cambia los endpoints de trazo y mapa.
 
 ### 2.4 `nucleo_agrario`
 Catálogo maestro nacional de núcleos agrarios (ejidos y comunidades). Su identidad interna permanece en `id_nucleo`; para el catálogo RAN/PHINA, la `cve_unica` oficial se almacena físicamente en `id_nucleo_fuente` y se identifica junto con `fuente_datos = 'RAN_PHINA_CATALOGO_NUCLEOS'`. No existe una columna física `clave_ran`. `ProyectoNucleo` continúa siendo el vínculo operativo con cada proyecto, conforme al principio Excel-First.

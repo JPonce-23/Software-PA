@@ -240,7 +240,8 @@ Tablas Transaccionales
 ## 9. Componente Geoespacial y Cartografía
 
 - **Almacenamiento geográfico:** PostGIS almacena geometrías en proyección geográfica estándar WGS84 (`SRID=4326`):
-  - `trazo_proyecto.geometria_linea`: Líneas del proyecto ferroviario (`MULTILINESTRING`).
+  - `derecho_via_proyecto.geometria_poligono`: Derecho de Vía canónico (`MULTIPOLYGON`) ligado al proyecto y versionado; `es_vigente` identifica como máximo una versión por proyecto sin dar de baja las anteriores.
+  - `trazo_proyecto.geometria_linea`: Línea legacy del proyecto ferroviario (`MULTILINESTRING`), conservada temporalmente para los endpoints y el mapa actuales.
   - `nucleo_agrario.geometria_poligono`: Perímetro del núcleo agrario (`MULTIPOLYGON`).
   - `parcela.geometria_poligono`: Polígono parcelario opcional (`MULTIPOLYGON`).
 - **Pipeline de Importación Geoespacial:**  
