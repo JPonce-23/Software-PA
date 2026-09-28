@@ -24,7 +24,7 @@ def _login(email: str, password: str) -> tuple[TestClient, dict[str, str]]:
 
 
 def test_auth_health_and_csrf(client, admin_headers):
-    assert client.get("/health").json()["schema"] == 22
+    assert client.get("/health").json()["schema"] == 23
     anonymous = TestClient(app, raise_server_exceptions=False)
     assert anonymous.get("/api/proyectos").status_code == 401
     response = client.post(
@@ -37,6 +37,7 @@ def test_auth_health_and_csrf(client, admin_headers):
 def test_project_rbac_filters_before_pagination(api, target_domain):
     project_id = target_domain["project"]["id_proyecto"]
     role_sessions = {}
+    role_user_ids = {}
     for role in ("operador", "visualizador", "geografo"):
         password = _new_password()
         email = f"{role}-{uuid.uuid4().hex[:10]}@qa.local"
@@ -58,6 +59,7 @@ def test_project_rbac_filters_before_pagination(api, target_domain):
             expected=201,
             json={"id_usuario": user["id_usuario"]},
         )
+        role_user_ids[role] = user["id_usuario"]
         role_sessions[role] = _login(email, password)
 
     unassigned = api(
@@ -101,8 +103,27 @@ def test_project_rbac_filters_before_pagination(api, target_domain):
         headers=geographer_headers,
         json={"tipo_afectacion": "colectivo"},
     ).status_code == 403
+    # El mapa usa el proyecto de target_domain en otra prueba. Un proyecto
+    # propio evita que el alta del trazo dependa del orden de esos módulos.
+    gis_project = api(
+        "POST",
+        "/api/proyectos",
+        expected=201,
+        json={
+            "clave_proyecto": f"RBAC-GIS-{uuid.uuid4().hex[:12]}",
+            "nombre_proyecto": "Proyecto GIS aislado para RBAC",
+        },
+    ).json()
+    gis_project_id = gis_project["id_proyecto"]
+    api(
+        "POST",
+        f"/api/proyectos/{gis_project_id}/usuarios",
+        expected=201,
+        json={"id_usuario": role_user_ids["geografo"]},
+    )
+    assert api("GET", f"/api/proyectos/{gis_project_id}/trazos").json() == []
     trace = geographer.post(
-        f"/api/proyectos/{project_id}/trazos",
+        f"/api/proyectos/{gis_project_id}/trazos",
         headers=geographer_headers,
         json={
             "version": 1,

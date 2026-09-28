@@ -171,13 +171,15 @@ La unidad operativa central de la ruta individual.
 
 La resolución del identificador sigue [MODELO_FUNCIONAL.md §6.1](MODELO_FUNCIONAL.md#61-identificador-funcional-canónico-único) y [FUENTES_Y_COBERTURA_EXCEL.md §3.1](FUENTES_Y_COBERTURA_EXCEL.md#31-unicidad-del-identificador-parcelario-no_parcela): equivalencia o diferencia de formato produce un único valor conservando ambos originales; un solo valor presente se utiliza con su procedencia exacta; divergencia sustantiva requiere **REVISAR** y aclaración humana sin crear automáticamente dos parcelas ni asumir prioridad PPT. Sin ambos valores, `no_parcela` puede quedar `NULL` y la ausencia se conserva en trazabilidad/revisión al importar, incluidas las 17 filas auditadas.
 
+La importación cartográfica estricta de parcelas existentes usa `POST /api/proyectos/{id_proyecto}/geoespacial/parcelas/importaciones` y `importacion_archivo.tipo_objetivo = 'parcela_gpkg'`, distinto de `parcela` legacy. El GeoPackage aporta `cve_unica_nucleo` y `no_parcela`, nunca `id_parcela` ni `id_destino`. Se resuelve el núcleo RAN/PHINA activo y vinculado al proyecto antes de buscar la parcela activa por `id_nucleo + no_parcela`. El staging conserva número original, número normalizado, `registro_destino_id`, geometría y trazabilidad; no modifica `parcela`. Sólo se equiparan espacios/caja y el patrón auditado `P.-<dígitos>` con `P-<dígitos>`; letras finales y otros signos permanecen distintos. Una ambigüedad bloquea la importación. Tras bloquear y revalidar los destinos, la confirmación actualiza `geometria_poligono`, `fuente_geometria` y `fecha_fuente_geometria` en una transacción, con aceptación explícita para reparaciones o reemplazos.
+
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
 | `parcela` | `id_parcela` | `INTEGER` | No | PK | Identificador interno de la parcela. | Sistema | `/api/parcelas` |
 | `parcela` | `id_nucleo` | `INTEGER` | No | `nucleo_agrario` | Núcleo agrario al que pertenece. | NÚCLEO | Pertenencia agraria |
 | `parcela` | `no_parcela` | `VARCHAR(80)` | Sí | — | **Único identificador funcional canónico.** | NO. DE PARCELA / NO. DE PARCELA PPT | Identificación unívoca |
 | `parcela` | `tipo_parcela` | `VARCHAR(50)` | Sí | — | Ejidal, comunal, infraestructura, etc. | TIPO PARCELA | Clasificación |
-| `parcela` | `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Polígono cartográfico de la parcela. | Shapefile/GeoJSON | Visor cartográfico (opcional) |
+| `parcela` | `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Polígono cartográfico de la parcela. | GPKG/legacy | Visor cartográfico (opcional) |
 | `parcela_titular` | `id_parcela` | `INTEGER` | No | `parcela.id_parcela` | Parcela correspondiente. | Fila titular | Vínculo de titularidad |
 | `parcela_titular` | `id_persona` | `BIGINT` | No | `persona.id_persona` | Sujeto de derecho acreditado. | TITULAR | Suscripción de convenios |
 | `parcela_titular` | `tipo_derecho` | `VARCHAR(50)` | No | — | Titular, posesionario, sucesor. | CALIDAD | Cláusulas contractuales |

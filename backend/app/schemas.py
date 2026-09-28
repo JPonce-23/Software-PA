@@ -1401,7 +1401,7 @@ class TrazoProyectoResponse(AuditRead):
 class ImportacionArchivoResponse(AuditRead):
     id_importacion: int
     id_proyecto: int
-    tipo_objetivo: Literal["trazo_proyecto", "nucleo_agrario", "parcela", "derecho_via_proyecto", "nucleo_agrario_gpkg"]
+    tipo_objetivo: Literal["trazo_proyecto", "nucleo_agrario", "parcela", "derecho_via_proyecto", "nucleo_agrario_gpkg", "parcela_gpkg"]
     nombre_original: str
     formato_detectado: str
     tamano_bytes: int
