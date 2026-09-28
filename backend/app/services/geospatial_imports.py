@@ -36,6 +36,8 @@ EXTENSIONS = {
     ".gpkg": "gpkg",
     ".zip": "zip",
 }
+RAN_NUCLEI_SOURCE = "RAN_PHINA_CATALOGO_NUCLEOS"
+STRICT_NUCLEUS_TARGET = "nucleo_agrario_gpkg"
 
 
 def _root() -> Path:
@@ -54,12 +56,13 @@ def _safe_name(value: str | None) -> str:
 
 
 async def _store_upload(
-    upload: UploadFile, *, allowed_formats: set[str] | None = None
+    upload: UploadFile, *, allowed_formats: set[str] | None = None,
+    strict_label: str = "El DDV",
 ) -> tuple[Path, str, int, str, str]:
     original = _safe_name(upload.filename)
     declared = EXTENSIONS.get(Path(original).suffix.lower())
     if allowed_formats is not None and declared not in allowed_formats:
-        raise HTTPException(status_code=415, detail="El DDV requiere un archivo .gpkg")
+        raise HTTPException(status_code=415, detail=f"{strict_label} requiere un archivo .gpkg")
     if declared is None:
         raise HTTPException(
             status_code=415,
@@ -254,16 +257,85 @@ async def stage_ddv_import(
     upload: UploadFile,
     user: models.Usuario,
 ) -> models.ImportacionArchivo:
+    return await _stage_strict_gpkg_import(
+        db, project_id, source, source_date, upload, user,
+        target="derecho_via_proyecto",
+    )
+
+
+async def stage_nucleus_import(
+    db: Session,
+    project_id: int,
+    source: str,
+    source_date: date | None,
+    upload: UploadFile,
+    user: models.Usuario,
+) -> models.ImportacionArchivo:
+    return await _stage_strict_gpkg_import(
+        db, project_id, source, source_date, upload, user,
+        target=STRICT_NUCLEUS_TARGET,
+    )
+
+
+def _resolve_nucleus(
+    db: Session, project_id: int, key: str
+) -> tuple[int | None, dict[str, str] | None]:
+    matches = db.query(models.NucleoAgrario).filter(
+        func.lower(func.btrim(models.NucleoAgrario.fuente_datos)) == RAN_NUCLEI_SOURCE.lower(),
+        func.btrim(models.NucleoAgrario.id_nucleo_fuente) == key,
+    ).limit(2).all()
+    if not matches:
+        return None, {"codigo": "CVE_UNICA_INEXISTENTE", "campo": "cve_unica"}
+    if len(matches) != 1:
+        return None, {"codigo": "CVE_UNICA_AMBIGUA", "campo": "cve_unica"}
+    nucleus = matches[0]
+    if not nucleus.activo:
+        return None, {"codigo": "NUCLEO_INACTIVO", "campo": "cve_unica"}
+    linked = db.query(models.ProyectoNucleo.id_proyecto_nucleo).filter(
+        models.ProyectoNucleo.id_proyecto == project_id,
+        models.ProyectoNucleo.id_nucleo == nucleus.id_nucleo,
+        models.ProyectoNucleo.activo.is_(True),
+    ).first()
+    if linked is None:
+        return None, {"codigo": "NUCLEO_FUERA_DEL_PROYECTO", "campo": "cve_unica"}
+    return nucleus.id_nucleo, None
+
+
+def _nucleus_geometry_state(
+    db: Session, nucleus_id: int, wkt: str | None
+) -> tuple[str | None, bool]:
+    row = db.execute(text("""
+        SELECT md5(ST_AsBinary(geometria_poligono)) AS hash_previo,
+               CASE WHEN geometria_poligono IS NULL OR :wkt IS NULL THEN false
+                    ELSE NOT ST_Equals(geometria_poligono, ST_GeomFromText(:wkt, 4326))
+               END AS distinta
+          FROM nucleo_agrario WHERE id_nucleo = :id
+    """), {"id": nucleus_id, "wkt": wkt}).one()
+    return row.hash_previo, row.distinta
+
+
+async def _stage_strict_gpkg_import(
+    db: Session,
+    project_id: int,
+    source: str,
+    source_date: date | None,
+    upload: UploadFile,
+    user: models.Usuario,
+    *,
+    target: str,
+) -> models.ImportacionArchivo:
+    is_nucleus = target == STRICT_NUCLEUS_TARGET
     require_project_access(db, user, project_id, mode="gis")
     source = source.strip()
     if not source:
         raise HTTPException(status_code=422, detail="La fuente es obligatoria")
     path, digest, size, original, _ = await _store_upload(
-        upload, allowed_formats={"gpkg"}
+        upload, allowed_formats={"gpkg"},
+        strict_label="La importación de núcleos" if is_nucleus else "El DDV",
     )
     existing = db.query(models.ImportacionArchivo).filter(
         models.ImportacionArchivo.id_proyecto == project_id,
-        models.ImportacionArchivo.tipo_objetivo == "derecho_via_proyecto",
+        models.ImportacionArchivo.tipo_objetivo == target,
         models.ImportacionArchivo.sha256 == digest,
         models.ImportacionArchivo.activo.is_(True),
     ).first()
@@ -275,10 +347,22 @@ async def stage_ddv_import(
         if dataset.format != "gpkg":
             raise HTTPException(status_code=415, detail="El contenido no es GeoPackage")
         if len(dataset.layers) != 1:
-            raise HTTPException(status_code=422, detail="El DDV requiere exactamente una capa")
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "La importación de núcleos requiere exactamente una capa"
+                    if is_nucleus else "El DDV requiere exactamente una capa"
+                ),
+            )
         layer = dataset.layers[0]
         if not _ddv_crs_identifiable(layer.crs):
             raise HTTPException(status_code=422, detail="CRS desconocido")
+        if is_nucleus:
+            columns = {name.lower() for name in layer.columns}
+            if "cve_unica" not in columns:
+                raise HTTPException(status_code=422, detail="Falta la columna cve_unica")
+            if columns & {"id_nucleo", "id_destino"}:
+                raise HTTPException(status_code=422, detail="No se admiten id_nucleo ni id_destino")
     except IngestionError as exc:
         path.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=exc.public_detail) from exc
@@ -289,7 +373,7 @@ async def stage_ddv_import(
     set_audit_context(db, user.id_usuario)
     record = models.ImportacionArchivo(
         id_proyecto=project_id,
-        tipo_objetivo="derecho_via_proyecto",
+        tipo_objetivo=target,
         nombre_original=original,
         nombre_almacenado=path.name,
         formato_detectado="gpkg",
@@ -314,11 +398,42 @@ async def stage_ddv_import(
     try:
         set_audit_context(db, user.id_usuario)
         valid = warnings = errors = processed = 0
+        seen_nuclei: set[int] = set()
         for index, (layer_name, feature) in enumerate(iter_features(path, dataset)):
             geometry = feature.get("geometry")
             geometry_wkt, feature_errors, feature_warnings, transformations = (
                 _normalize_ddv_geometry(db, geometry)
             )
+            properties = feature.get("properties") or {}
+            normalized: dict[str, Any] = {}
+            destination_id = None
+            if is_nucleus:
+                raw_key = next(
+                    (value for key, value in properties.items() if key.lower() == "cve_unica"),
+                    None,
+                )
+                key = raw_key.strip() if isinstance(raw_key, str) else ""
+                if not key:
+                    feature_errors.append({"codigo": "CVE_UNICA_VACIA", "campo": "cve_unica"})
+                else:
+                    normalized["cve_unica"] = key
+                    destination_id, identity_error = _resolve_nucleus(db, project_id, key)
+                    if identity_error:
+                        feature_errors.append(identity_error)
+                    elif destination_id in seen_nuclei:
+                        feature_errors.append({"codigo": "NUCLEO_DUPLICADO_EN_IMPORTACION", "campo": "cve_unica"})
+                        destination_id = None
+                    else:
+                        seen_nuclei.add(destination_id)
+                        prior_hash, different = _nucleus_geometry_state(
+                            db, destination_id, geometry_wkt
+                        )
+                        normalized["geometria_previa_hash"] = prior_hash
+                        if different:
+                            feature_warnings.append({
+                                "codigo": "GEOMETRIA_EXISTENTE_DISTINTA",
+                                "campo": "geometry",
+                            })
             if not layer.is_wgs84:
                 transformations.insert(0, {
                     "codigo": "CRS_REPROYECTADO",
@@ -335,8 +450,8 @@ async def stage_ddv_import(
                 capa_origen=layer_name,
                 id_externo=str(feature["id"]) if feature.get("id") is not None else None,
                 tipo_geometria=(geometry or {}).get("type"),
-                atributos_originales=feature.get("properties") or {},
-                atributos_normalizados={},
+                atributos_originales=properties,
+                atributos_normalizados=normalized,
                 geometria_normalizada=(
                     WKTElement(geometry_wkt, srid=4326) if geometry_wkt else None
                 ),
@@ -344,6 +459,7 @@ async def stage_ddv_import(
                 errores=feature_errors,
                 advertencias=feature_warnings,
                 transformaciones=transformations,
+                registro_destino_id=destination_id,
             ))
             processed += 1
         if processed != dataset.total_features:
@@ -682,6 +798,112 @@ def _confirm_ddv_import(
     return record
 
 
+def _confirm_nucleus_import(
+    db: Session,
+    record: models.ImportacionArchivo,
+    data: schemas.ImportacionConfirmarRequest,
+    user: models.Usuario,
+) -> models.ImportacionArchivo:
+    try:
+        record = db.query(models.ImportacionArchivo).filter(
+            models.ImportacionArchivo.id_importacion == record.id_importacion,
+            models.ImportacionArchivo.activo.is_(True),
+        ).populate_existing().with_for_update().one_or_none()
+        if record is None:
+            raise HTTPException(status_code=404, detail="Importación no encontrada")
+        if record.tipo_objetivo != STRICT_NUCLEUS_TARGET:
+            raise HTTPException(status_code=409, detail="Objetivo de importación inconsistente")
+        if record.estado != "previsualizado":
+            raise HTTPException(status_code=409, detail="La importación no está previsualizada")
+        if record.errores:
+            raise HTTPException(status_code=409, detail="Corrija los features con error")
+        if record.advertencias and not data.aceptar_advertencias:
+            raise HTTPException(status_code=409, detail="Debe aceptar las advertencias")
+        features = db.query(models.ImportacionFeature).filter(
+            models.ImportacionFeature.id_importacion == record.id_importacion,
+            models.ImportacionFeature.estado.in_(["valido", "advertencia"]),
+        ).order_by(models.ImportacionFeature.indice_feature).all()
+        destination_ids = [feature.registro_destino_id for feature in features]
+        if (
+            not features or len(features) != record.total_features
+            or len(features) != record.features_procesados
+            or any(feature.geometria_normalizada is None or feature.registro_destino_id is None
+                   for feature in features)
+            or len(set(destination_ids)) != len(destination_ids)
+        ):
+            raise HTTPException(status_code=409, detail="Staging de núcleos incompleto")
+
+        # El bloqueo de relaciones impide retirar un núcleo del proyecto durante
+        # la confirmación. El orden estable de los destinos evita deadlocks entre
+        # importaciones distintas que incluyen varios núcleos.
+        linked_ids = db.query(models.ProyectoNucleo.id_nucleo).filter(
+            models.ProyectoNucleo.id_proyecto == record.id_proyecto,
+            models.ProyectoNucleo.id_nucleo.in_(destination_ids),
+            models.ProyectoNucleo.activo.is_(True),
+        ).order_by(models.ProyectoNucleo.id_nucleo).with_for_update().all()
+        if {row.id_nucleo for row in linked_ids} != set(destination_ids):
+            raise HTTPException(status_code=409, detail="Un núcleo ya no pertenece al proyecto")
+        destinations = db.query(models.NucleoAgrario).filter(
+            models.NucleoAgrario.id_nucleo.in_(destination_ids),
+        ).order_by(models.NucleoAgrario.id_nucleo).populate_existing().with_for_update().all()
+        by_id = {destination.id_nucleo: destination for destination in destinations}
+        if len(by_id) != len(destination_ids):
+            raise HTTPException(status_code=409, detail="Un núcleo ya no existe")
+        for feature in features:
+            destination = by_id[feature.registro_destino_id]
+            key = feature.atributos_normalizados.get("cve_unica")
+            if (
+                not destination.activo
+                or (destination.fuente_datos or "").strip().lower() != RAN_NUCLEI_SOURCE.lower()
+                or (destination.id_nucleo_fuente or "").strip() != key
+            ):
+                raise HTTPException(status_code=409, detail="La identidad del núcleo cambió")
+            current_hash, _ = _nucleus_geometry_state(db, destination.id_nucleo, None)
+            if current_hash != feature.atributos_normalizados.get("geometria_previa_hash"):
+                raise HTTPException(status_code=409, detail="La geometría del núcleo cambió desde el preview")
+
+        now = datetime.now(timezone.utc)
+        set_audit_context(db, user.id_usuario)
+        for feature in features:
+            destination = by_id[feature.registro_destino_id]
+            destination.geometria_poligono = feature.geometria_normalizada
+            destination.fuente_geometria = record.fuente
+            destination.fecha_fuente_geometria = record.fecha_fuente
+            destination.actualizado_en = now
+            destination.actualizado_por = user.id_usuario
+            feature.estado = "confirmado"
+            feature.fecha_importacion = now
+            if feature.advertencias:
+                feature.advertencias_aceptadas = True
+                feature.id_usuario_revision = user.id_usuario
+                feature.fecha_revision = now
+        record.confirmacion_explicita = True
+        record.fecha_confirmacion = now
+        record.id_usuario_confirmacion = user.id_usuario
+        record.importados = len(features)
+        record.estado = "completo"
+        record.actualizado_en = now
+        record.actualizado_por = user.id_usuario
+        record.reporte = {
+            **(record.reporte or {}),
+            "confirmados": len(features),
+            "advertencias_aceptadas": bool(record.advertencias),
+            "confirmado_en": now.isoformat(),
+        }
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="La confirmación de núcleos se revirtió completamente",
+        ) from exc
+    db.refresh(record)
+    return record
+
+
 def confirm_import(
     db: Session,
     import_id: int,
@@ -693,6 +915,8 @@ def confirm_import(
         raise HTTPException(status_code=422, detail="Se requiere confirmación explícita")
     if record.tipo_objetivo == "derecho_via_proyecto":
         return _confirm_ddv_import(db, record, data, user)
+    if record.tipo_objetivo == STRICT_NUCLEUS_TARGET:
+        return _confirm_nucleus_import(db, record, data, user)
     if record.estado != "previsualizado":
         raise HTTPException(status_code=409, detail="La importación no está previsualizada")
     if record.errores:

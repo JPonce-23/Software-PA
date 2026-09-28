@@ -63,6 +63,33 @@ async def stage_ddv_import(
 
 
 @router.post(
+    "/proyectos/{id_proyecto}/geoespacial/nucleos/importaciones",
+    response_model=schemas.ImportacionArchivoResponse,
+    status_code=201,
+)
+async def stage_nucleus_import(
+    id_proyecto: int,
+    request: Request,
+    fuente: str = Form(...),
+    fecha_fuente: date | None = Form(default=None),
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(GIS_ROLES)),
+):
+    fields = [key for key, _ in (await request.form()).multi_items()]
+    if sorted(fields) != sorted(set(fields)) or set(fields) - {
+        "fuente", "fecha_fuente", "archivo"
+    }:
+        raise HTTPException(
+            status_code=422,
+            detail="Los núcleos solo admiten archivo, fuente y fecha_fuente",
+        )
+    return await service.stage_nucleus_import(
+        db, id_proyecto, fuente, fecha_fuente, archivo, user
+    )
+
+
+@router.post(
     "/proyectos/{id_proyecto}/importaciones",
     response_model=schemas.ImportacionArchivoResponse,
     status_code=201,

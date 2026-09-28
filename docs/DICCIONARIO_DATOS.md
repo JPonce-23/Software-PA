@@ -85,6 +85,8 @@ Incluye las columnas estándar de auditoría y baja lógica descritas en §1. Es
 ### 2.4 `nucleo_agrario`
 Catálogo maestro nacional de núcleos agrarios (ejidos y comunidades). Su identidad interna permanece en `id_nucleo`; para el catálogo RAN/PHINA, la `cve_unica` oficial se almacena físicamente en `id_nucleo_fuente` y se identifica junto con `fuente_datos = 'RAN_PHINA_CATALOGO_NUCLEOS'`. No existe una columna física `clave_ran`. `ProyectoNucleo` continúa siendo el vínculo operativo con cada proyecto, conforme al principio Excel-First.
 
+La importación cartográfica estricta usa `POST /api/proyectos/{id_proyecto}/geoespacial/nucleos/importaciones` y el objetivo interno `nucleo_agrario_gpkg`, separado del importador legacy. Cada feature GPKG exige `cve_unica`, resuelta sólo por `fuente_datos + id_nucleo_fuente` a un núcleo activo con `proyecto_nucleo` activo. `registro_destino_id` se conserva desde staging. No se crean núcleos ni se admite `id_nucleo`/`id_destino` del archivo. La geometría normalizada es `MULTIPOLYGON` 4326; un reemplazo diferente o una reparación válida requiere aceptación explícita de advertencias. La confirmación revalida identidad, vínculo y geometría previa bajo bloqueo y actualiza `geometria_poligono`, `fuente_geometria` y `fecha_fuente_geometria` en una transacción. Los errores impiden toda modificación.
+
 | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|
 | `id_nucleo` | `INTEGER` | No | PK | Identificador interno estable del núcleo agrario. | Sistema | `/api/nucleos` |
