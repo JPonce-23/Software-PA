@@ -201,6 +201,8 @@ def iter_features(
             "EPSG:4326",
             "-lco",
             "RS=NO",
+            "-lco",
+            "COORDINATE_PRECISION=15",
         ])
         try:
             process = subprocess.Popen(

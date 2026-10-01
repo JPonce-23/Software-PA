@@ -140,6 +140,79 @@ def test_ddv_polygon_and_multipolygon_versions_preserve_history(
     ), {"id": project_id}).scalar_one() == 2
 
 
+def test_ddv_preserves_valid_narrow_ring_during_geojsonseq_streaming(
+    transactional_api, tmp_path
+):
+    api = transactional_api["request"]
+    connection = transactional_api["connection"]
+    project_id = _project(api)
+    narrow_ring = [
+        [-100.2986040957567, 20.62935477054833],
+        [-100.298603199728, 20.62935473210204],
+        [-100.2986040957566, 20.62935477054833],
+        [-100.2986040957567, 20.62935477054833],
+    ]
+    geometry = {"type": "MultiPolygon", "coordinates": [[[
+        [-100.31, 20.62], [-100.29, 20.62],
+        [-100.29, 20.64], [-100.31, 20.64], [-100.31, 20.62],
+    ], narrow_ring]]}
+    content = _gpkg(tmp_path, "narrow-ring", [("ddv", [geometry])])
+
+    staged = _stage(api, project_id, content).json()
+    assert staged["total_features"] == staged["validos"] == 1
+    assert staged["advertencias"] == staged["errores"] == 0
+    preview = api(
+        "GET", f"/api/importaciones/{staged['id_importacion']}/features"
+    ).json()
+    assert len(preview) == 1
+    assert preview[0]["tipo_geometria"] == "MultiPolygon"
+    assert preview[0]["estado"] == "valido"
+    assert preview[0]["advertencias"] == preview[0]["transformaciones"] == []
+    preserved = connection.execute(text("""
+        SELECT ST_IsValid(geometria_normalizada),
+               ST_NumInteriorRings(ST_GeometryN(geometria_normalizada, 1)),
+               ST_NPoints(geometria_normalizada)
+          FROM importacion_feature
+         WHERE id_importacion = :id
+    """), {"id": staged["id_importacion"]}).one()
+    assert preserved == (True, 1, 9)
+    assert _confirm(api, staged["id_importacion"]).json()["estado"] == "completo"
+
+
+def test_ddv_streaming_keeps_separated_components_apart(transactional_api, tmp_path):
+    api = transactional_api["request"]
+    connection = transactional_api["connection"]
+    project_id = _project(api)
+    left = {"type": "MultiPolygon", "coordinates": [[[[
+        0, 0], [1.00000001, 0], [1.00000001, 1], [0, 1], [0, 0],
+    ]]]}
+    right = {"type": "MultiPolygon", "coordinates": [[[[
+        1.00000002, 0], [2, 0], [2, 1], [1.00000002, 1], [1.00000002, 0],
+    ]]]}
+    content = _gpkg(tmp_path, "separated", [("ddv", [left, right])])
+
+    staged = _stage(api, project_id, content).json()
+    assert staged["total_features"] == staged["validos"] == 2
+    assert staged["advertencias"] == staged["errores"] == 0
+    gap = connection.execute(text("""
+        SELECT ST_Distance(a.geometria_normalizada, b.geometria_normalizada)
+          FROM importacion_feature a
+          JOIN importacion_feature b ON a.id_importacion = b.id_importacion
+         WHERE a.id_importacion = :id
+           AND a.indice_feature = 0 AND b.indice_feature = 1
+    """), {"id": staged["id_importacion"]}).scalar_one()
+    assert gap > 0
+    confirmed = _confirm(api, staged["id_importacion"]).json()
+    assert confirmed["estado"] == "completo"
+    consolidated = connection.execute(text("""
+        SELECT ST_IsValid(geometria_poligono),
+               ST_NumGeometries(geometria_poligono)
+          FROM derecho_via_proyecto
+         WHERE id_derecho_via = :id
+    """), {"id": confirmed["reporte"]["id_derecho_via"]}).one()
+    assert consolidated == (True, 2)
+
+
 def test_ddv_rejects_other_formats_multiple_layers_and_mapping(transactional_api, tmp_path):
     api = transactional_api["request"]
     project_id = _project(api)
