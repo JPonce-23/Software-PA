@@ -1,0 +1,231 @@
+[
+  {
+    "pantalla": "dashboard.html",
+    "enlaces": [
+      {
+        "id": "",
+        "texto": "Todos los proyectos",
+        "accion": ""
+      }
+    ],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "actividades.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "afectacion.html",
+    "enlaces": [
+      {
+        "id": "",
+        "texto": "Ver mapa",
+        "accion": ""
+      }
+    ],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "asamblea.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "auditoria.html",
+    "enlaces": [],
+    "deshabilitados": [
+      {
+        "id": "cambiosProyectoNucleo",
+        "tag": "SELECT"
+      },
+      {
+        "id": "btnAnteriorCambios",
+        "tag": "BUTTON"
+      }
+    ]
+  },
+  {
+    "pantalla": "cambiarContrasena.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "catalogosOperativos.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "detalleAfectacion.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "estadoFinanciero.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "expedienteDocumental.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "fichaConvenio.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "fichaFifonafe.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "fichaProyecto.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "fichaRan.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "fifonafe.html",
+    "enlaces": [
+      {
+        "id": "enlaceNucleo",
+        "texto": "Núcleo agrario",
+        "accion": ""
+      }
+    ],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "indemnizacion.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "nucleoAgrario.html",
+    "enlaces": [],
+    "deshabilitados": [
+      {
+        "id": "",
+        "tag": "DIV"
+      }
+    ]
+  },
+  {
+    "pantalla": "nuevoConvenio.html",
+    "enlaces": [],
+    "deshabilitados": [
+      {
+        "id": "idConvenioPadre",
+        "tag": "SELECT"
+      }
+    ]
+  },
+  {
+    "pantalla": "nuevoProyecto.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "orv.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "padrones.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "parcela.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "persona.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "reporteActividadesPeriodo.html",
+    "enlaces": [],
+    "deshabilitados": [
+      {
+        "id": "btnAvanceAnterior",
+        "tag": "BUTTON"
+      }
+    ]
+  },
+  {
+    "pantalla": "reportesConvenios.html",
+    "enlaces": [],
+    "deshabilitados": [
+      {
+        "id": "reporteConvenioFiltro_id_proyecto_nucleo",
+        "tag": "SELECT"
+      },
+      {
+        "id": "reporteConvenioFiltro_id_convenio",
+        "tag": "SELECT"
+      },
+      {
+        "id": "btnAnteriorReportesConvenios",
+        "tag": "BUTTON"
+      }
+    ]
+  },
+  {
+    "pantalla": "reportesFifonafe.html",
+    "enlaces": [],
+    "deshabilitados": [
+      {
+        "id": "btnAnteriorFifReportes",
+        "tag": "BUTTON"
+      },
+      {
+        "id": "btnSiguienteFifReportes",
+        "tag": "BUTTON"
+      }
+    ]
+  },
+  {
+    "pantalla": "seguimiento.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "tramiteRan.html",
+    "enlaces": [
+      {
+        "id": "enlaceAsamblea",
+        "texto": "Asamblea #183",
+        "accion": ""
+      }
+    ],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "unidadAgraria.html",
+    "enlaces": [],
+    "deshabilitados": []
+  },
+  {
+    "pantalla": "usuarios.html",
+    "enlaces": [],
+    "deshabilitados": [
+      {
+        "id": "btnPaginaAnterior",
+        "tag": "BUTTON"
+      },
+      {
+        "id": "btnPaginaSiguiente",
+        "tag": "BUTTON"
+      }
+    ]
+  }
+]

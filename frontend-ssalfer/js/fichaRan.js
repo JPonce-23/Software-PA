@@ -949,10 +949,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         seccionFormularioEvento
             .style.display = "";
 
-        seccionFormularioEvento.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(seccionFormularioEvento);
     }
 
     function abrirEdicionEvento(idEvento) {
@@ -1044,10 +1041,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         seccionFormularioEvento
             .style.display = "";
 
-        seccionFormularioEvento.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(seccionFormularioEvento);
     }
 
     function cerrarFormularioEvento() {

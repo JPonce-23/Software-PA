@@ -537,10 +537,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             true
         );
 
-        elementos.formularioOrv?.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.formularioOrv);
     }
 
     function abrirEdicionOrv(id) {
@@ -595,10 +592,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             true
         );
 
-        elementos.formularioOrv?.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.formularioOrv);
     }
 
     function obtenerDatosOrv() {
@@ -1200,10 +1194,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             true
         );
 
-        elementos.formularioIntegrante?.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.formularioIntegrante);
     }
 
     function abrirEdicionIntegrante(id) {
@@ -1266,10 +1257,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             true
         );
 
-        elementos.formularioIntegrante?.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.formularioIntegrante);
     }
 
     function obtenerDatosIntegrante() {
@@ -1537,12 +1525,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
 
-        elementos
-            .formularioFinalizarIntegrante
-            ?.scrollIntoView({
-                behavior: "smooth",
-                block: "start"
-            });
+        window.SSALFER_UI?.desplazarA(elementos.formularioFinalizarIntegrante);
 
     }
 

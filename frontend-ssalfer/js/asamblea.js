@@ -1475,10 +1475,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         actualizarTextoFormulario();
 
-        elementos.form.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.form);
     }
 
     async function guardarEdicion(
@@ -1749,6 +1746,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     await cargarAsambleas();
 
                     prepararNueva();
+                    window.SSALFER_UI?.desplazarA(seccionListado);
 
                 } catch (error) {
                     window.ClienteAPI.mostrarErrorAPI(

@@ -787,15 +787,7 @@ document.addEventListener(
                 .hidden =
                 false;
 
-            elementos
-                .formularioActividad
-                .scrollIntoView({
-                    behavior:
-                        "smooth",
-
-                    block:
-                        "start"
-                });
+            window.SSALFER_UI?.desplazarA(elementos.formularioActividad);
         }
 
         function cerrarFormulario() {

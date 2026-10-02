@@ -1069,20 +1069,12 @@ async function cargarCatalogos() {
             false;
 
 
-        formulario.scrollIntoView({
-
-            behavior:
-                "smooth",
-
-            block:
-                "start"
-
-        });
+        window.SSALFER_UI?.desplazarA(formulario);
 
 
         document.getElementById(
             "idRequisito"
-        )?.focus();
+        )?.focus({ preventScroll: true });
 
     }
 

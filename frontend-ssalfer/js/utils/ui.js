@@ -172,7 +172,134 @@
         return confirmado ? valor : null;
     }
 
+    // Una entrada por destino: las peticiones paralelas comparten contador y tiempos.
+    const cargas = new Map();
+    const TEXTO_CARGA = "Cargando...";
+    let peticiones = 0;
+    let accionUsuario = null;
+    let temporizadorAccion;
+    const reglasAcciones = [];
+    const resolverElemento = valor => typeof valor === "function" ? valor() :
+        typeof valor === "string" ? document.querySelector(valor) : valor;
+    const visible = elemento => Boolean(elemento?.isConnected && elemento.getClientRects().length &&
+        getComputedStyle(elemento).visibility !== "hidden");
+    const esModal = elemento => elemento?.closest('[role="dialog"], .ssalfer-modal-backdrop, [id^="modal"], .fifonafe-modal-backdrop');
+
+    function crearIndicador(enLinea) {
+        const nodo = document.createElement("div");
+        nodo.className = `ssalfer-cargando ${enLinea ? "ssalfer-cargando-inline" : "ssalfer-cargando-pantalla"}`;
+        nodo.setAttribute("role", "status");
+        nodo.setAttribute("aria-live", "polite");
+        nodo.innerHTML = `<div class="ssalfer-cargando-contenido">
+            <svg viewBox="0 0 160 105" aria-hidden="true" focusable="false">
+                <g class="ssalfer-cargando-humo" fill="currentColor" opacity=".45">
+                    <circle cx="105" cy="32" r="7"/><circle cx="105" cy="32" r="7"/><circle cx="105" cy="32" r="7"/>
+                </g>
+                <path fill="currentColor" d="M20 46h42v31H20z M15 40h52v8H15z M62 54h62v23H62z M99 38h14v22H99z M94 36h24v6H94z M124 68l16 12H15v-7h109z"/>
+                <path fill="#eef6f0" d="M28 49h12v13H28z M46 49h10v13H46z"/>
+                <g fill="#eef6f0" stroke="currentColor" stroke-width="5">
+                    <g class="ssalfer-cargando-rueda"><circle cx="38" cy="80" r="10"/><path d="M38 73v14M31 80h14" stroke-width="2"/></g>
+                    <g class="ssalfer-cargando-rueda"><circle cx="74" cy="80" r="10"/><path d="M74 73v14M67 80h14" stroke-width="2"/></g>
+                    <g class="ssalfer-cargando-rueda"><circle cx="110" cy="80" r="10"/><path d="M110 73v14M103 80h14" stroke-width="2"/></g>
+                </g><path d="M10 94h140" stroke="currentColor" stroke-width="3"/>
+            </svg><span>${TEXTO_CARGA}</span></div>`;
+        return nodo;
+    }
+
+    function programarDesplazamiento() {
+        clearTimeout(temporizadorAccion);
+        temporizadorAccion = setTimeout(() => {
+            if (!accionUsuario || peticiones || cargas.size) return;
+            const accion = accionUsuario;
+            accionUsuario = null;
+            if (accion.condicion && !accion.condicion()) return;
+            const destino = resolverElemento(accion.destino);
+            if (visible(destino) && !esModal(destino)) moverVista(destino);
+        }, 100); // El consumidor de la promesa termina de renderizar antes del enfoque.
+    }
+
+    function iniciarCarga({ silencioso = false, carga, metodo = "GET" } = {}) {
+        if (silencioso || /(?:gestionGeoespacial|mapa)\.html$/i.test(location.pathname)) return () => {};
+        peticiones++;
+        const solicitado = resolverElemento(carga ?? (metodo.toUpperCase() === "GET" ? accionUsuario?.carga : null));
+        const destino = visible(solicitado) ? solicitado : document.body;
+        let estado = cargas.get(destino);
+        if (!estado) {
+            estado = { cuenta: 0, nodo: null, inicio: 0, solicitado: performance.now() };
+            cargas.set(destino, estado);
+        }
+        if (!estado.cuenta && !estado.nodo) {
+            estado.mostrar = setTimeout(() => {
+                estado.nodo = crearIndicador(destino !== document.body);
+                estado.inicio = performance.now();
+                if (destino === document.body) destino.appendChild(estado.nodo);
+                else destino.prepend(estado.nodo);
+            }, Math.max(0, 300 - (performance.now() - estado.solicitado)));
+        }
+        clearTimeout(estado.ocultar);
+        estado.cuenta++;
+        let finalizada = false;
+        return () => {
+            if (finalizada) return;
+            finalizada = true;
+            peticiones--;
+            if (--estado.cuenta === 0) {
+                clearTimeout(estado.mostrar);
+                const quitar = () => {
+                    estado.nodo?.remove();
+                    cargas.delete(destino);
+                    programarDesplazamiento();
+                };
+                estado.ocultar = setTimeout(quitar, estado.nodo ? Math.max(0, 400 - (performance.now() - estado.inicio)) : 0);
+            }
+            programarDesplazamiento();
+        };
+    }
+
+    function moverVista(elemento) {
+        const rect = elemento.getBoundingClientRect();
+        // Solo barras que realmente cruzan el destino; una barra lateral no es un encabezado.
+        let margen = 16;
+        document.querySelectorAll('header, nav, aside, .menu, .sidebar, .encabezado, [data-scroll-cabecera]').forEach(barra => {
+            const css = getComputedStyle(barra), r = barra.getBoundingClientRect();
+            if (["fixed", "sticky"].includes(css.position) && r.top < innerHeight * .5 && r.bottom > 0 &&
+                r.height < innerHeight * .75 && r.right > rect.left && r.left < rect.right) margen = Math.max(margen, r.bottom + 16);
+        });
+        const foco = elemento.matches('input, select, textarea, button, a, h1, h2, h3, h4') ? elemento :
+            [...elemento.querySelectorAll('h1, h2, h3, h4, input:not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled)')].find(visible) || elemento;
+        if (!foco.matches('input, select, textarea, button, a[href]')) foco.setAttribute("tabindex", "-1");
+        foco.focus({ preventScroll: true });
+        if (rect.top < margen || rect.bottom > innerHeight - 16) {
+            window.scrollTo({ top: Math.max(0, scrollY + rect.top - margen),
+                behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+        }
+    }
+
+    function desplazarA(elemento) {
+        // Sin un evento de usuario pendiente, los refrescos y cargas iniciales no desplazan.
+        if (!accionUsuario || !elemento || esModal(elemento)) return;
+        accionUsuario.destino ||= elemento;
+        programarDesplazamiento();
+    }
+
+    function registrarAcciones(reglas) { reglasAcciones.push(...reglas); }
+
+    ["click", "change", "submit"].forEach(tipo => document.addEventListener(tipo, event => {
+        if (!event.isTrusted || !(event.target instanceof Element)) return;
+        const regla = reglasAcciones.find(item => (item.evento || "click") === tipo && event.target.closest(item.selector));
+        accionUsuario = { ...regla };
+        if (esModal(event.target)) accionUsuario = null;
+        programarDesplazamiento();
+    }, true));
+    // No quitar el foco a alguien que ya continuó escribiendo o desplazándose manualmente.
+    ["wheel", "touchstart", "keydown"].forEach(tipo => document.addEventListener(tipo, event => {
+        if (event.isTrusted && (tipo !== "keydown" || !["Enter", " "].includes(event.key))) accionUsuario = null;
+    }, { capture: true, passive: true }));
+
     window.SSALFER_UI = Object.freeze({
+        cargando: Object.freeze({ iniciar: iniciarCarga }),
+        desplazarA,
+        registrarAcciones,
         escaparHTML,
         toast,
         abrirModal,

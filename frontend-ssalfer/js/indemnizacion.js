@@ -301,10 +301,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         actualizarDescripcionEstatus();
 
-        elementos.formIndemnizacion.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.formIndemnizacion);
     }
 
     function cerrarFormularioIndemnizacion() {
@@ -614,10 +611,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         elementos.formPago.hidden =
             false;
 
-        elementos.formPago.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.formPago);
     }
 
     function cerrarFormularioPago() {

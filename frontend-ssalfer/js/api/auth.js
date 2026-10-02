@@ -25,7 +25,7 @@
 
     async function obtenerSesionActual() {
 
-        return get("/auth/sesion");
+        return get("/auth/sesion", { silencioso: true });
 
     }
 

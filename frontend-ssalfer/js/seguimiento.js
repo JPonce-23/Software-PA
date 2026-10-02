@@ -2001,12 +2001,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         mostrarFormularioVisible(true);
 
-        elementos.formulario?.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.formulario);
 
-        elementos.ambito?.focus();
+        elementos.ambito?.focus({ preventScroll: true });
     }
 
     async function abrirEdicion(id) {
@@ -2071,10 +2068,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             mostrarFormularioVisible(true);
 
-            elementos.formulario?.scrollIntoView({
-                behavior: "smooth",
-                block: "start"
-            });
+            window.SSALFER_UI?.desplazarA(elementos.formulario);
 
         } catch (error) {
             mostrarErrorSeguimiento(error);

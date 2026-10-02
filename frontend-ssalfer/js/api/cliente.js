@@ -151,6 +151,10 @@ function formatearDetalle(detail) {
  *        que se pase formUrlEncoded=true.
  * @param {boolean} [opciones.formUrlEncoded=false] - Para /auth/sesiones,
  *        que espera application/x-www-form-urlencoded (OAuth2PasswordRequestForm).
+ * @param {boolean} [opciones.silencioso=false] - No presenta indicador de carga.
+ * @param {Element|string} [opciones.carga] - Bloque estable para indicador compacto.
+ * @param {AbortSignal} [opciones.signal] - Cancelación opcional de la petición.
+ * @param {"json"|"blob"} [opciones.tipoRespuesta="json"] - Blob para descargas.
  * @returns {Promise<any>} El cuerpo ya parseado (JSON), o null si la
  *          respuesta no trae cuerpo (204, o 200 vacío).
  * @throws {ErrorAPI} Si la respuesta no es 2xx.
@@ -160,118 +164,131 @@ async function request(
     {
         metodo = "GET",
         cuerpo = null,
-        formUrlEncoded = false
+        formUrlEncoded = false,
+        silencioso = false,
+        carga,
+        signal,
+        tipoRespuesta = "json"
     } = {}
 ) {
 
-    const metodosConCSRF = ["POST", "PATCH", "DELETE", "PUT"];
-
-    const encabezados = {};
-
-    let cuerpoFinal = undefined;
-
-    if (cuerpo !== null && cuerpo !== undefined) {
-
-        if (formUrlEncoded) {
-
-            encabezados["Content-Type"] =
-                "application/x-www-form-urlencoded";
-
-            cuerpoFinal = new URLSearchParams(cuerpo).toString();
-
-        } else if (
-            typeof FormData !== "undefined" &&
-            cuerpo instanceof FormData
-        ) {
-
-            /*
-            * IMPORTANTE:
-            * No establecer Content-Type manualmente.
-            *
-            * El navegador genera automáticamente:
-            *
-            * multipart/form-data; boundary=...
-            *
-            * incluyendo el boundary correcto para el archivo.
-            */
-            cuerpoFinal = cuerpo;
-
-        } else {
-
-            encabezados["Content-Type"] =
-                "application/json";
-
-            cuerpoFinal = JSON.stringify(cuerpo);
-
-        }
-
-    }
-
-    if (metodosConCSRF.includes(metodo.toUpperCase())) {
-
-        const token = obtenerTokenCSRF();
-
-        if (token) {
-
-            encabezados["X-CSRF-Token"] = token;
-
-        }
-
-    }
-
-    let respuesta;
-
+    const finalizarCarga = window.SSALFER_UI?.cargando.iniciar({ silencioso, carga, metodo });
     try {
+        const metodosConCSRF = ["POST", "PATCH", "DELETE", "PUT"];
 
-        respuesta = await fetch(
-            `${API_BASE_URL}${ruta}`,
-            {
-                method: metodo,
-                headers: encabezados,
-                credentials: "include",
-                body: cuerpoFinal
+        const encabezados = {};
+
+        let cuerpoFinal = undefined;
+
+        if (cuerpo !== null && cuerpo !== undefined) {
+
+            if (formUrlEncoded) {
+
+                encabezados["Content-Type"] =
+                    "application/x-www-form-urlencoded";
+
+                cuerpoFinal = new URLSearchParams(cuerpo).toString();
+
+            } else if (
+                typeof FormData !== "undefined" &&
+                cuerpo instanceof FormData
+            ) {
+
+                /*
+                * IMPORTANTE:
+                * No establecer Content-Type manualmente.
+                *
+                * El navegador genera automáticamente:
+                *
+                * multipart/form-data; boundary=...
+                *
+                * incluyendo el boundary correcto para el archivo.
+                */
+                cuerpoFinal = cuerpo;
+
+            } else {
+
+                encabezados["Content-Type"] =
+                    "application/json";
+
+                cuerpoFinal = JSON.stringify(cuerpo);
+
             }
-        );
 
-    } catch (errorRed) {
+        }
 
-        throw new ErrorAPI(
-            0,
-            null,
-            "No se pudo conectar con el servidor. Verifica tu conexión o que el backend esté disponible."
-        );
+        if (metodosConCSRF.includes(metodo.toUpperCase())) {
 
+            const token = obtenerTokenCSRF();
+
+            if (token) {
+
+                encabezados["X-CSRF-Token"] = token;
+
+            }
+
+        }
+
+        let respuesta;
+
+        try {
+
+            respuesta = await fetch(
+                `${API_BASE_URL}${ruta}`,
+                {
+                    method: metodo,
+                    headers: encabezados,
+                    credentials: "include",
+                    body: cuerpoFinal,
+                    signal
+                }
+            );
+
+        } catch (errorRed) {
+
+            throw new ErrorAPI(
+                0,
+                null,
+                "No se pudo conectar con el servidor. Verifica tu conexión o que el backend esté disponible."
+            );
+
+        }
+
+        if (respuesta.status === 204) return null;
+
+        if (respuesta.ok && tipoRespuesta === "blob") return await respuesta.blob();
+
+        const tipoContenido = respuesta.headers.get("content-type") || "";
+
+        const cuerpoRespuesta =
+            tipoContenido.includes("application/json")
+                ? await respuesta.json().catch(() => null)
+                : null;
+
+        if (!respuesta.ok) {
+
+            const detail = cuerpoRespuesta ? cuerpoRespuesta.detail : null;
+
+            throw new ErrorAPI(
+                respuesta.status,
+                detail,
+                formatearDetalle(detail)
+            );
+
+        }
+
+        return cuerpoRespuesta;
+
+    } finally {
+        finalizarCarga?.();
     }
-
-    if (respuesta.status === 204) return null;
-
-    const tipoContenido = respuesta.headers.get("content-type") || "";
-
-    const cuerpoRespuesta =
-        tipoContenido.includes("application/json")
-            ? await respuesta.json().catch(() => null)
-            : null;
-
-    if (!respuesta.ok) {
-
-        const detail = cuerpoRespuesta ? cuerpoRespuesta.detail : null;
-
-        throw new ErrorAPI(
-            respuesta.status,
-            detail,
-            formatearDetalle(detail)
-        );
-
-    }
-
-    return cuerpoRespuesta;
 
 }
 
 
-function get(ruta) {
+function get(ruta, opciones = {}) {
 
-    return request(ruta, { metodo: "GET" });
+    return request(ruta, { ...opciones, metodo: "GET" });
 
 }
 
@@ -283,15 +300,16 @@ function post(ruta, cuerpo, opciones = {}) {
 }
 
 
-function patch(ruta, cuerpo) {
+function patch(ruta, cuerpo, opciones = {}) {
 
-    return request(ruta, { metodo: "PATCH", cuerpo });
+    return request(ruta, { ...opciones, metodo: "PATCH", cuerpo });
 
 }
 
 
-function del(ruta, cuerpo = null) {
+function del(ruta, cuerpo = null, opciones = {}) {
     return request(ruta, {
+        ...opciones,
         metodo: "DELETE",
         cuerpo
     });

@@ -83,10 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnNueva.innerHTML =
             '<i class="bi bi-x-lg"></i> Cancelar nueva afectación';
 
-        formulario.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(formulario);
     }
 
     function ocultarFormulario() {

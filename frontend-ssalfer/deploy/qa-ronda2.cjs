@@ -205,11 +205,11 @@ const path = require('node:path');
         await page.waitForFunction(() => document.getElementById('enlaceReporteConvenios').href.includes('id_proyecto=4'));
         const rects = await page.locator('.reportes-accesos > a').evaluateAll(els => els.map(e => ({x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y})));
         assert.equal(rects.length,3);assert.ok(rects.every(r=>Math.abs(r.y-rects[0].y)<2));
-        await page.locator('.tarjeta-reportes').screenshot({path:path.join(__dirname,'qa-ronda2-reportes-desktop.png')});
+        if (!process.env.QA_SIN_CAPTURAS) await page.locator('.tarjeta-reportes').screenshot({path:path.join(__dirname,'qa-ronda2-reportes-desktop.png')});
         await page.setViewportSize({width:390,height:844});
         const mobile = await page.locator('.reportes-accesos > a').evaluateAll(els => els.map(e => ({x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y})));
         assert.ok(mobile[1].y>mobile[0].y && mobile[2].y>mobile[1].y);
-        await page.locator('.tarjeta-reportes').screenshot({path:path.join(__dirname,'qa-ronda2-reportes-mobile.png')});
+        if (!process.env.QA_SIN_CAPTURAS) await page.locator('.tarjeta-reportes').screenshot({path:path.join(__dirname,'qa-ronda2-reportes-mobile.png')});
         await page.setViewportSize({width:1440,height:1000});
         console.log('PASS Reportes: tres bloques horizontales y apilados en móvil.');
 

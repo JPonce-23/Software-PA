@@ -280,12 +280,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         elementos.formularioUnidad.hidden =
             false;
 
-        elementos.formularioUnidad.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.formularioUnidad);
 
-        elementos.idTipoTierra?.focus();
+        elementos.idTipoTierra?.focus({ preventScroll: true });
     }
 
     function ocultarFormularioUnidad() {
@@ -609,13 +606,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         await cargarTitularesUnidad();
-
-        window.requestAnimationFrame(() => {
-            elementos.seccionTitulares?.scrollIntoView({
-                behavior: "smooth",
-                block: "start"
-            });
-        });
 
         if (idAfectacion) {
             elementos.seccionVinculacion.hidden =
@@ -1380,10 +1370,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             : "La unidad quedó vinculada a la afectación."
                     );
 
-                    elementos.seccionVinculacion?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start"
-                    });
+                    window.SSALFER_UI?.desplazarA(elementos.seccionVinculacion);
 
                 } catch (error) {
                     window.ClienteAPI.mostrarErrorAPI(

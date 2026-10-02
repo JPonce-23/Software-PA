@@ -1069,10 +1069,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         panel.hidden =
             false;
 
-        panel.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(panel);
 
         panel.querySelector(
             "#cancelarEditarConvenio"

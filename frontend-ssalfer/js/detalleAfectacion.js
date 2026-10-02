@@ -483,10 +483,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         panelEdicion.hidden =
             false;
 
-        panelEdicion.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(panelEdicion);
     }
 
     btnEditarAfectacion
@@ -763,10 +760,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 formAvaluo.hidden =
                     false;
 
-                formAvaluo.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center"
-                });
+                window.SSALFER_UI?.desplazarA(formAvaluo);
             }
         );
 
@@ -778,11 +772,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 formAvaluo.hidden =
                     true;
 
-                formAvaluo.closest(".bloque")
-                    ?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start"
-                    });
+                window.SSALFER_UI?.desplazarA(formAvaluo.closest(".bloque"));
             }
         );
 

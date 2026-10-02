@@ -453,7 +453,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         elementos.editarProyectoContenedor.hidden =
             false;
 
-        elementos.editarNombreProyecto.focus();
+        elementos.editarNombreProyecto.focus({ preventScroll: true });
     }
 
     function cerrarEdicionProyecto() {
@@ -803,7 +803,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     await cargarCatalogosNucleo();
 
                 if (cargados) {
-                    elementos.nucleoNombre.focus();
+                    elementos.nucleoNombre.focus({ preventScroll: true });
                 }
             }
         );

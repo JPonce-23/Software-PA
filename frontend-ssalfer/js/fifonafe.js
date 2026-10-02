@@ -511,10 +511,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         elementos.formularioContenedor.hidden = false;
 
-        elementos.formularioContenedor.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        window.SSALFER_UI?.desplazarA(elementos.formularioContenedor);
     }
 
     function cerrarFormulario() {
