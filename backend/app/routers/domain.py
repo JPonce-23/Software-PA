@@ -481,9 +481,9 @@ def create_person(
 def get_person(
     id_persona: int,
     db: Session = Depends(get_db),
-    _: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    return service.get_person(db, id_persona)
+    return service.get_person(db, id_persona, user)
 
 
 @router.patch("/personas/{id_persona}", response_model=schemas.PersonaResponse)
@@ -493,7 +493,7 @@ def update_person(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
-    person = service.get_person(db, id_persona)
+    person = service.get_person(db, id_persona, user)
     return service.update_person(db, person, data, user)
 
 
@@ -506,7 +506,7 @@ def delete_person(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
 ):
-    person = service.get_person(db, id_persona)
+    person = service.get_person(db, id_persona, user)
     service.deactivate_person(db, person, user, data.motivo)
     return {"detail": "Persona dada de baja"}
 
@@ -1857,6 +1857,21 @@ def assign_project_user(
     user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
 ):
     return service.assign_user_to_project(db, id_proyecto, data, user)
+
+
+@router.delete(
+    "/proyectos/{id_proyecto}/usuarios/{id_usuario}",
+    response_model=schemas.AuthOperationResponse,
+)
+def unassign_project_user(
+    id_proyecto: int,
+    id_usuario: int,
+    data: schemas.BajaRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(["admin"])),
+):
+    service.unassign_user_from_project(db, id_proyecto, id_usuario, data, user)
+    return {"detail": "Asignación desactivada"}
 
 
 @router.post(

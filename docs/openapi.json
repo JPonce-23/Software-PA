@@ -2383,6 +2383,178 @@
         }
       }
     },
+    "/api/personas/{id_persona}": {
+      "get": {
+        "summary": "Get Person",
+        "operationId": "get_person_api_personas__id_persona__get",
+        "parameters": [
+          {
+            "name": "id_persona",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Persona"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update Person",
+        "operationId": "update_person_api_personas__id_persona__patch",
+        "parameters": [
+          {
+            "name": "id_persona",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Persona"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonaUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Person",
+        "operationId": "delete_person_api_personas__id_persona__delete",
+        "parameters": [
+          {
+            "name": "id_persona",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Persona"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthOperationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/personas/{id_persona}/reactivar": {
+      "post": {
+        "summary": "Reactivate Person",
+        "operationId": "reactivate_person_api_personas__id_persona__reactivar_post",
+        "parameters": [
+          {
+            "name": "id_persona",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Persona"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/proyecto-nucleo/{id_proyecto_nucleo}/orv": {
       "get": {
         "summary": "List Orv",
@@ -2582,6 +2754,16 @@
               "type": "integer",
               "title": "Id Orv"
             }
+          },
+          {
+            "name": "incluir_historico",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Historico"
+            }
           }
         ],
         "responses": {
@@ -2637,6 +2819,141 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrvIntegranteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Orv Member",
+        "operationId": "delete_orv_member_api_orv_integrantes__id_orv_integrante__delete",
+        "parameters": [
+          {
+            "name": "id_orv_integrante",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Orv Integrante"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthOperationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orv-integrantes/{id_orv_integrante}/finalizar": {
+      "post": {
+        "summary": "Finalize Orv Member",
+        "operationId": "finalize_orv_member_api_orv_integrantes__id_orv_integrante__finalizar_post",
+        "parameters": [
+          {
+            "name": "id_orv_integrante",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Orv Integrante"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrvIntegranteFinalizarRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrvIntegranteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orv-integrantes/{id_orv_integrante}/reactivar": {
+      "post": {
+        "summary": "Reactivate Orv Member",
+        "operationId": "reactivate_orv_member_api_orv_integrantes__id_orv_integrante__reactivar_post",
+        "parameters": [
+          {
+            "name": "id_orv_integrante",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Orv Integrante"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -6142,6 +6459,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UsuarioProyectoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{id_proyecto}/usuarios/{id_usuario}": {
+      "delete": {
+        "summary": "Unassign Project User",
+        "operationId": "unassign_project_user_api_proyectos__id_proyecto__usuarios__id_usuario__delete",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Proyecto"
+            }
+          },
+          {
+            "name": "id_usuario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Usuario"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthOperationResponse"
                 }
               }
             }
@@ -13246,7 +13621,6 @@
                 "enum": [
                   "cop_original",
                   "modificatorio",
-                  "superficie_adicional",
                   "obras_complementarias",
                   "ampliacion",
                   "ampliacion_remanente"
@@ -13796,7 +14170,6 @@
                 "enum": [
                   "cop_original",
                   "modificatorio",
-                  "superficie_adicional",
                   "obras_complementarias",
                   "ampliacion",
                   "ampliacion_remanente"
@@ -14089,7 +14462,6 @@
                 "enum": [
                   "cop_original",
                   "modificatorio",
-                  "superficie_adicional",
                   "obras_complementarias",
                   "ampliacion",
                   "ampliacion_remanente"
@@ -16585,72 +16957,6 @@
         ],
         "title": "NucleoAgrarioResponse"
       },
-      "NucleoRanCatalogoResponse": {
-        "properties": {
-          "id_nucleo": {
-            "type": "integer",
-            "title": "Id Nucleo"
-          },
-          "nombre_nucleo": {
-            "type": "string",
-            "title": "Nombre Nucleo"
-          },
-          "id_tipo_tenencia": {
-            "type": "integer",
-            "title": "Id Tipo Tenencia"
-          },
-          "codigo_tipo_tenencia": {
-            "type": "string",
-            "enum": [
-              "ejido",
-              "comunidad"
-            ],
-            "title": "Codigo Tipo Tenencia"
-          },
-          "tipo_tenencia": {
-            "type": "string",
-            "enum": [
-              "Ejido",
-              "Comunidad"
-            ],
-            "title": "Tipo Tenencia"
-          },
-          "id_municipio": {
-            "type": "integer",
-            "title": "Id Municipio"
-          },
-          "municipio": {
-            "type": "string",
-            "title": "Municipio"
-          },
-          "id_entidad": {
-            "type": "integer",
-            "title": "Id Entidad"
-          },
-          "entidad": {
-            "type": "string",
-            "title": "Entidad"
-          },
-          "id_nucleo_fuente": {
-            "type": "string",
-            "title": "Id Nucleo Fuente"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id_nucleo",
-          "nombre_nucleo",
-          "id_tipo_tenencia",
-          "codigo_tipo_tenencia",
-          "tipo_tenencia",
-          "id_municipio",
-          "municipio",
-          "id_entidad",
-          "entidad",
-          "id_nucleo_fuente"
-        ],
-        "title": "NucleoRanCatalogoResponse"
-      },
       "NucleoAgrarioUpdate": {
         "properties": {
           "observaciones": {
@@ -16716,6 +17022,72 @@
         "additionalProperties": false,
         "type": "object",
         "title": "NucleoAgrarioUpdate"
+      },
+      "NucleoRanCatalogoResponse": {
+        "properties": {
+          "id_nucleo": {
+            "type": "integer",
+            "title": "Id Nucleo"
+          },
+          "nombre_nucleo": {
+            "type": "string",
+            "title": "Nombre Nucleo"
+          },
+          "id_tipo_tenencia": {
+            "type": "integer",
+            "title": "Id Tipo Tenencia"
+          },
+          "codigo_tipo_tenencia": {
+            "type": "string",
+            "enum": [
+              "ejido",
+              "comunidad"
+            ],
+            "title": "Codigo Tipo Tenencia"
+          },
+          "tipo_tenencia": {
+            "type": "string",
+            "enum": [
+              "Ejido",
+              "Comunidad"
+            ],
+            "title": "Tipo Tenencia"
+          },
+          "id_municipio": {
+            "type": "integer",
+            "title": "Id Municipio"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "id_entidad": {
+            "type": "integer",
+            "title": "Id Entidad"
+          },
+          "entidad": {
+            "type": "string",
+            "title": "Entidad"
+          },
+          "id_nucleo_fuente": {
+            "type": "string",
+            "title": "Id Nucleo Fuente"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_nucleo",
+          "nombre_nucleo",
+          "id_tipo_tenencia",
+          "codigo_tipo_tenencia",
+          "tipo_tenencia",
+          "id_municipio",
+          "municipio",
+          "id_entidad",
+          "entidad",
+          "id_nucleo_fuente"
+        ],
+        "title": "NucleoRanCatalogoResponse"
       },
       "OrvCreate": {
         "properties": {
@@ -16839,18 +17211,6 @@
               }
             ],
             "title": "Fecha Inicio"
-          },
-          "fecha_fin": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fecha Fin"
           }
         },
         "additionalProperties": false,
@@ -16985,6 +17345,14 @@
             ],
             "title": "Fecha Inicio"
           },
+          "id_orv_integrante": {
+            "type": "integer",
+            "title": "Id Orv Integrante"
+          },
+          "id_orv": {
+            "type": "integer",
+            "title": "Id Orv"
+          },
           "fecha_fin": {
             "anyOf": [
               {
@@ -16997,13 +17365,31 @@
             ],
             "title": "Fecha Fin"
           },
-          "id_orv_integrante": {
-            "type": "integer",
-            "title": "Id Orv Integrante"
+          "id_tipo_fin": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Tipo Fin"
           },
-          "id_orv": {
-            "type": "integer",
-            "title": "Id Orv"
+          "detalle_fin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle Fin"
+          },
+          "vigente": {
+            "type": "boolean",
+            "title": "Vigente"
           },
           "nombre": {
             "type": "string",
@@ -17065,9 +17451,42 @@
           "id_calidad",
           "id_orv_integrante",
           "id_orv",
+          "vigente",
           "nombre"
         ],
         "title": "OrvIntegranteDetailResponse"
+      },
+      "OrvIntegranteFinalizarRequest": {
+        "properties": {
+          "fecha_fin": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Fin"
+          },
+          "id_tipo_fin": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Id Tipo Fin"
+          },
+          "detalle_fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle Fin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha_fin",
+          "id_tipo_fin"
+        ],
+        "title": "OrvIntegranteFinalizarRequest"
       },
       "OrvIntegranteResponse": {
         "properties": {
@@ -17191,6 +17610,14 @@
             ],
             "title": "Fecha Inicio"
           },
+          "id_orv_integrante": {
+            "type": "integer",
+            "title": "Id Orv Integrante"
+          },
+          "id_orv": {
+            "type": "integer",
+            "title": "Id Orv"
+          },
           "fecha_fin": {
             "anyOf": [
               {
@@ -17203,13 +17630,31 @@
             ],
             "title": "Fecha Fin"
           },
-          "id_orv_integrante": {
-            "type": "integer",
-            "title": "Id Orv Integrante"
+          "id_tipo_fin": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Tipo Fin"
           },
-          "id_orv": {
-            "type": "integer",
-            "title": "Id Orv"
+          "detalle_fin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle Fin"
+          },
+          "vigente": {
+            "type": "boolean",
+            "title": "Vigente"
           }
         },
         "additionalProperties": false,
@@ -17222,7 +17667,8 @@
           "id_cargo",
           "id_calidad",
           "id_orv_integrante",
-          "id_orv"
+          "id_orv",
+          "vigente"
         ],
         "title": "OrvIntegranteResponse"
       },
@@ -17286,18 +17732,6 @@
               }
             ],
             "title": "Fecha Inicio"
-          },
-          "fecha_fin": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fecha Fin"
           }
         },
         "additionalProperties": false,
@@ -17461,6 +17895,10 @@
           "id_nucleo": {
             "type": "integer",
             "title": "Id Nucleo"
+          },
+          "vigente": {
+            "type": "boolean",
+            "title": "Vigente"
           }
         },
         "additionalProperties": false,
@@ -17469,7 +17907,8 @@
           "activo",
           "creado_en",
           "id_orv",
-          "id_nucleo"
+          "id_nucleo",
+          "vigente"
         ],
         "title": "OrvResponse"
       },
@@ -19365,6 +19804,120 @@
           "id_persona"
         ],
         "title": "PersonaResponse"
+      },
+      "PersonaUpdate": {
+        "properties": {
+          "observaciones": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observaciones"
+          },
+          "curp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 18
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Curp"
+          },
+          "rfc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 13
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rfc"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "apellido_paterno": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido Paterno"
+          },
+          "apellido_materno": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido Materno"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "correo_electronico": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo Electronico"
+          },
+          "datos_identidad_incompletos": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datos Identidad Incompletos"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PersonaUpdate"
       },
       "ProyectoCreate": {
         "properties": {

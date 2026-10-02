@@ -3,13 +3,111 @@
 from typing import Literal
 
 from fastapi import HTTPException
-from sqlalchemy import exists, select
+from sqlalchemy import exists, select, text, union
 from sqlalchemy.orm import Query, Session
 
 from .. import models
 
 
 AccessMode = Literal["read", "capture", "gis"]
+
+
+def person_project_ids(db: Session, person_id: int) -> set[int]:
+    """Follow actual active business links, including indirect unit holders.
+
+    Inactive projects remain in the set: editing shared identity must not
+    silently bypass their scope. authorized_project_ids excludes them.
+    """
+    pn, nucleus = models.ProyectoNucleo, models.NucleoAgrario
+
+    def in_nucleus(relation, parent, parent_id, nucleus_id):
+        return select(pn.id_proyecto).select_from(relation).join(
+            parent, parent_id
+        ).join(nucleus, nucleus.id_nucleo == nucleus_id).join(
+            pn, pn.id_nucleo == nucleus.id_nucleo
+        ).where(relation.activo.is_(True), parent.activo.is_(True),
+                nucleus.activo.is_(True), pn.activo.is_(True))
+
+    member, orv = models.OrvIntegrante, models.Orv
+    holder, parcel = models.ParcelaTitular, models.Parcela
+    titular, unit = models.UnidadAgrariaTitular, models.UnidadAgraria
+    compareciente, agreement = models.ConvenioCompareciente, models.Convenio
+    interviniente, procedure = models.TramiteFifonafeInterviniente, models.TramiteFifonafe
+    payment, indemnity, affectation = models.Pago, models.Indemnizacion, models.Afectacion
+    statements = [
+        in_nucleus(member, orv, orv.id_orv == member.id_orv, orv.id_nucleo).where(member.id_persona == person_id),
+        in_nucleus(holder, parcel, parcel.id_parcela == holder.id_parcela, parcel.id_nucleo).where(holder.id_persona == person_id),
+        in_nucleus(titular, unit, unit.id_unidad_agraria == titular.id_unidad_agraria, unit.id_nucleo).where(titular.id_persona == person_id),
+        in_nucleus(titular, unit, unit.id_unidad_agraria == titular.id_unidad_agraria, unit.id_nucleo).join(
+            holder, holder.id_parcela_titular == titular.id_parcela_titular
+        ).join(parcel, parcel.id_parcela == holder.id_parcela).where(
+            holder.id_persona == person_id, holder.activo.is_(True), parcel.activo.is_(True)
+        ),
+        select(pn.id_proyecto).select_from(compareciente).join(
+            agreement, agreement.id_convenio == compareciente.id_convenio
+        ).join(pn, pn.id_proyecto_nucleo == agreement.id_proyecto_nucleo).where(
+            compareciente.id_persona == person_id, compareciente.activo.is_(True),
+            agreement.activo.is_(True), pn.activo.is_(True)
+        ),
+        select(pn.id_proyecto).select_from(interviniente).join(
+            procedure, procedure.id_tramite_fifonafe == interviniente.id_tramite_fifonafe
+        ).join(pn, pn.id_proyecto_nucleo == procedure.id_proyecto_nucleo).where(
+            interviniente.id_persona == person_id, interviniente.activo.is_(True),
+            procedure.activo.is_(True), pn.activo.is_(True)
+        ),
+        select(pn.id_proyecto).select_from(payment).join(
+            indemnity, indemnity.id_indemnizacion == payment.id_indemnizacion
+        ).join(affectation, affectation.id_afectacion == indemnity.id_afectacion).join(
+            pn, pn.id_proyecto_nucleo == affectation.id_proyecto_nucleo
+        ).where(payment.id_persona_beneficiaria == person_id, payment.activo.is_(True),
+                indemnity.activo.is_(True), affectation.activo.is_(True), pn.activo.is_(True)),
+    ]
+    return set(db.execute(union(*statements)).scalars())
+
+
+def lock_person_relations(db: Session, person_id: int) -> None:
+    # Existing migration 018 relation triggers use this exact transaction lock.
+    db.execute(text("SELECT pg_advisory_xact_lock("
+                    "hashtextextended('software-pa:persona-relaciones:' || :id, 0))"),
+               {"id": str(person_id)})
+
+
+def require_person_access(
+    db: Session, user: models.Usuario, person_id: int, *,
+    mode: Literal["read", "capture", "link"] = "read", lock: bool = False,
+) -> models.Persona:
+    if lock:
+        lock_person_relations(db, person_id)
+    query = db.query(models.Persona).filter(
+        models.Persona.id_persona == person_id, models.Persona.activo.is_(True)
+    )
+    if lock:
+        query = query.with_for_update(key_share=True).populate_existing()
+    person = query.first()
+    if person is None:
+        raise HTTPException(status_code=404, detail="Persona no encontrada")
+    if user.rol == "admin":
+        return person
+    allowed_role = "read" if mode == "read" else "capture"
+    denied = HTTPException(status_code=403, detail="Persona fuera del alcance autorizado")
+    if not _role_allows(user, allowed_role):
+        raise denied
+    related = person_project_ids(db, person_id)
+    authorized = set(db.execute(authorized_project_ids(db, user)).scalars())
+    if related:
+        if (mode == "capture" and related <= authorized) or (
+            mode != "capture" and related & authorized
+        ):
+            return person
+        raise denied
+    # A disconnected active business reference is not an orphan. Do not turn
+    # an inactive parent/project into permission through the creator fallback.
+    has_relations = db.execute(text("SELECT fn_persona_tiene_relaciones_activas(:id)"),
+                               {"id": person_id}).scalar_one()
+    if (not has_relations and user.rol == "operador" and authorized
+            and person.creado_por == user.id_usuario):
+        return person
+    raise denied
 
 
 def _forbidden() -> HTTPException:
@@ -49,6 +147,7 @@ def require_project_access(
     project_id: int,
     *,
     mode: AccessMode = "read",
+    lock: bool = False,
 ) -> models.Proyecto:
     if not _role_allows(user, mode):
         raise _forbidden()
@@ -64,6 +163,10 @@ def require_project_access(
                 models.UsuarioProyecto.activo.is_(True),
             )
         )
+    if lock:
+        # SHARE prevents deactivation until commit, while allowing assignments
+        # for different users to proceed concurrently in the same project.
+        query = query.with_for_update(read=True).populate_existing()
     project = query.first()
     if project is None:
         raise _forbidden()

@@ -1,8 +1,8 @@
 # Contrato y Especificación de la API — SOFTWARE-PA
 
 > **Autoridad:** Especificación técnica del contrato de integración HTTP entre el cliente web (frontend) y el servidor de aplicaciones (backend).  
-> **Alineación:** Validado contra `backend/app/routers/`, `schemas.py`, `services/`, migraciones `001–015` y el esquema OpenAPI formal en `docs/openapi.json`.  
-> **Esquema de base de datos vigente:** **015** (`GET /health` responde `{"status": "ok", "schema": 15}`).
+> **Alineación:** Validado contra `backend/app/routers/`, `schemas.py`, `services/`, migraciones `001–020` y el esquema OpenAPI formal en `docs/openapi.json`.
+> **Esquema de base de datos vigente:** **020** (`GET /health` responde `{"status": "ok", "schema": 20}`).
 
 ---
 
@@ -80,7 +80,43 @@ Para toda petición `POST`, `PUT`, `PATCH` o `DELETE` bajo `/api/`:
 ### 3.2 Proyecto y Asignaciones
 - `GET/POST /api/proyectos`: Administración de proyectos estratégicos.
 - `GET/POST /api/proyectos/{id_proyecto}/nucleos`: Asocia un núcleo agrario al proyecto, creando la relación `ProyectoNucleo`.
-- `GET/POST /api/proyectos/{id_proyecto}/usuarios`: Asigna operadores a proyectos (`UsuarioProyecto`). Los usuarios no administradores sólo pueden consultar recursos de proyectos que tienen asignados y cuyo proyecto permanezca activo (`activo = true`).
+- `GET /api/proyectos/{id_proyecto}/usuarios`: Exclusivo `admin`; lista únicamente relaciones `UsuarioProyecto` activas.
+- `POST /api/proyectos/{id_proyecto}/usuarios`: Exclusivo `admin`; recibe `{"id_usuario": 42}` y crea una nueva relación con `201`. Requiere una cuenta activa; una asignación activa duplicada responde `409`.
+- Los usuarios no administradores sólo pueden consultar recursos de proyectos que tienen asignados y cuyo proyecto permanezca activo (`activo = true`). La asignación autoriza acceso según el rol propio; no designa responsables del seguimiento ni responsables operativos. La figura funcional de responsable del seguimiento permanece en REVIEW.
+
+#### Desasignación administrativa
+
+`DELETE /api/proyectos/{id_proyecto}/usuarios/{id_usuario}` es exclusivo del rol `admin`. Requiere sesión autenticada, cookies, `Origin` permitido y cabecera `X-CSRF-Token`, conforme a la protección CSRF existente. El cuerpo JSON es obligatorio (`BajaRequest`); `motivo` se recorta y debe contener al menos 3 caracteres y como máximo 500.
+
+```http
+DELETE /api/proyectos/17/usuarios/42
+Content-Type: application/json
+Origin: http://localhost:5173
+X-CSRF-Token: <token de la cookie CSRF>
+Cookie: <cookies de sesión y CSRF>
+
+{"motivo":"Reasignación administrativa de personal"}
+```
+
+Respuesta `200 OK` (`AuthOperationResponse`):
+
+```json
+{"detail":"Asignación desactivada"}
+```
+
+| HTTP | Condición |
+|---|---|
+| `401` | Sin autenticación o sesión inválida, conforme al flujo de sesión existente. |
+| `403` | Rol distinto de `admin`, CSRF/origen inválido, o proyecto inexistente/inactivo (`Proyecto fuera del alcance autorizado`), según la convención de acceso vigente. |
+| `404` | Usuario inexistente (`Usuario no encontrado`) o ausencia de relación activa para esa pareja (`Asignación activa no encontrada`). |
+| `409` | Conflicto de integridad al persistir; la transacción se revierte. |
+| `422` | Cuerpo/motivo ausente o inválido, motivo vacío, sólo espacios, menor de 3 caracteres útiles o mayor de 500. |
+
+La operación desactiva exclusivamente la relación activa indicada, incluso si la cuenta objetivo ya está inactiva. Conserva la fila y sus fechas de creación/asignación; registra `activo=false`, `fecha_baja`, `id_usuario_baja`, `motivo_baja`, `actualizado_en` y `actualizado_por` en una transacción. El trigger existente genera un `UPDATE` en bitácora con actor y valores anteriores/nuevos. Los bloqueos de fila serializan bajas concurrentes; el índice único parcial sigue garantizando una sola asignación activa por pareja.
+
+Después de la baja, GET deja de listar esa relación. En nuevas peticiones, el usuario no administrador pierde el acceso al proyecto, sus `ProyectoNucleo` y las operaciones asociadas; conserva el acceso a otros proyectos con asignación válida. La cuenta, su rol y sus sesiones globales no cambian. Los administradores mantienen su alcance global por rol.
+
+Repetir DELETE sin una nueva asignación activa responde `404`, sin actualizar el registro histórico, sus timestamps ni su bitácora. El POST existente permite una reasignación mediante una **nueva fila activa con otro `id_usuario_proyecto`**, conservando todas las filas anteriores inactivas y sus datos de baja. No reactiva registros históricos ni concede permisos superiores al rol; reactivar una cuenta tampoco restaura asignaciones revocadas. Esta entrega no incorpora un endpoint de reactivación de asignaciones.
 
 ### 3.3 ProyectoNucleo
 - Al crear o actualizar un `ProyectoNucleo`, los campos administrados incluyen:
@@ -101,6 +137,36 @@ Para toda petición `POST`, `PUT`, `PATCH` o `DELETE` bajo `/api/`:
 - `GET/POST /api/parcelas/{id_parcela}/titulares`: Acreditación de titulares con `certificado_parcelario`, `folio_derechos` y `constancia_vigencia`. Edición en `PATCH /api/parcela-titulares/{id_parcela_titular}`.
 - **Regla canónica:** La parcela se identifica exclusivamente mediante `no_parcela`. **No existen en el contrato API los campos `no_parcela_ppt` ni `numero_parcela_ppt`**.
 - La geometría (`geometria_poligono`) es opcional y su ausencia no restringe ninguna operación de negocio.
+
+#### Acceso a Persona y datos compartidos
+
+`GET /api/personas/{id_persona}` requiere lectura y un proyecto autorizado
+vinculado mediante ORV, titularidad parcelaria, titularidad de unidad agraria
+(directa o por titular parcelario), comparecencia en convenio, intervención
+FIFONAFE o pago de indemnización. Se comprueba el estado activo de la relación
+y sus padres; una asignación a otro proyecto no basta para acceder.
+
+`PATCH /api/personas/{id_persona}` modifica campos globales compartidos y exige
+al operador captura en **todos** los proyectos relacionados. Leer una persona
+compartida no autoriza su edición ni da acceso a los demás proyectos. Admin
+conserva lectura y edición global. Una referencia activa a un proyecto inactivo
+no permite eludir esta condición mediante la excepción del creador.
+
+Una persona sin referencias activas sólo es accesible a admin o a su creador
+operador mientras éste conserve alguna asignación vigente. El creador puede
+leer, editar y hacer la primera vinculación a un recurso con captura autorizada.
+El POST `/api/proyectos/{id_proyecto}/personas` conserva su contrato y no crea
+un vínculo implícito con ese proyecto. Las demás altas y cambios de referencias
+validan previamente el acceso legítimo a Persona; no permiten incorporar una
+persona fuera del alcance para obtener acceso indirectamente. La vinculación
+exige lectura legítima de Persona y captura en el recurso destino, sin modificar
+sus campos globales.
+
+Fuera de alcance: `403 {"detail":"Persona fuera del alcance autorizado"}`;
+registro inexistente/inactivo: `404 {"detail":"Persona no encontrada"}`.
+Se conservan autenticación, permisos por rol y CSRF existentes. Estas reglas
+fueron confirmadas para esta corrección; no introducen responsabilidades de
+seguimiento ni asignaciones automáticas.
 
 ### 3.5 Actividades de Campo
 - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/actividades`: Registra sensibilizaciones y caminamientos del proyecto-núcleo.
@@ -196,7 +262,7 @@ Detalle de convenios colectivos desglosados por destino de suelo:
   ```json
   {
     "status": "ok",
-    "schema": 15
+    "schema": 20
   }
   ```
 - `GET /`:  

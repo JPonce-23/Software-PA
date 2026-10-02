@@ -231,6 +231,12 @@ def api(client: TestClient, admin_headers: dict[str, str]):
     yield request
 
     for project_id in sorted(created_projects, reverse=True):
+        # Concurrency tests can already have deactivated the project. Inspect
+        # persisted state instead of accepting arbitrary authorization errors.
+        with SessionLocal() as db:
+            project = db.get(models.Proyecto, project_id)
+            if project is None or not project.activo:
+                continue
         response = client.request(
             "DELETE",
             f"/api/proyectos/{project_id}",
