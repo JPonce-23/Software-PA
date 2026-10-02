@@ -19,6 +19,8 @@ from .access import (
     require_nucleus_access,
     require_parcel_access,
     require_payment_access,
+    require_person_access,
+    lock_person_relations,
     require_project_access,
     require_project_nucleus_access,
     require_ran_procedure_access,
@@ -27,6 +29,70 @@ from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_c
 
 
 T = TypeVar("T")
+RAN_NUCLEI_SOURCE = "RAN_PHINA_CATALOGO_NUCLEOS"
+
+
+def list_ran_nuclei_catalog(
+    db: Session,
+    *,
+    state_id: int | None = None,
+    municipality_id: int | None = None,
+    name_query: str | None = None,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Return the bounded national RAN nuclei catalog as an API projection."""
+    tenure = models.CatalogoOperativo
+    query = (
+        db.query(
+            models.NucleoAgrario.id_nucleo.label("id_nucleo"),
+            models.NucleoAgrario.nombre_nucleo.label("nombre_nucleo"),
+            models.NucleoAgrario.id_tipo_tenencia.label("id_tipo_tenencia"),
+            tenure.codigo.label("codigo_tipo_tenencia"),
+            tenure.nombre.label("tipo_tenencia"),
+            models.Municipio.id_municipio.label("id_municipio"),
+            models.Municipio.nombre.label("municipio"),
+            models.EntidadFederativa.id_entidad.label("id_entidad"),
+            models.EntidadFederativa.nombre.label("entidad"),
+            models.NucleoAgrario.id_nucleo_fuente.label("id_nucleo_fuente"),
+        )
+        .join(
+            models.Municipio,
+            models.Municipio.id_municipio == models.NucleoAgrario.id_municipio,
+        )
+        .join(
+            models.EntidadFederativa,
+            models.EntidadFederativa.id_entidad == models.Municipio.id_entidad,
+        )
+        .join(
+            tenure,
+            tenure.id_catalogo_opcion == models.NucleoAgrario.id_tipo_tenencia,
+        )
+        .filter(
+            models.NucleoAgrario.activo.is_(True),
+            models.NucleoAgrario.fuente_datos == RAN_NUCLEI_SOURCE,
+            tenure.tipo_catalogo == "tipo_tenencia",
+            tenure.codigo.in_(("ejido", "comunidad")),
+        )
+    )
+    if state_id is not None:
+        query = query.filter(models.Municipio.id_entidad == state_id)
+    if municipality_id is not None:
+        query = query.filter(models.NucleoAgrario.id_municipio == municipality_id)
+    if name_query is not None:
+        normalized_query = name_query.strip().lower()
+        if not normalized_query:
+            return []
+        query = query.filter(
+            func.lower(func.btrim(models.NucleoAgrario.nombre_nucleo)).contains(
+                normalized_query,
+                autoescape=True,
+            )
+        )
+    rows = query.order_by(
+        func.lower(func.btrim(models.NucleoAgrario.nombre_nucleo)),
+        models.NucleoAgrario.id_nucleo,
+    ).limit(limit).all()
+    return [dict(row._mapping) for row in rows]
 
 
 def require_catalog_option(
@@ -344,14 +410,42 @@ def create_person(
     return _persist(db, entity, user.id_usuario, "La persona ya existe")
 
 
-def get_person(db: Session, person_id: int) -> models.Persona:
-    person = db.query(models.Persona).filter(
-        models.Persona.id_persona == person_id,
-        models.Persona.activo.is_(True),
-    ).first()
-    if person is None:
-        raise HTTPException(status_code=404, detail="Persona no encontrada")
-    return person
+def _require_person_references(db: Session, records: list, user: models.Usuario) -> None:
+    """Authorize new identity references before any link can grant visibility.
+
+    Lock a batch in identifier order, matching migration 018's relation locks.
+    A link only requires legitimate reading plus capture on its target resource;
+    it does not authorize changes to the person's globally shared fields.
+    """
+    person_ids = set()
+    for record in records:
+        for field in ("id_persona", "id_persona_beneficiaria"):
+            value = getattr(record, field, None)
+            if value is not None:
+                person_ids.add(value)
+        holder_id = getattr(record, "id_parcela_titular", None)
+        if holder_id is not None:
+            holder = db.query(models.ParcelaTitular).filter(
+                models.ParcelaTitular.id_parcela_titular == holder_id,
+                models.ParcelaTitular.activo.is_(True),
+            ).first()
+            if holder is None:
+                if user.rol == "admin":
+                    continue  # Preserve the existing DB/domain conflict response.
+                raise HTTPException(status_code=409, detail="Titularidad inexistente o inactiva")
+            person_ids.add(holder.id_persona)
+    for person_id in sorted(person_ids):
+        lock_person_relations(db, person_id)
+    if user.rol == "admin":
+        # Admin has global scope; let existing validation/FK triggers preserve
+        # their 409 contract for nonexistent/inactive link references.
+        return
+    for person_id in sorted(person_ids):
+        require_person_access(db, user, person_id, mode="link", lock=True)
+
+
+def get_person(db: Session, person_id: int, user: models.Usuario) -> models.Persona:
+    return require_person_access(db, user, person_id)
 
 
 def update_person(
@@ -360,6 +454,7 @@ def update_person(
     data: schemas.PersonaUpdate,
     user: models.Usuario,
 ) -> models.Persona:
+    person = require_person_access(db, user, person.id_persona, mode="capture", lock=True)
     return _update(db, person, data, user.id_usuario)
 
 
@@ -463,12 +558,8 @@ def add_orv_member(
     data: schemas.OrvIntegranteCreate,
     user: models.Usuario,
 ) -> models.OrvIntegrante:
-    person = db.query(models.Persona).filter(
-        models.Persona.id_persona == data.id_persona,
-        models.Persona.activo.is_(True),
-    ).first()
-    if person is None:
-        raise HTTPException(status_code=404, detail="Persona no encontrada")
+    require_nucleus_access(db, user, orv.id_nucleo, mode="capture")
+    require_person_access(db, user, data.id_persona, mode="link", lock=True)
     entity = models.OrvIntegrante(
         id_orv=orv.id_orv,
         **data.model_dump(exclude={"observaciones"}),
@@ -716,12 +807,8 @@ def add_parcel_holder(
     data: schemas.ParcelaTitularCreate,
     user: models.Usuario,
 ) -> models.ParcelaTitular:
-    person = db.query(models.Persona).filter(
-        models.Persona.id_persona == data.id_persona,
-        models.Persona.activo.is_(True),
-    ).first()
-    if person is None:
-        raise HTTPException(status_code=404, detail="Persona no encontrada")
+    require_parcel_access(db, user, parcel.id_parcela, mode="capture")
+    require_person_access(db, user, data.id_persona, mode="link", lock=True)
     entity = models.ParcelaTitular(
         id_parcela=parcel.id_parcela,
         **data.model_dump(exclude={"observaciones"}),
@@ -970,6 +1057,7 @@ def create_agreement(
     affectation = require_affectation_access(
         db, user, initial_affectation_id, mode="capture"
     )
+    _require_person_references(db, data.comparecientes, user)
     set_audit_context(db, user.id_usuario)
     agreement = models.Convenio(
         id_proyecto_nucleo=affectation.id_proyecto_nucleo,
@@ -1043,6 +1131,7 @@ def add_agreement_compareciente(
     user: models.Usuario,
 ) -> models.ConvenioCompareciente:
     agreement = require_agreement_access(db, user, agreement_id, mode="capture")
+    _require_person_references(db, [data], user)
     entity = models.ConvenioCompareciente(
         id_convenio=agreement.id_convenio,
         **data.model_dump(exclude={"observaciones"}),
@@ -1280,6 +1369,7 @@ def add_fifonafe_interviniente(
 ) -> models.TramiteFifonafeInterviniente:
     procedure = require_fifonafe_access(db, user, procedure_id, mode="capture")
     validate_fifonafe_interviniente(db, procedure, data)
+    _require_person_references(db, [data], user)
     entity = models.TramiteFifonafeInterviniente(
         id_tramite_fifonafe=procedure.id_tramite_fifonafe,
         **data.model_dump(exclude={"observaciones"}),
@@ -1320,6 +1410,7 @@ def create_payment(
     user: models.Usuario,
 ) -> models.Pago:
     require_indemnity_access(db, user, indemnity_id, mode="capture")
+    _require_person_references(db, [data], user)
     entity = models.Pago(
         id_indemnizacion=indemnity_id,
         **data.model_dump(exclude={"observaciones"}),
@@ -1356,12 +1447,13 @@ def assign_user_to_project(
     data: schemas.UsuarioProyectoCreate,
     user: models.Usuario,
 ) -> models.UsuarioProyecto:
-    require_project_access(db, user, project_id)
+    require_project_access(db, user, project_id, lock=True)
     target = db.query(models.Usuario).filter(
         models.Usuario.id_usuario == data.id_usuario,
-        models.Usuario.activo.is_(True),
-    ).first()
-    if target is None:
+    ).with_for_update(key_share=True).populate_existing().first()
+    # Validate the state returned after acquiring NO KEY UPDATE, including when
+    # the principal was already present in SQLAlchemy's identity map.
+    if target is None or not target.activo:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     entity = models.UsuarioProyecto(
         id_usuario=data.id_usuario,
@@ -1372,12 +1464,43 @@ def assign_user_to_project(
     return _persist(db, entity, user.id_usuario, "La asignación ya existe")
 
 
+def unassign_user_from_project(
+    db: Session,
+    project_id: int,
+    user_id: int,
+    data: schemas.BajaRequest,
+    user: models.Usuario,
+) -> None:
+    require_project_access(db, user, project_id, lock=True)
+    # Serialize with account administration, without requiring an active account.
+    target = db.query(models.Usuario).filter(
+        models.Usuario.id_usuario == user_id,
+    ).with_for_update(key_share=True).populate_existing().first()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    assignment = db.query(models.UsuarioProyecto).filter(
+        models.UsuarioProyecto.id_usuario == user_id,
+        models.UsuarioProyecto.id_proyecto == project_id,
+        models.UsuarioProyecto.activo.is_(True),
+    ).with_for_update().first()
+    if assignment is None:
+        raise HTTPException(status_code=404, detail="Asignación activa no encontrada")
+    set_audit_context(db, user.id_usuario)
+    mark_inactive(assignment, user.id_usuario, data.motivo)
+    assignment.actualizado_en = assignment.fecha_baja
+    assignment.actualizado_por = user.id_usuario
+    commit_or_conflict(db, "No fue posible desactivar la asignación")
+
+
 def update_entity(
     db: Session,
     entity: T,
     data: schemas.BaseModel,
     user: models.Usuario,
 ) -> T:
+    if isinstance(entity, models.Persona):
+        return update_person(db, entity, data, user)
+    _require_person_references(db, [data], user)
     return _update(db, entity, data, user.id_usuario)
 
 
@@ -1410,6 +1533,7 @@ def add_unidad_agraria_titular(db: Session, unit_id: int, data: schemas.UnidadAg
         ).first()
         if holder is None or holder.parcela.id_nucleo != unit.id_nucleo or (unit.id_parcela is not None and holder.id_parcela != unit.id_parcela):
             raise HTTPException(status_code=409, detail="La titularidad no corresponde a la unidad agraria")
+    _require_person_references(db, [data], user)
     entity = models.UnidadAgrariaTitular(id_unidad_agraria=unit.id_unidad_agraria, **data.model_dump(exclude={"observaciones"}), **_audit_values(user.id_usuario, data))
     return _persist(db, entity, user.id_usuario, "La titularidad de unidad no es válida")
 

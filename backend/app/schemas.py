@@ -276,6 +276,19 @@ class NucleoAgrarioResponse(NucleoAgrarioCreate, AuditRead):
     geometria_wkt: str | None = None
 
 
+class NucleoRanCatalogoResponse(BaseModel):
+    id_nucleo: int
+    nombre_nucleo: str
+    id_tipo_tenencia: int
+    codigo_tipo_tenencia: Literal["ejido", "comunidad"]
+    tipo_tenencia: Literal["Ejido", "Comunidad"]
+    id_municipio: int
+    municipio: str
+    id_entidad: int
+    entidad: str
+    id_nucleo_fuente: str
+
+
 class ProyectoNucleoReferenciaCreate(AuditInput):
     tipo_referencia: Literal["consecutivo", "clave_tramo", "numero_tramo", "otro"]
     valor: str = Field(min_length=1, max_length=150)
