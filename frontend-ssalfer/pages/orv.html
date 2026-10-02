@@ -12,6 +12,8 @@
 
     <link rel="stylesheet" href="/styles/dashboard.css">
 
+    <link rel="stylesheet" href="/styles/shared.css">
+
     <link rel="stylesheet" href="/styles/orv.css">
 
     <link rel="stylesheet"
@@ -223,6 +225,8 @@
 
 
         <div class="acciones-header">
+            <button type="button" class="btn-secundario ssalfer-volver" id="btnVolver" data-volver="nucleo"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</button>
+
 
             <button
                 type="button"
@@ -498,6 +502,28 @@
 
                 </div>
 
+
+
+                <!-- Fin vigencia -->
+
+                <div class="campo">
+
+                    <label for="finVigencia">
+
+                        Fin de vigencia
+
+                        <span class="opcional">
+                            Opcional
+                        </span>
+
+                    </label>
+
+                    <input
+                        type="date"
+                        id="finVigencia"
+                        name="fin_vigencia">
+
+                </div>
 
 
                 <!-- Estatus fuente -->
@@ -879,7 +905,7 @@
 
                     <label for="fechaInicioIntegrante">
 
-                        Inicio de participación
+                        Fecha de inicio de participación
 
                         <span class="opcional">
                             Opcional
@@ -1132,6 +1158,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/navegacion.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

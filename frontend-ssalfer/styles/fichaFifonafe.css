@@ -671,3 +671,62 @@
     }
 
 }
+
+/* =========================================================
+        FORMULARIOS MODALES FIFONAFE
+========================================================= */
+
+.fifonafe-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.fifonafe-campo {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+}
+
+.fifonafe-campo--ancho {
+    grid-column: 1 / -1;
+}
+
+.fifonafe-campo > span {
+    color: #2b4637;
+    font-size: .83rem;
+    font-weight: 700;
+}
+
+.fifonafe-campo input,
+.fifonafe-campo select,
+.fifonafe-campo textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #cfd8d2;
+    border-radius: 8px;
+    background: #fff;
+    color: #26352d;
+    font: inherit;
+    padding: 9px 10px;
+}
+
+.fifonafe-campo textarea {
+    resize: vertical;
+}
+
+.fifonafe-campo small {
+    color: #6b756f;
+    font-size: .75rem;
+    line-height: 1.35;
+}
+
+@media (max-width: 680px) {
+    .fifonafe-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .fifonafe-campo--ancho {
+        grid-column: auto;
+    }
+}

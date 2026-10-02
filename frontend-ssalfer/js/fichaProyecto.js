@@ -17,6 +17,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         enlacePersonas:
             document.getElementById("enlacePersonas"),
 
+        enlaceReporteConvenios:
+            document.getElementById("enlaceReporteConvenios"),
+        enlaceReporteFifonafe:
+            document.getElementById("enlaceReporteFifonafe"),
+        enlaceReporteAvance:
+            document.getElementById("enlaceReporteAvance"),
+
         enlaceGestionGeoespacial:
             document.getElementById("enlaceGestionGeoespacial"),
 
@@ -90,15 +97,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             return null;
         }
 
-        const partes = String(valorISO).split("-");
-
-        if (partes.length !== 3) {
-            return String(valorISO);
-        }
-
-        const [anio, mes, dia] = partes;
-
-        return `${dia}/${mes}/${anio}`;
+        return window.SSALFER_FORMAT?.formatearFecha(valorISO, null)
+            ?? String(valorISO);
     }
 
     function formatoSuperficie(valor) {
@@ -182,6 +182,21 @@ document.addEventListener("DOMContentLoaded", async () => {
                 `/pages/persona.html?id_proyecto=${encodeURIComponent(
                     idProyecto
                 )}`;
+        }
+
+        if (elementos.enlaceReporteConvenios) {
+            elementos.enlaceReporteConvenios.href =
+                `/pages/reportesConvenios.html?id_proyecto=${encodeURIComponent(idProyecto)}`;
+        }
+
+        if (elementos.enlaceReporteFifonafe) {
+            elementos.enlaceReporteFifonafe.href =
+                `/pages/reportesFifonafe.html?id_proyecto=${encodeURIComponent(idProyecto)}`;
+        }
+
+        if (elementos.enlaceReporteAvance) {
+            elementos.enlaceReporteAvance.href =
+                `/pages/reporteActividadesPeriodo.html?id_proyecto=${encodeURIComponent(idProyecto)}`;
         }
 
 
@@ -547,9 +562,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     renderProyecto();
                     cerrarEdicionProyecto();
 
-                    alert(
-                        "Proyecto actualizado correctamente."
-                    );
+                    window.SSALFER_UI.toast("Proyecto actualizado correctamente.");
 
                 } catch (error) {
                     window.ClienteAPI.mostrarErrorAPI(
@@ -924,9 +937,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     elementos.formNuevoNucleo.hidden =
                         true;
 
-                    alert(
-                        "Núcleo agrario creado y vinculado correctamente."
-                    );
+                    window.SSALFER_UI.toast("Núcleo agrario creado y vinculado correctamente.");
 
                 } catch (error) {
                     mostrarMensajeError(

@@ -1,6 +1,72 @@
 document.addEventListener("DOMContentLoaded", async () => {
     "use strict";
 
+    const proyectosPorId = new Map();
+    const nucleosPorId = new Map();
+    const contextosPorId = new Map();
+
+    async function cargarFiltrosHumanos() {
+        function convertir(id, etiqueta, opciones, vacio = "Todos") {
+            const previo = document.getElementById(id);
+            const select = document.createElement("select");
+            select.id = previo.id;
+            select.name = previo.name;
+            select.className = previo.className;
+            select.add(new Option(vacio, ""));
+            opciones.forEach(([valor, texto]) => select.add(new Option(texto, String(valor))));
+            previo.replaceWith(select);
+            document.querySelector(`label[for="${id}"]`).textContent = etiqueta;
+            return select;
+        }
+        const [usuarios, proyectos, nucleos] = await Promise.all([
+            (async () => {
+                const todos = [];
+                for (let skip = 0; ; skip += 200) {
+                    const pagina = await window.UsuariosAPI.listar({ skip, limit: 200, estado: "todos" });
+                    todos.push(...pagina);
+                    if (pagina.length < 200) return todos;
+                }
+            })(),
+            window.ProyectosAPI.listar(), window.NucleosAPI.listar()
+        ]);
+        const opcionesUsuario = usuarios.map(item => [item.id_usuario, nombreUsuario(item)]);
+        convertir("cambiosUsuario", "Usuario", opcionesUsuario);
+        convertir("accesosUsuario", "Usuario afectado", opcionesUsuario);
+        convertir("accesosActor", "Usuario que realizó la acción", opcionesUsuario);
+        proyectos.forEach(item => proyectosPorId.set(Number(item.id_proyecto), item.nombre_proyecto));
+        nucleos.forEach(item => nucleosPorId.set(Number(item.id_nucleo), item.nombre_nucleo));
+        const proyecto = convertir("cambiosProyecto", "Proyecto", [...proyectosPorId]);
+        convertir("cambiosNucleo", "Núcleo", [...nucleosPorId]);
+        const contexto = convertir("cambiosProyectoNucleo", "Núcleo del proyecto", [], "Selecciona primero un proyecto");
+        contexto.disabled = true;
+        let revision = 0;
+        proyecto.addEventListener("change", async () => {
+            const actual = ++revision;
+            contexto.replaceChildren(new Option(proyecto.value ? "Cargando núcleos..." : "Selecciona primero un proyecto", ""));
+            contexto.disabled = true;
+            if (!proyecto.value) return;
+            try {
+                const lista = await window.NucleosAPI.listarPorProyecto(proyecto.value);
+                if (actual !== revision) return;
+                contexto.replaceChildren(new Option("Todos los núcleos del proyecto", ""));
+                lista.forEach(item => {
+                    contexto.add(new Option(item.nombre_nucleo, String(item.id_proyecto_nucleo)));
+                    contextosPorId.set(Number(item.id_proyecto_nucleo), item.nombre_nucleo);
+                });
+                contexto.disabled = false;
+            } catch (error) {
+                if (actual !== revision) return;
+                contexto.replaceChildren(new Option("No fue posible cargar los núcleos", ""));
+                mostrarError(error);
+            }
+        });
+        el.formCambios.addEventListener("reset", () => {
+            ++revision;
+            contexto.replaceChildren(new Option("Selecciona primero un proyecto", ""));
+            contexto.disabled = true;
+        });
+    }
+
     const estado = {
         pestana: "cambios",
 
@@ -163,13 +229,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             return String(valor);
         }
 
-        return fecha.toLocaleString(
-            "es-MX",
-            {
-                dateStyle: "medium",
-                timeStyle: "medium"
-            }
-        );
+        const fechaLocal = [fecha.getFullYear(), String(fecha.getMonth() + 1).padStart(2, "0"),
+            String(fecha.getDate()).padStart(2, "0")].join("-");
+        return `${window.SSALFER_FORMAT.formatearFecha(fechaLocal)} ${fecha.toLocaleTimeString("es-MX")}`;
     }
 
 
@@ -585,7 +647,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             tr.appendChild(
                 celda(
-                    item.id_proyecto ?? "—"
+                    item.id_proyecto ? proyectosPorId.get(Number(item.id_proyecto)) || "Proyecto no disponible" : "—"
                 )
             );
 
@@ -1184,20 +1246,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             bloqueDato(
                 "Proyecto",
-                item.id_proyecto ??
-                "—"
+                item.id_proyecto ? proyectosPorId.get(Number(item.id_proyecto)) || "Proyecto no disponible" : "—"
             ),
 
             bloqueDato(
                 "Proyecto-núcleo",
-                item.id_proyecto_nucleo ??
-                "—"
+                item.id_proyecto_nucleo ? contextosPorId.get(Number(item.id_proyecto_nucleo)) || "Referencia no disponible" : "—"
             ),
 
             bloqueDato(
                 "Núcleo",
-                item.id_nucleo ??
-                "—"
+                item.id_nucleo ? nucleosPorId.get(Number(item.id_nucleo)) || "Núcleo no disponible" : "—"
             ),
 
             bloqueDato(
@@ -1841,6 +1900,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
+        if (sesion.user?.rol === "admin") {
+            try { await cargarFiltrosHumanos(); }
+            catch (error) { mostrarError(error); }
+        }
         await cargarCambios();
 
     } catch (error) {

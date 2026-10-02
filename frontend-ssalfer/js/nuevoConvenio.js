@@ -321,12 +321,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         elementos
             .identificadorAfectacion
             .textContent =
-            `AF-${String(
-                idAfectacion
-            ).padStart(
-                3,
-                "0"
-            )}`;
+            [window.SSALFER_FORMAT.etiquetaCodigo(afectacion.tipo_afectacion),
+                afectacion.situacion || "Afectación del núcleo"].join(" · ");
 
         elementos.enlaceDetalle.href =
             `/pages/detalleAfectacion.html?id=${encodeURIComponent(
@@ -334,7 +330,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             )}`;
 
         document.title =
-            `Nuevo convenio | AF-${idAfectacion} | SSALFER`;
+            `Nuevo convenio | ${contextoPN.nombre_nucleo || "Núcleo del proyecto"} | SSALFER`;
     }
 
     /* =====================================================
@@ -606,11 +602,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     );
 
                 option.textContent =
-                    `Asamblea #${asamblea.id_asamblea}${
-                        asamblea.proposito
-                            ? ` · ${asamblea.proposito}`
-                            : ""
-                    }`;
+                    asamblea.proposito || "Asamblea sin propósito registrado";
 
                 elementos
                     .idAsambleaAutorizacion
@@ -716,11 +708,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                         );
 
                     option.textContent =
-                        `Convenio #${convenio.id_convenio}${
-                            convenio.tipo_convenio
-                                ? ` · ${convenio.tipo_convenio}`
-                                : ""
-                        }`;
+                        [window.SSALFER_FORMAT.etiquetaCodigo(convenio.tipo_convenio),
+                            `Consecutivo ${convenio.consecutivo}`, convenio.descripcion_instrumento].filter(Boolean).join(" · ");
 
                     elementos
                         .idConvenioPadre
@@ -1016,10 +1005,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             !candidatosCompareciente
                 .length
         ) {
-            alert(
-                "No hay titulares elegibles en las unidades agrarias vinculadas a esta afectación. " +
-                "Registra primero la parcela/titularidad correspondiente."
-            );
+            window.SSALFER_UI.toast("No hay titulares elegibles en las unidades agrarias vinculadas a esta afectación. " +
+                "Registra primero la parcela/titularidad correspondiente.", { tipo: "error" });
 
             return;
         }
@@ -1857,7 +1844,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 );
 
             if (error) {
-                alert(error);
+                window.SSALFER_UI.toast(error, { tipo: "error" });
                 return;
             }
 
@@ -1878,9 +1865,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             payload
                         );
 
-                alert(
-                    "El convenio se guardó correctamente."
-                );
+                await window.SSALFER_UI.verDatos("Registro guardado", { "Mensaje": "El convenio se guardó correctamente." });
 
                 window.location.href =
                     `/pages/fichaConvenio.html?id_convenio=${encodeURIComponent(

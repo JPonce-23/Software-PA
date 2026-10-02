@@ -301,8 +301,7 @@ function del(ruta, cuerpo = null) {
 /**
  * Helper de UI: muestra el mensaje de un ErrorAPI (o error genérico) dentro
  * de un contenedor de la página, en vez de un alert(). Cada página decide
- * dónde tiene su contenedor de errores; si no se pasa uno, hace fallback a
- * alert() para no romper el flujo.
+ * dónde tiene su contenedor de errores; si no se pasa uno, usa el toast común.
  */
 function mostrarErrorAPI(error, contenedor = null) {
 
@@ -319,7 +318,14 @@ function mostrarErrorAPI(error, contenedor = null) {
 
     } else {
 
-        alert(mensaje);
+        if (window.SSALFER_UI) {
+            window.SSALFER_UI.toast(mensaje, { tipo: "error" });
+        } else {
+            const aviso = document.createElement("p");
+            aviso.setAttribute("role", "alert");
+            aviso.textContent = mensaje;
+            (document.querySelector("main") || document.body).prepend(aviso);
+        }
 
     }
 

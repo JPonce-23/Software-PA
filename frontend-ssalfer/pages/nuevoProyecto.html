@@ -34,6 +34,8 @@
         href="/img/LOGOS VERDE/IMAGOTIPO.png"
     >
 
+    <link rel="stylesheet" href="/styles/shared.css">
+
 </head>
 
 
@@ -269,6 +271,8 @@
                     <p>
                         Ingresa la información general del proyecto.
                     </p>
+            <button type="button" class="btn-secundario ssalfer-volver" id="btnVolver" data-volver="dashboard"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</button>
+
 
                 </div>
 
@@ -441,38 +445,8 @@
 
 
 
-                <!-- =========================================
-                        OBSERVACIONES
-                ========================================== -->
-
-                <fieldset>
-
-                    <legend>
-                        Observaciones
-                    </legend>
-
-
-                    <div class="campo campo-completo">
-
-                        <label for="observaciones">
-
-                            Observaciones
-
-                        </label>
-
-
-                        <textarea
-                            id="observaciones"
-                            name="observaciones"
-                            rows="5"
-                            maxlength="2000"
-                            placeholder="Agrega información adicional relevante..."
-                        ></textarea>
-
-                    </div>
-
-                </fieldset>
-
+                <!-- Observaciones se ocultan hasta que el contrato de Proyecto
+                     tenga soporte explícito en backend. -->
 
 
                 <!-- =========================================
@@ -591,6 +565,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/navegacion.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

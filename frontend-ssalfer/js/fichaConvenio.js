@@ -127,6 +127,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     let afectacionesConvenio = [];
     let detallesAfectaciones = new Map();
     let comparecientes = [];
+    let detallesPersonas = new Map();
     let tramitesRan = [];
     let puedeCapturar = false;
 
@@ -146,16 +147,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function fechaVisual(valor) {
-        if (!valor) {
-            return "—";
-        }
-
-        const partes =
-            String(valor).split("-");
-
-        return partes.length === 3
-            ? `${partes[2]}/${partes[1]}/${partes[0]}`
-            : String(valor);
+        return window.SSALFER_FORMAT?.formatearFecha(valor)
+            ?? (valor || "—");
     }
 
     function moneda(valor) {
@@ -375,6 +368,21 @@ document.addEventListener("DOMContentLoaded", async () => {
                 ? tramitesRan
                 : [];
 
+        const personas = await Promise.all(
+            [...new Set(
+                comparecientes
+                    .map(item => Number(item.id_persona))
+                    .filter(id => Number.isInteger(id) && id > 0)
+            )].map(
+                idPersona =>
+                    window.PersonasAPI.obtener(idPersona)
+                        .then(persona => [idPersona, persona])
+                        .catch(() => [idPersona, null])
+            )
+        );
+
+        detallesPersonas = new Map(personas);
+
         const detalles =
             await Promise.all(
                 afectacionesConvenio.map(
@@ -410,10 +418,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function renderInformacionGeneral() {
         document.title =
-            `Convenio #${convenio.id_convenio} | SSALFER`;
+            `${etiquetaTipoConvenio(convenio.tipo_convenio)} · Consecutivo ${convenio.consecutivo} | SSALFER`;
 
         elementos.tituloConvenio.textContent =
-            `Convenio #${convenio.id_convenio}`;
+            `${etiquetaTipoConvenio(convenio.tipo_convenio)} · Consecutivo ${convenio.consecutivo}`;
 
         elementos.estadoConvenio.textContent =
             convenio.fecha_firma
@@ -526,7 +534,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 );
 
             elementos.padreNombre.textContent =
-                `Convenio #${padre.id_convenio}`;
+                `${etiquetaTipoConvenio(padre.tipo_convenio)} · Consecutivo ${padre.consecutivo}`;
 
             elementos.padreDescripcion.textContent =
                 `${etiquetaTipoConvenio(
@@ -548,7 +556,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         } catch {
             elementos.padreNombre.textContent =
-                `Convenio #${convenio.id_convenio_padre}`;
+                "Convenio anterior no disponible";
 
             elementos.padreDescripcion.textContent =
                 "No fue posible cargar el detalle del convenio anterior.";
@@ -685,7 +693,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 fila.innerHTML = `
                     <td>
-                        Persona #${item.id_persona}
+                        ${(() => {
+                            const persona = detallesPersonas.get(
+                                Number(item.id_persona)
+                            );
+                            const nombre = [persona?.nombre, persona?.apellido_paterno, persona?.apellido_materno].filter(Boolean).join(" ")
+                                || item.nombre_en_instrumento
+                                || "Nombre no disponible";
+                            const curp = persona?.curp
+                                ? ` · ${persona.curp}`
+                                : "";
+                            return `${escaparHTML(nombre)}${escaparHTML(curp)}`;
+                        })()}
                     </td>
 
                     <td>
@@ -1129,9 +1148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             payload.monto_90 >
             payload.monto_100
         ) {
-            alert(
-                "El monto 90% no puede exceder el monto 100%."
-            );
+            window.SSALFER_UI.toast("El monto 90% no puede exceder el monto 100%.", { tipo: "error" });
 
             return;
         }
@@ -1210,9 +1227,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             );
 
         if (!candidatas.length) {
-            alert(
-                "No hay otras afectaciones compatibles disponibles para este convenio."
-            );
+            window.SSALFER_UI.toast("No hay otras afectaciones compatibles disponibles para este convenio.", { tipo: "error" });
 
             return;
         }
@@ -1407,9 +1422,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         impacto <= 0
                     )
                 ) {
-                    alert(
-                        "Una adición requiere un impacto mayor a cero."
-                    );
+                    window.SSALFER_UI.toast("Una adición requiere un impacto mayor a cero.", { tipo: "error" });
 
                     return;
                 }
@@ -1423,9 +1436,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     ) &&
                     impacto == null
                 ) {
-                    alert(
-                        "Ese efecto requiere una superficie de impacto."
-                    );
+                    window.SSALFER_UI.toast("Ese efecto requiere una superficie de impacto.", { tipo: "error" });
 
                     return;
                 }
@@ -1549,8 +1560,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             convenio.ambito ===
             "colectivo"
         ) {
-            alert(
-                "Los comparecientes individuales no aplican al ámbito colectivo en este flujo."
+            window.SSALFER_UI?.toast(
+                "Los comparecientes individuales no aplican al ámbito colectivo en este flujo.",
+                { tipo: "error" }
             );
 
             return;
@@ -1560,9 +1572,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             await obtenerCandidatosCompareciente();
 
         if (!candidatos.length) {
-            alert(
-                "No hay titulares de parcelas elegibles para agregar como comparecientes."
-            );
+            window.SSALFER_UI.toast("No hay titulares de parcelas elegibles para agregar como comparecientes.", { tipo: "error" });
 
             return;
         }
@@ -1875,7 +1885,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         idCompareciente
     ) {
         const motivo =
-            window.prompt(
+            await window.SSALFER_UI.solicitarTexto(
                 "Motivo de baja del compareciente:"
             );
 
@@ -1886,9 +1896,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (!motivo.trim()) {
-            alert(
-                "El motivo es obligatorio."
-            );
+            window.SSALFER_UI.toast("El motivo es obligatorio.", { tipo: "error" });
 
             return;
         }
@@ -1906,6 +1914,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         await cargarDatos();
 
         renderInformacionGeneral();
+
+        if (elementos.btnAgregarCompareciente) {
+            elementos.btnAgregarCompareciente.hidden =
+                !puedeCapturar || convenio?.ambito === "colectivo";
+        }
+
         renderAfectaciones();
         renderComparecientes();
         renderTramitesRan();
@@ -1930,7 +1944,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         )}`;
 
                 } else {
-                    window.history.back();
+                    window.location.href = "/dashboard.html";
                 }
             }
         );

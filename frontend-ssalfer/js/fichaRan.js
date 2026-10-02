@@ -1,6 +1,9 @@
 document.addEventListener("DOMContentLoaded", async () => {
     "use strict";
 
+    let documentosRelacionados = new Map();
+    let referenciaOrigen = "Referencia no disponible";
+
     const parametros =
         new URLSearchParams(
             window.location.search
@@ -17,9 +20,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         !Number.isInteger(idTramiteRan) ||
         idTramiteRan <= 0
     ) {
-        alert(
-            "No se encontró un id_tramite_ran válido."
-        );
+        await window.SSALFER_UI.verDatos("No se pudo abrir la pantalla", { "Mensaje": "Abre este registro desde la ficha de su proyecto o núcleo." });
 
         window.location.href =
             "/dashboard.html";
@@ -335,6 +336,27 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         }
 
+        documentosRelacionados = await window.SSALFER_DOCUMENTOS.cargar([
+            ["proyecto_nucleo", tramite.id_proyecto_nucleo],
+            ["nucleo_agrario", contexto?.id_nucleo],
+            ["tramite_ran", idTramiteRan],
+            ...eventos.map(evento => ["tramite_ran_evento", evento.id_evento_ran])
+        ]);
+        try {
+            if (tramite.id_convenio) {
+                const origen = await window.ConveniosAPI.obtener(tramite.id_convenio);
+                referenciaOrigen = [window.SSALFER_FORMAT.etiquetaCodigo(origen.tipo_convenio),
+                    `Consecutivo ${origen.consecutivo}`, origen.descripcion_instrumento].filter(Boolean).join(" · ");
+            } else if (tramite.id_asamblea) {
+                const lista = await window.AsambleasAPI.listarPorProyectoNucleo(tramite.id_proyecto_nucleo);
+                referenciaOrigen = lista.find(item => Number(item.id_asamblea) === Number(tramite.id_asamblea))?.proposito || "Asamblea";
+            } else if (tramite.id_orv) {
+                const lista = await window.OrvAPI.listarPorProyectoNucleo(tramite.id_proyecto_nucleo);
+                referenciaOrigen = lista.find(item => Number(item.id_orv) === Number(tramite.id_orv))?.numero_orv || "Órgano de representación y vigilancia";
+            }
+        } catch (error) {
+            console.warn("No fue posible recuperar la referencia de origen.", error);
+        }
         mostrarInformacion();
         mostrarOrigen();
         mostrarEventos();
@@ -349,15 +371,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     function mostrarInformacion() {
         elementos.idTramite.textContent =
             texto(
-                tramite?.id_tramite_ran
+                tramite?.referencia_expediente || "Trámite RAN"
             );
 
         elementos.nombreNucleo.textContent =
             texto(
                 contexto?.nombre_nucleo,
-                tramite?.id_nucleo
-                    ? `Núcleo #${tramite.id_nucleo}`
-                    : "—"
+                "Nombre no disponible"
             );
 
         elementos.nombreProyecto.textContent =
@@ -367,9 +387,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             );
 
         elementos.fechaProgramada.textContent =
-            texto(
-                tramite?.fecha_programada_ingreso
-            );
+            window.SSALFER_FORMAT.formatearFecha(tramite?.fecha_programada_ingreso);
 
         elementos.referenciaExpediente.textContent =
             texto(
@@ -388,7 +406,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 tipo: "Asamblea",
                 id: tramite.id_asamblea,
                 referencia:
-                    `Asamblea #${tramite.id_asamblea}`
+                    referenciaOrigen
             };
         }
 
@@ -397,7 +415,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 tipo: "Convenio",
                 id: tramite.id_convenio,
                 referencia:
-                    `Convenio #${tramite.id_convenio}`
+                    referenciaOrigen
             };
         }
 
@@ -406,7 +424,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 tipo: "ORV",
                 id: tramite.id_orv,
                 referencia:
-                    `ORV #${tramite.id_orv}`
+                    referenciaOrigen
             };
         }
 
@@ -428,7 +446,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             origen.tipo;
 
         elementos.origenId.textContent =
-            origen.id || "—";
+            origen.referencia;
 
         elementos.origenReferencia.textContent =
             origen.referencia;
@@ -492,9 +510,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 <td>
                     ${escaparHTML(
-                        texto(
-                            evento.fecha_evento
-                        )
+                        window.SSALFER_FORMAT.formatearFecha(evento.fecha_evento)
                     )}
                 </td>
 
@@ -536,8 +552,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                             ? `
                                 <span class="etiqueta-tabla">
                                     <i class="bi bi-paperclip"></i>
-                                    Documento #${escaparHTML(
-                                        evento.id_documento
+                                    ${escaparHTML(
+                                        window.SSALFER_DOCUMENTOS.nombre(documentosRelacionados, evento.id_documento)
                                     )}
                                 </span>
                             `
@@ -602,23 +618,23 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        alert(
-            [
-                `Evento RAN #${evento.id_evento_ran}`,
-                "",
-                `Ordinal: ${evento.ordinal}`,
-                `Tipo: ${nombreTipoEvento(evento.id_tipo_evento)}`,
-                `Fecha: ${evento.fecha_evento || "—"}`,
-                `Número de solicitud: ${evento.numero_solicitud || "—"}`,
-                `Resultado: ${evento.resultado || "—"}`,
-                `Calificación: ${evento.calificacion || "—"}`,
-                `Folio / referencia: ${evento.folio_referencia || "—"}`,
-                `Documento: ${
+        window.SSALFER_UI?.verDatos(
+            "Consultar evento RAN",
+            {
+                Orden: evento.ordinal,
+                Tipo: nombreTipoEvento(evento.id_tipo_evento),
+                Fecha:
+                    window.SSALFER_FORMAT?.formatearFecha(evento.fecha_evento)
+                    ?? (evento.fecha_evento || "—"),
+                "Número de solicitud": evento.numero_solicitud || "—",
+                Resultado: evento.resultado || "—",
+                Calificación: evento.calificacion || "—",
+                "Folio / referencia": evento.folio_referencia || "—",
+                Documento:
                     evento.id_documento
-                        ? `#${evento.id_documento}`
-                        : "—"
-                }`
-            ].join("\n")
+                        ? window.SSALFER_DOCUMENTOS.nombre(documentosRelacionados, evento.id_documento)
+                        : "Sin documento asociado"
+            }
         );
     }
 
@@ -685,7 +701,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     <div class="campo">
 
                         <label for="ordinalEventoRan">
-                            Ordinal
+                            Orden
                             <span class="obligatorio">*</span>
                         </label>
 
@@ -778,15 +794,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                     <div class="campo">
 
                         <label for="documentoEventoRan">
-                            ID de documento
+                            Documento relacionado
                         </label>
 
-                        <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            id="documentoEventoRan"
-                            placeholder="Opcional">
+                        <select id="documentoEventoRan">
+                            ${window.SSALFER_DOCUMENTOS.opciones(documentosRelacionados)}
+                        </select>
 
                     </div>
 
@@ -906,6 +919,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         form?.reset();
 
+        document.getElementById("documentoEventoRan").innerHTML = window.SSALFER_DOCUMENTOS.opciones(documentosRelacionados);
+        document.getElementById("btnGuardarEventoRan").textContent = "Registrar evento";
+
         const ordinal =
             document.getElementById(
                 "ordinalEventoRan"
@@ -1009,10 +1025,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         ).value =
             evento.folio_referencia || "";
 
-        document.getElementById(
-            "documentoEventoRan"
-        ).value =
-            evento.id_documento || "";
+        document.getElementById("documentoEventoRan").innerHTML = window.SSALFER_DOCUMENTOS.opciones(documentosRelacionados, evento.id_documento);
+        document.getElementById("btnGuardarEventoRan").textContent = "Guardar cambios";
 
         const titulo =
             document.getElementById(
@@ -1021,7 +1035,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (titulo) {
             titulo.textContent =
-                `Editar evento RAN #${evento.id_evento_ran}`;
+                `Editar evento RAN · Orden ${evento.ordinal}`;
         }
 
         seccionFormularioEvento.hidden =
@@ -1095,9 +1109,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 ordinal <= 0
             )
         ) {
-            alert(
-                "Indica un ordinal válido."
-            );
+            window.SSALFER_UI.toast("Indica un orden válido.", { tipo: "error" });
 
             return;
         }
@@ -1106,17 +1118,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             !Number.isInteger(idTipoEvento) ||
             idTipoEvento <= 0
         ) {
-            alert(
-                "Selecciona el tipo de evento."
-            );
+            window.SSALFER_UI.toast("Selecciona el tipo de evento.", { tipo: "error" });
 
             return;
         }
 
         if (Number.isNaN(idDocumento)) {
-            alert(
-                "El ID del documento no es válido."
-            );
+            window.SSALFER_UI.toast("Selecciona un documento válido.", { tipo: "error" });
 
             return;
         }
@@ -1180,7 +1188,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         datosComunes
                     );
 
-                alert(
+                window.SSALFER_UI.toast(
                     "Evento RAN actualizado correctamente."
                 );
 
@@ -1194,7 +1202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         }
                     );
 
-                alert(
+                window.SSALFER_UI.toast(
                     "Evento RAN registrado correctamente."
                 );
             }
@@ -1294,7 +1302,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (ultimo.fecha_evento) {
             partes.push(
-                `Fecha: ${ultimo.fecha_evento}`
+                `Fecha: ${window.SSALFER_FORMAT?.formatearFecha(ultimo.fecha_evento) ?? ultimo.fecha_evento}`
             );
         }
 
@@ -1337,14 +1345,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                     tramite?.id_proyecto_nucleo
                 ) {
                     window.location.href =
-                        `/pages/tramiteRan.html?id_proyecto_nucleo=${encodeURIComponent(
+                        `/pages/nucleoAgrario.html?id_proyecto_nucleo=${encodeURIComponent(
                             tramite.id_proyecto_nucleo
                         )}`;
 
                     return;
                 }
 
-                window.history.back();
+                window.location.href = "/dashboard.html";
             }
         );
 

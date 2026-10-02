@@ -27,6 +27,8 @@
           sizes="40x40"
           href="/img/LOGOS VERDE/IMAGOTIPO.png">
 
+    <link rel="stylesheet" href="/styles/shared.css">
+
 </head>
 
 
@@ -548,7 +550,7 @@
                         </th>
 
                         <th>
-                            Identificador
+                            Registro relacionado
                         </th>
 
                         <th>
@@ -913,7 +915,7 @@
 
                     <label for="entidadId">
 
-                        Identificador
+                        Registro relacionado
 
                         <span class="obligatorio">
                             *
@@ -922,18 +924,14 @@
                     </label>
 
 
-                    <input
-                        type="number"
-                        id="entidadId"
-                        name="entidad_id"
-                        min="1"
-                        required
-                        placeholder="ID del registro relacionado">
+                    <select id="entidadId" name="entidad_id" required disabled>
+                        <option value="">Selecciona primero el tipo de entidad</option>
+                    </select>
 
                     <small>
 
-                        Identificador del registro al que
-                        corresponde este requisito.
+                        Selecciona el registro de este núcleo al que
+                        corresponde el requisito.
 
                     </small>
 
@@ -1114,10 +1112,9 @@
 
             <p>
 
-                Los documentos se identifican dentro del expediente
-                mediante sus datos y relaciones. La carga y gestión
-                física del archivo se integrará cuando esté disponible
-                el flujo correspondiente del sistema.
+                Esta pantalla permite asociar documentos ya registrados
+                y vinculados al registro seleccionado. Aquí no se cargan
+                archivos nuevos.
 
             </p>
 
@@ -1177,6 +1174,10 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

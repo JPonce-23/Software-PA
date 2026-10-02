@@ -13,6 +13,8 @@
     <title>Estado Financiero</title>
 
     <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/shared.css">
     <link rel="stylesheet" href="/styles/estadoFinanciero.css">
 
     <link
@@ -247,7 +249,9 @@
                 Exportar CSV de este proyecto
             </a>
 
-        </section>
+
+            <button type="button" class="btn-secundario ssalfer-volver" id="btnVolver" data-volver="proyecto"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</button>
+</section>
 
 
 
@@ -263,10 +267,15 @@
                 <small>Cantidad reportada en el periodo más reciente</small>
             </div>
 
-            <div class="tarjeta">
-                <h3>Valor declarado en convenios</h3>
-                <p id="kpiValorConvenios">—</p>
-                <small>Suma de valores declarados por convenio</small>
+            <div class="tarjeta tarjeta-valores-declarados">
+                <h3>Valores declarados de convenios</h3>
+                <div class="kpi-desglose" aria-label="Valores declarados separados por concepto">
+                    <span><strong>90 %</strong><b id="kpiMonto90">—</b></span>
+                    <span><strong>100 %</strong><b id="kpiMonto100">—</b></span>
+                    <span><strong>BDT</strong><b id="kpiMontoBdt">—</b></span>
+                    <span><strong>Superficie</strong><b id="kpiSuperficieDeclarada">—</b></span>
+                </div>
+                <small>Los conceptos se muestran por separado y no se consolidan entre sí.</small>
             </div>
 
             <div class="tarjeta">
@@ -292,7 +301,7 @@
         <section class="tarjeta seccion-tabla">
 
             <h2>Avance de periodo</h2>
-            <p>Programado vs. realizado por indicador, según <code>/reportes/avance-periodo</code>.</p>
+            <p>Programado vs. realizado por indicador para el proyecto seleccionado.</p>
 
             <div class="tabla-contenedor">
                 <table>
@@ -326,7 +335,7 @@
         <section class="tarjeta seccion-tabla">
 
             <h2>Valores declarados de convenios</h2>
-            <p>Según <code>/reportes/convenios/valores-declarados</code>.</p>
+            <p>Valores declarados por convenio, separados por concepto.</p>
 
             <div class="tabla-contenedor">
                 <table>
@@ -357,7 +366,7 @@
         <section class="tarjeta seccion-tabla">
 
             <h2>Cobertura de impactos de convenios</h2>
-            <p>Según <code>/reportes/convenios/cobertura-impactos</code>.</p>
+            <p>Estado de clasificación de los impactos asociados a los convenios.</p>
 
             <div class="tabla-contenedor">
                 <table>
@@ -462,6 +471,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/navegacion.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

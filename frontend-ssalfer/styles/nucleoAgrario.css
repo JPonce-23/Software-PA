@@ -633,3 +633,25 @@
     }
 
 }
+
+.modulo.modulo-deshabilitado {
+    cursor: default;
+    opacity: .7;
+    border-style: dashed;
+}
+
+.modulo.modulo-deshabilitado:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.modulo-estado {
+    display: inline-block;
+    margin-top: 7px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #eef2ef;
+    color: #52635a;
+    font-size: .72rem;
+    font-weight: 700;
+}

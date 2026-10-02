@@ -700,9 +700,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             idProyecto <= 0
         ) {
 
-            alert(
-                "No se puede registrar una persona porque falta id_proyecto."
-            );
+            window.SSALFER_UI.toast("Abre Personas desde la ficha del proyecto para registrar una persona.", { tipo: "error" });
 
             return;
 
@@ -996,9 +994,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             idPersona <= 0
         ) {
 
-            alert(
-                "Indica un ID de persona válido."
-            );
+            window.SSALFER_UI.toast("Indica un ID de persona válido.", { tipo: "error" });
 
             return;
 
@@ -1098,9 +1094,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             if (error) {
 
-                alert(
-                    error
-                );
+                window.SSALFER_UI.toast(error, { tipo: "error" });
 
                 return;
 
@@ -1143,9 +1137,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             );
 
 
-                    alert(
-                        "Persona actualizada correctamente."
-                    );
+                    window.SSALFER_UI.toast("Persona actualizada correctamente.");
 
 
                 } else {
@@ -1157,9 +1149,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         idProyecto <= 0
                     ) {
 
-                        alert(
-                            "No se puede registrar la persona porque falta id_proyecto."
-                        );
+                        window.SSALFER_UI.toast("Abre Personas desde la ficha del proyecto para registrar una persona.", { tipo: "error" });
 
                         return;
 
@@ -1191,9 +1181,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     }
 
 
-                    alert(
-                        "Persona registrada correctamente."
-                    );
+                    window.SSALFER_UI.toast("Persona registrada correctamente.");
 
                 }
 
@@ -1256,7 +1244,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
         const motivo =
-            window.prompt(
+            await window.SSALFER_UI.solicitarTexto(
                 `Indica el motivo de baja de ${nombreCompleto(
                     persona
                 )}:`
@@ -1281,9 +1269,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             3
         ) {
 
-            alert(
-                "El motivo de baja debe tener al menos 3 caracteres."
-            );
+            window.SSALFER_UI.toast("El motivo de baja debe tener al menos 3 caracteres.", { tipo: "error" });
 
             return;
 
@@ -1295,9 +1281,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             500
         ) {
 
-            alert(
-                "El motivo de baja no puede superar 500 caracteres."
-            );
+            window.SSALFER_UI.toast("El motivo de baja no puede superar 500 caracteres.", { tipo: "error" });
 
             return;
 
@@ -1305,7 +1289,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
         const confirmar =
-            window.confirm(
+            await window.SSALFER_UI.confirmar(
                 `¿Confirmas dar de baja a ${nombreCompleto(
                     persona
                 )}?`
@@ -1355,9 +1339,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             renderPersonas();
 
 
-            alert(
-                "Persona dada de baja correctamente."
-            );
+            window.SSALFER_UI.toast("Persona dada de baja correctamente.");
 
 
         } catch (error) {
@@ -1396,7 +1378,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
         const confirmar =
-            window.confirm(
+            await window.SSALFER_UI.confirmar(
                 `¿Confirmas reactivar a ${nombreCompleto(
                     persona
                 )}?`
@@ -1425,9 +1407,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             );
 
 
-            alert(
-                "Persona reactivada correctamente."
-            );
+            window.SSALFER_UI.toast("Persona reactivada correctamente.");
 
 
         } catch (error) {

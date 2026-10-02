@@ -11,6 +11,8 @@
 
     <link rel="stylesheet" href="/styles/nucleoAgrario.css">
     <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/shared.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
 
     <link rel="icon"
@@ -631,35 +633,6 @@
 
 
 
-            <!-- PADRÓN -->
-
-            <a class="modulo" id="btnPadron" href="#">
-
-                <div class="modulo-icono">
-
-                    <i class="bi bi-person-lines-fill"></i>
-
-                </div>
-
-                <div>
-
-                    <h3>
-                        Padrón
-                    </h3>
-
-                    <span>
-                        Consulta del padrón histórico
-                        del núcleo.
-                    </span>
-
-                </div>
-
-                <i class="bi bi-chevron-right modulo-flecha"></i>
-
-            </a>
-
-
-
             <!-- SENSIBILIZACIÓN -->
 
             <a class="modulo" id="btnSensibilizacion" href="#">
@@ -720,34 +693,25 @@
 
             <!-- DERECHOS COLECTIVOS -->
 
-            <a
-                class="modulo"
-                id="btnAsamblea"
-                href="#">
+            <div
+                class="modulo modulo-deshabilitado"
+                aria-disabled="true">
 
                 <div class="modulo-icono">
-
                     <i class="bi bi-people"></i>
-
                 </div>
 
                 <div>
-
-                    <h3>
-                        Derechos colectivos
-                    </h3>
-
+                    <h3>Derechos colectivos</h3>
                     <span>
-                        Asamblea y afectaciones
-                        colectivas.
+                        Módulo aún no disponible en esta interfaz.
                     </span>
-
+                    <small class="modulo-estado">Próximamente</small>
                 </div>
 
-                <i class="bi bi-chevron-right modulo-flecha"></i>
+                <i class="bi bi-lock modulo-flecha" aria-hidden="true"></i>
 
-            </a>
-
+            </div>
 
 
             <!-- PARCELAS -->
@@ -813,7 +777,7 @@
             <!-- AFECTACIONES -->
 
             <a
-                class="modulo modulo-principal"
+                class="modulo"
                 id="btnAfectaciones"
                 href="#">
 
@@ -840,6 +804,26 @@
 
             </a>
 
+
+
+            <!-- EXPEDIENTE DOCUMENTAL -->
+
+            <a class="modulo" id="btnExpedienteDocumental" href="#">
+
+                <div class="modulo-icono">
+                    <i class="bi bi-folder2-open"></i>
+                </div>
+
+                <div>
+                    <h3>Expediente documental</h3>
+                    <span>
+                        Requisitos y control documental del núcleo.
+                    </span>
+                </div>
+
+                <i class="bi bi-chevron-right modulo-flecha"></i>
+
+            </a>
 
 
             <!-- FIFONAFE -->
@@ -944,6 +928,10 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

@@ -656,3 +656,31 @@
     white-space: nowrap;
 
 }
+
+
+/* Valores declarados: conceptos separados para no mezclar dinero y superficie */
+.kpi-desglose {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    margin: 12px 0;
+}
+
+.kpi-desglose span {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.kpi-desglose strong {
+    font-size: .72rem;
+    color: #68766e;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+.kpi-desglose b {
+    font-size: .98rem;
+    color: #214c34;
+    overflow-wrap: anywhere;
+}

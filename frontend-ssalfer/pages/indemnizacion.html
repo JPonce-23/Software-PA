@@ -11,6 +11,8 @@
 
     <link rel="stylesheet" href="/styles/dashboard.css">
 
+    <link rel="stylesheet" href="/styles/shared.css">
+
     <link rel="stylesheet" href="/styles/indemnizacion.css">
 
     <link rel="stylesheet"
@@ -446,15 +448,14 @@
 
                 <div
                     class="campo"
-                    id="campoDescripcionEstatus"
-                    hidden>
+                    id="campoDescripcionEstatus">
 
                     <label for="descripcionEstatus">
 
                         Descripción del estatus
 
-                        <span class="obligatorio">
-                            *
+                        <span class="opcional">
+                            Obligatorio sólo si el estatus es “Otro”
                         </span>
 
                     </label>
@@ -1077,6 +1078,10 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

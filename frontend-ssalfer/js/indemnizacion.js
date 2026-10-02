@@ -167,16 +167,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function fechaVisual(valor) {
-        if (!valor) {
-            return "—";
-        }
-
-        const partes =
-            String(valor).split("-");
-
-        return partes.length === 3
-            ? `${partes[2]}/${partes[1]}/${partes[0]}`
-            : String(valor);
+        return window.SSALFER_FORMAT?.formatearFecha(valor)
+            ?? (valor || "—");
     }
 
     function etiquetaEstatus(valor) {
@@ -265,16 +257,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             elementos.estatus.value ===
             "otro";
 
-        elementos.campoDescripcionEstatus.hidden =
-            !otro;
+        elementos.campoDescripcionEstatus.hidden = false;
 
         elementos.descripcionEstatus.required =
             otro;
-
-        if (!otro) {
-            elementos.descripcionEstatus.value =
-                "";
-        }
     }
 
     function abrirFormularioIndemnizacion(
@@ -714,8 +700,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                         .value
                         .trim()
                 ) {
-                    alert(
-                        "El estatus 'Otro' requiere una descripción."
+                    window.SSALFER_UI?.toast(
+                        "El estatus 'Otro' requiere una descripción.",
+                        { tipo: "error" }
                     );
 
                     return;
@@ -780,9 +767,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     elementos.seccionPagos.hidden =
                         false;
 
-                    alert(
-                        "La indemnización se guardó correctamente."
-                    );
+                    window.SSALFER_UI.toast("La indemnización se guardó correctamente.");
 
                 } catch (error) {
                     window.ClienteAPI
@@ -829,9 +814,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     !Number.isFinite(monto) ||
                     monto <= 0
                 ) {
-                    alert(
-                        "El monto debe ser mayor a cero."
-                    );
+                    window.SSALFER_UI.toast("El monto debe ser mayor a cero.", { tipo: "error" });
 
                     return;
                 }
@@ -870,9 +853,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 if (
                     !payload.beneficiario_nombre
                 ) {
-                    alert(
-                        "El nombre del beneficiario es obligatorio."
-                    );
+                    window.SSALFER_UI.toast("El nombre del beneficiario es obligatorio.", { tipo: "error" });
 
                     return;
                 }
@@ -907,9 +888,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                     renderPagos();
 
-                    alert(
-                        "El pago se guardó correctamente."
-                    );
+                    window.SSALFER_UI.toast("El pago se guardó correctamente.");
 
                 } catch (error) {
                     window.ClienteAPI

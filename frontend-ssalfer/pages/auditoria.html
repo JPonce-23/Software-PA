@@ -32,6 +32,8 @@
         type="image/png"
         href="/img/LOGOS VERDE/IMAGOTIPO.png">
 
+    <link rel="stylesheet" href="/styles/shared.css">
+
 </head>
 
 
@@ -281,7 +283,7 @@
 
                 Consulta la bitácora de cambios
                 y los eventos de acceso
-                registrados por el backend.
+                registrados en el sistema.
 
                 Esta pantalla es de solo lectura.
 
@@ -289,7 +291,9 @@
 
         </div>
 
-    </section>
+
+            <button type="button" class="btn-secundario ssalfer-volver" id="btnVolver" data-volver="dashboard"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</button>
+</section>
 
 
 
@@ -308,14 +312,8 @@
 
         <p>
 
-            El backend restringe estas consultas
-            al rol <strong>admin</strong> y aplica
-            redacción del lado del servidor a
-            contraseñas, tokens, sesiones,
-            secretos y datos geométricos.
-
-            La interfaz muestra únicamente lo
-            que la API entrega.
+            Estas consultas están disponibles para administradores.
+            La información sensible se oculta automáticamente.
 
         </p>
 
@@ -1186,6 +1184,13 @@
 <script src="/js/api/proyectos.js"></script>
 
 <script src="/js/api/auditoria.js"></script>
+<script src="/js/api/usuarios.js"></script>
+<script src="/js/api/nucleos.js"></script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/navegacion.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

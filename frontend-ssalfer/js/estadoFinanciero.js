@@ -58,17 +58,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function fecha(valorISO) {
-
-        if (!valorISO) return "—";
-
-        const partes = valorISO.split("-");
-
-        if (partes.length !== 3) return valorISO;
-
-        const [anio, mes, dia] = partes;
-
-        return `${dia}/${mes}/${anio}`;
-
+        return window.SSALFER_FORMAT?.formatearFecha(valorISO)
+            ?? (valorISO || "—");
     }
 
     function textoSiNo(valor) {
@@ -77,6 +68,33 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (valor === false) return "No";
         return "—";
 
+    }
+
+    const CONCEPTOS_DECLARADOS = Object.freeze({
+        monto_90_declarado: "Monto 90 %",
+        monto_100_declarado: "Monto 100 %",
+        monto_bdt_declarado: "Monto BDT",
+        superficie_declarada: "Superficie"
+    });
+
+    function etiquetaConcepto(concepto) {
+        return CONCEPTOS_DECLARADOS[concepto]
+            || window.SSALFER_FORMAT?.etiquetaCodigo(concepto)
+            || concepto
+            || "—";
+    }
+
+    function valorDeclaradoFormateado(fila) {
+        if (fila?.valor_declarado == null) return "—";
+
+        if (fila.concepto === "superficie_declarada") {
+            return `${Number(fila.valor_declarado).toLocaleString("es-MX", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 6
+            })} ha`;
+        }
+
+        return moneda(fila.valor_declarado);
     }
 
     function celdaVacia(colspan, texto) {
@@ -173,11 +191,25 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.getElementById("kpiConvenios").textContent =
                 `${numero(convRealizado)} / ${numero(convProgramado)}`;
 
-            const totalValorDeclarado = (Array.isArray(valoresDeclarados) ? valoresDeclarados : [])
+            const filasValores = Array.isArray(valoresDeclarados)
+                ? valoresDeclarados
+                : [];
+
+            const totalPorConcepto = concepto => filasValores
+                .filter(fila => fila.concepto === concepto)
                 .reduce((acc, fila) => acc + Number(fila.valor_declarado || 0), 0);
 
-            document.getElementById("kpiValorConvenios").textContent =
-                moneda(totalValorDeclarado);
+            document.getElementById("kpiMonto90").textContent =
+                moneda(totalPorConcepto("monto_90_declarado"));
+            document.getElementById("kpiMonto100").textContent =
+                moneda(totalPorConcepto("monto_100_declarado"));
+            document.getElementById("kpiMontoBdt").textContent =
+                moneda(totalPorConcepto("monto_bdt_declarado"));
+            document.getElementById("kpiSuperficieDeclarada").textContent =
+                `${totalPorConcepto("superficie_declarada").toLocaleString("es-MX", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 6
+                })} ha`;
 
             const indProgramado = filasIndemnizaciones.reduce((a, f) => a + Number(f.programado || 0), 0);
             const indRealizado = filasIndemnizaciones.reduce((a, f) => a + Number(f.realizado || 0), 0);
@@ -261,16 +293,23 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             }
 
+            const referencias = new Map();
+            await Promise.allSettled([...new Set(filas.map(fila => fila.id_convenio))].map(async id => {
+                const convenio = await window.ConveniosAPI.obtener(id);
+                referencias.set(Number(id), [window.SSALFER_FORMAT.etiquetaCodigo(convenio.tipo_convenio),
+                    `Consecutivo ${convenio.consecutivo}`, window.SSALFER_FORMAT.etiquetaCodigo(convenio.ambito)].join(" · "));
+            }));
+
             cuerpo.innerHTML = filas.map(fila => `
                 <tr>
                     <td>
-                        <a href="/pages/fichaConvenio.html?id_convenio=${encodeURIComponent(fila.id_convenio)}">
-                            Convenio #${fila.id_convenio}
+                        <a class="ssalfer-link" href="/pages/fichaConvenio.html?id_convenio=${encodeURIComponent(fila.id_convenio)}">
+                            ${window.SSALFER_UI.escaparHTML(referencias.get(Number(fila.id_convenio)) || "Convenio · Referencia no disponible")}
                         </a>
                     </td>
-                    <td>${fila.concepto}</td>
-                    <td>${fila.tipo_convenio || "—"}</td>
-                    <td>${fila.valor_declarado != null ? moneda(fila.valor_declarado) : "—"}</td>
+                    <td>${etiquetaConcepto(fila.concepto)}</td>
+                    <td>${window.SSALFER_FORMAT?.etiquetaCodigo(fila.tipo_convenio) || fila.tipo_convenio || "—"}</td>
+                    <td>${valorDeclaradoFormateado(fila)}</td>
                     <td>${fecha(fila.fecha_instrumento_reportada)}</td>
                     <td>${textoSiNo(fila.firma_acreditada)}</td>
                 </tr>
@@ -308,7 +347,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             cuerpo.innerHTML = filas.map(fila => `
                 <tr>
                     <td>${fila.ambito}</td>
-                    <td>${fila.concepto}</td>
+                    <td>${etiquetaConcepto(fila.concepto)}</td>
                     <td>${numero(fila.universo)}</td>
                     <td>${numero(fila.clasificados)}</td>
                     <td>${numero(fila.pendientes)}</td>

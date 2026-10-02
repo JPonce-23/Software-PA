@@ -694,3 +694,23 @@
     }
 
 }
+/* QA UX: enlaces con apariencia de boton */
+
+a.btn-principal,
+a.btn-principal:visited,
+a.btn-principal:hover,
+a.btn-principal:focus-visible {
+    color: #fff;
+    text-decoration: none;
+}
+
+a.btn-secundario,
+a.btn-secundario:visited {
+    color: #555;
+    text-decoration: none;
+}
+
+a.btn-secundario:hover,
+a.btn-secundario:focus-visible {
+    color: var(--verde);
+}

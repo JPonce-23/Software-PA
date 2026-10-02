@@ -12,6 +12,8 @@
 
     <link rel="stylesheet" href="/styles/dashboard.css">
 
+    <link rel="stylesheet" href="/styles/shared.css">
+
     <link rel="stylesheet" href="/styles/fichaRan.css">
 
 
@@ -340,7 +342,7 @@
             <div class="dato">
 
                 <span>
-                    Identificador del trámite
+                    Trámite
                 </span>
 
                 <strong id="idTramite">
@@ -518,7 +520,7 @@
             <div class="dato">
 
                 <span>
-                    Identificador de origen
+                    Registro de origen
                 </span>
 
                 <strong id="origenId">
@@ -852,6 +854,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/documentos.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

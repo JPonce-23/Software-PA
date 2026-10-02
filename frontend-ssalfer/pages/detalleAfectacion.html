@@ -27,6 +27,8 @@
         href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
     >
 
+    <link rel="stylesheet" href="/styles/shared.css">
+
 </head>
 
 
@@ -720,7 +722,7 @@
                 <i class="bi bi-bank"></i>
 
                 <strong>
-                    El backend aún no expone una consulta de FIFONAFE por afectación.
+                    Consulta los trámites FIFONAFE desde el núcleo agrario.
                 </strong>
 
                 <span>
@@ -1004,8 +1006,7 @@
             <div class="observaciones">
 
                 <p>
-                    El backend no expone un campo de observaciones para
-                    afectaciones; esta sección queda como referencia visual.
+                    Las notas de seguimiento se consultan y registran desde la ficha del núcleo agrario.
                 </p>
 
             </div>
@@ -1097,6 +1098,10 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

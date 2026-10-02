@@ -190,20 +190,9 @@ document.addEventListener(
                 );
         }
 
-        function fechaVisual(
-            valor
-        ) {
-            if (!valor) {
-                return "—";
-            }
-
-            const partes =
-                String(valor)
-                    .split("-");
-
-            return partes.length === 3
-                ? `${partes[2]}/${partes[1]}/${partes[0]}`
-                : String(valor);
+        function fechaVisual(valor) {
+            return window.SSALFER_FORMAT?.formatearFecha(valor)
+                ?? (valor || "—");
         }
 
         function etiquetaTipo(

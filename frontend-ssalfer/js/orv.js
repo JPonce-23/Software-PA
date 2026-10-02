@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         !Number.isInteger(idProyectoNucleo) ||
         idProyectoNucleo <= 0
     ) {
-        alert("Falta un id_proyecto_nucleo válido.");
+        await window.SSALFER_UI.verDatos("No se pudo abrir la pantalla", { "Mensaje": "Abre este registro desde la ficha de su proyecto o núcleo." });
         window.location.href = "/dashboard.html";
         return;
     }
@@ -185,7 +185,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             .join(" ")
             .trim();
 
-        return nombre || `Persona #${integrante.id_persona}`;
+        return nombre || "Nombre no disponible";
     }
 
 
@@ -428,8 +428,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
 
             const vigencia = [
-                orv.inicio_vigencia || "—",
-                orv.fin_vigencia || "—"
+                window.SSALFER_FORMAT.formatearFecha(orv.inicio_vigencia),
+                window.SSALFER_FORMAT.formatearFecha(orv.fin_vigencia)
             ].join(" a ");
 
             articulo.innerHTML = `
@@ -575,7 +575,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (tituloFormularioOrv) {
             tituloFormularioOrv.textContent =
-                `Editar ORV #${orv.id_orv}`;
+                `Editar ORV · ${orv.numero_orv || "Sin número registrado"}`;
         }
 
         if (descripcionFormularioOrv) {
@@ -645,8 +645,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 datos.inicio_vigencia
         ) {
 
-            alert(
-                "La fecha de fin de vigencia no puede ser anterior al inicio."
+            window.SSALFER_UI?.toast(
+                "La fecha de fin de vigencia no puede ser anterior al inicio.",
+                { tipo: "error" }
             );
 
             return false;
@@ -680,9 +681,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         datos
                     );
 
-                    alert(
-                        "ORV actualizado correctamente."
-                    );
+                    window.SSALFER_UI.toast("ORV actualizado correctamente.");
 
                 } else {
                     await window.OrvAPI.crear(
@@ -690,9 +689,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         datos
                     );
 
-                    alert(
-                        "ORV registrado correctamente."
-                    );
+                    window.SSALFER_UI.toast("ORV registrado correctamente.");
                 }
 
                 limpiarFormularioOrv();
@@ -754,6 +751,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             !puedeCapturar;
 
         await cargarIntegrantes();
+        await cargarTramitesRanOrv();
     }
 
     elementos.orvLista?.addEventListener(
@@ -790,6 +788,214 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
     /* =====================================================
+                        TRÁMITES RAN
+    ====================================================== */
+
+    function obtenerPanelRanOrv() {
+        let panel =
+            document.getElementById(
+                "tramitesRanOrv"
+            );
+
+        if (panel) {
+            return panel;
+        }
+
+        panel =
+            document.createElement(
+                "section"
+            );
+
+        panel.id =
+            "tramitesRanOrv";
+
+        panel.className =
+            "tarjeta";
+
+        panel.hidden =
+            true;
+
+        if (elementos.orvSeleccionado) {
+            elementos.orvSeleccionado
+                .insertAdjacentElement(
+                    "afterend",
+                    panel
+                );
+        }
+
+        return panel;
+    }
+
+
+    async function cargarTramitesRanOrv() {
+        const panel =
+            obtenerPanelRanOrv();
+
+        if (
+            !panel ||
+            !Number.isInteger(idOrvSeleccionado) ||
+            idOrvSeleccionado <= 0
+        ) {
+            return;
+        }
+
+        panel.hidden =
+            false;
+
+        panel.innerHTML = `
+            <div class="seccion-titulo">
+                <div>
+                    <i class="bi bi-file-earmark-text"></i>
+
+                    <div>
+                        <h2>
+                            Trámites RAN
+                        </h2>
+
+                        <p class="descripcion-seccion">
+                            Trámites ante el Registro Agrario Nacional
+                            vinculados al ORV seleccionado.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <p>
+                Consultando trámites RAN...
+            </p>
+        `;
+
+        try {
+            const respuesta =
+                await window.TramitesRanAPI.listarPorOrv(
+                    idOrvSeleccionado
+                );
+
+            const tramites =
+                Array.isArray(respuesta)
+                    ? respuesta
+                    : [];
+
+            const listado =
+                tramites.length
+                    ? tramites
+                        .map(tramite => `
+                            <a
+                                class="btn-secundario"
+                                href="/pages/fichaRan.html?id_tramite_ran=${encodeURIComponent(
+                                    tramite.id_tramite_ran
+                                )}">
+
+                                <i class="bi bi-eye"></i>
+
+                                Trámite RAN #${escaparHTML(
+                                    tramite.id_tramite_ran
+                                )}
+
+                                ${
+                                    tramite.referencia_expediente
+                                        ? ` · ${escaparHTML(
+                                            tramite.referencia_expediente
+                                        )}`
+                                        : ""
+                                }
+
+                            </a>
+                        `)
+                        .join("")
+                    : `
+                        <span
+                            style="
+                                color:#777;
+                                font-size:.9rem;
+                            ">
+                            No hay trámites RAN registrados para este ORV.
+                        </span>
+                    `;
+
+            panel.innerHTML = `
+                <div class="seccion-titulo">
+
+                    <div>
+                        <i class="bi bi-file-earmark-text"></i>
+
+                        <div>
+                            <h2>
+                                Trámites RAN
+                            </h2>
+
+                            <p class="descripcion-seccion">
+                                Trámites ante el Registro Agrario Nacional
+                                vinculados al ORV seleccionado.
+                            </p>
+                        </div>
+                    </div>
+
+                    <span class="contador-registros">
+                        ${tramites.length} trámite(s)
+                    </span>
+
+                </div>
+
+                <div
+                    style="
+                        display:flex;
+                        flex-wrap:wrap;
+                        align-items:center;
+                        gap:10px;
+                    ">
+
+                    ${listado}
+
+                    ${
+                        puedeCapturar
+                            ? `
+                                <a
+                                    class="btn-principal"
+                                    href="/pages/tramiteRan.html?id_orv=${encodeURIComponent(
+                                        idOrvSeleccionado
+                                    )}&id_proyecto_nucleo=${encodeURIComponent(idProyectoNucleo)}">
+
+                                    <i class="bi bi-plus-lg"></i>
+
+                                    Nuevo trámite RAN
+
+                                </a>
+                            `
+                            : ""
+                    }
+
+                </div>
+            `;
+
+        } catch (error) {
+            console.error(
+                "No fue posible consultar los trámites RAN del ORV.",
+                error
+            );
+
+            panel.innerHTML = `
+                <div class="seccion-titulo">
+                    <div>
+                        <i class="bi bi-file-earmark-text"></i>
+
+                        <div>
+                            <h2>
+                                Trámites RAN
+                            </h2>
+                        </div>
+                    </div>
+                </div>
+
+                <p style="color:#9b2c2c;">
+                    No fue posible consultar los trámites RAN.
+                </p>
+            `;
+        }
+    }
+
+
+    /* =====================================================
                         INTEGRANTES
     ====================================================== */
 
@@ -801,15 +1007,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         try {
+            const idSolicitado = idOrvSeleccionado;
             const respuesta =
                 await window.OrvAPI.listarIntegrantes(
-                    idOrvSeleccionado
+                    idSolicitado
                 );
 
+            const registros = Array.isArray(respuesta) ? respuesta : [];
+            const personas = new Map();
+            await Promise.allSettled([...new Set(registros.filter(item => !item.nombre).map(item => item.id_persona))].map(async id => {
+                personas.set(Number(id), await window.PersonasAPI.obtener(id));
+            }));
+            if (idSolicitado !== idOrvSeleccionado) return;
+
             integrantes =
-                Array.isArray(respuesta)
-                    ? respuesta
-                    : [];
+                registros.map(item => {
+                    const persona = personas.get(Number(item.id_persona));
+                    return persona ? { ...item, nombre: persona.nombre, apellido_paterno: persona.apellido_paterno, apellido_materno: persona.apellido_materno } : item;
+                });
 
             mostrarIntegrantes();
 
@@ -1097,9 +1312,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             !Number.isInteger(datos.id_persona) ||
             datos.id_persona <= 0
         ) {
-            alert(
-                "Selecciona una persona."
-            );
+            window.SSALFER_UI.toast("Selecciona una persona.", { tipo: "error" });
 
             return false;
         }
@@ -1109,9 +1322,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             !datos.id_cargo ||
             !datos.id_calidad
         ) {
-            alert(
-                "Selecciona órgano, cargo y calidad."
-            );
+            window.SSALFER_UI.toast("Selecciona órgano, cargo y calidad.", { tipo: "error" });
 
             return false;
         }
@@ -1162,9 +1373,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         payload
                     );
 
-                    alert(
-                        "Integrante actualizado correctamente."
-                    );
+                    window.SSALFER_UI.toast("Integrante actualizado correctamente.");
 
                 } else {
                     await window.OrvAPI.agregarIntegrante(
@@ -1172,9 +1381,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         datos
                     );
 
-                    alert(
-                        "Integrante registrado correctamente."
-                    );
+                    window.SSALFER_UI.toast("Integrante registrado correctamente.");
                 }
 
                 limpiarFormularioIntegrante();
@@ -1213,13 +1420,14 @@ document.addEventListener("DOMContentLoaded", async () => {
      */
     elementos.btnBuscarPersona?.addEventListener(
         "click",
-        () => {
+        async () => {
             if (idIntegranteEditando) {
                 return;
             }
 
-            const valor = prompt(
-                "Indica el ID de una persona activa ya registrada:"
+            const valor = await window.SSALFER_UI.solicitarTexto(
+                "Identificador de una persona ya registrada. La búsqueda por nombre aún no está disponible.",
+                { titulo: "Seleccionar persona", minimo: 1, maximo: 16, textoAceptar: "Consultar", validar: valor => /^\d+$/.test(valor) && Number.isSafeInteger(Number(valor)) && Number(valor) > 0 ? null : "Indica un identificador numérico mayor que cero." }
             );
 
             if (valor === null) {
@@ -1233,18 +1441,20 @@ document.addEventListener("DOMContentLoaded", async () => {
                 !Number.isInteger(idPersona) ||
                 idPersona <= 0
             ) {
-                alert(
-                    "El ID de persona no es válido."
-                );
+                window.SSALFER_UI.toast("El ID de persona no es válido.", { tipo: "error" });
 
                 return;
             }
 
-            elementos.idPersonaIntegrante.value =
-                idPersona;
-
-            elementos.personaIntegrante.value =
-                `Persona #${idPersona}`;
+            try {
+                const persona = await window.PersonasAPI.obtener(idPersona);
+                if (persona.activo === false) throw new Error("Esta persona está dada de baja. Selecciona una persona activa.");
+                if (idIntegranteEditando || elementos.formularioIntegrante.hidden) return;
+                elementos.idPersonaIntegrante.value = idPersona;
+                elementos.personaIntegrante.value = nombrePersona(persona);
+            } catch (error) {
+                window.ClienteAPI.mostrarErrorAPI(error);
+            }
         }
     );
 
@@ -1292,9 +1502,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (integrante.fecha_fin) {
 
-            alert(
-                "La participación de este integrante ya está finalizada."
-            );
+            window.SSALFER_UI.toast("La participación de este integrante ya está finalizada.", { tipo: "error" });
 
             return;
 
@@ -1383,9 +1591,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             if (!fechaFin) {
 
-                alert(
-                    "Indica la fecha de finalización."
-                );
+                window.SSALFER_UI.toast("Indica la fecha de finalización.", { tipo: "error" });
 
                 return;
 
@@ -1399,9 +1605,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 idTipoFin <= 0
             ) {
 
-                alert(
-                    "Selecciona el motivo de finalización."
-                );
+                window.SSALFER_UI.toast("Selecciona el motivo de finalización.", { tipo: "error" });
 
                 return;
 
@@ -1420,9 +1624,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 !detalle
             ) {
 
-                alert(
-                    'El motivo "Otro" requiere un detalle.'
-                );
+                window.SSALFER_UI.toast('El motivo "Otro" requiere un detalle.', { tipo: "error" });
 
                 return;
 
@@ -1445,9 +1647,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     integrante.fecha_inicio
             ) {
 
-                alert(
-                    "La fecha de finalización no puede ser anterior a la fecha de inicio."
-                );
+                window.SSALFER_UI.toast("La fecha de finalización no puede ser anterior a la fecha de inicio.", { tipo: "error" });
 
                 return;
 
@@ -1488,9 +1688,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     );
 
 
-                alert(
-                    "Participación finalizada correctamente."
-                );
+                window.SSALFER_UI.toast("Participación finalizada correctamente.");
 
 
                 limpiarFormularioFinalizarIntegrante();

@@ -109,9 +109,113 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     let requisitos = [];
+    let idRequisitoEditando = null;
 
 
     let catalogoRequisitos = [];
+    const referencias = new Map();
+    const listasEntidad = new Map();
+    let revisionEntidad = 0;
+    let revisionDocumento = 0;
+
+    async function listarRegistros(tipo) {
+        if (listasEntidad.has(tipo)) return listasEntidad.get(tipo);
+        const consulta = (async () => {
+            const f = window.SSALFER_FORMAT;
+            const fecha = valor => valor ? f.formatearFecha(valor) : null;
+            const texto = partes => partes.filter(Boolean).join(" · ");
+            const nombre = item => texto([item.nombre, item.apellido_paterno, item.apellido_materno]).replaceAll(" · ", " ");
+            const directos = {
+                afectacion: ["AfectacionesAPI", "id_afectacion", item => texto([f.etiquetaCodigo(item.tipo_afectacion), item.superficie_afectada_ha == null ? null : `${Number(item.superficie_afectada_ha).toLocaleString("es-MX")} ha`, item.situacion])],
+                parcela: ["ParcelasAPI", "id_parcela", item => texto([item.no_parcela, item.certificado_parcelario])],
+                unidad_agraria: ["UnidadesAgrariasAPI", "id_unidad_agraria", item => item.referencia_alfanumerica || item.referencia_normalizada],
+                asamblea: ["AsambleasAPI", "id_asamblea", item => item.proposito],
+                tramite_ran: ["TramitesRanAPI", "id_tramite_ran", item => item.referencia_expediente],
+                tramite_fifonafe: ["FifonafeAPI", "id_tramite_fifonafe", item => texto([item.referencia_expediente, f.etiquetaCodigo(item.estatus)])],
+                orv: ["OrvAPI", "id_orv", item => item.numero_orv],
+                padron_historial: ["PadronesAPI", "id_padron", item => texto(["Padrón", fecha(item.fecha_padron), item.numero_ejidatarios_comuneros == null ? null : `${item.numero_ejidatarios_comuneros} integrantes`])],
+                actividad_campo: ["ActividadesAPI", "id_actividad", item => texto([f.etiquetaCodigo(item.tipo_actividad), fecha(item.fecha_realizada || item.fecha_programada), item.resultado])]
+            };
+            let registros = [];
+            if (tipo === "proyecto_nucleo") {
+                const item = await window.NucleosAPI.obtenerProyectoNucleo(idNucleo);
+                registros = [{ id: Number(idNucleo), etiqueta: item.nombre_nucleo, item }];
+            } else if (directos[tipo]) {
+                const [api, campo, etiqueta] = directos[tipo];
+                registros = (await window[api].listarPorProyectoNucleo(idNucleo)).map(item => ({
+                    id: Number(item[campo]), etiqueta: etiqueta(item) || nombresEntidad[tipo], item
+                }));
+            } else {
+                const dependientes = {
+                    parcela_titular: ["parcela", "ParcelasAPI", "listarTitulares", "id_parcela_titular"],
+                    unidad_agraria_titular: ["unidad_agraria", "UnidadesAgrariasAPI", "listarTitulares", "id_unidad_titular"],
+                    asamblea_convocatoria: ["asamblea", "AsambleasAPI", "listarConvocatorias", "id_convocatoria"],
+                    convenio: ["afectacion", "ConveniosAPI", "listarPorAfectacion", "id_convenio"],
+                    convenio_compareciente: ["convenio", "ConveniosAPI", "listarComparecientes", "id_compareciente"],
+                    tramite_ran_evento: ["tramite_ran", "TramitesRanAPI", "listarEventos", "id_evento_ran"],
+                    tramite_fifonafe_evento: ["tramite_fifonafe", "FifonafeAPI", "listarEventos", "id_evento_fifonafe"],
+                    tramite_fifonafe_interviniente: ["tramite_fifonafe", "FifonafeAPI", "listarIntervinientes", "id_interviniente_fifonafe"],
+                    indemnizacion: ["afectacion", "IndemnizacionAPI", "listarPorAfectacion", "id_indemnizacion"],
+                    pago: ["indemnizacion", "IndemnizacionAPI", "listarPagos", "id_pago"]
+                };
+                const config = dependientes[tipo];
+                if (!config) return [];
+                const [padreTipo, api, metodo, campo] = config;
+                for (const padre of await listarRegistros(padreTipo)) {
+                    const respuesta = await window[api][metodo](padre.id);
+                    const hijos = Array.isArray(respuesta) ? respuesta : respuesta ? [respuesta] : [];
+                    for (const item of hijos) {
+                        let etiqueta;
+                        if (tipo === "parcela_titular") etiqueta = texto([nombre(item), item.tipo_derecho]);
+                        if (tipo === "convenio") etiqueta = texto([f.etiquetaCodigo(item.tipo_convenio), `Consecutivo ${item.consecutivo}`, item.descripcion_instrumento]);
+                        if (tipo === "asamblea_convocatoria") etiqueta = texto([`Convocatoria ${item.ordinal}`, fecha(item.fecha_realizacion || item.fecha_programada)]);
+                        if (tipo === "tramite_ran_evento") etiqueta = texto([`Evento ${item.ordinal}`, item.folio_referencia || item.numero_solicitud, fecha(item.fecha_evento)]);
+                        if (tipo === "tramite_fifonafe_evento") etiqueta = texto([`Evento ${item.ordinal}`, item.numero_oficio, fecha(item.fecha_evento || item.fecha_oficio)]);
+                        if (tipo === "indemnizacion") etiqueta = texto(["Indemnización", f.etiquetaCodigo(item.estatus), fecha(item.fecha_programada)]);
+                        if (tipo === "pago") etiqueta = texto([item.referencia || "Pago", item.beneficiario_nombre, fecha(item.fecha_pago)]);
+                        if (["convenio_compareciente", "tramite_fifonafe_interviniente", "unidad_agraria_titular"].includes(tipo)) {
+                            etiqueta = item.nombre_en_instrumento;
+                            if (!etiqueta && item.id_persona) etiqueta = nombre(await window.PersonasAPI.obtener(item.id_persona));
+                            if (!etiqueta && item.id_parcela_titular) etiqueta = (await listarRegistros("parcela_titular")).find(titular => titular.id === Number(item.id_parcela_titular))?.etiqueta;
+                            etiqueta = texto([etiqueta || "Nombre no disponible", item.rol ? f.etiquetaCodigo(item.rol) : null]);
+                        }
+                        registros.push({ id: Number(item[campo]), etiqueta: texto([padre.etiqueta, etiqueta || nombresEntidad[tipo]]), item });
+                    }
+                }
+            }
+            registros = [...new Map(registros.map(item => [item.id, item])).values()];
+            registros.forEach(item => referencias.set(`${tipo}:${item.id}`, item.etiqueta));
+            return registros;
+        })().catch(error => { listasEntidad.delete(tipo); throw error; });
+        listasEntidad.set(tipo, consulta);
+        return consulta;
+    }
+
+    async function cargarSelectorEntidad(actual = null) {
+        const revision = ++revisionEntidad;
+        ++revisionDocumento;
+        const tipo = document.getElementById("entidadTipo").value;
+        const select = document.getElementById("entidadId");
+        select.disabled = true;
+        select.replaceChildren(new Option(tipo ? "Cargando registros..." : "Selecciona primero el tipo de entidad", ""));
+        elementoIdDocumento().replaceChildren(new Option("Sin documento relacionado", ""));
+        if (!tipo) return;
+        try {
+            const registros = await listarRegistros(tipo);
+            if (revision !== revisionEntidad) return;
+            select.replaceChildren(new Option(registros.length ? "Selecciona un registro" : "No hay elementos disponibles", ""));
+            registros.forEach(item => select.add(new Option(item.etiqueta, String(item.id))));
+            if (actual && !registros.some(item => item.id === Number(actual))) {
+                select.add(new Option("Registro asociado no disponible en el listado", String(actual)));
+            }
+            select.value = actual ? String(actual) : "";
+            select.disabled = Boolean(idRequisitoEditando) || !registros.length;
+        } catch (error) {
+            if (revision !== revisionEntidad) return;
+            select.replaceChildren(new Option("No fue posible cargar los registros", ""));
+            window.SSALFER_UI.toast("No fue posible cargar los registros relacionados. Vuelve a seleccionar el tipo para reintentar.", { tipo: "error" });
+        }
+    }
 let estadosRequisito = [];
 
 let requisitoPorId = new Map();
@@ -323,6 +427,13 @@ async function cargarCatalogos() {
                 await window.DocumentosAPI.listarRequisitosPorProyectoNucleo(idNucleo);
 
             requisitos = Array.isArray(reales) ? reales : [];
+
+            listasEntidad.clear();
+            referencias.clear();
+            const resultados = await Promise.allSettled([...new Set(requisitos.map(item => item.entidad_tipo))].map(listarRegistros));
+            if (resultados.some(resultado => resultado.status === "rejected")) {
+                window.SSALFER_UI.toast("Algunas referencias no están disponibles. Vuelve a abrir el expediente para reintentar.", { tipo: "error" });
+            }
 
             mostrarRequisitos();
 
@@ -661,8 +772,7 @@ async function cargarCatalogos() {
                     <td>
 
                         ${
-                            requisito.entidad_id
-                            || "—"
+                            window.SSALFER_UI.escaparHTML(referencias.get(`${requisito.entidad_tipo}:${requisito.entidad_id}`) || "Referencia no disponible")
                         }
 
                     </td>
@@ -822,24 +932,42 @@ async function cargarCatalogos() {
                         }
 
 
-                        alert(
+                        const requisitoCatalogo =
+                            requisitoPorId.get(
+                                Number(requisito.id_requisito)
+                            );
 
-                            `Requisito: ${
-                                requisito.requisito
-                            }\n\n` +
+                        const estadoCatalogo =
+                            estadoPorId.get(
+                                Number(requisito.id_estado)
+                            );
 
-                            `Estado: ${
-                                nombresEstado[
-                                    requisito.estado
-                                ]
-                                || requisito.estado
-                            }\n\n` +
-
-                            `Detalle: ${
-                                requisito.detalle
-                                || "Sin detalle adicional."
-                            }`
-
+                        window.SSALFER_UI?.verDatos(
+                            "Consultar requisito",
+                            {
+                                Requisito:
+                                    requisitoCatalogo?.nombre
+                                    || requisitoCatalogo?.codigo
+                                    || `Requisito #${requisito.id_requisito}`,
+                                Estado:
+                                    estadoCatalogo?.nombre
+                                    || estadoCatalogo?.codigo
+                                    || `Estado #${requisito.id_estado}`,
+                                Entidad:
+                                    nombresEntidad[requisito.entidad_tipo]
+                                    || requisito.entidad_tipo
+                                    || "—",
+                                "Registro relacionado":
+                                    referencias.get(`${requisito.entidad_tipo}:${requisito.entidad_id}`) || "Referencia no disponible",
+                                Documento:
+                                    requisito.documento
+                                    || (requisito.id_documento
+                                        ? "Documento asociado"
+                                        : "Sin documento"),
+                                Detalle:
+                                    requisito.detalle
+                                    || "Sin detalle adicional."
+                            }
                         );
 
                     }
@@ -857,17 +985,63 @@ async function cargarCatalogos() {
 
                 boton.addEventListener(
                     "click",
-                    () => {
+                    async () => {
 
                         const id =
                             boton.dataset
                                 .editar;
 
+                        const requisito =
+                            requisitos.find(
+                                item =>
+                                    String(item.id_expediente_requisito) ===
+                                    String(id)
+                            );
 
-                        alert(
-                            "La edición se habilitará al conectar el backend."
-                        );
+                        if (!requisito) return;
 
+                        idRequisitoEditando =
+                            Number(requisito.id_expediente_requisito);
+
+                        mostrarFormulario();
+
+                        document.getElementById("idRequisito").value =
+                            String(requisito.id_requisito || "");
+                        document.getElementById("idEstado").value =
+                            String(requisito.id_estado || "");
+                        document.getElementById("entidadTipo").value =
+                            requisito.entidad_tipo || "";
+                        await cargarSelectorEntidad(requisito.entidad_id);
+                        document.getElementById("idRequisito").disabled = true;
+                        document.getElementById("entidadTipo").disabled = true;
+                        document.getElementById("detalle").value =
+                            requisito.detalle || "";
+
+                        await cargarDocumentosDeEntidad();
+
+                        if (requisito.id_documento && !Array.from(elementoIdDocumento().options).some(opcion => Number(opcion.value) === Number(requisito.id_documento))) {
+                            elementoIdDocumento().add(new Option("Documento asociado no disponible en el listado", String(requisito.id_documento)));
+                        }
+
+                        document.getElementById("idDocumento").value =
+                            requisito.id_documento
+                                ? String(requisito.id_documento)
+                                : "";
+
+                        const titulo =
+                            formulario.querySelector("h2");
+                        const botonGuardar =
+                            form.querySelector('[type="submit"]');
+
+                        if (titulo) {
+                            titulo.textContent =
+                                "Editar requisito documental";
+                        }
+
+                        if (botonGuardar) {
+                            botonGuardar.textContent =
+                                "Guardar cambios";
+                        }
                     }
                 );
 
@@ -925,7 +1099,7 @@ async function cargarCatalogos() {
         formulario.hidden =
             true;
 
-
+        idRequisitoEditando = null;
         limpiarFormulario();
 
     }
@@ -936,7 +1110,27 @@ async function cargarCatalogos() {
 
         btnNuevoRequisito.addEventListener(
             "click",
-            mostrarFormulario
+            () => {
+                idRequisitoEditando = null;
+                limpiarFormulario();
+
+                const titulo =
+                    formulario?.querySelector("h2");
+                const botonGuardar =
+                    form?.querySelector('[type="submit"]');
+
+                if (titulo) {
+                    titulo.textContent =
+                        "Registrar requisito documental";
+                }
+
+                if (botonGuardar) {
+                    botonGuardar.textContent =
+                        "Registrar requisito";
+                }
+
+                mostrarFormulario();
+            }
         );
 
     }
@@ -1003,8 +1197,9 @@ async function cargarCatalogos() {
             );
 
 
-            alert(
-                "Selecciona el requisito documental."
+            window.SSALFER_UI?.toast(
+                "Selecciona el requisito documental.",
+                { tipo: "error" }
             );
 
 
@@ -1020,8 +1215,9 @@ async function cargarCatalogos() {
             );
 
 
-            alert(
-                "Selecciona el estado del requisito."
+            window.SSALFER_UI?.toast(
+                "Selecciona el estado del requisito.",
+                { tipo: "error" }
             );
 
 
@@ -1037,8 +1233,9 @@ async function cargarCatalogos() {
             );
 
 
-            alert(
-                "Selecciona el tipo de entidad."
+            window.SSALFER_UI?.toast(
+                "Selecciona el tipo de entidad.",
+                { tipo: "error" }
             );
 
 
@@ -1058,8 +1255,9 @@ async function cargarCatalogos() {
             );
 
 
-            alert(
-                "Indica el identificador de la entidad relacionada."
+            window.SSALFER_UI?.toast(
+                "Selecciona el registro relacionado.",
+                { tipo: "error" }
             );
 
 
@@ -1086,6 +1284,7 @@ async function cargarCatalogos() {
 
 
     async function cargarDocumentosDeEntidad() {
+        const revision = ++revisionDocumento;
 
         const entidadTipo =
             document.getElementById("entidadTipo").value;
@@ -1115,6 +1314,8 @@ async function cargarCatalogos() {
                     entidadId
                 );
 
+            if (revision !== revisionDocumento) return;
+
             (Array.isArray(documentos) ? documentos : []).forEach(
                 documento => {
 
@@ -1126,7 +1327,7 @@ async function cargarCatalogos() {
                     opcion.textContent =
                         documento.nombre
                         || documento.titulo
-                        || `Documento #${documento.id_documento}`;
+                        || documento.tipo_documento || "Documento";
 
                     selectDocumento.appendChild(opcion);
 
@@ -1143,7 +1344,7 @@ async function cargarCatalogos() {
 
 
     document.getElementById("entidadTipo")
-        ?.addEventListener("change", cargarDocumentosDeEntidad);
+        ?.addEventListener("change", () => cargarSelectorEntidad());
 
     document.getElementById("entidadId")
         ?.addEventListener("change", cargarDocumentosDeEntidad);
@@ -1164,6 +1365,10 @@ async function cargarCatalogos() {
 
 
         form.reset();
+
+        document.getElementById("idRequisito").disabled = false;
+        document.getElementById("entidadTipo").disabled = false;
+        void cargarSelectorEntidad();
 
 
         document.querySelectorAll(
@@ -1242,8 +1447,9 @@ async function cargarCatalogos() {
 
                 if (!idNucleo) {
 
-                    alert(
-                        "No se puede registrar el requisito porque falta el id_proyecto_nucleo."
+                    window.SSALFER_UI?.toast(
+                        "No se puede registrar el requisito porque falta el contexto del núcleo.",
+                        { tipo: "error" }
                     );
 
                     return;
@@ -1297,17 +1503,34 @@ async function cargarCatalogos() {
 
                 try {
 
-                    await window.DocumentosAPI.crearRequisito(
-                        idNucleo,
-                        nuevoRequisito
-                    );
+                    const estabaEditando =
+                        Number.isInteger(idRequisitoEditando)
+                        && idRequisitoEditando > 0;
+
+                    if (estabaEditando) {
+                        await window.DocumentosAPI.actualizarRequisito(
+                            idRequisitoEditando,
+                            {
+                                id_estado: nuevoRequisito.id_estado,
+                                id_documento: nuevoRequisito.id_documento,
+                                detalle: nuevoRequisito.detalle
+                            }
+                        );
+                    } else {
+                        await window.DocumentosAPI.crearRequisito(
+                            idNucleo,
+                            nuevoRequisito
+                        );
+                    }
 
                     await cargarRequisitos();
 
                     ocultarFormulario();
 
-                    alert(
-                        "El requisito se guardó correctamente."
+                    window.SSALFER_UI?.toast(
+                        estabaEditando
+                            ? "El requisito se actualizó correctamente."
+                            : "El requisito se guardó correctamente."
                     );
 
                 } catch (error) {
@@ -1362,7 +1585,7 @@ async function cargarCatalogos() {
             "click",
             () => {
 
-                window.history.back();
+                window.location.href = idNucleo ? `/pages/nucleoAgrario.html?id_proyecto_nucleo=${encodeURIComponent(idNucleo)}` : "/dashboard.html";
 
             }
         );

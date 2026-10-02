@@ -16,9 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         !Number.isInteger(idProyectoNucleo) ||
         idProyectoNucleo <= 0
     ) {
-        alert(
-            "Falta un id_proyecto_nucleo válido."
-        );
+        await window.SSALFER_UI.verDatos("No se pudo abrir la pantalla", { "Mensaje": "Abre este registro desde la ficha de su proyecto o núcleo." });
 
         window.location.href =
             "/dashboard.html";
@@ -208,7 +206,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function formatoFecha(fecha) {
-        return fecha || "—";
+        return window.SSALFER_FORMAT?.formatearFecha(fecha)
+            ?? (fecha || "—");
+    }
+
+    function nombreDocumento(id) {
+        if (!id) return "Sin documento asociado";
+        return Array.from(elementos.idDocumento.options).find(opcion => Number(opcion.value) === Number(id))?.textContent
+            || "Documento asociado no disponible en el listado";
     }
 
 
@@ -360,8 +365,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     documento.id_documento;
 
                 option.textContent =
-                    `#${documento.id_documento} — ${
-                        documento.titulo ||
+                    `${documento.titulo ||
                         documento.tipo_documento ||
                         "Documento"
                     }`;
@@ -501,9 +505,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             fila.innerHTML = `
                 <td>
-                    #${escaparHTML(
-                        padron.id_padron
-                    )}
+                    Padrón
                 </td>
 
                 <td>
@@ -534,8 +536,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                             ? `
                                 <span class="etiqueta-documento">
                                     <i class="bi bi-paperclip"></i>
-                                    Documento #${escaparHTML(
-                                        padron.id_documento
+                                    ${escaparHTML(
+                                        nombreDocumento(padron.id_documento)
                                     )}
                                 </span>
                             `
@@ -590,15 +592,18 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        alert(
-            [
-                `Padrón #${padron.id_padron}`,
-                "",
-                `Fecha: ${padron.fecha_padron || "—"}`,
-                `Ejidatarios / comuneros: ${padron.numero_ejidatarios_comuneros ?? "—"}`,
-                `Fuente: ${padron.fuente || "—"}`,
-                `Documento: ${padron.id_documento ? `#${padron.id_documento}` : "—"}`
-            ].join("\n")
+        window.SSALFER_UI?.verDatos(
+            "Consultar padrón",
+            {
+                Fecha: formatoFecha(padron.fecha_padron),
+                "Ejidatarios / comuneros":
+                    padron.numero_ejidatarios_comuneros ?? "—",
+                Fuente: padron.fuente || "—",
+                Documento:
+                    padron.id_documento
+                        ? nombreDocumento(padron.id_documento)
+                        : "Sin documento asociado"
+            }
         );
     }
 
@@ -701,7 +706,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 padron.id_documento;
 
             option.textContent =
-                `Documento #${padron.id_documento}`;
+                "Documento asociado no disponible en el listado";
 
             elementos.idDocumento
                 .appendChild(option);
@@ -773,9 +778,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             elementos.numeroEjidatarios
                 .classList.add("invalido");
 
-            alert(
-                "Debes indicar al menos la fecha del padrón o la cantidad de ejidatarios/comuneros."
-            );
+            window.SSALFER_UI.toast("Debes indicar al menos la fecha del padrón o la cantidad de ejidatarios/comuneros.", { tipo: "error" });
 
             return false;
         }
@@ -784,9 +787,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             elementos.numeroEjidatarios
                 .classList.add("invalido");
 
-            alert(
-                "La cantidad debe ser un número entero mayor o igual a cero."
-            );
+            window.SSALFER_UI.toast("La cantidad debe ser un número entero mayor o igual a cero.", { tipo: "error" });
 
             return false;
         }
@@ -795,9 +796,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             elementos.idDocumento
                 ?.classList.add("invalido");
 
-            alert(
-                "El documento seleccionado no es válido."
-            );
+            window.SSALFER_UI.toast("El documento seleccionado no es válido.", { tipo: "error" });
 
             return false;
         }
@@ -853,7 +852,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             payload
                         );
 
-                    alert(
+                    window.SSALFER_UI.toast(
                         "Padrón actualizado correctamente."
                     );
 
@@ -864,7 +863,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             payload
                         );
 
-                    alert(
+                    window.SSALFER_UI.toast(
                         "Padrón registrado correctamente."
                     );
                 }

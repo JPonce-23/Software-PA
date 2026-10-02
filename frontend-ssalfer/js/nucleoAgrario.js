@@ -127,11 +127,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 "btnOrv"
             ),
 
-        btnPadron:
-            document.getElementById(
-                "btnPadron"
-            ),
-
         btnSensibilizacion:
             document.getElementById(
                 "btnSensibilizacion"
@@ -176,6 +171,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         btnFifonafe:
             document.getElementById(
                 "btnFifonafe"
+            ),
+
+        btnExpedienteDocumental:
+            document.getElementById(
+                "btnExpedienteDocumental"
             ),
 
         btnPersona:
@@ -492,11 +492,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
 
     configurarEnlace(
-        elementos.btnPadron,
-        `/pages/padrones.html?${queryBase}`
-    );
-
-    configurarEnlace(
         elementos.btnSensibilizacion,
         `/pages/actividades.html?${queryBase}&tipo_actividad=sensibilizacion`
     );
@@ -534,6 +529,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     configurarEnlace(
         elementos.btnAfectaciones,
         `/pages/afectacion.html?${queryBase}`
+    );
+
+    configurarEnlace(
+        elementos.btnExpedienteDocumental,
+        `/pages/expedienteDocumental.html?${queryBase}`
     );
 
     configurarEnlace(

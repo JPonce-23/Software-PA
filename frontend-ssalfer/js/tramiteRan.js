@@ -233,7 +233,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 "click",
                 event => {
                     event.preventDefault();
-                    window.history.back();
+                    volver();
                 }
             );
         }
@@ -579,9 +579,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 !Number.isInteger(ordinal) ||
                 ordinal <= 0
             ) {
-                alert(
-                    "El orden de cada evento debe ser un entero mayor que cero."
-                );
+                window.SSALFER_UI.toast("El orden de cada evento debe ser un entero mayor que cero.", { tipo: "error" });
 
                 ordinalElemento?.focus();
 
@@ -589,9 +587,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
 
             if (ordinales.has(ordinal)) {
-                alert(
-                    `El orden ${ordinal} está repetido.`
-                );
+                window.SSALFER_UI.toast(`El orden ${ordinal} está repetido.`, { tipo: "error" });
 
                 ordinalElemento?.focus();
 
@@ -606,9 +602,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 ) ||
                 idTipoEvento <= 0
             ) {
-                alert(
-                    `Selecciona el tipo del evento ${ordinal}.`
-                );
+                window.SSALFER_UI.toast(`Selecciona el tipo del evento ${ordinal}.`, { tipo: "error" });
 
                 tipoElemento?.focus();
 
@@ -625,9 +619,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (
                 Number.isNaN(idDocumento)
             ) {
-                alert(
-                    `El documento del evento ${ordinal} no es válido.`
-                );
+                window.SSALFER_UI.toast(`El documento del evento ${ordinal} no es válido.`, { tipo: "error" });
 
                 return null;
             }
@@ -696,9 +688,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
 
             if (!objetivo) {
-                alert(
-                    "No se puede registrar el trámite porque debe tener exactamente una Asamblea, Convenio u ORV de origen."
-                );
+                window.SSALFER_UI.toast("No se puede registrar el trámite porque debe tener exactamente una Asamblea, Convenio u ORV de origen.", { tipo: "error" });
 
                 return;
             }
@@ -780,9 +770,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 errorEvento
                             );
 
-                        alert(
-                            `El trámite #${tramiteCreado.id_tramite_ran} sí fue creado, pero no fue posible guardar todos sus eventos. Puedes completarlos desde su ficha.`
-                        );
+                        await window.SSALFER_UI.verDatos("Trámite registrado", { "Mensaje": "El trámite fue creado, pero faltan eventos por guardar. Puedes completarlos desde su ficha." });
 
                         window.location.href =
                             `/pages/fichaRan.html?id_tramite_ran=${encodeURIComponent(
@@ -793,9 +781,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     }
                 }
 
-                alert(
-                    "El trámite ante el RAN se guardó correctamente."
-                );
+                await window.SSALFER_UI.verDatos("Registro guardado", { "Mensaje": "El trámite ante el RAN se guardó correctamente." });
 
                 window.location.href =
                     `/pages/fichaRan.html?id_tramite_ran=${encodeURIComponent(
@@ -820,7 +806,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     ====================================================== */
 
     function volver() {
-        window.history.back();
+        const nucleo = numeroParametro("id_proyecto_nucleo");
+        let destino = nucleo ? `/pages/nucleoAgrario.html?id_proyecto_nucleo=${nucleo}` : "/dashboard.html";
+        if (objetivo?.tipo === "convenio") destino = `/pages/fichaConvenio.html?id_convenio=${objetivo.id}`;
+        if (objetivo?.tipo === "asamblea" && nucleo) destino = `/pages/asamblea.html?id_proyecto_nucleo=${nucleo}`;
+        if (objetivo?.tipo === "orv" && nucleo) destino = `/pages/orv.html?id_proyecto_nucleo=${nucleo}`;
+        window.location.href = destino;
     }
 
     elementos.btnVolver

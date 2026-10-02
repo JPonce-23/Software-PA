@@ -187,20 +187,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
     function formatearFecha(fecha) {
-        if (!fecha) {
-            return "—";
-        }
-
-        const partes =
-            String(fecha).split("-");
-
-        if (partes.length !== 3) {
-            return String(fecha);
-        }
-
-        return (
-            `${partes[2]}/${partes[1]}/${partes[0]}`
-        );
+        return window.SSALFER_FORMAT?.formatearFecha(fecha)
+            ?? (fecha || "—");
     }
 
 
@@ -772,7 +760,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         el.observaciones.readOnly = true;
 
         el.observacionesAyuda.textContent =
-            "Solo lectura: el servicio actual del backend no persiste cambios de observaciones en PATCH.";
+            "Las observaciones de una opción existente están disponibles solo para consulta.";
 
 
         abrirModal(el.modal);

@@ -68,21 +68,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function fechaLegible(valorISO) {
-        if (!valorISO) {
-            return "—";
-        }
-
-        const partes =
-            String(valorISO).split("-");
-
-        if (partes.length !== 3) {
-            return String(valorISO);
-        }
-
-        const [anio, mes, dia] =
-            partes;
-
-        return `${dia}/${mes}/${anio}`;
+        return window.SSALFER_FORMAT?.formatearFecha(valorISO)
+            ?? (valorISO || "—");
     }
 
     function textoOPendiente(
@@ -588,9 +575,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 payload.superficie_preliminar_ha <
                     0
             ) {
-                alert(
-                    "La superficie preliminar no puede ser negativa."
-                );
+                window.SSALFER_UI.toast("La superficie preliminar no puede ser negativa.", { tipo: "error" });
 
                 return;
             }
@@ -601,9 +586,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 payload.superficie_afectada_ha <
                     0
             ) {
-                alert(
-                    "La superficie afectada no puede ser negativa."
-                );
+                window.SSALFER_UI.toast("La superficie afectada no puede ser negativa.", { tipo: "error" });
 
                 return;
             }
@@ -613,9 +596,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     "otro" &&
                 !payload.descripcion_condicion
             ) {
-                alert(
-                    "La condición 'otro' requiere una descripción."
-                );
+                window.SSALFER_UI.toast("La condición 'otro' requiere una descripción.", { tipo: "error" });
 
                 return;
             }
@@ -793,8 +774,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         ?.addEventListener(
             "click",
             () => {
+                formAvaluo.reset();
                 formAvaluo.hidden =
                     true;
+
+                formAvaluo.closest(".bloque")
+                    ?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start"
+                    });
             }
         );
 
@@ -856,9 +844,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         0
                 )
             ) {
-                alert(
-                    "El monto del avalúo debe ser un número igual o mayor a cero."
-                );
+                window.SSALFER_UI.toast("El monto del avalúo debe ser un número igual o mayor a cero.", { tipo: "error" });
 
                 return;
             }
@@ -873,6 +859,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 pintarAvaluo(
                     afectacion
                 );
+
+                window.SSALFER_UI.toast("Avalúo guardado correctamente.");
 
                 formAvaluo.hidden =
                     true;
@@ -956,6 +944,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                                             <td>
                                                 <a
+                                                    class="ssalfer-link"
                                                     href="/pages/fichaConvenio.html?id_convenio=${encodeURIComponent(
                                                         convenio.id_convenio
                                                     )}">

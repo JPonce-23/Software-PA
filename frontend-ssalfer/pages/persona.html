@@ -11,6 +11,8 @@
 
     <link rel="stylesheet" href="/styles/dashboard.css">
 
+    <link rel="stylesheet" href="/styles/shared.css">
+
     <link rel="stylesheet" href="/styles/persona.css">
 
     <link rel="stylesheet"
@@ -221,6 +223,8 @@
 
 
         <div class="acciones-header">
+            <button type="button" class="btn-secundario ssalfer-volver" id="btnVolver" data-volver="persona"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</button>
+
 
             <button
                 type="button"
@@ -815,6 +819,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/navegacion.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

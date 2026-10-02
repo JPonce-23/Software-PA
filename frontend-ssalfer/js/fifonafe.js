@@ -12,9 +12,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         !Number.isInteger(idProyectoNucleo) ||
         idProyectoNucleo <= 0
     ) {
-        alert(
-            "Falta el identificador del proyecto-núcleo."
-        );
+        await window.SSALFER_UI.verDatos("No se pudo abrir la pantalla", { "Mensaje": "Abre este registro desde la ficha de su proyecto o núcleo." });
 
         window.location.href = "/dashboard.html";
         return;
@@ -396,6 +394,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 </button>
             </div>
 
+            <p class="fifonafe-evidencia"><strong>Evidencia: al menos un dato obligatorio.</strong> Captura número de oficio, fecha del oficio o documento.</p>
             <div class="form-grid">
                 <div class="campo">
                     <label>
@@ -574,21 +573,41 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (!idsAfectacion.length) {
             elementos.errorAfectaciones.hidden = false;
+            window.SSALFER_UI?.toast(
+                "Debes seleccionar al menos una afectación.",
+                { tipo: "error" }
+            );
             return;
         }
 
         elementos.errorAfectaciones.hidden = true;
 
         const eventos = leerEventos();
+        const ordinales = new Set();
 
         for (const evento of eventos) {
             if (!Number.isInteger(evento.ordinal) || evento.ordinal <= 0) {
-                alert("Revisa el ordinal de los eventos.");
+                window.SSALFER_UI?.toast(
+                    "Revisa el ordinal de los eventos.",
+                    { tipo: "error" }
+                );
+                return;
+            }
+            if (ordinales.has(evento.ordinal)) {
+                window.SSALFER_UI.toast(`Ya existe un evento con el ordinal ${evento.ordinal} en este formulario.`, { tipo: "error" });
+                return;
+            }
+            ordinales.add(evento.ordinal);
+            if (!evento.numeroOficio && !evento.fechaOficio && !evento.idDocumento) {
+                window.SSALFER_UI.toast(`El evento con ordinal ${evento.ordinal} requiere número de oficio, fecha del oficio o documento.`, { tipo: "error" });
                 return;
             }
 
             if (!Number.isInteger(evento.idTipoEvento) || evento.idTipoEvento <= 0) {
-                alert("Selecciona el tipo de evento en cada evento agregado.");
+                window.SSALFER_UI?.toast(
+                    "Selecciona el tipo de evento en cada evento agregado.",
+                    { tipo: "error" }
+                );
                 return;
             }
         }
@@ -597,6 +616,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const payload = {
             estatus: elementos.campoEstatus.value,
+
+            ids_afectacion: idsAfectacion,
 
             acuse_fifonafe_fecha:
                 elementos.campoAcuseFecha.value || null,
@@ -631,13 +652,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 );
             }
 
-            for (const idAfectacion of idsAfectacion) {
-                await window.FifonafeAPI.agregarAfectacion(
-                    idTramite,
-                    idAfectacion
-                );
-            }
-
             for (const evento of eventos) {
                 await window.FifonafeAPI.crearEvento(idTramite, {
                     ordinal: evento.ordinal,
@@ -650,7 +664,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 });
             }
 
-            alert("Trámite FIFONAFE registrado correctamente.");
+            window.SSALFER_UI?.toast(
+                "Trámite FIFONAFE registrado correctamente."
+            );
 
             cerrarFormulario();
             await recargar();

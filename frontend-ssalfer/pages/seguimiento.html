@@ -27,6 +27,8 @@
           sizes="40x40"
           href="/img/LOGOS VERDE/IMAGOTIPO.png">
 
+    <link rel="stylesheet" href="/styles/shared.css">
+
 </head>
 
 
@@ -766,8 +768,8 @@
 
                     <small>
 
-                        Opcional. Si seleccionas una entidad,
-                        deberás indicar su identificador.
+                        Opcional. Selecciona una entidad si el evento
+                        corresponde a un registro específico.
 
                     </small>
 
@@ -777,24 +779,69 @@
 
 
                 <!-- =================================================
-                            ID ENTIDAD
+                            CONTEXTO DE ENTIDAD DEPENDIENTE
+                ================================================== -->
+
+                <div
+                    class="campo"
+                    id="entidadContextoCampo"
+                    hidden>
+
+                    <label for="entidadContextoSelector">
+
+                        Selecciona el contexto
+
+                    </label>
+
+                    <select
+                        id="entidadContextoSelector"
+                        hidden
+                        disabled>
+
+                        <option value="">
+                            Selecciona una opción
+                        </option>
+
+                    </select>
+
+                    <small>
+
+                        Selecciona primero el registro del que depende
+                        la entidad relacionada.
+
+                    </small>
+
+                </div>
+
+
+                <!-- =================================================
+                            REGISTRO RELACIONADO
                 ================================================== -->
 
                 <div class="campo">
 
                     <label for="entidadId">
 
-                        Identificador
+                        Registro relacionado
 
                     </label>
 
 
+                    <select
+                        id="entidadSelector"
+                        hidden
+                        disabled>
+
+                        <option value="">
+                            Selecciona un registro
+                        </option>
+
+                    </select>
+
                     <input
-                        type="number"
+                        type="hidden"
                         id="entidadId"
-                        name="entidad_id"
-                        min="1"
-                        placeholder="ID del registro relacionado">
+                        name="entidad_id">
 
                     <small>
 
@@ -932,17 +979,20 @@
                     </label>
 
 
-                    <input
-                        type="number"
+                    <select
                         id="documento"
-                        name="id_documento"
-                        min="1"
-                        placeholder="Identificador del documento">
+                        name="id_documento">
+
+                        <option value="">
+                            Sin documento asociado
+                        </option>
+
+                    </select>
 
                     <small>
 
-                        Opcional. Debe corresponder a un documento
-                        previamente registrado.
+                        Opcional. Selecciona un documento previamente
+                        registrado y vinculado a este núcleo o proyecto.
 
                     </small>
 
@@ -1075,6 +1125,10 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

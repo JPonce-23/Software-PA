@@ -758,6 +758,15 @@ document.addEventListener("DOMContentLoaded", () => {
             );
         }
 
+        if (
+            datos.tipo_cop_revision_pendiente &&
+            !datos.tipo_cop_revision_detalle
+        ) {
+            errores.push(
+                "Indica qué información requiere revisión del COP."
+            );
+        }
+
         return errores;
     }
 
@@ -773,16 +782,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 validarDatos(datos);
 
             if (errores.length > 0) {
-                alert(
-                    errores.join("\n")
+                window.SSALFER_UI?.toast(
+                    errores.join(" "),
+                    { tipo: "error", duracion: 7000 }
                 );
 
                 return;
             }
 
             if (!idProyectoNucleo) {
-                alert(
-                    "No se puede registrar la afectación porque falta el id_proyecto_nucleo."
+                window.SSALFER_UI?.toast(
+                    "No se puede registrar la afectación porque falta el contexto del núcleo.",
+                    { tipo: "error" }
                 );
 
                 return;
@@ -807,7 +818,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         datos
                     );
 
-                alert(
+                window.SSALFER_UI?.toast(
                     "La afectación se guardó correctamente."
                 );
 

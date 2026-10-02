@@ -293,6 +293,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             event.preventDefault();
 
+            const btnGuardar = formulario.querySelector("[type='submit']");
+            if (btnGuardar?.disabled) return;
 
             if (!validarFormulario()) {
 
@@ -321,31 +323,25 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
 
+            if (btnGuardar) btnGuardar.disabled = true;
             const confirmar =
-                confirm(
+                await window.SSALFER_UI.confirmar(
                     "¿Deseas registrar este proyecto?"
                 );
 
 
             if (!confirmar) {
-
+                if (btnGuardar) btnGuardar.disabled = false;
                 return;
 
             }
 
 
-            const btnGuardar =
-                formulario.querySelector("[type='submit']");
-
-            if (btnGuardar) btnGuardar.disabled = true;
-
             try {
 
                 await window.ProyectosAPI.crear(proyecto);
 
-                alert(
-                    "El proyecto se registró correctamente."
-                );
+                await window.SSALFER_UI.verDatos("Registro guardado", { "Mensaje": "El proyecto se registró correctamente." });
 
                 window.location.href =
 

@@ -176,7 +176,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 "Cobertura de solicitudes por proyecto y ámbito.",
 
             nota:
-                "La cobertura v2 se calcula por solicitud. Los pendientes y la falta de soporte impiden presentar sus subtotales como un total definitivo.",
+                "Este reporte corresponde al flujo FIFONAFE v2. Los trámites históricos del flujo v1 no forman parte de esta cobertura; los pendientes y la falta de soporte impiden presentar subtotales como un total definitivo.",
 
 
             columnas: [
@@ -430,7 +430,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 "Solicitudes resueltas positivamente respecto de solicitudes recibidas, por proyecto y año.",
 
             nota:
-                "El indicador institucional es solicitudes resueltas positivamente / solicitudes recibidas. No cuenta oficios, parcelas, entregas ni pagos.",
+                "Este indicador corresponde al flujo FIFONAFE v2: solicitudes resueltas positivamente / solicitudes recibidas. Los trámites históricos v1 no se incluyen y no se cuentan oficios, parcelas, entregas ni pagos.",
 
 
             columnas: [
@@ -1370,7 +1370,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             ) {
 
                 mostrarInfo(
-                    "La consulta se ejecutó correctamente, pero no encontró registros para los filtros seleccionados."
+                    estado.reporte === "cobertura"
+                        ? "No hay solicitudes del flujo FIFONAFE v2 que cumplan los filtros. Los trámites históricos v1 no forman parte de este reporte."
+                        : "No hay solicitudes del flujo FIFONAFE v2 con hitos suficientes para el indicador en los filtros seleccionados. Los trámites históricos v1 no se incluyen."
                 );
 
             }

@@ -20,7 +20,7 @@
 
     <link
         rel="stylesheet"
-        href="/styles/reporteAvancePeriodo.css">
+        href="/styles/reporteActividadesPeriodo.css">
 
     <link
         rel="stylesheet"
@@ -31,6 +31,8 @@
         rel="icon"
         type="image/png"
         href="/img/LOGOS VERDE/IMAGOTIPO.png">
+
+    <link rel="stylesheet" href="/styles/shared.css">
 
 </head>
 
@@ -115,7 +117,7 @@
 
 
             <a
-                href="/pages/reporteAvancePeriodo.html"
+                href="/pages/reporteActividadesPeriodo.html"
                 class="activo">
 
                 <i class="bi bi-bar-chart-line"></i>
@@ -260,7 +262,9 @@
 
         </div>
 
-    </section>
+
+            <button type="button" class="btn-secundario ssalfer-volver" id="btnVolver" data-volver="proyecto"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</button>
+</section>
 
 
 
@@ -1084,6 +1088,11 @@
 <script src="/js/api/catalogos.js"></script>
 
 <script src="/js/api/reportes.js"></script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/navegacion.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

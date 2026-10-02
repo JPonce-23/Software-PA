@@ -11,6 +11,8 @@
 
 
     <link rel="stylesheet" href="/styles/dashboard.css">
+
+    <link rel="stylesheet" href="/styles/shared.css">
     <link rel="stylesheet" href="/styles/nuevoProyecto.css">
 
 
@@ -261,6 +263,8 @@
     </div>
 
     <div class="dashboard-acciones">
+            <button type="button" class="btn-secundario ssalfer-volver" id="btnVolver" data-volver="dashboard"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</button>
+
         <button
             type="button"
             class="btn-secundario"
@@ -447,6 +451,38 @@
         </small>
 
         </a>
+    </div>
+
+
+    <div class="tarjeta tarjeta-reportes">
+
+        <div class="tarjeta-icono">
+            <i class="bi bi-bar-chart-line"></i>
+        </div>
+
+        <div>
+            <h3>Reportes</h3>
+            <p>Consulta reportes operativos del proyecto.</p>
+
+            <div class="reportes-accesos">
+                <a id="enlaceReporteConvenios" class="ssalfer-link" href="/pages/reportesConvenios.html">
+                    <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+                    <strong>Convenios</strong>
+                    <span>Consulta valores, impactos y cobertura.</span>
+                </a>
+                <a id="enlaceReporteFifonafe" class="ssalfer-link" href="/pages/reportesFifonafe.html">
+                    <i class="bi bi-bank" aria-hidden="true"></i>
+                    <strong>FIFONAFE</strong>
+                    <span>Revisa cobertura y solicitudes resueltas.</span>
+                </a>
+                <a id="enlaceReporteAvance" class="ssalfer-link" href="/pages/reporteActividadesPeriodo.html">
+                    <i class="bi bi-calendar3" aria-hidden="true"></i>
+                    <strong>Avance por periodo</strong>
+                    <span>Consulta los hitos de cada periodo.</span>
+                </a>
+            </div>
+        </div>
+
     </div>
 
 
@@ -646,6 +682,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AuthAPI.requerirSesion();
 });
 </script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/navegacion.js"></script>
 
 <script src="/js/dashboard.js"></script>
 

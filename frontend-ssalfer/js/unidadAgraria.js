@@ -130,7 +130,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (elementos.btnAgregarTitular) {
             elementos.btnAgregarTitular.hidden =
-                !puedeCapturar;
+                !puedeCapturar || !unidadSeleccionada?.id_parcela;
+
+            elementos.btnAgregarTitular.title =
+                unidadSeleccionada?.id_parcela
+                    ? "Agregar un titular desde la parcela relacionada"
+                    : "Relaciona primero una parcela con titulares para habilitar esta acción";
         }
     }
 
@@ -514,12 +519,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                         )
                     )}">
 
-                    <i class="bi bi-eye"></i>
+                    <i class="bi ${
+                        idAfectacion
+                            ? "bi-link-45deg"
+                            : "bi-eye"
+                    }"></i>
 
                     ${
                         idAfectacion
                             ? "Seleccionar / vincular"
-                            : "Consultar"
+                            : "Consultar detalle"
                     }
 
                 </a>
@@ -593,10 +602,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (elementos.btnAgregarTitular) {
             elementos.btnAgregarTitular.hidden =
-                !puedeCapturar;
+                !puedeCapturar || !unidadSeleccionada.id_parcela;
+            elementos.btnAgregarTitular.title = unidadSeleccionada.id_parcela
+                ? "Agregar un titular desde la parcela relacionada"
+                : "Relaciona primero una parcela con titulares para habilitar esta acción";
         }
 
         await cargarTitularesUnidad();
+
+        window.requestAnimationFrame(() => {
+            elementos.seccionTitulares?.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+        });
 
         if (idAfectacion) {
             elementos.seccionVinculacion.hidden =
@@ -1010,9 +1029,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (!unidadSeleccionada.id_parcela) {
-            alert(
-                "Para seleccionar un titular desde la interfaz, primero relaciona la unidad con una parcela que tenga titulares registrados."
-            );
+            window.SSALFER_UI.toast("Para seleccionar un titular desde la interfaz, primero relaciona la unidad con una parcela que tenga titulares registrados.", { tipo: "error" });
 
             return;
         }
@@ -1044,9 +1061,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }));
 
             if (opciones.length === 0) {
-                alert(
-                    "La parcela relacionada todavía no tiene titulares. Registra primero un titular en la ficha de la parcela."
-                );
+                window.SSALFER_UI.toast("La parcela relacionada todavía no tiene titulares. Registra primero un titular en la ficha de la parcela.", { tipo: "error" });
 
                 return;
             }
@@ -1248,7 +1263,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     validarUnidad(datos);
 
                 if (error) {
-                    alert(error);
+                    window.SSALFER_UI.toast(error, { tipo: "error" });
                     return;
                 }
 
@@ -1312,9 +1327,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     datos.superficie_preliminar_ha != null &&
                     datos.superficie_preliminar_ha < 0
                 ) {
-                    alert(
-                        "La superficie preliminar no puede ser negativa."
-                    );
+                    window.SSALFER_UI.toast("La superficie preliminar no puede ser negativa.", { tipo: "error" });
 
                     return;
                 }
@@ -1323,9 +1336,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     datos.superficie_afectada_ha != null &&
                     datos.superficie_afectada_ha < 0
                 ) {
-                    alert(
-                        "La superficie afectada no puede ser negativa."
-                    );
+                    window.SSALFER_UI.toast("La superficie afectada no puede ser negativa.", { tipo: "error" });
 
                     return;
                 }
@@ -1363,11 +1374,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                     await cargarVinculoActual();
 
-                    alert(
+                    window.SSALFER_UI?.toast(
                         yaExistia
                             ? "La vinculación quedó actualizada."
                             : "La unidad quedó vinculada a la afectación."
                     );
+
+                    elementos.seccionVinculacion?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start"
+                    });
 
                 } catch (error) {
                     window.ClienteAPI.mostrarErrorAPI(

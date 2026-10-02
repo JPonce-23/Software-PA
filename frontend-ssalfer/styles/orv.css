@@ -1037,3 +1037,74 @@
     }
 
 }
+/* QA UX: tarjetas de integrantes y enlaces-boton */
+
+.integrante-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+}
+
+.integrante-item > div:first-child {
+    min-width: 0;
+}
+
+.integrante-item > div:first-child > strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: .95rem;
+    color: #333;
+}
+
+.integrante-item > div:first-child > div {
+    line-height: 1.45;
+    color: #555;
+}
+
+.integrante-item > div:first-child > small {
+    display: block;
+    margin-top: 6px;
+    line-height: 1.45;
+    color: #6b6b6b;
+}
+
+.integrante-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+a.btn-principal,
+a.btn-principal:visited,
+a.btn-principal:hover,
+a.btn-principal:focus-visible {
+    color: #fff;
+    text-decoration: none;
+}
+
+a.btn-secundario,
+a.btn-secundario:visited {
+    color: #555;
+    text-decoration: none;
+}
+
+@media (max-width: 900px) {
+    .integrante-item {
+        grid-template-columns: 1fr;
+    }
+
+    .integrante-acciones {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 700px) {
+    .integrante-acciones {
+        width: 100%;
+    }
+
+    .integrante-acciones button {
+        flex: 1 1 auto;
+    }
+}

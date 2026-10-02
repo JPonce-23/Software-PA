@@ -151,17 +151,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function fechaLegible(valorISO) {
-        if (!valorISO) {
-            return "—";
-        }
-
-        const partes =
-            String(valorISO)
-                .split("-");
-
-        return partes.length === 3
-            ? `${partes[2]}/${partes[1]}/${partes[0]}`
-            : String(valorISO);
+        return window.SSALFER_FORMAT?.formatearFecha(valorISO)
+            ?? (valorISO || "—");
     }
 
     function limpiarPersonaRetornoDeUrl() {
@@ -1378,7 +1369,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     );
 
                 if (error) {
-                    alert(error);
+                    window.SSALFER_UI.toast(error, { tipo: "error" });
                     return;
                 }
 
@@ -1423,9 +1414,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 if (
                     !idProyectoNucleo
                 ) {
-                    alert(
-                        "No se pudo determinar el proyecto de esta parcela."
-                    );
+                    window.SSALFER_UI.toast("No se pudo determinar el proyecto de esta parcela.", { tipo: "error" });
 
                     return;
                 }

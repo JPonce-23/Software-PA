@@ -53,16 +53,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function fechaVisual(valor) {
-        if (!valor) {
-            return "—";
-        }
-
-        const partes =
-            String(valor).split("-");
-
-        return partes.length === 3
-            ? `${partes[2]}/${partes[1]}/${partes[0]}`
-            : String(valor);
+        return window.SSALFER_FORMAT?.formatearFecha(valor)
+            ?? (valor || "—");
     }
 
     async function cargarRol() {
@@ -1073,7 +1065,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         <div>
 
                             <strong>
-                                Asamblea #${asamblea.id_asamblea}
+                                ${escaparHTML(asamblea.proposito || "Asamblea")}
                             </strong>
 
                             <div
@@ -1153,12 +1145,183 @@ document.addEventListener("DOMContentLoaded", async () => {
                     </div>
                 `;
 
+                const contenedorRan =
+                    document.createElement(
+                        "div"
+                    );
+
+                contenedorRan.dataset.ranAsamblea =
+                    asamblea.id_asamblea;
+
+                card.appendChild(
+                    contenedorRan
+                );
+
                 lista.appendChild(
                     card
+                );
+
+                cargarTramitesRanAsamblea(
+                    asamblea.id_asamblea,
+                    contenedorRan
                 );
             }
         );
     }
+
+    async function cargarTramitesRanAsamblea(
+        idAsamblea,
+        contenedor
+    ) {
+        if (!contenedor) {
+            return;
+        }
+
+        contenedor.innerHTML = `
+            <div
+                style="
+                    margin-top:12px;
+                    padding-top:12px;
+                    border-top:1px solid #eee;
+                    color:#666;
+                    font-size:.85rem;
+                ">
+                Consultando trámites RAN...
+            </div>
+        `;
+
+        try {
+            const respuesta =
+                await window.TramitesRanAPI.listarPorAsamblea(
+                    idAsamblea
+                );
+
+            const tramites =
+                Array.isArray(respuesta)
+                    ? respuesta
+                    : [];
+
+            const enlaces =
+                tramites.length
+                    ? tramites
+                        .map(tramite => {
+                            const referencia =
+                                tramite.referencia_expediente
+                                    ? ` · ${escaparHTML(
+                                        tramite.referencia_expediente
+                                    )}`
+                                    : "";
+
+                            return `
+                                <a
+                                    class="btn-secundario"
+                                    href="/pages/fichaRan.html?id_tramite_ran=${encodeURIComponent(
+                                        tramite.id_tramite_ran
+                                    )}">
+
+                                    <i class="bi bi-eye"></i>
+
+                                    Trámite RAN${referencia}
+
+                                </a>
+                            `;
+                        })
+                        .join("")
+                    : `
+                        <span
+                            style="
+                                color:#777;
+                                font-size:.85rem;
+                            ">
+                            Sin trámites RAN registrados.
+                        </span>
+                    `;
+
+            contenedor.innerHTML = `
+                <div
+                    style="
+                        margin-top:12px;
+                        padding-top:12px;
+                        border-top:1px solid #eee;
+                    ">
+
+                    <div
+                        style="
+                            display:flex;
+                            justify-content:space-between;
+                            align-items:center;
+                            gap:12px;
+                            margin-bottom:8px;
+                        ">
+
+                        <strong>
+                            Trámites RAN
+                        </strong>
+
+                        <span
+                            style="
+                                color:#666;
+                                font-size:.82rem;
+                            ">
+                            ${tramites.length} registrado(s)
+                        </span>
+
+                    </div>
+
+                    <div
+                        style="
+                            display:flex;
+                            flex-wrap:wrap;
+                            gap:8px;
+                            align-items:center;
+                        ">
+
+                        ${enlaces}
+
+                        ${
+                            puedeCapturar
+                                ? `
+                                    <a
+                                        class="btn-principal"
+                                        href="/pages/tramiteRan.html?id_asamblea=${encodeURIComponent(
+                                            idAsamblea
+                                        )}&id_proyecto_nucleo=${encodeURIComponent(idProyectoNucleo)}">
+
+                                        <i class="bi bi-plus-lg"></i>
+
+                                        Nuevo trámite RAN
+
+                                    </a>
+                                `
+                                : ""
+                        }
+
+                    </div>
+
+                </div>
+            `;
+
+        } catch (error) {
+            console.error(
+                "No fue posible consultar los trámites RAN de la asamblea.",
+                error
+            );
+
+            contenedor.innerHTML = `
+                <div
+                    style="
+                        margin-top:12px;
+                        padding-top:12px;
+                        border-top:1px solid #eee;
+                        color:#9b2c2c;
+                        font-size:.85rem;
+                    ">
+                    No fue posible consultar los trámites RAN.
+                </div>
+            `;
+        }
+    }
+
 
     async function cargarAsambleas() {
         const respuesta =
@@ -1183,7 +1346,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (titulo) {
             titulo.textContent =
                 idAsambleaEdicion
-                    ? `Editar asamblea #${idAsambleaEdicion}`
+                    ? "Editar asamblea"
                     : "Información de la asamblea";
         }
 
@@ -1457,9 +1620,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 if (
                     errorConvocatorias
                 ) {
-                    alert(
-                        errorConvocatorias
-                    );
+                    window.SSALFER_UI.toast(errorConvocatorias, { tipo: "error" });
 
                     return;
                 }
@@ -1468,9 +1629,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     validarTipoContexto();
 
                 if (errorContexto) {
-                    alert(
-                        errorContexto
-                    );
+                    window.SSALFER_UI.toast(errorContexto, { tipo: "error" });
 
                     return;
                 }
@@ -1535,9 +1694,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     !payloadBase
                         .id_tipo_asamblea
                 ) {
-                    alert(
-                        "Selecciona el tipo de asamblea."
-                    );
+                    window.SSALFER_UI.toast("Selecciona el tipo de asamblea.", { tipo: "error" });
 
                     return;
                 }
@@ -1560,8 +1717,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                             convocatorias
                         );
 
-                        alert(
-                            `Asamblea #${idAsambleaEdicion} actualizada correctamente.`
+                        window.SSALFER_UI.toast(
+                            "Asamblea actualizada correctamente."
                         );
 
                     } else {
@@ -1584,8 +1741,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 payloadCrear
                             );
 
-                        alert(
-                            `Asamblea #${creada.id_asamblea} registrada correctamente.`
+                        window.SSALFER_UI.toast(
+                            "Asamblea registrada correctamente."
                         );
                     }
 
