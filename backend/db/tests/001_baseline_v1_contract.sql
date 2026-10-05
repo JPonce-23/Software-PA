@@ -18,12 +18,79 @@ BEGIN
         RAISE EXCEPTION 'schema_migrations debe conservar baseline 001 con SHA-256';
     END IF;
 
-    SELECT count(*) INTO v_count
-      FROM information_schema.tables
-     WHERE table_schema='public' AND table_type='BASE TABLE'
-       AND table_name NOT IN ('schema_migrations','spatial_ref_sys','seguimiento_evento');
-    IF v_count <> 51 THEN
-        RAISE EXCEPTION 'Se esperaban 51 tablas funcionales; existen %', v_count;
+    -- Final schemas may add tables. The complete baseline set must survive.
+    IF EXISTS (SELECT 1 FROM (VALUES
+            ('actividad_campo'),
+            ('afectacion'),
+            ('afectacion_unidad_agraria'),
+            ('asamblea'),
+            ('asamblea_convocatoria'),
+            ('bitacora'),
+            ('catalogo_alias_territorial'),
+            ('catalogo_operativo'),
+            ('catalogo_operativo_alias'),
+            ('convenio'),
+            ('convenio_afectacion'),
+            ('convenio_compareciente'),
+            ('documento'),
+            ('documento_version'),
+            ('documento_vinculo'),
+            ('entidad_federativa'),
+            ('estado_autenticacion_usuario'),
+            ('evento_acceso'),
+            ('expediente_requisito'),
+            ('importacion_archivo'),
+            ('importacion_feature'),
+            ('importacion_tabular'),
+            ('importacion_tabular_celda'),
+            ('indemnizacion'),
+            ('municipio'),
+            ('nucleo_agrario'),
+            ('orv'),
+            ('orv_integrante'),
+            ('padron_historial'),
+            ('pago'),
+            ('parcela'),
+            ('parcela_titular'),
+            ('perfil_mapeo_importacion'),
+            ('persona'),
+            ('proyecto'),
+            ('proyecto_nucleo'),
+            ('proyecto_nucleo_referencia'),
+            ('proyecto_nucleo_responsable'),
+            ('requisito_documental'),
+            ('sesion_usuario'),
+            ('tramite_fifonafe'),
+            ('tramite_fifonafe_afectacion'),
+            ('tramite_fifonafe_evento'),
+            ('tramite_ran'),
+            ('tramite_ran_evento'),
+            ('trazabilidad_fuente'),
+            ('trazo_proyecto'),
+            ('unidad_agraria'),
+            ('unidad_agraria_titular'),
+            ('usuario'),
+            ('usuario_proyecto'),
+            ('schema_migrations')) required(table_name)
+        WHERE NOT EXISTS (SELECT 1 FROM information_schema.tables t
+          WHERE t.table_schema='public' AND t.table_type='BASE TABLE'
+            AND t.table_name=required.table_name)) THEN
+        RAISE EXCEPTION 'Faltan tablas obligatorias del baseline';
+    END IF;
+    IF EXISTS (SELECT 1 FROM (VALUES
+        ('proyecto','id_proyecto'),('proyecto','activo'),
+        ('proyecto_nucleo','id_proyecto_nucleo'),('proyecto_nucleo','id_proyecto'),
+        ('proyecto_nucleo','id_nucleo'),('parcela','id_parcela'),
+        ('afectacion','id_proyecto_nucleo'),('convenio','id_proyecto_nucleo'),
+        ('tramite_ran_evento','id_tramite_ran'),('usuario','id_usuario')
+      ) required(table_name,column_name)
+      WHERE NOT EXISTS (SELECT 1 FROM information_schema.columns c
+        WHERE c.table_schema='public' AND c.table_name=required.table_name
+          AND c.column_name=required.column_name)) THEN
+        RAISE EXCEPTION 'Faltan columnas esenciales del baseline';
+    END IF;
+    IF to_regprocedure('public.fn_audit_log()') IS NULL THEN
+        RAISE EXCEPTION 'Falta función de auditoría baseline';
     END IF;
 
     IF to_regclass('public.bien_afectado') IS NOT NULL THEN
@@ -130,11 +197,21 @@ BEGIN
             RAISE EXCEPTION 'vw_dashboard_kpi no usa todas las fuentes canónicas';
         END IF;
     ELSE
-        SELECT pg_get_viewdef('vw_reporte_avance_periodo'::regclass,true) INTO v_definition;
-        IF position('asamblea_convocatoria' in v_definition)=0
-           OR position('tramite_ran_evento' in v_definition)=0
-           OR position('afectacion_unidad_agraria' in v_definition)=0 THEN
-            RAISE EXCEPTION 'vw_reporte_avance_periodo no usa todas las fuentes canónicas';
+        -- Later migrations place canonical sources behind intermediate views.
+        -- Validate actual transitive dependencies instead of SQL text in one layer.
+        WITH RECURSIVE sources(oid) AS (
+          SELECT 'public.vw_reporte_avance_periodo'::regclass::oid
+          UNION
+          SELECT d.refobjid FROM sources s
+          JOIN pg_rewrite rw ON rw.ev_class=s.oid
+          JOIN pg_depend d ON d.classid='pg_rewrite'::regclass AND d.objid=rw.oid
+            AND d.refclassid='pg_class'::regclass AND d.refobjid<>s.oid
+        ) SELECT count(DISTINCT c.relname) INTO v_count
+          FROM sources s JOIN pg_class c ON c.oid=s.oid
+          WHERE c.relname IN ('asamblea_convocatoria','tramite_ran_evento',
+                             'tramite_fifonafe_evento','afectacion_unidad_agraria');
+        IF v_count<>4 THEN
+          RAISE EXCEPTION 'Reporting no conserva todas las fuentes canónicas baseline';
         END IF;
     END IF;
 

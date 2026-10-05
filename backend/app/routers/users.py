@@ -94,7 +94,7 @@ def update_user(
     target = db.query(models.Usuario).filter(
         models.Usuario.id_usuario == id_usuario,
         models.Usuario.activo.is_(True),
-    ).with_for_update().first()
+    ).with_for_update(key_share=True).populate_existing().first()
     if target is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     if target.rol == "admin" and data.rol is not None and data.rol != "admin":
@@ -154,7 +154,7 @@ def reactivate_user(
 ):
     target = db.query(models.Usuario).filter(
         models.Usuario.id_usuario == id_usuario,
-    ).with_for_update().first()
+    ).with_for_update(key_share=True).populate_existing().first()
     if target is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     if target.activo:
@@ -183,7 +183,7 @@ def delete_user(
     target = db.query(models.Usuario).filter(
         models.Usuario.id_usuario == id_usuario,
         models.Usuario.activo.is_(True),
-    ).with_for_update().first()
+    ).with_for_update(key_share=True).populate_existing().first()
     if target is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     if target.rol == "admin":

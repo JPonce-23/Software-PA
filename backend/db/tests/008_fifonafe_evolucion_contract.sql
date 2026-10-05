@@ -31,13 +31,37 @@ BEGIN
    AND table_name='tramite_fifonafe_evento' AND column_name='ciclo_consulta'
    AND is_nullable<>'YES') THEN RAISE EXCEPTION 'ciclo_consulta debe ser nullable'; END IF;
 
- IF EXISTS (SELECT h.* FROM vw_hito_seguimiento_007 h
-             WHERE h.indicador<>'fifonafe' OR EXISTS (SELECT 1 FROM tramite_fifonafe t WHERE t.version_flujo=1 AND h.clave_hito='fifonafe:'||t.id_tramite_fifonafe)
-            EXCEPT SELECT * FROM vw_hito_seguimiento)
- OR EXISTS (SELECT * FROM vw_hito_seguimiento WHERE indicador='fifonafe'
-            EXCEPT SELECT h.* FROM vw_hito_seguimiento_007 h WHERE h.indicador='fifonafe'
-             AND EXISTS (SELECT 1 FROM tramite_fifonafe t WHERE t.version_flujo=1 AND h.clave_hito='fifonafe:'||t.id_tramite_fifonafe)) THEN
-  RAISE EXCEPTION 'El indicador legado fifonafe cambió'; END IF;
+ -- Compare surviving legacy indicators within the same project universe.
+ -- 015 intentionally excludes inactive projects from the final read-model.
+ IF EXISTS (
+   WITH legacy AS (
+     SELECT h.* FROM vw_hito_seguimiento_007 h
+     WHERE (NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version='015')
+            OR EXISTS (SELECT 1 FROM proyecto p WHERE p.id_proyecto=h.id_proyecto AND p.activo))
+       AND (h.indicador<>'fifonafe' OR EXISTS (SELECT 1 FROM tramite_fifonafe t
+            WHERE t.version_flujo=1 AND h.clave_hito='fifonafe:'||t.id_tramite_fifonafe))
+   ), current_legacy AS (
+     SELECT h.* FROM vw_hito_seguimiento h
+     WHERE (NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version='015')
+            OR EXISTS (SELECT 1 FROM proyecto p WHERE p.id_proyecto=h.id_proyecto AND p.activo))
+       AND (h.indicador<>'fifonafe' OR EXISTS (SELECT 1 FROM tramite_fifonafe t
+            WHERE t.version_flujo=1 AND h.clave_hito='fifonafe:'||t.id_tramite_fifonafe))
+   ) SELECT * FROM legacy EXCEPT SELECT * FROM current_legacy
+ ) OR EXISTS (
+   WITH legacy AS (
+     SELECT h.* FROM vw_hito_seguimiento_007 h WHERE h.indicador='fifonafe'
+       AND (NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version='015')
+            OR EXISTS (SELECT 1 FROM proyecto p WHERE p.id_proyecto=h.id_proyecto AND p.activo))
+       AND EXISTS (SELECT 1 FROM tramite_fifonafe t WHERE t.version_flujo=1
+                   AND h.clave_hito='fifonafe:'||t.id_tramite_fifonafe)
+   ), current_legacy AS (
+     SELECT h.* FROM vw_hito_seguimiento h WHERE h.indicador='fifonafe'
+       AND (NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version='015')
+            OR EXISTS (SELECT 1 FROM proyecto p WHERE p.id_proyecto=h.id_proyecto AND p.activo))
+       AND EXISTS (SELECT 1 FROM tramite_fifonafe t WHERE t.version_flujo=1
+                   AND h.clave_hito='fifonafe:'||t.id_tramite_fifonafe)
+   ) SELECT * FROM current_legacy EXCEPT SELECT * FROM legacy
+ ) THEN RAISE EXCEPTION 'El indicador legado fifonafe cambió en el universo vigente'; END IF;
  IF EXISTS (SELECT 1 FROM vw_fifonafe_hito_008 h
    GROUP BY h.clave_hito HAVING count(*)>1) THEN
   RAISE EXCEPTION 'Reporting FIFONAFE depende de cardinalidad de afectaciones'; END IF;

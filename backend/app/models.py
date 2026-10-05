@@ -1172,6 +1172,10 @@ class DerechoViaProyecto(Base, AuditableMixin):
     )
     fuente = Column(String(250), nullable=False)
     fecha_fuente = Column(Date)
+    id_importacion = Column(BigInteger, ForeignKey("importacion_archivo.id_importacion"))
+    sha256 = Column(CHAR(64))
+    srid_trabajo = Column(Integer)
+    geometria_trabajo = Column(Geometry("MULTIPOLYGON"))
 
     proyecto = relationship("Proyecto", back_populates="derechos_via")
 
@@ -1227,6 +1231,9 @@ class ImportacionArchivo(Base, AuditableMixin):
     sha256 = Column(CHAR(64), nullable=False)
     fuente = Column(String(250), nullable=False)
     fecha_fuente = Column(Date)
+    version_pipeline = Column(String(40), nullable=False, default="legacy-v1")
+    srid_trabajo = Column(Integer, nullable=False, default=4326)
+    crs_fuente_wkt = Column(Text)
     crs_original = Column(Text)
     crs_destino = Column(String(30), nullable=False, default="EPSG:4326")
     columnas_detectadas = Column(JSONB, nullable=False, default=list)
@@ -1286,6 +1293,11 @@ class ImportacionFeature(Base):
     atributos_originales = Column(JSONB, nullable=False, default=dict)
     atributos_normalizados = Column(JSONB, nullable=False, default=dict)
     geometria_normalizada = Column(Geometry("GEOMETRY", srid=4326))
+    geometria_original = Column(Geometry(geometry_type=None))
+    geometria_trabajo = Column(Geometry("MULTIPOLYGON"))
+    crs_fuente = Column(Text)
+    dimension_fuente = Column(String(8))
+    estado_conciliacion = Column(String(30), nullable=False, default="pendiente")
     estado = Column(String(40), nullable=False, default="pendiente_revision")
     errores = Column(JSONB, nullable=False, default=list)
     advertencias = Column(JSONB, nullable=False, default=list)
@@ -1527,3 +1539,59 @@ class ConvenioColectivoDestino(Base):
     anio = Column(Integer)
     mes = Column(Integer)
     trimestre = Column(Integer)
+
+
+class ProyectoConfiguracionGis(Base, AuditableMixin):
+    """Una configuración explícita por proyecto; nunca un UTM nacional."""
+    __tablename__ = "proyecto_configuracion_gis"
+    id_proyecto = Column(Integer, ForeignKey("proyecto.id_proyecto"), primary_key=True)
+    srid_trabajo = Column(Integer, nullable=False)
+
+
+class ImportacionFeatureCandidato(Base, AuditableMixin):
+    __tablename__ = "importacion_feature_candidato"
+    id_candidato = Column(BigInteger, primary_key=True)
+    id_importacion = Column(BigInteger, ForeignKey("importacion_archivo.id_importacion"), nullable=False)
+    id_importacion_feature = Column(BigInteger, ForeignKey("importacion_feature.id_importacion_feature"), nullable=False)
+    id_proyecto_nucleo = Column(Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False)
+    id_parcela = Column(Integer, ForeignKey("parcela.id_parcela"))
+    criterio = Column(String(80), nullable=False)
+    clasificacion = Column(String(20), nullable=False)
+    coincidencias = Column(JSONB, nullable=False, default=list)
+    estado = Column(String(20), nullable=False, default="propuesto")
+    id_usuario_revision = Column(Integer, ForeignKey("usuario.id_usuario"))
+    fecha_revision = Column(DateTime(timezone=True))
+    geometria_previa_hash = Column(Text)
+
+
+class ImportacionFeatureDecision(Base):
+    __tablename__ = "importacion_feature_decision"
+    id_decision = Column(BigInteger, primary_key=True)
+    id_importacion_feature = Column(BigInteger, ForeignKey("importacion_feature.id_importacion_feature"), nullable=False)
+    id_candidato = Column(BigInteger, ForeignKey("importacion_feature_candidato.id_candidato"))
+    accion = Column(String(20), nullable=False)
+    motivo = Column(String(250))
+    creado_por = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    creado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class GeometriaProyectoMixin(AuditableMixin):
+    id_geometria = Column(BigInteger, primary_key=True)
+    id_proyecto_nucleo = Column(Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False)
+    id_importacion_feature = Column(BigInteger, ForeignKey("importacion_feature.id_importacion_feature"), nullable=False)
+    version = Column(Integer, nullable=False)
+    es_vigente = Column(Boolean, nullable=False, default=True)
+    geometria_poligono = Column(Geometry("MULTIPOLYGON", srid=4326), nullable=False)
+    geometria_trabajo = Column(Geometry("MULTIPOLYGON"), nullable=False)
+    srid_trabajo = Column(Integer, nullable=False)
+    fuente = Column(String(250), nullable=False)
+    fecha_fuente = Column(Date)
+
+
+class ProyectoNucleoGeometria(Base, GeometriaProyectoMixin):
+    __tablename__ = "proyecto_nucleo_geometria"
+
+
+class ProyectoParcelaGeometria(Base, GeometriaProyectoMixin):
+    __tablename__ = "proyecto_parcela_geometria"
+    id_parcela = Column(Integer, ForeignKey("parcela.id_parcela"), nullable=False)

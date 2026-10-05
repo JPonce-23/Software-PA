@@ -1,0 +1,201 @@
+{
+  "format": 1,
+  "source_gis_head": "a829f1c631e4ee56c0ce26edcb3615ceaf5d61f8",
+  "source_remote_head": "49f12f747a1eda4fc75930d78e0f23dd00baf422",
+  "common": [
+    {
+      "version": "001",
+      "nombre": "baseline_v1",
+      "file": "001_baseline_v1.sql",
+      "sha256": "242ffc787beb2886d36b6fb3031c25a8baddd23ce669e78488672e274c4ad7c7"
+    },
+    {
+      "version": "002",
+      "nombre": "cierre_fuentes_excel",
+      "file": "002_cierre_fuentes_excel.sql",
+      "sha256": "ef1165711cc6054f26921062fd4e8202ce3dc0f7623ddb8f7eac1daa8639577e"
+    },
+    {
+      "version": "003",
+      "nombre": "reporting_fuentes_excel",
+      "file": "003_reporting_fuentes_excel.sql",
+      "sha256": "807279889979c3e7d55e849738f2361483e8e20810614f068515e8f95aa053ba"
+    },
+    {
+      "version": "004",
+      "nombre": "seguimiento_funcional_excel",
+      "file": "004_seguimiento_funcional_excel.sql",
+      "sha256": "7c1a470e2429b6ec6ff3bc003ae9e3324ce3d552a984904760d0deb57381de12"
+    },
+    {
+      "version": "005",
+      "nombre": "reporting_cierre_excel",
+      "file": "005_reporting_cierre_excel.sql",
+      "sha256": "a35faa802c5f43a3c906aae6c62b5bac4ef842f610e87a178a2e8524ed494c76"
+    },
+    {
+      "version": "006",
+      "nombre": "ajustes_reporting_post_auditoria",
+      "file": "006_ajustes_reporting_post_auditoria.sql",
+      "sha256": "e1a603fd2015615671c0cd072a0a795f50e92e8c21e838f26d88abec25dddee4"
+    },
+    {
+      "version": "007",
+      "nombre": "convenios_impactos_precision",
+      "file": "007_convenios_impactos_precision.sql",
+      "sha256": "adabd7775fb8165a1db8be04a93e7971fe207e745b410c57eb6fc76cc3a7e4f7"
+    },
+    {
+      "version": "008",
+      "nombre": "fifonafe_evolucion_forward_only",
+      "file": "008_fifonafe_evolucion_forward_only.sql",
+      "sha256": "95bf328f18112933481488c59763df6a6467d8fd3db354bb7e5465c727c8f012"
+    },
+    {
+      "version": "009",
+      "nombre": "bitacora_append_only",
+      "file": "009_bitacora_append_only.sql",
+      "sha256": "ef85729089cc0b5d3905169f87abd343a34473f7cb97717ff98b710b49f991bc"
+    },
+    {
+      "version": "010",
+      "nombre": "credenciales_auditoria",
+      "file": "010_credenciales_auditoria.sql",
+      "sha256": "5673767c9a24325a17ac323ed8fbfce5241dd205fd41ffccfee644709c6c6668"
+    },
+    {
+      "version": "011",
+      "nombre": "auditoria_actor_update",
+      "file": "011_auditoria_actor_update.sql",
+      "sha256": "f28b2705694fb8a011f943a81376c687cba380474aa37cbad31cc524e010df5d"
+    },
+    {
+      "version": "012",
+      "nombre": "correccion_snapshot_tuc_triestado",
+      "file": "012_correccion_snapshot_tuc_triestado.sql",
+      "sha256": "c76d2d2af326a23427ae1aaf7358fdbc62faf31d91380758f744e8c8d72a7c01"
+    },
+    {
+      "version": "013",
+      "nombre": "pagos_en_reporting",
+      "file": "013_pagos_en_reporting.sql",
+      "sha256": "315194e6daa7b8bffd27c8d678b6e86c0486eaf851f58aba3722e90e19a37eef"
+    },
+    {
+      "version": "014",
+      "nombre": "convenios_colectivos_por_destino",
+      "file": "014_convenios_colectivos_por_destino.sql",
+      "sha256": "0ac8df3e32cc5bb7a103a314160fa4b6b392d9e5e041af3aaa74c0cda9aeceab"
+    },
+    {
+      "version": "015",
+      "nombre": "exclusion_proyectos_inactivos",
+      "file": "015_exclusion_proyectos_inactivos.sql",
+      "sha256": "4e5d7fa8926f8026923146d3a0695d933bb43e9bb5f8c71ef8f9ecd9bae4b422"
+    },
+    {
+      "version": "016",
+      "nombre": "normalizacion_convenio_superficie_adicional",
+      "file": "016_normalizacion_convenio_superficie_adicional.sql",
+      "sha256": "246eb8247d1f3256e40453afa5f5d13d09586d90f0d3e599680ed8865160c810"
+    },
+    {
+      "version": "017",
+      "nombre": "normalizar_contexto_asamblea_adicional",
+      "file": "017_normalizar_contexto_asamblea_adicional.sql",
+      "sha256": "7fe91d37c1724291f0bf3fa47ba58d6afff8c062e6c44d527b14ea025fa36282"
+    },
+    {
+      "version": "018",
+      "nombre": "orv_persona_ciclo_vida",
+      "file": "018_orv_persona_ciclo_vida.sql",
+      "sha256": "2fb5676b52d902b636b3941490ea71a8044a791764b2913a18b6a905d9ddfea3"
+    },
+    {
+      "version": "019",
+      "nombre": "catalogo_nucleos_ran",
+      "file": "019_catalogo_nucleos_ran.sql",
+      "sha256": "6769168eb11b2773b4e8e42f9409ccbbfbe986984f69895a562fe17c29f03b04"
+    }
+  ],
+  "legacy": [
+    {
+      "version": "020",
+      "nombre": "derecho_via_proyecto",
+      "file": "020_derecho_via_proyecto.sql",
+      "sha256": "3662cc9ce0ed2e63095b7a873616356aa965e94b1b34e9f651ffd5396452dc09",
+      "functional_sha256": "21812d02384258fedbefc3acbef6a7d746453f4f99ba7ed86e9da7891069341d"
+    },
+    {
+      "version": "021",
+      "nombre": "importacion_ddv_gpkg",
+      "file": "021_importacion_ddv_gpkg.sql",
+      "sha256": "16f63229569574f078105423a1a914c1621b6662150dfc090124f60817b719f6",
+      "functional_sha256": "4ede8607c1f516a724bc14529a01ea35e9acec3247ef5a675814ebe34ac0bb08"
+    },
+    {
+      "version": "022",
+      "nombre": "importacion_nucleos_gpkg",
+      "file": "022_importacion_nucleos_gpkg.sql",
+      "sha256": "a244ed434176feff02ceacbb0e5204bebe0bb16d582dbb4efdea9a13a41ebf0b",
+      "functional_sha256": "e543f1a0a625bbfd2f11aa6e403e06551f858bab25d9ca4bc7ceef237e5a6aa1"
+    },
+    {
+      "version": "023",
+      "nombre": "importacion_parcelas_gpkg",
+      "file": "023_importacion_parcelas_gpkg.sql",
+      "sha256": "6491328bf6da3f22af31e1ae93e4569ba3836493043748d40cbc23fe26d3a7dd",
+      "functional_sha256": "fa308ef5b25c940ab802c24ccd8656ea0c7f24e310fc9b8db7ab1fadbb42cd89"
+    },
+    {
+      "version": "024",
+      "nombre": "conciliacion_gis_proyecto",
+      "file": "024_conciliacion_gis_proyecto.sql",
+      "sha256": "c1a6684b06682ba63a9ad090c561d1cf2b9fee5b0fc1ce0da7f6c0a7952399c4",
+      "functional_sha256": "803a2b86818209a91309b8056f428012571b82cfc47fd10483834e41ec142934"
+    }
+  ],
+  "canonical": [
+    {
+      "version": "020",
+      "nombre": "auditoria_heartbeat_sesion",
+      "file": "020_auditoria_heartbeat_sesion.sql",
+      "sha256": "cfa4dadb2e8b5bb9b8cddddf617c34132380ad49a660de9037de43850263f4c8"
+    },
+    {
+      "version": "021",
+      "nombre": "derecho_via_proyecto",
+      "file": "021_derecho_via_proyecto.sql",
+      "sha256": "c759eaab96a7ed88679fd5fa288504b4bdf36724479d82e155044a572da90d4e",
+      "functional_sha256": "21812d02384258fedbefc3acbef6a7d746453f4f99ba7ed86e9da7891069341d"
+    },
+    {
+      "version": "022",
+      "nombre": "importacion_ddv_gpkg",
+      "file": "022_importacion_ddv_gpkg.sql",
+      "sha256": "40e988e06f7f211995ea62456ee7fc64e951fabd2ff14609f155de968171d58f",
+      "functional_sha256": "4ede8607c1f516a724bc14529a01ea35e9acec3247ef5a675814ebe34ac0bb08"
+    },
+    {
+      "version": "023",
+      "nombre": "importacion_nucleos_gpkg",
+      "file": "023_importacion_nucleos_gpkg.sql",
+      "sha256": "ede1ea43947cec0f9f9ba433319d69de21847c892985adbd03feed80ef0f051b",
+      "functional_sha256": "e543f1a0a625bbfd2f11aa6e403e06551f858bab25d9ca4bc7ceef237e5a6aa1"
+    },
+    {
+      "version": "024",
+      "nombre": "importacion_parcelas_gpkg",
+      "file": "024_importacion_parcelas_gpkg.sql",
+      "sha256": "15f36ea78a591aeb0f587a84e7e2bddb21f53de455d80daaf8532422796bc2d6",
+      "functional_sha256": "fa308ef5b25c940ab802c24ccd8656ea0c7f24e310fc9b8db7ab1fadbb42cd89"
+    },
+    {
+      "version": "025",
+      "nombre": "conciliacion_gis_proyecto",
+      "file": "025_conciliacion_gis_proyecto.sql",
+      "sha256": "8338aace95845761acf0f9b675064ca25a6b0da2117013178ed060f260ec372a",
+      "functional_sha256": "803a2b86818209a91309b8056f428012571b82cfc47fd10483834e41ec142934"
+    }
+  ]
+}

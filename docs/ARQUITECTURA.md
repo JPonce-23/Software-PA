@@ -239,17 +239,38 @@ Tablas Transaccionales
 
 ## 9. Componente Geoespacial y Cartografía
 
-- **Almacenamiento geográfico:** PostGIS almacena geometrías en proyección geográfica estándar WGS84 (`SRID=4326`):
-  - `derecho_via_proyecto.geometria_poligono`: Derecho de Vía canónico (`MULTIPOLYGON`) ligado al proyecto y versionado; `es_vigente` identifica como máximo una versión por proyecto sin dar de baja las anteriores.
-  - `trazo_proyecto.geometria_linea`: Línea legacy del proyecto ferroviario (`MULTILINESTRING`), conservada temporalmente para los endpoints y el mapa actuales.
-  - `nucleo_agrario.geometria_poligono`: Perímetro del núcleo agrario (`MULTIPOLYGON`).
-  - `parcela.geometria_poligono`: Polígono parcelario opcional (`MULTIPOLYGON`).
-- **Pipeline legacy de importación geoespacial:**
-  Conserva GeoJSON/KML/GeoPackage/ZIP Shapefile y sus objetivos anteriores mediante un flujo controlado en tres fases:
-  1. Carga del archivo y análisis de metadatos (`importacion_archivo`).
-  2. Extracción y validación topológica de cada feature (`importacion_feature`).
-  3. Previsualización y confirmación explícita del usuario (`confirmacion_explicita = true`) antes de impactar las capas de producción.
-- **Importación oficial DDV:** `POST /api/proyectos/{id_proyecto}/geoespacial/ddv/importaciones` acepta sólo GeoPackage de una capa con CRS identificable y polígonos. GDAL reproyecta a EPSG:4326 cuando corresponde; PostGIS valida y sólo intenta `ST_MakeValid` en geometrías inválidas, dejando advertencia y razón. El staging conserva atributos, transformaciones, errores y usuario. La confirmación reutiliza la ruta existente y, tras bloquear importación y proyecto, crea una nueva versión DDV y desmarca la anterior dentro de una transacción. `/mapa` permanece en `trazo_proyecto` durante esta fase.
-- **Importación oficial de geometrías de núcleos:** `POST /api/proyectos/{id_proyecto}/geoespacial/nucleos/importaciones` reutiliza el pipeline GPKG estricto y el preview/confirmación compartidos. `cve_unica` resuelve exclusivamente la identidad RAN/PHINA de un núcleo existente, activo y vinculado activamente al proyecto. El staging registra destino y advertencias sin cambiar el dominio. La confirmación bloquea importación, vínculos y núcleos; revalida la geometría previa y actualiza polígonos y procedencia de forma atómica. No crea núcleos ni usa intersección espacial para decidir pertenencia.
-- **Importación oficial de geometrías de parcelas:** `POST /api/proyectos/{id_proyecto}/geoespacial/parcelas/importaciones` reutiliza el GPKG estricto. Resuelve en staging `cve_unica_nucleo` contra RAN/PHINA y luego `id_nucleo + no_parcela` contra una parcela activa. La equivalencia auditada `P.-666/P-666` se aplica sin colapsar sufijos ni alterar el índice existente. La confirmación bloquea relaciones y destinos, revalida identidad/estado y evita sobrescribir una geometría cambiada desde el preview. No crea parcelas ni depende de datos personales o intersecciones espaciales.
-- **Directriz arquitectónica rectora:** La geometría es estrictamente de apoyo visual y consulta. **Ninguna validación espacial condiciona la captura administrativa de una afectación ni sustituye la superficie administrativa capturada (`superficie_ha` / `superficie_afectada_ha`) de un convenio o afectación**.
+La verdad administrativa sigue en Software-PA. GIS busca geometrías para registros existentes; ninguna feature crea proyectos, vínculos, núcleos, parcelas, afectaciones o expedientes. `ST_Intersects` y `ST_Area` no determinan pertenencia ni sustituyen superficies administrativas.
+
+### Destinos y legado
+
+DDV representa superficie y permanece en `derecho_via_proyecto`, con `MultiPolygon`, versiones históricas y una sola vigente; `activo` y `es_vigente` conservan significados distintos. Un núcleo del proyecto recibe geometría en `proyecto_nucleo_geometria`, ligada al `ProyectoNucleo` existente. Una parcela recibe geometría en `proyecto_parcela_geometria`, ligada a `ProyectoNucleo + Parcela`, sólo si ya existe el vínculo activo por afectación. Estas tablas son complementos cartográficos, no nuevos registros administrativos.
+
+Los campos globales `NucleoAgrario.geometria_poligono` y `Parcela.geometria_poligono` permanecen para compatibilidad; las nuevas importaciones no escriben en ellos. Se mantienen los endpoints directos legacy y el flujo lineal `trazo_proyecto`. `/api/proyectos/{id}/mapa` no cambia en esta fase y todavía usa el legado. Las importaciones poligonales legacy pendientes deben reprocesarse para usar la conciliación por proyecto.
+
+### Staging y conciliación
+
+`gis_ingestion.py` identifica sólo capas espaciales y mantiene `COORDINATE_PRECISION=15` en GeoJSONSeq. Un GPKG debe tener exactamente una capa espacial de datos; tablas como `layer_styles` son auxiliares. Se conserva WKB original, FID, capa, CRS/WKT, dimensión y atributos autorizados. El archivo cargado se elimina tras staging para evitar retener datos personales innecesarios; su nombre y SHA permanecen como trazabilidad. Los originales locales de los geógrafos no se alteran.
+
+`gis_reconciliation.py` consulta destinos activos del proyecto y propone 0..N filas normalizadas en `importacion_feature_candidato`. Una clave RAN oficial se verifica y nunca crea vínculos. Sin clave se comparan nombre y atributos territoriales disponibles, normalizando Unicode, acentos, caja y espacios; una coincidencia textual requiere revisión. En parcelas se evalúan `PARCELA` y `Num_parcela` por separado y se conserva cada valor. Dos destinos distintos son ambiguos. La normalización parcelaria preserva letras, sufijos, ceros y puntuación, salvo la equivalencia aprobada `P.-<dígitos> → P-<dígitos>`.
+
+Seleccionar un candidato no escribe geometría. Confirmarlo exige `confirmacion_explicita`, aceptación de advertencias y rol `admin` o `geografo` con acceso al proyecto. La transacción bloquea proyecto, importación, feature y relaciones administrativas; revalida identidad, pertenencia y hash de geometría previa. Restricciones únicas impiden seleccionar/confirmar dos features al mismo destino dentro de una importación. La geometría y la decisión append-only se guardan conjuntamente; un fallo revierte toda la decisión. Cada nueva importación puede crear una versión histórica posterior del mismo destino.
+
+La finalización permite features confirmadas, ignoradas, rechazadas y sin coincidencia. Los candidatos/ambiguos pendientes requieren decisión o ignorado explícito; una feature en error requiere ignorado explícito. No se obliga a vincular todo el archivo. El resumen distingue universo administrativo, features, confirmados, ambiguos, registros sin geometría y features no utilizadas.
+
+### CRS y dimensión
+
+`proyecto_configuracion_gis.srid_trabajo` define un CRS registrado y transformable en PostGIS. Sin configuración explícita se usa 4326, conservando compatibilidad; no hay un UTM nacional. Importación y feature conservan el CRS fuente; la importación fija el CRS de trabajo usado. Toda geometría de dominio tiene representación 2D de trabajo y representación 4326 para salida web. Si el origen válido ya utiliza el CRS de trabajo, se conserva directamente su geometría XY nativa, evitando el viaje de ida y vuelta por 4326. Los demás cambios de CRS se transforman explícitamente y se registran.
+
+XYZ/XYM/XYZM se detectan, se conserva la geometría original y se registra la reducción explícita a XY; no se asume Z=0 ni se usa altura para matching. Una geometría inválida en origen puede repararse con `ST_MakeValid`, con motivo y advertencia que exige aceptación. Una geometría válida que se invalida por serialización o transformación produce error, sin reparación que oculte el problema.
+
+No se permite confirmar staging con un CRS de proyecto cambiado. Una vez existen geometrías confirmadas, cambiar ese CRS exige una futura reproyección explícita; el endpoint rechaza el cambio para evitar mezcla accidental. La deduplicación incluye proyecto, objetivo, SHA-256, versión de pipeline y CRS de trabajo, permitiendo reprocesar la misma fuente con una versión/CRS diferente.
+
+### Alcance y API
+
+Se reutilizan creación de importaciones DDV/núcleos/parcelas, preview y finalización. Se agregan configuración GIS, resumen, candidatos, decisiones y GeoJSON 4326 de staging; `features?estado_conciliacion=ambiguo` reutiliza el listado existente. Lectura mantiene `admin/operador/visualizador/geografo`; escritura GIS mantiene `admin/geografo`, sin ampliar permisos. No se implementan frontend, adaptación de `/mapa`, obras transversales ni DDV lineal.
+
+El inventario real y las pruebas están en [INFORME_CONCILIACION_GIS_2026-10-05.md](INFORME_CONCILIACION_GIS_2026-10-05.md).
+
+Referencias GIS renumeradas excepcionalmente desde 020–024 a 021–025; los originales
+y la correspondencia se conservan en [MIGRACIONES.md](MIGRACIONES.md). No cambió el
+modelo funcional GIS ni administrativo.

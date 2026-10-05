@@ -52,262 +52,146 @@ def attrs(key, number, **extra):
     return {"cve_unica_nucleo": key, "no_parcela": number, **extra}
 
 
-def test_parcel_number_normalization_is_narrow():
-    assert normalize_parcel_number(" P.-666 ") == normalize_parcel_number("P-666") == "p-666"
-    assert {normalize_parcel_number(f"P-585{letter}") for letter in "ABCD"} == {
-        "p-585a", "p-585b", "p-585c", "p-585d",
-    }
-    assert normalize_parcel_number("P.-585A") != normalize_parcel_number("P-585A")
-    assert normalize_parcel_number("P/666") != normalize_parcel_number("P-666")
-    assert normalize_parcel_number(" P  -  666 ") == "p - 666"
+import pytest
+from tests.test_nucleus_gpkg_imports import candidates, decision, rename_nucleus
 
 
-def test_parcel_matches_documented_variant_and_stages_before_commit(transactional_api, tmp_path):
-    api = transactional_api["request"]
-    project_id = project(api)
-    nucleus_id, key = nucleus(transactional_api, project_id)
-    parcel_id = parcel(transactional_api, nucleus_id, "P-666")
-    content = gpkg(tmp_path, "match", [("parcelas", [
-        (polygon(), attrs(key, "P.-666", titular="No se usa para identificar")),
-    ])])
-    staged = stage(api, project_id, content).json()
-    assert staged["tipo_objetivo"] == "parcela_gpkg"
-    assert (staged["validos"], staged["errores"], staged["advertencias"]) == (1, 0, 0)
-    feature = preview(api, staged["id_importacion"])[0]
-    assert feature["registro_destino_id"] == parcel_id
-    assert feature["atributos_originales"]["no_parcela"] == "P.-666"
-    assert feature["atributos_normalizados"]["no_parcela"] == "p-666"
-    assert feature["atributos_normalizados"]["id_nucleo"] == nucleus_id
-    assert transactional_api["connection"].execute(text(
-        "SELECT geometria_poligono IS NULL FROM parcela WHERE id_parcela=:id"
-    ), {"id": parcel_id}).scalar_one() is True
-    confirm(api, staged["id_importacion"])
-    row = transactional_api["connection"].execute(text("""
-        SELECT ST_GeometryType(geometria_poligono), fuente_geometria,
-               fecha_fuente_geometria FROM parcela WHERE id_parcela=:id
-    """), {"id": parcel_id}).one()
-    assert row[0] == "ST_MultiPolygon"
-    assert row[1] == "Cartografía parcelaria QA" and str(row[2]) == "2026-09-25"
-    confirm(api, staged["id_importacion"], expected=409)
-
-
-def test_parcel_letter_suffixes_remain_distinct(transactional_api, tmp_path):
-    api = transactional_api["request"]
-    project_id = project(api)
-    nucleus_id, key = nucleus(transactional_api, project_id)
-    ids = {letter: parcel(transactional_api, nucleus_id, f"P-585{letter}") for letter in "ABCD"}
-    content = gpkg(tmp_path, "suffixes", [("parcelas", [
-        (polygon(index * 3), attrs(key, f"P-585{letter}"))
-        for index, letter in enumerate("ABCD")
-    ])])
-    staged = stage(api, project_id, content).json()
-    assert staged["validos"] == 4
-    assert [item["registro_destino_id"] for item in preview(api, staged["id_importacion"])] == list(ids.values())
-    confirm(api, staged["id_importacion"])
-
-
-def test_parcel_identity_errors_block_all_destinations(transactional_api, tmp_path):
-    api = transactional_api["request"]
-    project_id = project(api)
-    nucleus_id, key = nucleus(transactional_api, project_id)
-    parcel_id = parcel(transactional_api, nucleus_id, "P-777")
-    _, outside_key = nucleus(transactional_api, project_id, linked=False)
-    inactive_id = parcel(transactional_api, nucleus_id, "P-778", active=False)
-    cases = [
-        ("empty-key", attrs("", "P-777"), "CVE_UNICA_NUCLEO_VACIA"),
-        ("empty-number", attrs(key, ""), "NO_PARCELA_VACIO"),
-        ("unknown-key", attrs("SIN-CVE", "P-777"), "CVE_UNICA_INEXISTENTE"),
-        ("outside", attrs(outside_key, "P-777"), "NUCLEO_FUERA_DEL_PROYECTO"),
-        ("missing", attrs(key, "P-999"), "PARCELA_INEXISTENTE"),
-        ("inactive", attrs(key, "P-778"), "PARCELA_INACTIVA"),
-    ]
-    for label, properties, code in cases:
-        staged = stage(api, project_id, gpkg(tmp_path, label, [("parcelas", [
-            (polygon(), properties),
-        ])])).json()
-        assert staged["errores"] == 1
-        assert any(item["codigo"] == code for item in preview(api, staged["id_importacion"])[0]["errores"])
-        confirm(api, staged["id_importacion"], accept=True, expected=409)
-    assert transactional_api["connection"].execute(text(
-        "SELECT geometria_poligono IS NULL FROM parcela WHERE id_parcela IN (:first, :second)"
-    ), {"first": parcel_id, "second": inactive_id}).scalars().all() == [True, True]
-
-
-def test_parcel_ambiguous_variant_and_duplicate_destination(transactional_api, tmp_path):
-    api = transactional_api["request"]
-    project_id = project(api)
-    nucleus_id, key = nucleus(transactional_api, project_id)
-    parcel(transactional_api, nucleus_id, "P-666")
-    parcel(transactional_api, nucleus_id, "P.-666")
-    ambiguous = stage(api, project_id, gpkg(tmp_path, "ambiguous", [("parcelas", [
-        (polygon(), attrs(key, "P-666")),
-    ])])).json()
-    assert preview(api, ambiguous["id_importacion"])[0]["errores"][0]["codigo"] == "PARCELA_AMBIGUA"
-    confirm(api, ambiguous["id_importacion"], expected=409)
-
-    unique_id = parcel(transactional_api, nucleus_id, "P-667")
-    duplicate = stage(api, project_id, gpkg(tmp_path, "duplicate", [("parcelas", [
-        (polygon(), attrs(key, "P-667")),
-        (polygon(3), attrs(key, "P.-667")),
-    ])])).json()
-    assert duplicate["errores"] == 1
-    assert preview(api, duplicate["id_importacion"])[1]["errores"][0]["codigo"] == "PARCELA_DUPLICADA_EN_IMPORTACION"
-    confirm(api, duplicate["id_importacion"], expected=409)
-    assert transactional_api["connection"].execute(text(
-        "SELECT geometria_poligono IS NULL FROM parcela WHERE id_parcela=:id"
-    ), {"id": unique_id}).scalar_one() is True
-
-
-def test_parcel_replacement_and_repair_require_acceptance(transactional_api, tmp_path):
-    api = transactional_api["request"]
-    project_id = project(api)
-    nucleus_id, key = nucleus(transactional_api, project_id)
-    old_wkt = "MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)))"
-    parcel_id = parcel(transactional_api, nucleus_id, "P-100", geometry=old_wkt)
-    replacement = stage(api, project_id, gpkg(tmp_path, "replacement", [("parcelas", [
-        (polygon(3), attrs(key, "P-100")),
-    ])])).json()
-    assert replacement["advertencias"] == 1
-    assert preview(api, replacement["id_importacion"])[0]["advertencias"][0]["codigo"] == "GEOMETRIA_EXISTENTE_DISTINTA"
-    confirm(api, replacement["id_importacion"], expected=409)
-    assert transactional_api["connection"].execute(text(
-        "SELECT ST_AsText(geometria_poligono) FROM parcela WHERE id_parcela=:id"
-    ), {"id": parcel_id}).scalar_one() == old_wkt
-    confirm(api, replacement["id_importacion"], accept=True)
-
-    parcel(transactional_api, nucleus_id, "P-101")
-    bowtie = {"type": "Polygon", "coordinates": [[
-        [0, 0], [2, 2], [0, 2], [2, 0], [0, 0],
-    ]]}
-    repaired = stage(api, project_id, gpkg(tmp_path, "repair", [("parcelas", [
-        (bowtie, attrs(key, "P-101")),
-    ])])).json()
-    assert repaired["advertencias"] == 1
-    assert preview(api, repaired["id_importacion"])[0]["advertencias"][0]["codigo"] == "GEOMETRIA_REPARADA"
-    confirm(api, repaired["id_importacion"], expected=409)
-    confirm(api, repaired["id_importacion"], accept=True)
-
-
-def test_parcel_rollback_and_stale_preview(transactional_api, tmp_path):
-    api = transactional_api["request"]
-    project_id = project(api)
-    nucleus_id, key = nucleus(transactional_api, project_id)
-    first_id = parcel(transactional_api, nucleus_id, "P-200")
-    second_id = parcel(transactional_api, nucleus_id, "P-201")
-    staged = stage(api, project_id, gpkg(tmp_path, "rollback", [("parcelas", [
-        (polygon(), attrs(key, "P-200")),
-        (polygon(3), attrs(key, "P-201")),
-    ])])).json()
-
-    def fail_update(conn, cursor, statement, parameters, context, executemany):
-        if statement.lstrip().startswith("UPDATE parcela"):
-            raise RuntimeError("Fallo sintético de parcela")
-
-    event.listen(engine, "before_cursor_execute", fail_update)
-    try:
-        confirm(api, staged["id_importacion"], expected=409)
-    finally:
-        event.remove(engine, "before_cursor_execute", fail_update)
-    assert transactional_api["connection"].execute(text(
-        "SELECT geometria_poligono IS NULL FROM parcela WHERE id_parcela IN (:first, :second)"
-    ), {"first": first_id, "second": second_id}).scalars().all() == [True, True]
-    assert api("GET", f"/api/importaciones/{staged['id_importacion']}").json()["estado"] == "previsualizado"
-    with transactional_api["session_factory"]() as db:
-        admin = db.query(models.Usuario).filter(models.Usuario.rol == "admin").first()
-        set_audit_context(db, admin.id_usuario)
-        db.query(models.Parcela).filter(models.Parcela.id_parcela == first_id).update({
-            models.Parcela.geometria_poligono: WKTElement(
-                "MULTIPOLYGON(((10 0,10 1,11 1,11 0,10 0)))", srid=4326
-            )
-        })
+def link_parcel(ctx, project_id, nucleus_id, parcel_id):
+    """Prepara la relación administrativa ANTES de ejecutar GIS."""
+    with ctx['session_factory']() as db:
+        admin=db.query(models.Usuario).filter_by(rol='admin',activo=True).first(); set_audit_context(db,admin.id_usuario)
+        pn=db.query(models.ProyectoNucleo).filter_by(id_proyecto=project_id,id_nucleo=nucleus_id,activo=True).one()
+        def catalog(kind,code): return db.query(models.CatalogoOperativo.id_catalogo_opcion).filter_by(tipo_catalogo=kind,codigo=code).scalar()
+        unit=models.UnidadAgraria(id_nucleo=nucleus_id,id_parcela=parcel_id,id_tipo_tierra=catalog('tipo_tierra','parcelada'),
+            id_tipo_titularidad=catalog('tipo_titularidad_unidad','persona'),id_tipo_gestion=catalog('tipo_gestion','PARCELA'),
+            id_destino_superficie=catalog('destino_superficie','parcela_ejidal'),creado_por=admin.id_usuario)
+        affectation=models.Afectacion(id_proyecto_nucleo=pn.id_proyecto_nucleo,tipo_afectacion='individual',creado_por=admin.id_usuario)
+        db.add_all([unit,affectation]); db.flush()
+        db.add(models.AfectacionUnidadAgraria(id_afectacion=affectation.id_afectacion,id_unidad_agraria=unit.id_unidad_agraria,creado_por=admin.id_usuario))
         db.commit()
-    confirm(api, staged["id_importacion"], expected=409)
-    assert transactional_api["connection"].execute(text(
-        "SELECT geometria_poligono IS NULL FROM parcela WHERE id_parcela=:id"
-    ), {"id": second_id}).scalar_one() is True
 
 
-def test_parcel_strict_input_crs_and_permissions(transactional_api, tmp_path):
-    api = transactional_api["request"]
-    project_id = project(api)
-    other_project = project(api)
-    nucleus_id, key = nucleus(transactional_api, project_id)
-    parcel(transactional_api, nucleus_id, "P-300")
-    stage(api, project_id, b"bad", name="parcelas.kmz", expected=415)
-    stage(api, project_id, gpkg(tmp_path, "forbidden", [("parcelas", [
-        (polygon(), attrs(key, "P-300", id_parcela=5)),
-    ])]), expected=422)
-    stage(api, project_id, gpkg(tmp_path, "multi", [
-        ("parcelas", [(polygon(), attrs(key, "P-300"))]),
-        ("otra", [(polygon(3), attrs(key, "P-300"))]),
-    ]), expected=422)
-    stage(api, project_id, gpkg(tmp_path, "unknown", [("parcelas", [
-        (polygon(), attrs(key, "P-300")),
-    ])], unknown_crs=True), expected=422)
-    content = gpkg(tmp_path, "roles", [("parcelas", [
-        (polygon(), attrs(key, "P-300")),
-    ])])
-    original = app.dependency_overrides[auth.get_current_user]
-    try:
-        for role, expected in (("operador", 403), ("geografo", 201)):
-            user = api("POST", "/api/usuarios", expected=201, json={
-                "nombre": role.title(), "apellido_paterno": "Parcelas QA",
-                "correo": f"{role}-{uuid.uuid4().hex}@example.invalid",
-                "rol": role, "contrasena": f"Qa1!{uuid.uuid4().hex}Z",
-            }).json()
-            api("POST", f"/api/proyectos/{project_id}/usuarios", expected=201,
-                json={"id_usuario": user["id_usuario"]})
-            app.dependency_overrides[auth.get_current_user] = (
-                lambda user_id=user["id_usuario"], user_role=role:
-                SimpleNamespace(id_usuario=user_id, rol=user_role, activo=True)
-            )
-            result = stage(api, project_id, content, expected=expected)
-            if role == "geografo":
-                stage(api, other_project, content, expected=403)
-                confirm(api, result.json()["id_importacion"])
-            app.dependency_overrides[auth.get_current_user] = original
-    finally:
-        app.dependency_overrides[auth.get_current_user] = original
+def test_parcel_number_normalization_is_narrow():
+    assert normalize_parcel_number(' P.-666 ')==normalize_parcel_number('P-666')=='p-666'
+    assert len({normalize_parcel_number('P-585'+c) for c in 'ABCD'})==4
+    assert normalize_parcel_number('P.-585A')!=normalize_parcel_number('P-585A')
+    assert normalize_parcel_number('P/666')!=normalize_parcel_number('P-666')
+    assert normalize_parcel_number('016')!=normalize_parcel_number('16')
 
 
-def test_parcel_known_crs_and_irrecoverable_geometry(transactional_api, tmp_path):
-    api = transactional_api["request"]
-    project_id = project(api)
-    nucleus_id, key = nucleus(transactional_api, project_id)
-    parcel_id = parcel(transactional_api, nucleus_id, "P-400")
-    mercator = {"type": "MultiPolygon", "coordinates": [[[
-        [0, 0], [0, 1000], [1000, 1000], [1000, 0], [0, 0],
-    ]]]}
-    projected = stage(api, project_id, gpkg(tmp_path, "mercator", [("parcelas", [
-        (mercator, attrs(key, "P-400")),
-    ])], crs="EPSG:3857")).json()
-    assert projected["crs_original"] == "EPSG:3857"
-    assert preview(api, projected["id_importacion"])[0]["transformaciones"] == [{
-        "codigo": "CRS_REPROYECTADO", "origen": "EPSG:3857", "destino": "EPSG:4326",
-    }]
-    confirm(api, projected["id_importacion"])
-    maximum = transactional_api["connection"].execute(text(
-        "SELECT ST_XMax(geometria_poligono) FROM parcela WHERE id_parcela=:id"
-    ), {"id": parcel_id}).scalar_one()
-    assert 0 < maximum < 0.01
-
-    collapsed = {"type": "Polygon", "coordinates": [[
-        [0, 0], [1, 1], [2, 2], [0, 0],
-    ]]}
-    failed = stage(api, project_id, gpkg(tmp_path, "collapsed", [("parcelas", [
-        (collapsed, attrs(key, "P-400")),
-    ])])).json()
-    assert failed["errores"] == 1
-    assert preview(api, failed["id_importacion"])[0]["errores"][0]["codigo"] == "GEOMETRIA_IRRECUPERABLE"
-    confirm(api, failed["id_importacion"], accept=True, expected=409)
+@pytest.mark.parametrize('first,second,state,classification,count',[
+    ('P-1','P-1','candidato','fuerte',1),('P-1','otro','candidato','revision',1),
+    ('otro','P-1','candidato','revision',1),('P-1',None,'candidato','revision',1),
+    (None,'P-1','candidato','revision',1),('P-1','P-2','ambiguo',None,2),
+    ('otro','ninguno','sin_coincidencia',None,0),(None,None,'sin_coincidencia',None,0),
+])
+def test_independent_parcel_numbers(transactional_api,tmp_path,first,second,state,classification,count):
+    api=transactional_api['request']; pid=project(api); nid,key=nucleus(transactional_api,pid)
+    ids=[parcel(transactional_api,nid,'P-'+str(i)) for i in (1,2)]
+    for parcel_id in ids: link_parcel(transactional_api,pid,nid,parcel_id)
+    con=transactional_api['connection']; before=con.execute(text('SELECT count(*) FROM parcela')).scalar_one()
+    properties={'cve_unica_nucleo':key,'PARCELA':first,'Num_parcela':second,
+        'titular':'Persona sintética excluida','CURP':'QA-NO-PERSONAL','domicilio':'No conservar','NOM_SEDATU':'Excluir'}
+    staged=stage(api,pid,gpkg(tmp_path,'numbers',[('p',[(polygon(),properties)])])).json()
+    f=preview(api,staged['id_importacion'])[0]
+    assert f['estado_conciliacion']==state
+    assert f['atributos_originales']['PARCELA']==first and f['atributos_originales']['Num_parcela']==second
+    assert not {'CURP','titular','domicilio','NOM_SEDATU'}&set(f['atributos_originales'])
+    cs=candidates(api,staged['id_importacion'],f); assert len(cs)==count
+    if count==1: assert cs[0]['clasificacion']==classification
+    assert con.execute(text('SELECT count(*) FROM parcela')).scalar_one()==before
+    assert con.execute(text('SELECT count(*) FROM proyecto_parcela_geometria g JOIN proyecto_nucleo pn USING(id_proyecto_nucleo) WHERE pn.id_proyecto='+str(pid))).scalar_one()==0
 
 
-def test_parcel_staging_schema_contract(transactional_api):
-    assert transactional_api["connection"].execute(text("""
-        SELECT checksum_sha256 FROM schema_migrations WHERE version='023'
-    """)).scalar_one() == "6491328bf6da3f22af31e1ae93e4569ba3836493043748d40cbc23fe26d3a7dd"
-    assert transactional_api["connection"].execute(text("""
-        SELECT count(*) FROM pg_constraint
-         WHERE conrelid='public.importacion_archivo'::regclass
-           AND conname='chk_importacion_parcela_gpkg'
-    """)).scalar_one() == 1
+def test_textual_parcel_without_official_nucleus_key_and_suffixes(transactional_api,tmp_path):
+    api=transactional_api['request']; pid=project(api); nid,key=nucleus(transactional_api,pid)
+    rename_nucleus(transactional_api,nid,'San José')
+    ids={letter:parcel(transactional_api,nid,'P-585'+letter) for letter in 'ABCD'}
+    for parcel_id in ids.values(): link_parcel(transactional_api,pid,nid,parcel_id)
+    staged=stage(api,pid,gpkg(tmp_path,'suffixes',[('p',[(polygon(i*3),{'N__CLEO_AG':' SAN  JOSE ','Num_parcela':'P-585'+c}) for i,c in enumerate('ABCD')])])).json()
+    fs=preview(api,staged['id_importacion'])
+    assert all(f['estado_conciliacion']=='candidato' for f in fs)
+    for f in fs: decision(api,staged['id_importacion'],f,'confirmar',candidates(api,staged['id_importacion'],f)[0])
+    confirm(api,staged['id_importacion'])
+    con=transactional_api['connection']
+    assert set(con.execute(text('SELECT id_parcela FROM proyecto_parcela_geometria g JOIN proyecto_nucleo pn USING(id_proyecto_nucleo) WHERE pn.id_proyecto='+str(pid))).scalars())==set(ids.values())
+    assert all(con.execute(text('SELECT geometria_poligono IS NULL FROM parcela WHERE id_parcela=:p'),{'p':p}).scalar_one() for p in ids.values())
+
+
+def test_unlinked_or_other_project_parcels_are_not_destinations(transactional_api,tmp_path):
+    api=transactional_api['request']; pid=project(api); other=project(api); nid,key=nucleus(transactional_api,pid)
+    with transactional_api['session_factory']() as db:
+        admin=db.query(models.Usuario).filter_by(rol='admin',activo=True).first(); set_audit_context(db,admin.id_usuario)
+        db.add(models.ProyectoNucleo(id_proyecto=other,id_nucleo=nid,creado_por=admin.id_usuario)); db.commit()
+    p1=parcel(transactional_api,nid,'P-1'); p2=parcel(transactional_api,nid,'P-2')
+    link_parcel(transactional_api,other,nid,p1)
+    content=gpkg(tmp_path,'scope',[('p',[(polygon(),attrs(key,'P-1')),(polygon(3),attrs(key,'P-2'))])])
+    staged=stage(api,pid,content).json()
+    assert all(f['estado_conciliacion']=='sin_coincidencia' for f in preview(api,staged['id_importacion']))
+    assert confirm(api,staged['id_importacion']).json()['importados']==0
+    assert api('GET',f"/api/importaciones/{staged['id_importacion']}/resumen").json()['registros_administrativos']==0
+    assert transactional_api['connection'].execute(text('SELECT count(*) FROM proyecto_parcela_geometria g JOIN proyecto_nucleo pn USING(id_proyecto_nucleo) WHERE pn.id_proyecto='+str(pid))).scalar_one()==0
+
+
+def test_parcel_mixed_import_finishes_without_using_extra_features(transactional_api,tmp_path):
+    api=transactional_api['request']; pid=project(api); nid,key=nucleus(transactional_api,pid)
+    p1=parcel(transactional_api,nid,'P-666'); link_parcel(transactional_api,pid,nid,p1)
+    staged=stage(api,pid,gpkg(tmp_path,'partial',[('p',[(polygon(),attrs(key,'P.-666')),(polygon(3),attrs(key,'EXTRA'))])])).json()
+    fs=preview(api,staged['id_importacion'])
+    decision(api,staged['id_importacion'],fs[0],'confirmar',candidates(api,staged['id_importacion'],fs[0])[0])
+    assert confirm(api,staged['id_importacion']).json()['importados']==1
+    summary=api('GET',f"/api/importaciones/{staged['id_importacion']}/resumen").json()
+    assert summary['features_sin_destino']==1 and summary['features_no_utilizadas']==1
+
+
+def test_parcel_rollback_on_geometry_insert(transactional_api,tmp_path):
+    api=transactional_api['request']; pid=project(api); nid,key=nucleus(transactional_api,pid)
+    p1=parcel(transactional_api,nid,'P-1'); link_parcel(transactional_api,pid,nid,p1)
+    staged=stage(api,pid,gpkg(tmp_path,'rollback',[('p',[(polygon(),attrs(key,'P-1'))])])).json()
+    f=preview(api,staged['id_importacion'])[0]; c=candidates(api,staged['id_importacion'],f)[0]
+    def fail(conn,cursor,statement,parameters,context,executemany):
+        if statement.lstrip().startswith('INSERT INTO proyecto_parcela_geometria'): raise RuntimeError('Rollback')
+    event.listen(engine,'before_cursor_execute',fail)
+    try: decision(api,staged['id_importacion'],f,'confirmar',c,expected=409)
+    finally: event.remove(engine,'before_cursor_execute',fail)
+    assert preview(api,staged['id_importacion'])[0]['estado_conciliacion']=='candidato'
+    assert transactional_api['connection'].execute(text('SELECT count(*) FROM proyecto_parcela_geometria g JOIN proyecto_nucleo pn USING(id_proyecto_nucleo) WHERE pn.id_proyecto='+str(pid))).scalar_one()==0
+
+
+def test_documented_number_variants_can_be_ambiguous(transactional_api,tmp_path):
+    api=transactional_api['request']; pid=project(api); nid,key=nucleus(transactional_api,pid)
+    for number in ('P-666','P.-666'):
+        p=parcel(transactional_api,nid,number); link_parcel(transactional_api,pid,nid,p)
+    staged=stage(api,pid,gpkg(tmp_path,'variant-ambiguous',[('p',[(polygon(),attrs(key,'P-666'))])])).json()
+    f=preview(api,staged['id_importacion'])[0]
+    assert f['estado_conciliacion']=='ambiguo' and len(candidates(api,staged['id_importacion'],f))==2
+
+
+def test_lost_administrative_membership_blocks_confirmation(transactional_api,tmp_path):
+    api=transactional_api['request']; pid=project(api); nid,key=nucleus(transactional_api,pid)
+    p=parcel(transactional_api,nid,'P-1'); link_parcel(transactional_api,pid,nid,p)
+    staged=stage(api,pid,gpkg(tmp_path,'stale-member',[('p',[(polygon(),attrs(key,'P-1'))])])).json()
+    f=preview(api,staged['id_importacion'])[0]; c=candidates(api,staged['id_importacion'],f)[0]
+    with transactional_api['session_factory']() as db:
+        from datetime import datetime,timezone
+        admin=db.query(models.Usuario).filter_by(rol='admin',activo=True).first(); set_audit_context(db,admin.id_usuario)
+        link=db.query(models.AfectacionUnidadAgraria).join(models.UnidadAgraria).filter(models.UnidadAgraria.id_parcela==p).one()
+        link.activo=False;link.fecha_baja=datetime.now(timezone.utc);link.id_usuario_baja=admin.id_usuario;link.motivo_baja='QA';link.actualizado_por=admin.id_usuario
+        db.commit()
+    decision(api,staged['id_importacion'],f,'confirmar',c,expected=409)
+
+
+def test_database_candidate_must_have_explicit_project_membership(transactional_api,tmp_path):
+    from sqlalchemy.exc import DBAPIError
+    api=transactional_api['request']; pid=project(api); nid,key=nucleus(transactional_api,pid)
+    p=parcel(transactional_api,nid,'P-1')  # Global catalogue membership is insufficient.
+    staged=stage(api,pid,gpkg(tmp_path,'forged',[('p',[(polygon(),attrs(key,'P-1'))])])).json()
+    f=preview(api,staged['id_importacion'])[0]
+    with transactional_api['session_factory']() as db:
+        admin=db.query(models.Usuario).filter_by(rol='admin',activo=True).first(); set_audit_context(db,admin.id_usuario)
+        pn=db.query(models.ProyectoNucleo).filter_by(id_proyecto=pid,id_nucleo=nid).one()
+        with pytest.raises(DBAPIError):
+            with db.begin_nested():
+                db.add(models.ImportacionFeatureCandidato(id_importacion=staged['id_importacion'],id_importacion_feature=f['id_importacion_feature'],
+                    id_proyecto_nucleo=pn.id_proyecto_nucleo,id_parcela=p,criterio='forjado',clasificacion='revision',coincidencias=[],creado_por=admin.id_usuario))
+                db.flush()

@@ -1,16 +1,20 @@
 """Integration coverage for administrative audit projections."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from app import models
 from app.config import AUTH_SETTINGS
 from app.database import SessionLocal
 from app.main import app
 from app.services.audit import calculate_changes
+from app.services import authentication
+from app.services.common import set_audit_context
 
 
 def _password() -> str:
@@ -119,7 +123,13 @@ def test_access_events_and_append_only_privileges(api):
     api("POST", f"/api/usuarios/{target['id_usuario']}/desbloquear", json={"motivo": "Desbloqueo auditado QA"})
     _login(target["correo"], password)
     _login(target["correo"], password)
+    with SessionLocal() as db:
+        session_ids = [row.id_sesion for row in db.query(models.SesionUsuario).filter_by(id_usuario=target["id_usuario"])]
+        before = {session_id: _session_audit(db, session_id).count() for session_id in session_ids}
     api("POST", f"/api/usuarios/{target['id_usuario']}/revocar-sesiones", json={"motivo": "Revocación auditada QA"})
+    with SessionLocal() as db:
+        for session_id in session_ids:
+            assert _session_audit(db, session_id).count() == before[session_id] + 1
     events = api(
         "GET",
         f"/api/auditoria/accesos?id_usuario={target['id_usuario']}&motivo_codigo=desbloqueo_admin&limit=20",
@@ -138,3 +148,153 @@ def test_access_events_and_append_only_privileges(api):
         privileges = db.execute(text("SELECT has_table_privilege(current_user, 'public.bitacora', 'INSERT'), has_table_privilege(current_user, 'public.bitacora', 'UPDATE'), has_table_privilege(current_user, 'public.bitacora', 'DELETE'), has_table_privilege(current_user, 'public.bitacora', 'TRUNCATE')")).one()
         assert privileges == (False, False, False, False)
         assert db.query(models.Bitacora).filter(models.Bitacora.entidad_tipo == "usuario", models.Bitacora.entidad_id == target["id_usuario"]).count() > 0
+
+
+def _session_id(user_id):
+    with SessionLocal() as db:
+        return db.query(models.SesionUsuario.id_sesion).filter_by(id_usuario=user_id).one()[0]
+
+
+def _session_audit(db, session_id):
+    return db.query(models.Bitacora).filter_by(entidad_tipo="sesion_usuario", entidad_id=session_id)
+
+
+def test_authenticated_requests_update_activity_without_audit_noise(api):
+    target, password = _create_user(api)
+    client, _ = _login(target["correo"], password)
+    session_id = _session_id(target["id_usuario"])
+    with SessionLocal() as db:
+        previous = db.get(models.SesionUsuario, session_id).ultima_actividad
+        history = [(row.id_bitacora, row.valor_anterior, row.valor_nuevo) for row in _session_audit(db, session_id)]
+        total_before = db.query(models.Bitacora).count()
+        events_before = db.query(models.EventoAcceso).filter_by(id_sesion=session_id).count()
+    for _ in range(5):
+        response = client.get("/api/auth/sesion")
+        assert response.status_code == 200, response.text
+        with SessionLocal() as db:
+            current = db.get(models.SesionUsuario, session_id).ultima_actividad
+            assert current > previous
+            previous = current
+            assert [(row.id_bitacora, row.valor_anterior, row.valor_nuevo) for row in _session_audit(db, session_id)] == history
+            assert db.query(models.Bitacora).count() == total_before
+            assert db.query(models.EventoAcceso).filter_by(id_sesion=session_id).count() == events_before
+
+
+def test_activity_update_requires_actor(api):
+    target, password = _create_user(api)
+    _login(target["correo"], password)
+    session_id = _session_id(target["id_usuario"])
+    with SessionLocal() as db:
+        session = db.get(models.SesionUsuario, session_id)
+        previous = session.ultima_actividad
+        db.execute(text("SELECT set_config('app.current_user_id', '', true)"))
+        session.ultima_actividad += timedelta(seconds=1)
+        with pytest.raises(DBAPIError, match="app.current_user_id"):
+            db.commit()
+        db.rollback()
+        assert db.get(models.SesionUsuario, session_id).ultima_actividad == previous
+
+
+@pytest.mark.parametrize("field", ["expira_en", "user_agent_creacion", "token_hash", "csrf_hash", "revocada_en"])
+def test_activity_with_simultaneous_changes_is_audited_and_redacted(api, field):
+    target, password = _create_user(api)
+    _login(target["correo"], password)
+    session_id = _session_id(target["id_usuario"])
+    with SessionLocal() as db:
+        before = _session_audit(db, session_id).count()
+        session = db.get(models.SesionUsuario, session_id)
+        set_audit_context(db, target["id_usuario"])
+        session.ultima_actividad += timedelta(seconds=1)
+        value = session.expira_en + timedelta(minutes=1) if field == "expira_en" else uuid.uuid4().hex * 2
+        if field == "revocada_en":
+            value = datetime.now(timezone.utc)
+            session.id_usuario_revoca = target["id_usuario"]
+            session.motivo_revocacion = "revocacion_admin"
+        setattr(session, field, value)
+        db.commit()
+        assert _session_audit(db, session_id).count() == before + 1
+        row = _session_audit(db, session_id).order_by(models.Bitacora.id_bitacora.desc()).first()
+        assert row.accion == "update" and row.id_usuario == target["id_usuario"]
+        assert row.valor_anterior["ultima_actividad"] != row.valor_nuevo["ultima_actividad"]
+        for payload in (row.valor_anterior, row.valor_nuevo):
+            assert not {"token_hash", "csrf_hash", "contrasena_hash"} & payload.keys()
+        if field not in {"token_hash", "csrf_hash"}:
+            assert row.valor_anterior[field] != row.valor_nuevo[field]
+
+
+@pytest.mark.parametrize("reason", ["expiracion_inactividad", "expiracion_absoluta"])
+def test_expiration_keeps_correlated_system_event_without_session_audit(api, monkeypatch, reason):
+    target, password = _create_user(api)
+    client, _ = _login(target["correo"], password)
+    session_id = _session_id(target["id_usuario"])
+    with SessionLocal() as db:
+        session = db.get(models.SesionUsuario, session_id)
+        future = (session.expira_en + timedelta(seconds=1) if reason == "expiracion_absoluta"
+                  else session.ultima_actividad + timedelta(minutes=AUTH_SETTINGS.inactivity_minutes, seconds=1))
+        before = _session_audit(db, session_id).count()
+    monkeypatch.setattr(authentication, "_utcnow", lambda: future)
+    assert client.get("/api/auth/sesion").status_code == 401
+    assert client.get("/api/auth/sesion").status_code == 401
+    with SessionLocal() as db:
+        session = db.get(models.SesionUsuario, session_id)
+        assert session.revocada_en == future and session.id_usuario_revoca is None
+        assert session.motivo_revocacion == reason
+        assert _session_audit(db, session_id).count() == before
+        event = db.query(models.EventoAcceso).filter_by(id_sesion=session_id, tipo_evento="sesion_expirada").one()
+        assert event.motivo_codigo == reason and event.id_usuario_actor is None
+
+
+def test_logout_keeps_session_audit_and_access_event(api):
+    target, password = _create_user(api)
+    client, headers = _login(target["correo"], password)
+    session_id = _session_id(target["id_usuario"])
+    with SessionLocal() as db:
+        before = _session_audit(db, session_id).count()
+    assert client.post("/api/auth/logout", headers=headers).status_code == 200
+    assert client.get("/api/auth/sesion").status_code == 401
+    with SessionLocal() as db:
+        assert _session_audit(db, session_id).count() == before + 1
+        assert db.get(models.SesionUsuario, session_id).revocada_en is not None
+        event = db.query(models.EventoAcceso).filter_by(id_sesion=session_id, tipo_evento="logout").one()
+        assert event.id_usuario_actor == target["id_usuario"]
+
+
+@pytest.mark.parametrize("invalid", ["previous_transaction", "session", "actor", "event_type", "reason", "activity", "secret", "heartbeat_only"])
+def test_system_expiration_validation_cannot_bypass_audit(api, invalid):
+    target, password = _create_user(api)
+    _login(target["correo"], password)
+    session_id = _session_id(target["id_usuario"])
+    with SessionLocal() as db:
+        session = db.get(models.SesionUsuario, session_id)
+        activity = session.ultima_actividad
+        before = _session_audit(db, session_id).count()
+        event = models.EventoAcceso(
+            id_usuario=target["id_usuario"],
+            id_sesion=None if invalid == "session" else session_id,
+            id_usuario_actor=target["id_usuario"] if invalid == "actor" else None,
+            tipo_evento="login_exitoso" if invalid == "event_type" else "sesion_expirada",
+            motivo_codigo="expiracion_absoluta" if invalid == "reason" else "expiracion_inactividad",
+        )
+        db.add(event)
+        db.flush()
+        event_id = event.id_evento
+        if invalid == "previous_transaction":
+            db.commit()
+        db.execute(text("SELECT set_config('app.auth_system_event_id', :event, true)"), {"event": str(event_id)})
+        # Even a valid actor must not bypass the dedicated system-event checks.
+        set_audit_context(db, target["id_usuario"])
+        if invalid == "heartbeat_only":
+            session.ultima_actividad += timedelta(seconds=1)
+        else:
+            session.revocada_en = datetime.now(timezone.utc)
+            session.motivo_revocacion = "expiracion_inactividad"
+            if invalid == "activity":
+                session.ultima_actividad += timedelta(seconds=1)
+            if invalid == "secret":
+                session.csrf_hash = uuid.uuid4().hex * 2
+        with pytest.raises(DBAPIError, match="Expiración de sesión sin evento de sistema"):
+            db.commit()
+        db.rollback()
+        session = db.get(models.SesionUsuario, session_id)
+        assert session.revocada_en is None and session.ultima_actividad == activity
+        assert _session_audit(db, session_id).count() == before

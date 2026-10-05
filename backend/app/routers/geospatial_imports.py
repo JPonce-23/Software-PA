@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services import geospatial_imports as service
+from ..services import gis_reconciliation as reconciliation
 from ..services.access import require_project_access
 
 
@@ -172,13 +173,17 @@ def preview_features(
     id_importacion: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    estado_conciliacion: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     service.require_import_access(db, id_importacion, user)
-    return db.query(models.ImportacionFeature).filter(
+    query = db.query(models.ImportacionFeature).filter(
         models.ImportacionFeature.id_importacion == id_importacion
-    ).order_by(models.ImportacionFeature.indice_feature).offset(skip).limit(limit).all()
+    )
+    if estado_conciliacion is not None:
+        query = query.filter(models.ImportacionFeature.estado_conciliacion == estado_conciliacion)
+    return query.order_by(models.ImportacionFeature.indice_feature).offset(skip).limit(limit).all()
 
 
 @router.post(
@@ -192,3 +197,52 @@ def confirm_import(
     user: models.Usuario = Depends(auth.RoleChecker(GIS_ROLES)),
 ):
     return service.confirm_import(db, id_importacion, data, user)
+
+
+@router.get("/proyectos/{id_proyecto}/geoespacial/configuracion", response_model=schemas.ConfiguracionGisResponse)
+def get_gis_configuration(id_proyecto: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    require_project_access(db,user,id_proyecto)
+    return {"id_proyecto":id_proyecto,"srid_trabajo":reconciliation.working_srid(db,id_proyecto)}
+
+
+@router.put("/proyectos/{id_proyecto}/geoespacial/configuracion", response_model=schemas.ConfiguracionGisResponse)
+def configure_gis(id_proyecto: int, data: schemas.ConfiguracionGisRequest, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+    return reconciliation.configure_project(db,id_proyecto,data.srid_trabajo,user)
+
+
+@router.get("/importaciones/{id_importacion}/resumen")
+def get_reconciliation_summary(id_importacion: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    record=service.require_import_access(db,id_importacion,user)
+    if record.tipo_objetivo not in reconciliation.RECONCILIATION_TARGETS:
+        return record.reporte
+    return reconciliation.reconciliation_summary(db,record)
+
+
+@router.get("/importaciones/{id_importacion}/features/{id_feature}/candidatos", response_model=list[schemas.CandidatoGisResponse])
+def get_feature_candidates(id_importacion: int, id_feature: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    service.require_import_access(db,id_importacion,user)
+    return db.query(models.ImportacionFeatureCandidato).filter_by(id_importacion=id_importacion,id_importacion_feature=id_feature).order_by(models.ImportacionFeatureCandidato.id_candidato).all()
+
+
+@router.post("/importaciones/{id_importacion}/features/{id_feature}/decisiones", response_model=schemas.ImportacionFeatureResponse)
+def decide_feature(id_importacion: int, id_feature: int, data: schemas.DecisionGisRequest, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+    return reconciliation.decide(db,id_importacion,id_feature,data,user)
+
+
+@router.get("/importaciones/{id_importacion}/features/{id_feature}/decisiones", response_model=list[schemas.DecisionGisResponse])
+def get_feature_decisions(id_importacion: int, id_feature: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    service.require_import_access(db,id_importacion,user)
+    feature=db.query(models.ImportacionFeature).filter_by(id_importacion=id_importacion,id_importacion_feature=id_feature).first()
+    if feature is None: raise HTTPException(404,"Feature no encontrada")
+    return db.query(models.ImportacionFeatureDecision).filter_by(id_importacion_feature=id_feature).order_by(models.ImportacionFeatureDecision.id_decision).all()
+
+
+@router.get('/importaciones/{id_importacion}/features/{id_feature}/geometria')
+def get_feature_geometry(id_importacion: int,id_feature: int,db: Session=Depends(get_db),user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    from sqlalchemy import func
+    service.require_import_access(db,id_importacion,user)
+    row=db.query(models.ImportacionFeature.id_importacion_feature,
+        func.ST_AsGeoJSON(models.ImportacionFeature.geometria_normalizada,15)).filter_by(
+            id_importacion=id_importacion,id_importacion_feature=id_feature).one_or_none()
+    if row is None: raise HTTPException(404,'Feature no encontrada')
+    return {'type':'Feature','id':row[0],'properties':{},'geometry':json.loads(row[1]) if row[1] else None}

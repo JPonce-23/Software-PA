@@ -1408,6 +1408,8 @@ class ImportacionArchivoResponse(AuditRead):
     sha256: str
     fuente: str
     fecha_fuente: date | None = None
+    version_pipeline: str = "legacy-v1"
+    srid_trabajo: int = 4326
     crs_original: str | None = None
     crs_destino: str
     estado: str
@@ -1437,6 +1439,15 @@ class ImportacionFeatureResponse(ORMModel):
     transformaciones: list[Any]
     advertencias_aceptadas: bool
     registro_destino_id: int | None = None
+    estado_conciliacion: str = "pendiente"
+    crs_fuente: str | None = None
+    dimension_fuente: str | None = None
+
+    @field_validator("atributos_originales", "atributos_normalizados")
+    @classmethod
+    def exclude_personal_attributes(cls, value):
+        from .services.gis_attributes import sanitize_attributes
+        return sanitize_attributes(value)
 
 
 class ImportacionConfirmarRequest(BaseModel):
@@ -1651,3 +1662,43 @@ class AuditAccessItem(BaseModel):
 class AuditAccessPageResponse(BaseModel):
     total: int
     items: list[AuditAccessItem]
+
+
+class ConfiguracionGisRequest(BaseModel):
+    srid_trabajo: int = Field(gt=0, le=998999)
+
+
+class ConfiguracionGisResponse(ORMModel):
+    id_proyecto: int
+    srid_trabajo: int
+
+
+class CandidatoGisResponse(ORMModel):
+    id_candidato: int
+    id_importacion_feature: int
+    id_proyecto_nucleo: int
+    id_parcela: int | None = None
+    criterio: str
+    clasificacion: str
+    coincidencias: list[str]
+    estado: str
+    id_usuario_revision: int | None = None
+    fecha_revision: datetime | None = None
+
+
+class DecisionGisRequest(BaseModel):
+    accion: Literal["seleccionar", "confirmar", "rechazar", "ignorar"]
+    id_candidato: int | None = None
+    confirmacion_explicita: bool = False
+    aceptar_advertencias: bool = False
+    motivo: str | None = Field(default=None, max_length=250)
+
+
+class DecisionGisResponse(ORMModel):
+    id_decision: int
+    id_importacion_feature: int
+    id_candidato: int | None = None
+    accion: str
+    motivo: str | None = None
+    creado_por: int
+    creado_en: datetime

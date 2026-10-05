@@ -27,6 +27,11 @@ class LayerInfo:
     columns: tuple[str, ...]
     crs: str
     is_wgs84: bool
+    fid_column: str = ""
+    geometry_column: str = ""
+    geometry_type: str = ""
+    crs_wkt: str = ""
+    srid: int | None = None
 
 
 @dataclass(frozen=True)
@@ -124,6 +129,14 @@ def _authority_from_coordinate_system(coordinate_system: dict | None) -> tuple[s
     return description, is_wgs84
 
 
+def get_spatial_layers(metadata: dict) -> list[dict]:
+    """OGR expone también tablas QGIS; sólo cuentan campos geométricos."""
+    return [layer for layer in metadata.get("layers", []) if any(
+        str(field.get("type", "Unknown")).lower() not in {"none", "", "null"}
+        for field in layer.get("geometryFields", [])
+    )]
+
+
 def inspect_dataset(path: Path) -> DatasetInfo:
     metadata = _run_json(["ogrinfo", "-ro", "-so", "-al", "-json", str(path)])
     driver = str(metadata.get("driverShortName") or metadata.get("driverLongName") or "")
@@ -143,7 +156,7 @@ def inspect_dataset(path: Path) -> DatasetInfo:
         )
 
     layers: list[LayerInfo] = []
-    for raw_layer in metadata.get("layers") or []:
+    for raw_layer in get_spatial_layers(metadata):
         name = str(raw_layer.get("name") or "").strip()
         if not name:
             continue
@@ -169,6 +182,11 @@ def inspect_dataset(path: Path) -> DatasetInfo:
                 columns=columns,
                 crs=crs,
                 is_wgs84=is_wgs84,
+                fid_column=str(raw_layer.get("fidColumnName") or ""),
+                geometry_column=str(geometry_fields[0].get("name") or ""),
+                geometry_type=str(geometry_fields[0].get("type") or ""),
+                crs_wkt=str((coordinate_system or {}).get("wkt") or ""),
+                srid=int(crs.split(":")[1]) if crs.startswith("EPSG:") and crs.split(":")[1].isdigit() else None,
             )
         )
     if not layers:
@@ -182,6 +200,8 @@ def iter_features(
     path: Path,
     dataset: DatasetInfo,
     limit_per_layer: int | None = None,
+    *,
+    preserve_source_geometry: bool = False,
 ) -> Iterator[tuple[str, dict]]:
     """Convierte cada capa a GeoJSONSeq en stdout y entrega un feature a la vez."""
     timeout = int(os.getenv("IMPORT_GDAL_TIMEOUT_SECONDS", "300"))
@@ -192,8 +212,18 @@ def iter_features(
             "GeoJSONSeq",
             "/vsistdout/",
             str(path),
-            layer.name,
         ]
+        if preserve_source_geometry and dataset.format == "gpkg":
+            # WKB is lossless, including source Z/M, and survives GeoJSONSeq's
+            # mandatory 4326 conversion. Identifiers originate in OGR metadata.
+            quoted_layer = layer.name.replace('"', '""')
+            quoted_geom = layer.geometry_column.replace('"', '""')
+            fid = layer.fid_column.replace('"', '""')
+            select_fid = f', "{fid}" AS "__pa_source_fid"' if fid else ''
+            command.extend(["-dialect", "SQLite", "-sql",
+                f'SELECT *{select_fid}, hex(ST_AsBinary("{quoted_geom}")) AS "__pa_source_wkb" FROM "{quoted_layer}"'])
+        else:
+            command.append(layer.name)
         if limit_per_layer is not None:
             command.extend(["-limit", str(max(1, limit_per_layer))])
         command.extend([
