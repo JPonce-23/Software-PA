@@ -191,6 +191,49 @@ La conciliación vigente (025) usa `POST /api/proyectos/{id_proyecto}/geoespacia
 
 ---
 
+### 4.2 `persona` — búsqueda y reutilización
+
+Persona es una identidad compartida; su alcance por proyecto se deriva de
+relaciones de negocio activas (ORV, titulares parcelarios y de unidad agraria
+directos/indirectos, comparecientes, intervinientes FIFONAFE y beneficiarios de
+pago), respetando los padres activos de cada camino. No existe un vínculo
+Persona–Proyecto creado automáticamente por el POST de Persona o la búsqueda.
+
+`GET /api/personas` devuelve la proyección `PersonaBusquedaResponse`:
+
+| Campo | Tipo del dato fuente | Nullable | Uso |
+|---|---|---|---|
+| `id_persona` | `INTEGER` | No | Seleccionar una Persona existente |
+| `nombre` | `VARCHAR(300)` | No | Identificación |
+| `apellido_paterno` | `VARCHAR(200)` | Sí | Identificación |
+| `apellido_materno` | `VARCHAR(200)` | Sí | Identificación |
+| `curp` | `VARCHAR(18)` | Sí | Búsqueda exacta e identificación |
+| `rfc` | `VARCHAR(13)` | Sí | Búsqueda exacta; no es único |
+
+No expone contacto, observaciones, origen, auditoría ni relaciones. Exige
+exactamente un criterio: `q` (2–300 caracteres, todas las palabras en nombres o
+apellidos, sin distinguir caja ni eliminar acentos), `curp` (no vacío, máximo
+18) o `rfc` (no vacío, máximo 13). Se retiran espacios ordinarios exteriores;
+CURP/RFC se comparan mediante `upper(btrim(...))`, sin modificar datos.
+En `q`, `%`, `_` y `\` son literales. `limit` vale 20 por defecto (1–100) y
+`skip` vale 0 por defecto (mínimo 0). Orden estable por apellidos, nombre e id,
+sin distinguir caja y con apellidos nulos al final; visibilidad antes del límite.
+
+Admin ve todas las Personas activas; operador, visualizador y geógrafo ven las
+relacionadas con algún proyecto activo autorizado. Sólo el operador creador,
+con algún proyecto activo autorizado, obtiene además sus verdaderas huérfanas:
+sin proyectos derivados y sin referencias activas según
+`fn_persona_tiene_relaciones_activas()`. Padres inactivos no bastan para esa
+excepción. Personas inactivas y coincidencias fuera de alcance no se devuelven
+(lista vacía, HTTP 200). El criterio ausente, vacío, combinado o inválido y la
+paginación inválida producen 422; siguen aplicándose autenticación y roles.
+
+`uq_persona_curp` conserva su definición: único sobre `upper(curp)` para
+Personas activas con CURP no nulo, sin `btrim`. Por ello la búsqueda normalizada
+puede devolver varias coincidencias visibles. No se introduce unicidad de RFC,
+normalización de escrituras ni cambios de esquema; el esquema continúa en 027.
+La selección no crea relaciones y no amplía permisos de captura o edición.
+
 ## 5. Afectaciones y Unidades Agrarias
 
 ### 5.1 `afectacion`, `unidad_agraria` y `afectacion_unidad_agraria`

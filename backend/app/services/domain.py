@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from .access import (
+    filter_persons_by_read_access,
     require_affectation_access,
     require_agreement_access,
     require_agricultural_unit_access,
@@ -398,6 +399,33 @@ def create_responsible(
         **_audit_values(user.id_usuario, data),
     )
     return _persist(db, entity, user.id_usuario, "El responsable no es válido")
+
+
+def search_persons(
+    db: Session, criteria: schemas.PersonaBusquedaParametros, user: models.Usuario,
+):
+    """Search a minimal projection of readable active people in one SQL query."""
+    person = models.Persona
+    query = db.query(person.id_persona, person.nombre, person.apellido_paterno,
+                     person.apellido_materno, person.curp, person.rfc)
+    query = filter_persons_by_read_access(query, db, user)
+    if criteria.curp is not None:
+        query = query.filter(func.upper(func.btrim(person.curp)) == criteria.curp)
+    elif criteria.rfc is not None:
+        query = query.filter(func.upper(func.btrim(person.rfc)) == criteria.rfc)
+    else:
+        for word in criteria.q.split():
+            # Explicit escape character; %, _ and backslash are literal input.
+            literal = word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{literal}%"
+            query = query.filter(or_(*(column.ilike(pattern, escape="\\") for column in (
+                person.nombre, person.apellido_paterno, person.apellido_materno,
+            ))))
+    return query.order_by(
+        func.lower(person.apellido_paterno).asc().nulls_last(),
+        func.lower(person.apellido_materno).asc().nulls_last(),
+        func.lower(person.nombre), person.id_persona,
+    ).offset(criteria.skip).limit(criteria.limit).all()
 
 
 def create_person(

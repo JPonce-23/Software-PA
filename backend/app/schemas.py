@@ -404,6 +404,44 @@ class PersonaUpdate(AuditInput):
     datos_identidad_incompletos: bool | None = None
 
 
+class PersonaBusquedaParametros(BaseModel):
+    q: str | None = Field(default=None, min_length=2, max_length=300,
+                         description="Nombre/apellidos; longitud tras retirar espacios exteriores. Exactamente un criterio.")
+    curp: str | None = Field(default=None, min_length=1, max_length=18,
+                            description="Igualdad en mayúsculas sin espacios exteriores; no exige 18 caracteres.")
+    rfc: str | None = Field(default=None, min_length=1, max_length=13,
+                           description="Igualdad en mayúsculas sin espacios exteriores; no implica unicidad.")
+    limit: int = Field(default=20, ge=1, le=100)
+    skip: int = Field(default=0, ge=0)
+
+    @field_validator("q", "curp", "rfc", mode="before")
+    @classmethod
+    def normalize_search(cls, value, info):
+        if not isinstance(value, str):
+            return value
+        value = value.strip(" ")
+        if info.field_name == "q":
+            if not value.split():
+                raise ValueError("q debe contener al menos una palabra")
+            return value
+        return value.upper()
+
+    @model_validator(mode="after")
+    def require_one_criterion(self):
+        if sum(value is not None for value in (self.q, self.curp, self.rfc)) != 1:
+            raise ValueError("Debe proporcionar exactamente uno de q, curp o rfc")
+        return self
+
+
+class PersonaBusquedaResponse(ORMModel):
+    id_persona: int
+    nombre: str
+    apellido_paterno: str | None
+    apellido_materno: str | None
+    curp: str | None
+    rfc: str | None
+
+
 class PersonaResponse(PersonaCreate, AuditRead):
     id_persona: int
 

@@ -140,6 +140,43 @@ Repetir DELETE sin una nueva asignación activa responde `404`, sin actualizar e
 
 #### Acceso a Persona y datos compartidos
 
+`GET /api/personas` busca Personas activas dentro del alcance de lectura del
+usuario. Admite los roles `admin`, `operador`, `visualizador` y `geografo`.
+Debe enviarse **exactamente uno** de `q`, `curp` o `rfc`; la ausencia de criterio,
+los valores vacíos o la combinación de criterios producen HTTP `422`.
+
+- `q`: entre 2 y 300 caracteres después de retirar espacios ordinarios exteriores.
+  Se divide en palabras: todas deben aparecer en alguno de `nombre`,
+  `apellido_paterno` o `apellido_materno`, sin depender del orden ni distinguir
+  mayúsculas. No elimina acentos: `PEREZ` no equivale a `PÉREZ`. `%`, `_` y `\`
+  se comparan literalmente; no hay búsqueda fuzzy.
+- `curp`: valor no vacío, máximo 18 caracteres después de retirar espacios
+  ordinarios exteriores y convertir a mayúsculas; igualdad contra
+  `upper(btrim(curp))`. No admite búsqueda parcial ni exige 18 caracteres.
+- `rfc`: misma comparación por igualdad, máximo 13 caracteres normalizados.
+  No supone unicidad. La normalización sólo se usa para comparar; no cambia
+  datos almacenados ni la persistencia de POST/PATCH.
+- `limit`: predeterminado 20, entre 1 y 100; `skip`: predeterminado 0, mínimo 0.
+
+Devuelve una lista con únicamente `id_persona`, `nombre`, `apellido_paterno`,
+`apellido_materno`, `curp` y `rfc`; apellidos e identificadores admiten `null`.
+Ordena por apellidos, nombre e id, sin distinguir caja y con apellidos nulos
+al final. Aplica visibilidad antes de paginar y no duplica Personas compartidas.
+
+Admin encuentra todas las Personas activas. Los demás roles sólo encuentran
+Personas relacionadas con algún proyecto activo autorizado, más la excepción
+del creador operador descrita abajo. Una referencia activa con padre inactivo
+no convierte a la Persona en huérfana recuperable por el creador. Las Personas
+inactivas se excluyen para todos, incluido admin. Una coincidencia fuera de
+alcance devuelve `200 []`, igual que una búsqueda sin resultados; no revela id
+ni existencia. Autenticación ausente: `401`; rol no admitido: `403`.
+
+Ejemplos: `GET /api/personas?q=Juan%20P%C3%A9rez&limit=20&skip=0` y
+`GET /api/personas?curp=ABCD1234`. Buscar o seleccionar no crea relaciones.
+La vinculación posterior vuelve a comprobar permisos y reglas de negocio.
+El conflicto de creación conserva `409 {"detail":"La persona ya existe"}`
+sin devolver identidad; buscar previamente no sustituye la restricción SQL.
+
 `GET /api/personas/{id_persona}` requiere lectura y un proyecto autorizado
 vinculado mediante ORV, titularidad parcelaria, titularidad de unidad agraria
 (directa o por titular parcelario), comparecencia en convenio, intervención

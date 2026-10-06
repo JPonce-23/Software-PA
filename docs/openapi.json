@@ -2383,6 +2383,130 @@
         }
       }
     },
+    "/api/personas": {
+      "get": {
+        "summary": "Search Persons",
+        "description": "Busca Personas activas legibles por el usuario. Exactamente uno de q, curp o rfc. q exige todas las palabras, sin distinguir caja ni eliminar acentos; %, _ y \\ son literales. Sin coincidencias visibles devuelve []; no revela Personas fuera de alcance.",
+        "operationId": "search_persons_api_personas_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre/apellidos; longitud tras retirar espacios exteriores. Exactamente un criterio.",
+              "title": "Q"
+            },
+            "description": "Nombre/apellidos; longitud tras retirar espacios exteriores. Exactamente un criterio."
+          },
+          {
+            "name": "curp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 18
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Igualdad en mayúsculas sin espacios exteriores; no exige 18 caracteres.",
+              "title": "Curp"
+            },
+            "description": "Igualdad en mayúsculas sin espacios exteriores; no exige 18 caracteres."
+          },
+          {
+            "name": "rfc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 13
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Igualdad en mayúsculas sin espacios exteriores; no implica unicidad.",
+              "title": "Rfc"
+            },
+            "description": "Igualdad en mayúsculas sin espacios exteriores; no implica unicidad."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PersonaBusquedaResponse"
+                  },
+                  "title": "Response Search Persons Api Personas Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticación requerida"
+          },
+          "403": {
+            "description": "Rol no permitido"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/personas/{id_persona}": {
       "get": {
         "summary": "Get Person",
@@ -21278,6 +21402,72 @@
         "additionalProperties": false,
         "type": "object",
         "title": "ParcelaUpdate"
+      },
+      "PersonaBusquedaResponse": {
+        "properties": {
+          "id_persona": {
+            "type": "integer",
+            "title": "Id Persona"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "apellido_paterno": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido Paterno"
+          },
+          "apellido_materno": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido Materno"
+          },
+          "curp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Curp"
+          },
+          "rfc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rfc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_persona",
+          "nombre",
+          "apellido_paterno",
+          "apellido_materno",
+          "curp",
+          "rfc"
+        ],
+        "title": "PersonaBusquedaResponse"
       },
       "PersonaCreate": {
         "properties": {
