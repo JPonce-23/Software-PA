@@ -738,24 +738,26 @@ def current_validity_expression(model: Any, start: Any, end: Any):
 
 
 def list_orv_members(
-    db: Session, orv_id: int, *, include_history: bool
+    db: Session, orv_id: int, *, include_history: bool, include_deactivated: bool = False
 ) -> list[dict[str, Any]]:
     query = db.query(models.OrvIntegrante, models.Persona).join(
         models.Persona,
         models.Persona.id_persona == models.OrvIntegrante.id_persona,
     ).filter(
         models.OrvIntegrante.id_orv == orv_id,
-        models.OrvIntegrante.activo.is_(True),
         models.Persona.activo.is_(True),
     )
+    if not include_deactivated:
+        query = query.filter(models.OrvIntegrante.activo.is_(True))
     if not include_history:
-        query = query.filter(
-            current_validity_expression(
-                models.OrvIntegrante,
-                models.OrvIntegrante.fecha_inicio,
-                models.OrvIntegrante.fecha_fin,
-            )
+        validity = current_validity_expression(
+            models.OrvIntegrante,
+            models.OrvIntegrante.fecha_inicio,
+            models.OrvIntegrante.fecha_fin,
         )
+        if include_deactivated:
+            validity = or_(models.OrvIntegrante.activo.is_(False), validity)
+        query = query.filter(validity)
     rows = query.order_by(
         models.OrvIntegrante.id_organo,
         models.OrvIntegrante.id_cargo,

@@ -2868,6 +2868,7 @@
       },
       "get": {
         "summary": "List Orv Members",
+        "description": "Lista integrantes de un ORV activo dentro del alcance de lectura del núcleo. incluir_historico elimina el filtro temporal de los integrantes activos. incluir_bajas añade bajas administrativas sin filtrar sus fechas. La Persona debe permanecer activa en todos los casos.",
         "operationId": "list_orv_members_api_orv__id_orv__integrantes_get",
         "parameters": [
           {
@@ -2887,6 +2888,16 @@
               "type": "boolean",
               "default": false,
               "title": "Incluir Historico"
+            }
+          },
+          {
+            "name": "incluir_bajas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Bajas"
             }
           }
         ],

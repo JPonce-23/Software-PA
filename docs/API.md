@@ -130,6 +130,48 @@ Repetir DELETE sin una nueva asignación activa responde `404`, sin actualizar e
   - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/responsables`: Brigadistas y enlaces institucionales. Edición en `PATCH /api/responsables/{id_responsable}`.
   - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/padrones`: Registro del padrón agrario oficial. Edición en `PATCH /api/padrones/{id_padron}`.
 
+#### Integrantes ORV: vigencia e histórico administrativo
+
+`GET /api/orv/{id_orv}/integrantes` conserva los roles de lectura `admin`,
+`operador`, `visualizador` y `geografo`. Acepta dos booleanos, ambos `false`
+por defecto:
+
+| `incluir_historico` | `incluir_bajas` | Integrantes devueltos |
+|---|---|---|
+| false | false | Activos y funcionalmente vigentes |
+| true | false | Todos los activos, sin filtro temporal |
+| false | true | Activos vigentes y todas las bajas administrativas, sin filtrar fechas de las bajas |
+| true | true | Todos los activos y todas las bajas administrativas |
+
+Omitir `incluir_bajas` o enviarlo como `false` conserva los resultados anteriores.
+La Persona debe estar activa incluso al consultar bajas. Se exige ORV activo,
+núcleo activo y el acceso vigente al núcleo; no hay excepciones históricas para
+padres inactivos o proyectos fuera del alcance. Admin conserva el alcance del
+listado existente. Autenticación ausente: `401`; alcance no autorizado: `403`;
+ORV o núcleo inexistente/inactivo: `404`; booleano inválido: `422`.
+
+La respuesta sigue siendo `OrvIntegranteDetailResponse` y el orden sigue siendo
+órgano, cargo y nombre. Una baja se identifica por `activo=false`, `vigente=false`,
+`fecha_baja`, `motivo_baja` e `id_usuario_baja`. No se añade nombre, correo ni
+perfil del actor. Ejemplo para localizar todas las bajas junto con el histórico
+funcional: `GET /api/orv/42/integrantes?incluir_historico=true&incluir_bajas=true`.
+
+`vigente` se calcula con el estado activo y las fechas propias del integrante,
+con inicio y fin inclusivos. Un fin hoy o futuro puede seguir siendo vigente;
+la vigencia del ORV padre no se incorpora a esta propiedad.
+
+`POST /api/orv-integrantes/{id_orv_integrante}/finalizar` termina el periodo
+funcional mediante `fecha_fin`, `id_tipo_fin` y `detalle_fin`, conservando
+`activo=true`. Sigue disponible para admin y operador con captura autorizada.
+`DELETE /api/orv-integrantes/{id_orv_integrante}` es una baja administrativa,
+exclusiva de admin: conserva el periodo y registra los campos de baja.
+`POST /api/orv-integrantes/{id_orv_integrante}/reactivar`, también exclusivo de
+admin, restaura `activo=true` y limpia esos campos de baja; conserva el cierre
+funcional y puede responder `409` por conflicto. No reabre un periodo finalizado.
+Si el registro ya está activo responde `409`, tenga o no cierre. No existe una
+operación de reapertura; una nueva participación se registra con el POST
+existente del ORV, sujeto a la protección temporal vigente.
+
 ### 3.4 Parcelas y Derechos Individuales
 - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/parcelas`: Consulta y alta parcelaria dentro del proyecto-núcleo.
 - `GET/PATCH /api/parcelas/{id_parcela}`: Consulta y actualización de datos de la parcela.

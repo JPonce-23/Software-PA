@@ -601,17 +601,22 @@ def add_orv_member(
 @router.get(
     "/orv/{id_orv}/integrantes",
     response_model=list[schemas.OrvIntegranteDetailResponse],
+    description="Lista integrantes de un ORV activo dentro del alcance de lectura del núcleo. "
+                "incluir_historico elimina el filtro temporal de los integrantes activos. "
+                "incluir_bajas añade bajas administrativas sin filtrar sus fechas. "
+                "La Persona debe permanecer activa en todos los casos.",
 )
 def list_orv_members(
     id_orv: int,
     incluir_historico: bool = False,
+    incluir_bajas: bool = False,
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     orv = _active_or_404(db, models.Orv, models.Orv.id_orv, id_orv, "ORV no encontrado")
     require_nucleus_access(db, user, orv.id_nucleo)
     return service.list_orv_members(
-        db, id_orv, include_history=incluir_historico
+        db, id_orv, include_history=incluir_historico, include_deactivated=incluir_bajas
     )
 
 

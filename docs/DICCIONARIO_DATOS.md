@@ -137,13 +137,41 @@ Eje operativo fundamental. Vincula el proyecto estratégico con el núcleo agrar
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `orv` | `numero_orv` | `VARCHAR(50)` | No | — | Número de acta o registro del ORV. | ORV | `/api/orvs` |
+| `orv` | `numero_orv` | `VARCHAR(50)` | Sí | — | Número de acta o registro del ORV. | ORV | `/api/proyecto-nucleo/{id_proyecto_nucleo}/orv` |
 | `orv` | `inicio_vigencia` / `fin_vigencia` | `DATE` | Sí | — | Periodo de ejercicio legal del Comisariado. | VIGENCIA ORV | Validación jurídica |
 | `orv` | `id_estado_registral` | `BIGINT` | Sí | `catalogo_operativo` | Estado registral de la mesa directiva. | ESTATUS ORV | Evidencia institucional |
-| `orv_integrante` | `id_persona` | `BIGINT` | No | `persona.id_persona` | Persona que ostenta el cargo ejidal. | INTEGRANTES | Acreditación en convenios |
-| `orv_integrante` | `cargo` | `VARCHAR(100)` | No | — | Presidente, Secretario, Tesorero, Consejo. | CARGO | Cláusulas de convenio |
+| `orv_integrante` | `id_persona` | `INTEGER` | No | `persona.id_persona` | Persona que ostenta el cargo ejidal. | INTEGRANTES | Acreditación en convenios |
+| `orv_integrante` | `id_organo` / `id_cargo` / `id_calidad` | `BIGINT` | No | `catalogo_operativo` | Órgano, cargo y calidad según sus catálogos; no existe columna `cargo` de texto libre. | CARGO | `/api/orv/{id_orv}/integrantes` |
+| `orv_integrante` | `fecha_inicio` / `fecha_fin` | `DATE` | Sí | — | Periodo funcional con límites inclusivos. | Vigencia del cargo | Histórico funcional |
+| `orv_integrante` | `id_tipo_fin` / `detalle_fin` | `BIGINT` / `TEXT` | Sí | `catalogo_operativo` para tipo | Causa y detalle del cierre; fecha de fin y tipo deben coexistir. | Cierre funcional | `/api/orv-integrantes/{id_orv_integrante}/finalizar` |
+| `orv_integrante` | `activo` | `BOOLEAN` | No | — | Estado administrativo; un periodo finalizado puede conservar `true`. | Sistema | Baja lógica y restauración |
+| `orv_integrante` | `fecha_baja` / `motivo_baja` / `id_usuario_baja` | `TIMESTAMPTZ` / `TEXT` / `INTEGER` | Sí | `usuario` para actor | Obligatorios en baja administrativa y nulos cuando activo. | Auditoría | DELETE / reactivar |
 | `padron_historial` | `fecha_padron` | `DATE` | No | — | Fecha de expedición del padrón ejidal. | FECHA PADRÓN | Quórum de asamblea |
 | `padron_historial` | `numero_ejidatarios_comuneros` | `INTEGER` | No | — | Total de sujetos de derecho reconocidos. | NO. SUJETOS | Verificación de mayorías |
+
+`vigente` es una propiedad calculada, no una columna: activo, inicio alcanzado
+y fin no vencido, incluyendo ambos límites. No incorpora el periodo del ORV
+padre. `finalizar` conserva el estado activo; la baja administrativa conserva el
+periodo y la causa del cierre. `reactivar` limpia únicamente los campos de baja,
+sin eliminar `fecha_fin`, `id_tipo_fin` ni `detalle_fin`.
+
+El listado conserva `OrvIntegranteDetailResponse`, incluidos los campos de baja
+ya existentes, y el orden por órgano, cargo y nombre. `incluir_historico=false`
+y `incluir_bajas=false` son los valores predeterminados:
+
+| Histórico | Bajas | Universo |
+|---|---|---|
+| false | false | Activos vigentes |
+| true | false | Todos los activos |
+| false | true | Activos vigentes más todas las bajas, independientemente de sus fechas |
+| true | true | Todos los activos y todas las bajas |
+
+La Persona permanece obligatoriamente activa. El ORV y núcleo deben estar
+activos y se conserva el acceso de lectura para admin, operador, visualizador
+y geógrafo; la opción de bajas no amplía el alcance por proyecto. No resuelve
+el actor a datos de perfil. La baja y reactivación siguen siendo exclusivas de
+admin. No se modifica la exclusión temporal por ORV/órgano/cargo/calidad para
+filas activas, ni se introduce reapertura o cambio de esquema.
 
 ### 3.2 `actividad_campo`
 Sensibilización comunitaria y caminamientos técnicos.
