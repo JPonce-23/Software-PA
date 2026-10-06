@@ -1,0 +1,5 @@
+.colectivo-detalle { margin: 16px 0; border: 1px solid #cbdace; border-radius: 8px; }
+.colectivo-detalle summary { padding: 16px; cursor: pointer; font-weight: 600; background: #eef6f0; }
+.colectivo-detalle [data-colectivo-detalle] { padding: 16px; }
+.colectivo-detalle h3 { margin-top: 20px; }
+#reporteColectivo form { margin-bottom: 16px; }

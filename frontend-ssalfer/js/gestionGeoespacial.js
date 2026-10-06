@@ -212,6 +212,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let proyectos = [];
 
     let proyectoActivo = null;
+    let revisionProyecto = 0;
+    let revisionHistorial = 0;
+    let revisionPreview = 0;
 
     let archivoActivo = null;
 
@@ -704,6 +707,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ) {
 
         procesando = valor;
+        if (elementos.selectorProyecto) elementos.selectorProyecto.disabled = valor;
 
 
         if (elementos.btnPreparar) {
@@ -849,6 +853,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     function seleccionarProyecto(idProyecto) {
+        ++revisionProyecto;
+        ++revisionHistorial;
+        ++revisionPreview;
 
         const id =
             Number(idProyecto);
@@ -1412,6 +1419,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     async function cargarHistorial() {
+        const revision = ++revisionHistorial;
+        const idProyectoConsulta = proyectoActivo?.id_proyecto;
 
         if (!proyectoActivo) {
 
@@ -1457,6 +1466,8 @@ document.addEventListener("DOMContentLoaded", () => {
             await obtenerImportacionesProyecto(
                 proyectoActivo.id_proyecto
             );
+
+        if (revision !== revisionHistorial || idProyectoConsulta !== proyectoActivo?.id_proyecto) return;
 
 
         if (
@@ -2043,6 +2054,8 @@ document.addEventListener("DOMContentLoaded", () => {
     async function mostrarPreview(
         importacion
     ) {
+        if (Number(importacion.id_proyecto) !== Number(proyectoActivo?.id_proyecto)) return;
+        const revision = ++revisionPreview, contexto = revisionProyecto;
 
         importacionActiva =
             importacion;
@@ -2084,6 +2097,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 importacion.id_importacion
             );
 
+        if (revision !== revisionPreview || contexto !== revisionProyecto) return;
+
 
         renderizarFeatures(
             features
@@ -2105,6 +2120,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function abrirImportacion(
         idImportacion
     ) {
+        const contexto = revisionProyecto, revision = ++revisionPreview;
 
         limpiarMensajes();
 
@@ -2121,6 +2137,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     idImportacion
                 );
 
+            if (contexto !== revisionProyecto || revision !== revisionPreview) return;
+
 
             limpiarMensajes();
 
@@ -2130,6 +2148,7 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
         } catch (error) {
+            if (contexto !== revisionProyecto) return;
 
             limpiarMensajes();
 
@@ -2377,7 +2396,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ) {
 
                 mostrarError(
-                    "El backend procesó el archivo, pero encontró errores que impiden su importación."
+                    "El archivo contiene errores que impiden su importación. Revisa el detalle de la previsualización."
                 );
 
             } else {
@@ -2469,10 +2488,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
-        const continuar =
-            window.confirm(
-                "¿Confirmas la incorporación de estas geometrías a la información vigente del proyecto?"
-            );
+        const importacionConfirmada = importacionActiva;
+        const contextoConfirmado = revisionProyecto;
+        if (Number(importacionConfirmada.id_proyecto) !== Number(proyectoActivo?.id_proyecto)) {
+            mostrarError("Selecciona una importación del proyecto actual.");
+            return;
+        }
+        const continuar = await window.SSALFER_UI.confirmar(
+            `¿Confirmas incorporar estas geometrías al proyecto ${nombreProyecto(proyectoActivo)}?`,
+            "Confirmar importación geoespacial"
+        );
+        if (contextoConfirmado !== revisionProyecto || importacionActiva !== importacionConfirmada || procesando) return;
 
 
         if (!continuar) {
@@ -2480,7 +2506,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
-        procesando = true;
+        establecerProcesando(true);
 
 
         if (
@@ -2503,7 +2529,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const actualizada =
                 await window.ClienteAPI.post(
-                    `/importaciones/${importacionActiva.id_importacion}/confirmar`,
+                    `/importaciones/${importacionConfirmada.id_importacion}/confirmar`,
                     {
                         confirmacion_explicita: true,
 
@@ -2559,8 +2585,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } finally {
 
-            procesando =
-                false;
+            establecerProcesando(false);
 
 
             if (

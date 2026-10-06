@@ -1,5 +1,7 @@
 (() => {
     "use strict";
+    const colecciones = new Map();
+    let secuencia = 0;
 
     async function cargar(objetivos) {
         const unicos = new Map(objetivos.filter(([, id]) => Number(id) > 0)
@@ -16,6 +18,9 @@
         if (resultados.some(resultado => resultado.status === "rejected")) {
             window.SSALFER_UI.toast("No se pudieron cargar todos los documentos. Vuelve a abrir la ficha para reintentar.", { tipo: "error" });
         }
+        colecciones.set(++secuencia, { documentos, objetivos: [...unicos.values()] });
+        const nucleo = [...unicos.values()].find(([tipo]) => tipo === "proyecto_nucleo");
+        if (nucleo) window.dispatchEvent(new CustomEvent("ssalfer:contexto-documentos", { detail: { idProyectoNucleo: Number(nucleo[1]) } }));
         return documentos;
     }
 
@@ -27,7 +32,8 @@
 
     function opciones(documentos, actual = null) {
         const escape = window.SSALFER_UI.escaparHTML;
-        let html = '<option value="">Sin documento asociado</option>';
+        const clave = [...colecciones].find(([, c]) => c.documentos === documentos)?.[0] || "";
+        let html = `<option value="" data-documentos-coleccion="${clave}">Sin documento asociado</option>`;
         const ids = [...documentos.keys()];
         if (Number(actual) > 0 && !documentos.has(Number(actual))) ids.push(Number(actual));
         for (const id of ids) {
@@ -36,5 +42,16 @@
         return html;
     }
 
-    window.SSALFER_DOCUMENTOS = Object.freeze({ cargar, nombre, opciones });
+    async function refrescar(tipo, id) {
+        const resultado = await window.DocumentosAPI.listarPorEntidad(tipo, id);
+        for (const [clave, coleccion] of colecciones) {
+            if (!coleccion.objetivos.some(([t, i]) => t === tipo && Number(i) === Number(id))) continue;
+            resultado.forEach(d => coleccion.documentos.set(Number(d.id_documento), d));
+            document.querySelectorAll(`option[data-documentos-coleccion="${clave}"]`).forEach(opcion => {
+                const select = opcion.parentElement, actual = select.value;
+                select.innerHTML = opciones(coleccion.documentos, actual);
+            });
+        }
+    }
+    window.SSALFER_DOCUMENTOS = Object.freeze({ cargar, nombre, opciones, refrescar });
 })();

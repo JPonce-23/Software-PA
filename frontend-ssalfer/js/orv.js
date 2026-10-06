@@ -91,6 +91,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     let idIntegranteFinalizando = null;
 
     let puedeCapturar = false;
+    let esAdministrador = false;
+    const bajasEstaSesion = new Map();
 
     let estadosRegistrales = [];
     let organos = [];
@@ -199,6 +201,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const rol = sesion?.user?.rol;
 
+        esAdministrador = rol === "admin";
         puedeCapturar =
             rol === "admin" ||
             rol === "operador";
@@ -1042,7 +1045,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         elementos.sinIntegrantes.hidden =
             integrantes.length > 0;
 
-        integrantes.forEach(integrante => {
+        [...integrantes, ...[...bajasEstaSesion.values()].filter(i => Number(i.id_orv) === Number(idOrvSeleccionado))].forEach(integrante => {
 
             const estaFinalizado =
                 Boolean(
@@ -1107,7 +1110,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         Estado:
                         <strong>
                             ${
-                                estaFinalizado
+                                integrante.activo === false ? "Registro dado de baja" : estaFinalizado
                                     ? "Finalizado"
                                     : "Vigente"
                             }
@@ -1116,7 +1119,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 </div>
 
                 ${
-                    puedeCapturar
+                    puedeCapturar && integrante.activo !== false
                         ? `
                             <div class="integrante-acciones">
 
@@ -1136,15 +1139,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                                                 class="btn-secundario"
                                                 data-finalizar-integrante="${integrante.id_orv_integrante}">
                                                 <i class="bi bi-check-circle"></i>
-                                                Finalizar
+                                                Finalizar participación
                                             </button>
                                         `
                                         : ""
                                 }
 
+                                ${esAdministrador ? `<button type="button" class="btn-secundario" data-baja-integrante="${integrante.id_orv_integrante}">Eliminar registro</button>` : ""}
                             </div>
                         `
-                        : ""
+                        : esAdministrador && integrante.activo === false ? `<button type="button" class="btn-secundario" data-reactivar-integrante="${integrante.id_orv_integrante}">Reactivar registro</button>` : ""
                 }
             `;
 
@@ -1398,54 +1402,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                     SELECCIONAR PERSONA
     ====================================================== */
 
-    /*
-     * El backend actual no ofrece un listado/buscador general
-     * de personas del proyecto.
-     *
-     * Para no dejar otro botón falso, permitimos indicar
-     * una persona existente por su ID. El backend valida
-     * posteriormente que exista y esté activa.
-     */
-    elementos.btnBuscarPersona?.addEventListener(
-        "click",
-        async () => {
-            if (idIntegranteEditando) {
-                return;
-            }
-
-            const valor = await window.SSALFER_UI.solicitarTexto(
-                "Identificador de una persona ya registrada. La búsqueda por nombre aún no está disponible.",
-                { titulo: "Seleccionar persona", minimo: 1, maximo: 16, textoAceptar: "Consultar", validar: valor => /^\d+$/.test(valor) && Number.isSafeInteger(Number(valor)) && Number(valor) > 0 ? null : "Indica un identificador numérico mayor que cero." }
-            );
-
-            if (valor === null) {
-                return;
-            }
-
-            const idPersona =
-                Number(valor.trim());
-
-            if (
-                !Number.isInteger(idPersona) ||
-                idPersona <= 0
-            ) {
-                window.SSALFER_UI.toast("El ID de persona no es válido.", { tipo: "error" });
-
-                return;
-            }
-
-            try {
-                const persona = await window.PersonasAPI.obtener(idPersona);
-                if (persona.activo === false) throw new Error("Esta persona está dada de baja. Selecciona una persona activa.");
-                if (idIntegranteEditando || elementos.formularioIntegrante.hidden) return;
-                elementos.idPersonaIntegrante.value = idPersona;
-                elementos.personaIntegrante.value = nombrePersona(persona);
-            } catch (error) {
-                window.ClienteAPI.mostrarErrorAPI(error);
-            }
-        }
-    );
-
+    elementos.btnBuscarPersona?.addEventListener("click", async () => {
+        if (idIntegranteEditando) return;
+        elementos.btnBuscarPersona.disabled = true;
+        try {
+            const persona = await window.SSALFER_DIRECTORIO.seleccionar(Number(idProyectoNucleo));
+            if (!persona || idIntegranteEditando || elementos.formularioIntegrante.hidden) return;
+            elementos.idPersonaIntegrante.value = persona.id_persona;
+            elementos.personaIntegrante.value = nombrePersona(persona);
+        } catch (error) { window.ClienteAPI.mostrarErrorAPI(error); }
+        finally { elementos.btnBuscarPersona.disabled = false; }
+    });
 
     function limpiarFormularioFinalizarIntegrante() {
 
@@ -1808,7 +1775,23 @@ elementos
 
     elementos.integrantesLista?.addEventListener(
         "click",
-        event => {
+        async event => {
+            const ciclo = event.target.closest("[data-baja-integrante], [data-reactivar-integrante]");
+            if (ciclo && esAdministrador && !ciclo.disabled) {
+                ciclo.disabled = true;
+                try {
+                    const id = Number(ciclo.dataset.bajaIntegrante || ciclo.dataset.reactivarIntegrante);
+                    if (ciclo.dataset.bajaIntegrante) {
+                        const integrante = integrantes.find(i => Number(i.id_orv_integrante) === id);
+                        if (await window.SSALFER_GESTION.baja(`el registro de ${nombrePersona(integrante)}. Esto es una baja administrativa y no finaliza su vigencia de participación`, motivo => window.OrvAPI.eliminarIntegrante(id, motivo))) bajasEstaSesion.set(id, { ...integrante, activo: false });
+                    } else if (await window.SSALFER_UI.confirmar("Se restaurará el registro conservando sus fechas de participación.", "Reactivar integrante")) {
+                        await window.OrvAPI.reactivarIntegrante(id); bajasEstaSesion.delete(id); window.SSALFER_UI.toast("Registro reactivado.");
+                    }
+                    await cargarIntegrantes();
+                } catch (error) { window.ClienteAPI.mostrarErrorAPI(error); }
+                finally { ciclo.disabled = false; }
+                return;
+            }
 
 
             /* =================================================

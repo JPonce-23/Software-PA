@@ -136,6 +136,8 @@
 
 
     window.OrvAPI = {
+        reactivarIntegrante: id => window.ClienteAPI.post(`/orv-integrantes/${id}/reactivar`, null),
+        eliminarIntegrante: (id, motivo) => window.ClienteAPI.del(`/orv-integrantes/${id}`, { motivo }),
 
         listarPorProyectoNucleo,
 

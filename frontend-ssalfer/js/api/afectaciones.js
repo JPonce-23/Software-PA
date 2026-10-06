@@ -6,8 +6,9 @@
 
     const { get, post, patch, del } = window.ClienteAPI;
 
-    function listarPorProyectoNucleo(idProyectoNucleo) {
-        return get(`/proyecto-nucleo/${idProyectoNucleo}/afectaciones`);
+    function listarPorProyectoNucleo(idProyectoNucleo, filtros = {}) {
+        const query = new URLSearchParams(filtros).toString();
+        return get(`/proyecto-nucleo/${idProyectoNucleo}/afectaciones${query ? `?${query}` : ""}`);
     }
 
     function crear(idProyectoNucleo, payload) {

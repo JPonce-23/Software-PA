@@ -23,6 +23,7 @@
         sizes="40x40"
         href="/img/LOGOS VERDE/IMAGOTIPO.png">
 
+<link rel="stylesheet" href="/styles/gestion.css">
 </head>
 
 
@@ -260,7 +261,7 @@
             <p>
                 Las personas se registran desde el contexto del proyecto
                 y posteriormente pueden ser referenciadas por otros
-                módulos del sistema mediante su identificador.
+                módulos del sistema mediante el directorio del núcleo.
             </p>
 
         </div>
@@ -316,16 +317,10 @@
                 <div class="campo">
 
                     <label for="busqueda">
-                        ID de persona
+                        Núcleo del proyecto
                     </label>
 
-                    <input
-                        type="number"
-                        id="busqueda"
-                        min="1"
-                        step="1"
-                        placeholder="Ej. 15"
-                    >
+                    <select id="busqueda"><option value="">Cargando núcleos…</option></select>
 
                 </div>
 
@@ -359,9 +354,7 @@
 
 
             <small>
-                El backend actual permite consultar una persona
-                mediante su ID. La búsqueda por nombre o CURP
-                requiere todavía un endpoint de búsqueda.
+                Selecciona un núcleo para buscar personas ya referenciadas en sus registros. El directorio no incluye a todas las personas del sistema.
             </small>
 
         </section>
@@ -424,7 +417,7 @@
             </p>
 
             <span>
-                Consulta una persona por su ID o registra una nueva.
+                Elige una persona del directorio o registra una nueva.
             </span>
 
         </div>
@@ -828,6 +821,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <script src="/js/dashboard.js"></script>
 
+<script src="/js/utils/gestion.js"></script>
+<script src="/js/utils/contexto.js"></script>
+<script src="/js/utils/directorioPersonas.js"></script>
 <script src="/js/persona.js"></script>
 
 

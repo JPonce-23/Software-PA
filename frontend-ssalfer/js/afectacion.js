@@ -77,6 +77,11 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
     function mostrarFormulario() {
+        if (parametros.get("tipo") === "colectivo") {
+            const tipo = form.elements.namedItem("tipo_afectacion");
+            tipo.value = "colectivo";
+            [...tipo.options].forEach(opcion => { opcion.disabled = opcion.value !== "colectivo"; });
+        }
         formulario.hidden =
             false;
 
@@ -593,8 +598,7 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
         const resultado = {
-            tipo_afectacion:
-                datos.get(
+            tipo_afectacion: parametros.get("tipo") === "colectivo" ? "colectivo" : datos.get(
                     "tipo_afectacion"
                 ),
 

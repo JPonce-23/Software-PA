@@ -33,6 +33,7 @@
     }
 
     window.CatalogosAPI = {
+        buscarNucleos: (params = {}) => get(`/catalogos/nucleos?${new URLSearchParams(params)}`),
         obtenerOperativo,
         obtenerEntidades,
         obtenerMunicipios,

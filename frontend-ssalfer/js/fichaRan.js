@@ -235,21 +235,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
 
-    /*
-     * El backend NO tiene endpoint para modificar
-     * TramiteRan directamente.
-     *
-     * Por lo tanto ocultamos los dos botones que
-     * actualmente prometen una edición inexistente.
-     */
-    [
-        elementos.btnEditarTramite,
-        elementos.btnEditarDatos
-    ].forEach(boton => {
-        if (boton) {
-            boton.hidden = true;
-            boton.style.display = "none";
-        }
+    [elementos.btnEditarTramite, elementos.btnEditarDatos].forEach(boton => {
+        if (!boton) return; boton.hidden = !puedeCapturar; boton.style.display = puedeCapturar ? "" : "none"; boton.textContent = "Editar fecha programada";
+        boton.addEventListener("click", async () => { if(!tramite)return; boton.disabled=true; try { if(await window.SSALFER_EDICIONES.ran(tramite)) { tramite = await window.TramitesRanAPI.obtener(idTramiteRan); const campo=elementos.fechaProgramada;if(campo)campo.textContent=window.SSALFER_FORMAT.formatearFecha(tramite.fecha_programada_ingreso); } }catch(error){window.ClienteAPI.mostrarErrorAPI(error);}finally{boton.disabled=false;} });
     });
 
     if (

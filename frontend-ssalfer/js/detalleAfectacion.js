@@ -1339,7 +1339,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             <th>Unidad agraria</th>
                             <th>Superficie preliminar</th>
                             <th>Superficie afectada</th>
-                            <th>Fuente</th>
+                            <th>Fuente</th><th>Acciones</th>
                         </tr>
                     </thead>
 
@@ -1356,7 +1356,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                                     ?.referencia_alfanumerica ||
                                                 unidad.unidad_agraria
                                                     ?.referencia_normalizada ||
-                                                `Unidad #${unidad.id_unidad_agraria}`
+                                                "Unidad sin referencia"
                                             )}
                                         </td>
 
@@ -1379,6 +1379,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                             )}
                                         </td>
 
+<td><button type="button" class="btn-secundario" data-quitar-unidad="${unidad.id_afectacion_unidad}">Quitar vínculo</button></td>
                                     </tr>
                                 `
                             )
@@ -1390,6 +1391,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             </div>
         `;
+        contenedor.querySelectorAll("[data-quitar-unidad]").forEach(b => b.addEventListener("click", async () => { b.disabled=true; try { if(await window.SSALFER_GESTION.baja("el vínculo de esta unidad con la afectación", motivo=>window.UnidadesAgrariasAPI.eliminarVinculo(Number(b.dataset.quitarUnidad),motivo))) { afectacion=await window.AfectacionesAPI.obtener(idAfectacion); pintarUnidadesAgrarias(); } }catch(error){window.ClienteAPI.mostrarErrorAPI(error);}finally{b.disabled=false;} }));
     }
 
     pintarUnidadesAgrarias();

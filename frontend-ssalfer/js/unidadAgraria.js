@@ -130,12 +130,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (elementos.btnAgregarTitular) {
             elementos.btnAgregarTitular.hidden =
-                !puedeCapturar || !unidadSeleccionada?.id_parcela;
+                !puedeCapturar || !unidadSeleccionada;
 
             elementos.btnAgregarTitular.title =
                 unidadSeleccionada?.id_parcela
                     ? "Agregar un titular desde la parcela relacionada"
-                    : "Relaciona primero una parcela con titulares para habilitar esta acción";
+                    : "Agregar una persona del directorio del núcleo";
         }
     }
 
@@ -462,7 +462,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const referencia =
             unidad.referencia_alfanumerica ||
             unidad.referencia_normalizada ||
-            `Unidad #${unidad.id_unidad_agraria}`;
+            "Unidad sin referencia";
 
         article.innerHTML = `
             <div class="unidad-icono">
@@ -599,10 +599,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (elementos.btnAgregarTitular) {
             elementos.btnAgregarTitular.hidden =
-                !puedeCapturar || !unidadSeleccionada.id_parcela;
+                !puedeCapturar;
             elementos.btnAgregarTitular.title = unidadSeleccionada.id_parcela
                 ? "Agregar un titular desde la parcela relacionada"
-                : "Relaciona primero una parcela con titulares para habilitar esta acción";
+                : "Agregar una persona del directorio del núcleo";
         }
 
         await cargarTitularesUnidad();
@@ -690,7 +690,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        lista.forEach(titular => {
+        for (const titular of lista) {
             const nombre =
                 titular.id_parcela_titular
                     ? (
@@ -699,9 +699,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 titular.id_parcela_titular
                             )
                         ) ||
-                        `Titular de parcela #${titular.id_parcela_titular}`
+                        "Titular de parcela sin nombre disponible"
                     )
-                    : `Persona #${titular.id_persona}`;
+                    : window.SSALFER_CONTEXTO.nombrePersona(await window.SSALFER_CONTEXTO.persona(titular.id_persona));
 
             const article =
                 document.createElement(
@@ -745,10 +745,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                 </div>
             `;
 
+            if (puedeCapturar) {
+                const acciones = document.createElement("div"); acciones.innerHTML = window.SSALFER_GESTION.boton("Editar", "editar") + window.SSALFER_GESTION.boton("Dar de baja", "baja");
+                acciones.addEventListener("click", async event => { const b=event.target.closest("button"); if(!b || b.disabled)return; b.disabled=true; try { const modificado=b.dataset.gestion === "editar" ? await window.SSALFER_EDICIONES.unidad(titular,unidadSeleccionada,idProyectoNucleo) : await window.SSALFER_GESTION.baja("este titular de la unidad",motivo=>window.UnidadesAgrariasAPI.eliminarTitular(titular.id_unidad_titular,motivo)); if(modificado)await cargarTitularesUnidad(); } catch(error){window.ClienteAPI.mostrarErrorAPI(error);} finally{b.disabled=false;} }); article.appendChild(acciones);
+            }
             elementos.titularesUnidadContainer.appendChild(
                 article
             );
-        });
+        }
     }
 
     function crearModalTitularUnidad(opciones) {
@@ -1011,60 +1015,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function abrirAgregarTitular() {
-        if (
-            !puedeCapturar ||
-            !unidadSeleccionada
-        ) {
-            return;
-        }
-
-        if (!unidadSeleccionada.id_parcela) {
-            window.SSALFER_UI.toast("Para seleccionar un titular desde la interfaz, primero relaciona la unidad con una parcela que tenga titulares registrados.", { tipo: "error" });
-
-            return;
-        }
-
-        try {
-            const titulares =
-                await window.ParcelasAPI.listarTitulares(
-                    unidadSeleccionada.id_parcela
-                );
-
-            const opciones =
-                (
-                    Array.isArray(titulares)
-                        ? titulares
-                        : []
-                ).map(titular => ({
-                    id:
-                        titular.id_parcela_titular,
-
-                    nombre:
-                        [
-                            titular.nombre,
-                            titular.apellido_paterno,
-                            titular.apellido_materno
-                        ]
-                            .filter(Boolean)
-                            .join(" ") ||
-                        `Titular #${titular.id_parcela_titular}`
-                }));
-
-            if (opciones.length === 0) {
-                window.SSALFER_UI.toast("La parcela relacionada todavía no tiene titulares. Registra primero un titular en la ficha de la parcela.", { tipo: "error" });
-
-                return;
-            }
-
-            crearModalTitularUnidad(
-                opciones
-            );
-
-        } catch (error) {
-            window.ClienteAPI.mostrarErrorAPI(
-                error
-            );
-        }
+        if (!puedeCapturar || !unidadSeleccionada) return;
+        try { if(await window.SSALFER_EDICIONES.unidad(null,unidadSeleccionada,idProyectoNucleo)) await cargarTitularesUnidad(); }
+        catch(error){window.ClienteAPI.mostrarErrorAPI(error);}
     }
 
     function obtenerDatosVinculacion() {

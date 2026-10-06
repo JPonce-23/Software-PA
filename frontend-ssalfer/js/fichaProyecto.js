@@ -184,6 +184,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 )}`;
         }
 
+        const enlaceColectivos = document.getElementById("enlaceReporteColectivos");
+        if (enlaceColectivos) enlaceColectivos.href = `/pages/reportesColectivos.html?id_proyecto=${encodeURIComponent(idProyecto)}`;
         if (elementos.enlaceReporteConvenios) {
             elementos.enlaceReporteConvenios.href =
                 `/pages/reportesConvenios.html?id_proyecto=${encodeURIComponent(idProyecto)}`;
@@ -583,6 +585,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     ====================================================== */
 
     function limpiarFormularioNucleo() {
+        ++revisionBusquedaRan;
+        document.getElementById("buscarNucleoRan").value = "";
+        document.getElementById("nucleoCatalogoRan").replaceChildren(new Option("Busca para ver los núcleos disponibles", ""));
+        document.getElementById("nucleoCatalogoRan").disabled = true;
+        document.getElementById("resultadoCatalogoRan").textContent = "";
+        document.getElementById("nucleoAltaExcepcional").checked = false;
+        mostrarAltaExcepcional();
         elementos.nucleoEntidad.value = "";
 
         elementos.nucleoMunicipio.innerHTML =
@@ -600,6 +609,37 @@ document.addEventListener("DOMContentLoaded", async () => {
             elementos.nuevoNucleoError
         );
     }
+
+    let revisionBusquedaRan = 0;
+    const catalogoRan = document.getElementById("nucleoCatalogoRan");
+    const altaExcepcional = document.getElementById("nucleoAltaExcepcional");
+    function mostrarAltaExcepcional() {
+        const excepcional = altaExcepcional.checked;
+        elementos.nucleoNombre.closest(".campo").hidden = !excepcional;
+        elementos.nucleoTipoTenencia.closest(".campo").hidden = !excepcional;
+        document.getElementById("avisoAltaExcepcional").hidden = !excepcional;
+        elementos.btnGuardarNucleo.textContent = excepcional ? "Crear y vincular núcleo" : "Vincular núcleo seleccionado";
+    }
+    altaExcepcional.addEventListener("change", mostrarAltaExcepcional);
+    const invalidarCatalogo = () => { ++revisionBusquedaRan; catalogoRan.replaceChildren(new Option("Busca para ver los núcleos disponibles", "")); catalogoRan.disabled = true; };
+    ["buscarNucleoRan", "nucleoEntidad", "nucleoMunicipio"].forEach(nombre => document.getElementById(nombre).addEventListener(nombre === "buscarNucleoRan" ? "input" : "change", invalidarCatalogo));
+    document.getElementById("btnBuscarNucleoRan").addEventListener("click", async () => {
+        const actual = ++revisionBusquedaRan;
+        const params = { limit: 100 };
+        const q = document.getElementById("buscarNucleoRan").value.trim(); if (q) params.q = q;
+        if (elementos.nucleoEntidad.value) params.id_entidad = elementos.nucleoEntidad.value;
+        if (elementos.nucleoMunicipio.value) params.id_municipio = elementos.nucleoMunicipio.value;
+        catalogoRan.disabled = true; catalogoRan.replaceChildren(new Option("Buscando…", ""));
+        try {
+            const resultados = await window.CatalogosAPI.buscarNucleos(params);
+            if (actual !== revisionBusquedaRan) return;
+            catalogoRan.replaceChildren(new Option(resultados.length ? "Selecciona un núcleo" : "No se encontraron núcleos", ""));
+            resultados.forEach(n => catalogoRan.add(new Option(`${n.nombre_nucleo} · ${n.tipo_tenencia} · ${n.municipio}, ${n.entidad}`, n.id_nucleo)));
+            catalogoRan.disabled = !resultados.length;
+            document.getElementById("resultadoCatalogoRan").textContent = resultados.length === 100 ? "Se muestran los primeros 100 resultados. Precisa el nombre o los filtros." : `${resultados.length} núcleos encontrados.`;
+        } catch (error) { if (actual === revisionBusquedaRan) { catalogoRan.replaceChildren(new Option("No fue posible buscar", "")); mostrarMensajeError(elementos.nuevoNucleoError, error.message); } }
+    });
+    document.getElementById("buscarNucleoRan").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); document.getElementById("btnBuscarNucleoRan").click(); } });
 
     async function cargarCatalogosNucleo() {
         if (catalogosNucleoCargados) {
@@ -741,6 +781,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 idEntidad
                             );
 
+                    if (elementos.nucleoEntidad.value !== idEntidad) return;
+
                     for (
                         const municipio of
                         Array.isArray(municipios)
@@ -803,7 +845,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     await cargarCatalogosNucleo();
 
                 if (cargados) {
-                    elementos.nucleoNombre.focus({ preventScroll: true });
+                    document.getElementById("buscarNucleoRan").focus({ preventScroll: true });
                 }
             }
         );
@@ -828,6 +870,20 @@ document.addEventListener("DOMContentLoaded", async () => {
                 limpiarMensajeError(
                     elementos.nuevoNucleoError
                 );
+
+                if (!altaExcepcional.checked) {
+                    const idNucleo = Number(catalogoRan.value);
+                    if (!idNucleo || catalogoRan.disabled) { mostrarMensajeError(elementos.nuevoNucleoError, "Busca y selecciona un núcleo del catálogo."); return; }
+                    elementos.btnGuardarNucleo.disabled = true;
+                    try {
+                        await window.NucleosAPI.vincularAProyecto(idProyecto, { id_nucleo: idNucleo });
+                        nucleos = await window.NucleosAPI.listarPorProyecto(idProyecto); renderNucleos();
+                        limpiarFormularioNucleo(); elementos.formNuevoNucleo.hidden = true;
+                        window.SSALFER_UI.toast("Núcleo vinculado correctamente al proyecto.");
+                    } catch (error) { mostrarMensajeError(elementos.nuevoNucleoError, error.message); }
+                    finally { elementos.btnGuardarNucleo.disabled = false; }
+                    return;
+                }
 
                 const idMunicipio =
                     Number(
@@ -913,13 +969,15 @@ document.addEventListener("DOMContentLoaded", async () => {
                             );
 
                     } catch (errorVinculo) {
+                        catalogoRan.replaceChildren(new Option(nombreNucleo, nucleoCreado.id_nucleo));
+                        catalogoRan.disabled = false; altaExcepcional.checked = false; mostrarAltaExcepcional();
                         throw new Error(
-                            `El núcleo se creó con ID ${nucleoCreado.id_nucleo}, ` +
+                            `El núcleo ${nombreNucleo} se creó, ` +
                             "pero no pudo vincularse al proyecto. " +
                             (
                                 errorVinculo?.mensaje ||
                                 errorVinculo?.message ||
-                                "Revisa el backend antes de volver a intentarlo."
+                                "Intenta vincular el núcleo seleccionado nuevamente."
                             )
                         );
                     }

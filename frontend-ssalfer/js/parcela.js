@@ -817,8 +817,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                     </div>
                 `;
 
-                elementos.titularesContainer
-                    .appendChild(article);
+                if (puedeCapturar) {
+                    const editar = document.createElement("button"); editar.type = "button"; editar.className = "btn-secundario"; editar.textContent = "Editar titular";
+                    editar.addEventListener("click", async () => { editar.disabled = true; try { if (await window.SSALFER_EDICIONES.parcela(titular)) await cargarTitulares(); } catch(error) { window.ClienteAPI.mostrarErrorAPI(error); } finally { editar.disabled = false; } }); article.appendChild(editar);
+                }
+                elementos.titularesContainer.appendChild(article);
 
                 agregarOpcionPersona(
                     titular.id_persona,

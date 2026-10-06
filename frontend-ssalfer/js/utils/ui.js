@@ -65,10 +65,12 @@
         return `<dl class="ssalfer-modal__grid">${filas}</dl>`;
     }
 
-    function abrirModal({ titulo = "Detalle", contenido = "", acciones = [], validar } = {}) {
+    let secuenciaModal = 0;
+    function abrirModal({ titulo = "Detalle", contenido = "", acciones = [], validar, preparar } = {}) {
         return new Promise(resolve => {
             const fondo = document.createElement("div");
             fondo.className = "ssalfer-modal-backdrop";
+            const tituloId = `ssalferModalTitle-${++secuenciaModal}`;
 
             const botones = (acciones.length ? acciones : [
                 { valor: true, texto: "Cerrar", principal: true }
@@ -82,9 +84,9 @@
             `).join("");
 
             fondo.innerHTML = `
-                <section class="ssalfer-modal" role="dialog" aria-modal="true" aria-labelledby="ssalferModalTitle">
+                <section class="ssalfer-modal" role="dialog" aria-modal="true" aria-labelledby="${tituloId}">
                     <header class="ssalfer-modal__header">
-                        <h2 id="ssalferModalTitle" class="ssalfer-modal__title">${escaparHTML(titulo)}</h2>
+                        <h2 id="${tituloId}" class="ssalfer-modal__title">${escaparHTML(titulo)}</h2>
                         <button type="button" class="ssalfer-modal__close" data-modal-cerrar aria-label="Cerrar">×</button>
                     </header>
                     <div class="ssalfer-modal__body">${contenido}</div>
@@ -93,19 +95,30 @@
             `;
 
             let resuelto = false;
+            let pendiente = false;
+            const focoAnterior = document.activeElement;
             const cerrar = valor => {
                 if (resuelto) return;
                 resuelto = true;
                 document.removeEventListener("keydown", onKeydown);
                 fondo.remove();
+                if (focoAnterior?.isConnected) focoAnterior.focus({ preventScroll: true });
                 resolve(valor);
             };
 
             const onKeydown = event => {
-                if (event.key === "Escape") cerrar(null);
+                if (fondo !== [...document.querySelectorAll(".ssalfer-modal-backdrop")].at(-1)) return;
+                if (event.key === "Escape" && !pendiente) { event.preventDefault(); cerrar(null); }
+                if (event.key === "Tab") {
+                    const controles = [...fondo.querySelectorAll('button, input, select, textarea, a[href], [tabindex="0"]')].filter(n => !n.disabled && n.getClientRects().length);
+                    const primero = controles[0], ultimo = controles.at(-1);
+                    if (event.shiftKey && document.activeElement === primero) { event.preventDefault(); ultimo?.focus(); }
+                    else if (!event.shiftKey && document.activeElement === ultimo) { event.preventDefault(); primero?.focus(); }
+                }
             };
 
-            fondo.addEventListener("click", event => {
+            fondo.addEventListener("click", async event => {
+                if (pendiente) return;
                 if (event.target === fondo || event.target.closest("[data-modal-cerrar]")) {
                     cerrar(null);
                     return;
@@ -116,12 +129,28 @@
 
                 const indice = Number(boton.dataset.modalAccion);
                 const valor = acciones.length ? acciones[indice]?.valor : true;
-                if (validar && !validar(valor, fondo)) return;
-                cerrar(valor);
+                pendiente = true;
+                const controles = [...fondo.querySelectorAll("[data-modal-accion], [data-modal-cerrar]")];
+                controles.forEach(control => { control.disabled = true; });
+                try {
+                    if (validar && !await validar(valor, fondo)) return;
+                    cerrar(valor);
+                } catch (error) {
+                    toast(error.message || "No se pudo completar la acción.", { tipo: "error" });
+                } finally {
+                    pendiente = false;
+                    controles.forEach(control => { control.disabled = false; });
+                }
+            });
+
+            fondo.addEventListener("submit", event => {
+                event.preventDefault();
+                fondo.querySelector(".ssalfer-modal__button--primary")?.click();
             });
 
             document.addEventListener("keydown", onKeydown);
             document.body.appendChild(fondo);
+            preparar?.(fondo);
             fondo.querySelector("[data-modal-accion], [data-modal-cerrar]")?.focus();
         });
     }

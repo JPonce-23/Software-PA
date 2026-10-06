@@ -39,8 +39,8 @@
         return patch(`/proyecto-nucleo/${idProyectoNucleo}`, payload);
     }
 
-    function eliminarProyectoNucleo(idProyectoNucleo) {
-        return window.ClienteAPI.del(`/proyecto-nucleo/${idProyectoNucleo}`);
+    function eliminarProyectoNucleo(idProyectoNucleo, motivo) {
+        return window.ClienteAPI.del(`/proyecto-nucleo/${idProyectoNucleo}`, { motivo });
     }
 
     function listarReferencias(idProyectoNucleo) {

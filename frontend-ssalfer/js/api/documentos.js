@@ -19,8 +19,8 @@
         return patch(`/documentos/${idDocumento}`, payload);
     }
 
-    function eliminar(idDocumento) {
-        return del(`/documentos/${idDocumento}`);
+    function eliminar(idDocumento, motivo) {
+        return del(`/documentos/${idDocumento}`, { motivo });
     }
 
     function listarVersiones(idDocumento) {
@@ -60,7 +60,7 @@
     }
 
     function listarCatalogoRequisitos() {
-        return get("/catalogos/requisitos-documentales");
+        return window.CatalogosAPI.obtenerRequisitosDocumentales();
     }
 
 

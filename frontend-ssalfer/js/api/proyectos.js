@@ -8,8 +8,9 @@
 
     const { get, post, patch, del } = window.ClienteAPI;
 
-    function listar() {
-        return get("/proyectos");
+    function listar(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return get(`/proyectos${query ? `?${query}` : ""}`);
     }
 
     function obtener(idProyecto) {
@@ -45,6 +46,7 @@
     }
 
     window.ProyectosAPI = {
+        revocarUsuario: (idProyecto, idUsuario, motivo) => del(`/proyectos/${idProyecto}/usuarios/${idUsuario}`, { motivo }),
         listar,
         obtener,
         crear,

@@ -113,6 +113,7 @@
     }
 
     window.TramitesRanAPI = {
+        actualizar: (id, datos) => patch(`/tramites-ran/${id}`, datos),
         crear,
         obtener,
         listarPorAsamblea,

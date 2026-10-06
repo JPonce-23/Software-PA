@@ -2450,13 +2450,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     async function cargarMapaDeProyecto(
-        proyecto
+        proyecto,
+        cargaActual
     ) {
 
         const geojson =
             await obtenerMapaProyecto(
                 proyecto.id_proyecto
             );
+
+        // Una respuesta anterior no debe volver a colocar capas de otro proyecto.
+        if (cargaActual !== tokenCarga) return { total: 0, agregadas: 0 };
 
 
         const features =
@@ -3624,7 +3628,8 @@ document.addEventListener("DOMContentLoaded", () => {
         ] = await Promise.allSettled([
 
             cargarMapaDeProyecto(
-                proyecto
+                proyecto,
+                cargaActual
             ),
 
             obtenerNucleosProyecto(

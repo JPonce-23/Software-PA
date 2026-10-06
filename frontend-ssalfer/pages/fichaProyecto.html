@@ -465,6 +465,7 @@
             <p>Consulta reportes operativos del proyecto.</p>
 
             <div class="reportes-accesos">
+<a id="enlaceReporteColectivos" class="ssalfer-link" href="/pages/reportesColectivos.html">Destinos colectivos</a>
                 <a id="enlaceReporteConvenios" class="ssalfer-link" href="/pages/reportesConvenios.html">
                     <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
                     <strong>Convenios</strong>
@@ -557,7 +558,14 @@
 
     <div id="formNuevoNucleo" class="tarjeta" hidden>
 
-    <h3>Nuevo núcleo agrario</h3>
+    <h3>Agregar núcleo agrario</h3>
+    <p>Busca primero en el catálogo oficial RAN. Puedes filtrar por entidad y municipio.</p>
+    <div class="campo"><label for="buscarNucleoRan">Nombre del núcleo</label><input id="buscarNucleoRan" type="search" maxlength="300" autocomplete="off"></div>
+    <button id="btnBuscarNucleoRan" type="button" class="btn-secundario">Buscar en catálogo RAN</button>
+    <div class="campo"><label for="nucleoCatalogoRan">Núcleo del catálogo</label><select id="nucleoCatalogoRan" disabled><option value="">Busca para ver los núcleos disponibles</option></select></div>
+    <p id="resultadoCatalogoRan" role="status"></p>
+    <label><input type="checkbox" id="nucleoAltaExcepcional"> No aparece en el catálogo: crear núcleo nuevo</label>
+    <p id="avisoAltaExcepcional" hidden>Alta excepcional. Verifica el nombre, municipio y tipo de tenencia para evitar duplicados.</p>
 
     <div class="form-grid">
 

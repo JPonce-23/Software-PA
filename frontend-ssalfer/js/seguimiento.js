@@ -1492,7 +1492,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
 
-    async function cargarDocumentos() {
+    window.addEventListener("ssalfer:documentos", async event => {
+        const actual = elementos.documento?.value;
+        await cargarDocumentos(event.detail);
+        if (actual) { asegurarDocumentoSeleccionable(actual); elementos.documento.value = actual; }
+    });
+
+    async function cargarDocumentos(objetivoNuevo = null) {
         if (
             !elementos.documento ||
             !window.DocumentosAPI
@@ -1512,6 +1518,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 idProyectoNucleo
             )
         ];
+
+        if (objetivoNuevo?.tipo && Number(objetivoNuevo.id) > 0) consultas.push(window.DocumentosAPI.listarPorEntidad(objetivoNuevo.tipo, objetivoNuevo.id));
 
         try {
             if (

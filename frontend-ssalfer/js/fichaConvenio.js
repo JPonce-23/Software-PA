@@ -345,8 +345,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                         idConvenio
                     ),
 
-                window.ConveniosAPI
-                    .listarTramitesRan(
+                window.TramitesRanAPI
+                    .listarPorConvenio(
                         idConvenio
                     )
             ]);
@@ -565,14 +565,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                 "";
         }
 
-        /*
-         * El backend actual no expone un endpoint
-         * "listar convenios hijos de X".
-         *
-         * No inventamos derivados en frontend.
-         */
-        elementos.conveniosDerivadosSeccion.style.display =
-            "none";
+    }
+
+    async function renderDerivados() {
+        const seccion = elementos.conveniosDerivadosSeccion, lista = elementos.conveniosDerivados;
+        if (!seccion || !lista) return;
+        seccion.style.display = "";
+        try {
+            const registros = await window.SSALFER_CONTEXTO.crear(convenio.id_proyecto_nucleo).listar("convenio");
+            const hijos = registros.filter(r => Number(r.item.id_convenio_padre) === Number(idConvenio));
+            lista.innerHTML = hijos.length ? hijos.map(r => `<p><a href="/pages/fichaConvenio.html?id_convenio=${r.id}">${escaparHTML(r.etiqueta)}</a></p>`).join("") : "<p>No hay convenios derivados registrados en este núcleo.</p>";
+        } catch (error) { lista.textContent = "No fue posible consultar los convenios derivados. Vuelve a abrir la ficha para reintentar."; }
     }
 
     function renderAfectaciones() {
@@ -613,12 +616,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 fila.innerHTML = `
                     <td>
-                        AF-${String(
-                            relacion.id_afectacion
-                        ).padStart(
-                            3,
-                            "0"
-                        )}
+                        ${escaparHTML(`${etiquetaAmbito(detalle?.tipo_afectacion)} · ${detalle?.superficie_afectada_ha == null ? "Superficie sin especificar" : `${Number(detalle.superficie_afectada_ha).toLocaleString("es-MX")} ha`} · ${detalle?.situacion || "Sin situación registrada"}`)}
                     </td>
 
                     <td>
@@ -655,6 +653,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     </td>
                 `;
 
+                if (puedeCapturar) { const b=document.createElement("button"); b.type="button"; b.className="btn-secundario"; b.textContent="Editar efecto"; b.addEventListener("click",async()=>{b.disabled=true;try{if(await window.SSALFER_EDICIONES.afectacionConvenio(relacion))await recargar();}catch(error){window.ClienteAPI.mostrarErrorAPI(error);}finally{b.disabled=false;}});fila.lastElementChild.appendChild(b); }
                 elementos.afectacionesTabla.appendChild(
                     fila
                 );
@@ -779,6 +778,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     </td>
                 `;
 
+                if (puedeCapturar) { const b=document.createElement("button"); b.type="button"; b.className="btn-secundario"; b.textContent="Editar"; b.addEventListener("click",async()=>{b.disabled=true;try{if(await window.SSALFER_EDICIONES.compareciente(item))await recargar();}catch(error){window.ClienteAPI.mostrarErrorAPI(error);}finally{b.disabled=false;}});fila.lastElementChild.prepend(b); }
                 elementos.comparecientesTabla.appendChild(
                     fila
                 );
@@ -1921,6 +1921,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderComparecientes();
         renderTramitesRan();
         await renderConvenioPadre();
+        await renderDerivados();
     }
 
     elementos.btnVolver

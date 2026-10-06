@@ -20,6 +20,7 @@
         sizes="40x40"
         href="/img/LOGOS VERDE/IMAGOTIPO.png">
 
+<link rel="stylesheet" href="/styles/gestion.css">
 </head>
 
 
@@ -693,9 +694,7 @@
 
             <!-- DERECHOS COLECTIVOS -->
 
-            <div
-                class="modulo modulo-deshabilitado"
-                aria-disabled="true">
+            <a class="modulo" id="btnDerechosColectivos" href="/dashboard.html">
 
                 <div class="modulo-icono">
                     <i class="bi bi-people"></i>
@@ -704,14 +703,15 @@
                 <div>
                     <h3>Derechos colectivos</h3>
                     <span>
-                        Módulo aún no disponible en esta interfaz.
+                        Afectaciones, convenios y destinos colectivos.
                     </span>
-                    <small class="modulo-estado">Próximamente</small>
                 </div>
 
-                <i class="bi bi-lock modulo-flecha" aria-hidden="true"></i>
+                <i class="bi bi-chevron-right modulo-flecha" aria-hidden="true"></i>
 
-            </div>
+            </a>
+
+            <a class="modulo" id="btnDocumentos" href="/dashboard.html"><div class="modulo-icono"><i class="bi bi-files"></i></div><div><h3>Documentos</h3><span>Archivos, versiones y procedencia.</span></div><i class="bi bi-chevron-right modulo-flecha"></i></a>
 
 
             <!-- PARCELAS -->
@@ -936,6 +936,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <script src="/js/dashboard.js"></script>
 
+<script src="/js/utils/gestion.js"></script>
+<script src="/js/gestionNucleo.js"></script>
 <script src="/js/nucleoAgrario.js"></script>
 
 

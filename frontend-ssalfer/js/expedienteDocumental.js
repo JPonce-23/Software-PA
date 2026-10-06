@@ -1334,6 +1334,13 @@ async function cargarCatalogos() {
 
     }
 
+    window.addEventListener("ssalfer:documentos", async event => {
+        if (event.detail.tipo !== document.getElementById("entidadTipo").value || Number(event.detail.id) !== Number(document.getElementById("entidadId").value)) return;
+        const actual = elementoIdDocumento().value;
+        await cargarDocumentosDeEntidad();
+        if ([...elementoIdDocumento().options].some(o => o.value === actual)) elementoIdDocumento().value = actual;
+    });
+
 
     document.getElementById("entidadTipo")
         ?.addEventListener("change", () => cargarSelectorEntidad());

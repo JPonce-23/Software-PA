@@ -490,6 +490,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         elementos.btnOrv,
         `/pages/orv.html?${queryBase}`
     );
+    configurarEnlace(document.getElementById("btnDerechosColectivos"), `/pages/derechosColectivos.html?${queryBase}`);
+    configurarEnlace(document.getElementById("btnDocumentos"), `/pages/documentos.html?${queryBase}`);
 
     configurarEnlace(
         elementos.btnSensibilizacion,
@@ -543,7 +545,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     configurarEnlace(
         elementos.btnPersona,
-        `/pages/persona.html?id_proyecto=${encodeURIComponent(
+        `/pages/persona.html?${queryBase}&id_proyecto=${encodeURIComponent(
             idProyecto
         )}`
     );

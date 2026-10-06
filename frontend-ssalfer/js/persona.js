@@ -329,12 +329,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             )}
                         </h3>
 
-                        <span>
-                            ID:
-                            ${escaparHTML(
-                                persona.id_persona
-                            )}
-                        </span>
+
 
                         <span>
                             CURP:
@@ -502,6 +497,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             ),
             persona
         );
+
+        window.SSALFER_CONTEXTO?.invalidarPersona(persona.id_persona);
 
 
         renderPersonas();
@@ -977,77 +974,23 @@ document.addEventListener("DOMContentLoaded", async () => {
        CONSULTA
     ====================================================== */
 
+    window.NucleosAPI.listarPorProyecto(idProyecto).then(nucleos => {
+        elementos.busqueda.replaceChildren(new Option(nucleos.length ? "Selecciona un núcleo" : "Este proyecto aún no tiene núcleos", ""));
+        nucleos.forEach(n => elementos.busqueda.add(new Option(n.nombre_nucleo,n.id_proyecto_nucleo)));
+        const contexto = parametros.get("id_proyecto_nucleo") || (returnTo ? new URL(returnTo, location.origin).searchParams.get("id_proyecto_nucleo") : null);
+        if (contexto && nucleos.some(n => Number(n.id_proyecto_nucleo) === Number(contexto))) elementos.busqueda.value = contexto;
+        else if(nucleos.length===1) elementos.busqueda.value = nucleos[0].id_proyecto_nucleo;
+        elementos.busqueda.disabled = !nucleos.length;
+    }).catch(error => window.ClienteAPI.mostrarErrorAPI(error));
+    if(elementos.btnConsultar) elementos.btnConsultar.textContent = "Abrir directorio";
     async function consultarPersona() {
-
-        const idPersona =
-            Number(
-                elementos
-                    .busqueda
-                    ?.value
-            );
-
-
-        if (
-            !Number.isInteger(
-                idPersona
-            ) ||
-            idPersona <= 0
-        ) {
-
-            window.SSALFER_UI.toast("Indica un ID de persona válido.", { tipo: "error" });
-
-            return;
-
-        }
-
-
-        if (
-            elementos.btnConsultar
-        ) {
-
-            elementos.btnConsultar.disabled =
-                true;
-
-        }
-
-
-        try {
-
-            const persona =
-                await window
-                    .PersonasAPI
-                    .obtener(
-                        idPersona
-                    );
-
-
-            guardarPersonaLocal(
-                persona
-            );
-
-
-        } catch (error) {
-
-            window.ClienteAPI
-                .mostrarErrorAPI(
-                    error
-                );
-
-        } finally {
-
-            if (
-                elementos.btnConsultar
-            ) {
-
-                elementos.btnConsultar.disabled =
-                    false;
-
-            }
-
-        }
-
+        const pn = Number(elementos.busqueda?.value);
+        if (!pn) { window.SSALFER_UI.toast("Selecciona un núcleo del proyecto.", { tipo: "error" }); return; }
+        elementos.btnConsultar.disabled = true;
+        try { const persona = await window.SSALFER_DIRECTORIO.seleccionar(pn, { incluirInactivas: true }); if(persona) guardarPersonaLocal(persona); }
+        catch(error) { window.ClienteAPI.mostrarErrorAPI(error); }
+        finally { elementos.btnConsultar.disabled = false; }
     }
-
 
     /* =====================================================
        GUARDAR

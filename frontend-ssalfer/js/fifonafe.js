@@ -23,6 +23,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                         ELEMENTOS
     ====================================================== */
 
+    document.querySelectorAll('.migas a[href="#"], .breadcrumb a[href="#"]').forEach(a => { if (a.textContent.trim() === "Núcleo agrario") a.href = `/pages/nucleoAgrario.html?id_proyecto_nucleo=${idProyectoNucleo}`; });
+
     const elementos = {
         btnVolver:
             document.getElementById("btnVolver"),

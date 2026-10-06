@@ -544,6 +544,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                     </td>
                 `;
 
+                const acciones = document.createElement("td");
+                if (puedeCapturar) {
+                    const b = document.createElement("button"); b.type = "button"; b.className = "btn-secundario"; b.textContent = "Editar";
+                    b.addEventListener("click", async () => { b.disabled = true; try { const pn = await window.SSALFER_DIRECTORIO.resolverNucleo(); if (await window.SSALFER_EDICIONES.pago(pago, pn)) await cargarDatos(); } catch(error) { window.ClienteAPI.mostrarErrorAPI(error); } finally { b.disabled = false; } }); acciones.appendChild(b);
+                }
+                fila.appendChild(acciones);
                 elementos.pagosBody.appendChild(
                     fila
                 );

@@ -55,6 +55,7 @@
     }
 
     window.ReportesAPI = {
+        obtenerColectivosDestino: (params = {}) => get(`/reportes/convenios/colectivos-destino?${new URLSearchParams(params)}`),
         obtenerKpiDashboard,
         obtenerAvancePeriodo,
         obtenerResumenActual,
