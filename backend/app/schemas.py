@@ -1401,13 +1401,17 @@ class TrazoProyectoResponse(AuditRead):
 class ImportacionArchivoResponse(AuditRead):
     id_importacion: int
     id_proyecto: int
-    tipo_objetivo: Literal["trazo_proyecto", "nucleo_agrario", "parcela"]
+    tipo_objetivo: Literal["trazo_proyecto", "nucleo_agrario", "parcela", "derecho_via_proyecto", "nucleo_agrario_gpkg", "parcela_gpkg"]
     nombre_original: str
     formato_detectado: str
     tamano_bytes: int
     sha256: str
     fuente: str
     fecha_fuente: date | None = None
+    version_pipeline: str = "legacy-v1"
+    alcance_entrega: Literal["completa", "parcial"]
+    id_importacion_anterior: int | None = None
+    srid_trabajo: int = 4326
     crs_original: str | None = None
     crs_destino: str
     estado: str
@@ -1437,6 +1441,15 @@ class ImportacionFeatureResponse(ORMModel):
     transformaciones: list[Any]
     advertencias_aceptadas: bool
     registro_destino_id: int | None = None
+    estado_conciliacion: str = "pendiente"
+    crs_fuente: str | None = None
+    dimension_fuente: str | None = None
+
+    @field_validator("atributos_originales", "atributos_normalizados")
+    @classmethod
+    def exclude_personal_attributes(cls, value):
+        from .services.gis_attributes import sanitize_attributes
+        return sanitize_attributes(value)
 
 
 class ImportacionConfirmarRequest(BaseModel):
@@ -1651,3 +1664,142 @@ class AuditAccessItem(BaseModel):
 class AuditAccessPageResponse(BaseModel):
     total: int
     items: list[AuditAccessItem]
+
+
+class ConfiguracionGisRequest(BaseModel):
+    srid_trabajo: int = Field(gt=0, le=998999)
+
+
+class ConfiguracionGisResponse(ORMModel):
+    id_proyecto: int
+    srid_trabajo: int
+
+
+class CandidatoGisResponse(ORMModel):
+    id_candidato: int
+    id_ciclo: int
+    id_importacion_feature: int
+    id_proyecto_nucleo: int
+    id_parcela: int | None = None
+    criterio: str
+    clasificacion: str
+    coincidencias: list[str]
+    estado: str
+    id_usuario_revision: int | None = None
+    fecha_revision: datetime | None = None
+
+
+class DecisionGisRequest(BaseModel):
+    accion: Literal["seleccionar", "confirmar", "rechazar", "ignorar"]
+    id_candidato: int | None = None
+    confirmacion_explicita: bool = False
+    aceptar_advertencias: bool = False
+    motivo: str | None = Field(default=None, max_length=250)
+
+
+class DecisionGisResponse(ORMModel):
+    id_decision: int
+    id_ciclo: int
+    id_importacion_feature: int
+    id_candidato: int | None = None
+    accion: str
+    motivo: str | None = None
+    creado_por: int
+    creado_en: datetime
+
+
+class SolicitudGisRequest(BaseModel):
+    motivo: str = Field(min_length=1, max_length=250)
+    clave_solicitud: str = Field(description="UUID de idempotencia; reutilizarlo en reintentos")
+
+    @field_validator("clave_solicitud")
+    @classmethod
+    def uuid_request(cls, value):
+        from uuid import UUID
+        return str(UUID(value))
+
+    @field_validator("motivo")
+    @classmethod
+    def nonblank_reason(cls, value):
+        if not value.strip():
+            raise ValueError("El motivo es obligatorio")
+        return value.strip()
+
+
+class ReconciliarGisRequest(SolicitudGisRequest):
+    incluir_ambiguos: bool = True
+    reabrir_rechazados: bool = False
+
+
+class CicloGisResponse(ORMModel):
+    id_ciclo: int
+    id_importacion: int
+    numero_ciclo: int
+    tipo_ciclo: str
+    motivo: str
+    estado: str
+    fecha_inicio: datetime
+    fecha_fin: datetime | None = None
+    id_usuario: int
+    version_algoritmo: str
+    universo_destinos: list[dict[str, Any]]
+    resumen: dict[str, Any]
+
+
+class RevisionGisDecisionRequest(SolicitudGisRequest):
+    accion: Literal["revisado", "no_aplica", "aplicado"]
+    id_seguimiento_evento: int | None = Field(default=None, gt=0)
+
+
+class RevisionGisDecisionResponse(ORMModel):
+    id_decision: int
+    id_revision: int
+    accion: str
+    motivo: str
+    id_seguimiento_evento: int | None = None
+    creado_por: int
+    creado_en: datetime
+
+
+class ResultadoCicloGisResponse(BaseModel):
+    id_importacion_feature: int
+    estado_matching: str
+    estado_resultado: str
+    candidatos: list[CandidatoGisResponse]
+    decisiones: list[DecisionGisResponse]
+
+
+class DetalleCicloGisResponse(CicloGisResponse):
+    features: list[ResultadoCicloGisResponse]
+
+
+class RevisionGisResponse(BaseModel):
+    id_revision: int
+    id_proyecto: int
+    objetivo: Literal['ddv','nucleo','parcela']
+    id_proyecto_nucleo: int | None = None
+    id_parcela: int | None = None
+    id_feature_nueva: int | None = None
+    id_importacion_anterior: int | None = None
+    id_importacion_nueva: int
+    id_nucleo_geometria_anterior: int | None = None
+    id_nucleo_geometria_nueva: int | None = None
+    id_parcela_geometria_anterior: int | None = None
+    id_parcela_geometria_nueva: int | None = None
+    id_ddv_anterior: int | None = None
+    id_ddv_nueva: int | None = None
+    tipo_cambio: str
+    subtipo_cambio: str | None = None
+    estado_revision: Literal['pendiente','revisado','no_aplica','aplicado']
+    srid_medicion: int | None = None
+    area_anterior_m2: float | None = None
+    area_nueva_m2: float | None = None
+    area_diferencia_m2: float | None = None
+    porcentaje_diferencia: float | None = None
+    metricas: dict[str,Any]
+    creado_en: datetime
+    creado_por: int
+
+
+class DetalleRevisionGisResponse(RevisionGisResponse):
+    decisiones: list[RevisionGisDecisionResponse]

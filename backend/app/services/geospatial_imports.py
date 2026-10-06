@@ -1,10 +1,11 @@
-"""Single staged importer for project traces, nuclei and optional parcels."""
+"""Staged GIS imports, including the strict GeoPackage flow for DDV."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import re
 import shutil
 import uuid
 import zipfile
@@ -15,6 +16,7 @@ from typing import Any
 from fastapi import HTTPException, UploadFile
 from geoalchemy2.elements import WKTElement
 from sqlalchemy import func, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -35,6 +37,9 @@ EXTENSIONS = {
     ".gpkg": "gpkg",
     ".zip": "zip",
 }
+RAN_NUCLEI_SOURCE = "RAN_PHINA_CATALOGO_NUCLEOS"
+STRICT_NUCLEUS_TARGET = "nucleo_agrario_gpkg"
+STRICT_PARCEL_TARGET = "parcela_gpkg"
 
 
 def _root() -> Path:
@@ -52,9 +57,14 @@ def _safe_name(value: str | None) -> str:
     return PurePath(normalized).name[:255]
 
 
-async def _store_upload(upload: UploadFile) -> tuple[Path, str, int, str, str]:
+async def _store_upload(
+    upload: UploadFile, *, allowed_formats: set[str] | None = None,
+    strict_label: str = "El DDV",
+) -> tuple[Path, str, int, str, str]:
     original = _safe_name(upload.filename)
     declared = EXTENSIONS.get(Path(original).suffix.lower())
+    if allowed_formats is not None and declared not in allowed_formats:
+        raise HTTPException(status_code=415, detail=f"{strict_label} requiere un archivo .gpkg")
     if declared is None:
         raise HTTPException(
             status_code=415,
@@ -128,7 +138,7 @@ def _normalize_geometry(
         text(
             """
             WITH parsed AS (
-                SELECT ST_SetSRID(ST_GeomFromGeoJSON(:geometry), 4326) AS geom
+                SELECT ST_SetSRID(ST_Force2D(ST_GeomFromGeoJSON(:geometry)), 4326) AS geom
             ), normalized AS (
                 SELECT ST_Multi(
                     ST_CollectionExtract(ST_MakeValid(geom), :dimension)
@@ -136,7 +146,7 @@ def _normalize_geometry(
                 FROM parsed
             )
             SELECT
-                ST_AsText(geom) AS wkt,
+                ST_AsText(geom, 17) AS wkt,
                 GeometryType(geom) AS geometry_type,
                 ST_IsEmpty(geom) AS is_empty,
                 ST_IsValid(geom) AS is_valid
@@ -151,6 +161,159 @@ def _normalize_geometry(
     return row["wkt"], None
 
 
+def _normalize_ddv_geometry(
+    db: Session, geometry: dict[str, Any] | None,
+    *, source_is_valid: bool | None = None,
+) -> tuple[str | None, list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
+    warnings: list[dict[str, str]] = []
+    transformations: list[dict[str, str]] = []
+    if not geometry:
+        return None, [{"codigo": "GEOMETRIA_AUSENTE", "campo": "geometry"}], warnings, transformations
+    original_type = geometry.get("type")
+    if original_type not in {"Polygon", "MultiPolygon"}:
+        return None, [{"codigo": "TIPO_GEOMETRIA_NO_PERMITIDO", "campo": "geometry"}], warnings, transformations
+    payload = json.dumps(geometry)
+    reason = "No se pudo interpretar la geometría"
+    try:
+        with db.begin_nested():
+            inspected = db.execute(
+                text(
+                    """
+                    WITH source AS (
+                        SELECT ST_SetSRID(ST_Force2D(ST_GeomFromGeoJSON(:geometry)), 4326) AS geom
+                    )
+                    SELECT ST_IsEmpty(geom) AS vacia,
+                           ST_IsValid(geom) AS valida,
+                           ST_IsValidReason(geom) AS razon
+                    FROM source
+                    """
+                ),
+                {"geometry": payload},
+            ).mappings().one()
+            reason = inspected["razon"]
+            if inspected["vacia"]:
+                return None, [{
+                    "codigo": "GEOMETRIA_IRRECUPERABLE",
+                    "campo": "geometry",
+                    "razon": "Geometría vacía",
+                }], warnings, transformations
+            if not inspected["valida"] and source_is_valid is True:
+                return None, [{"codigo":"PIPELINE_ALTERO_TOPOLOGIA","campo":"geometry","razon":reason}], warnings, transformations
+            expression = (
+                "ST_Multi(geom)" if inspected["valida"]
+                else "ST_Multi(ST_CollectionExtract(ST_MakeValid(geom), 3))"
+            )
+            row = db.execute(
+                text(f"""
+                    WITH source AS (
+                        SELECT ST_SetSRID(ST_Force2D(ST_GeomFromGeoJSON(:geometry)), 4326) AS geom
+                    ), normalized AS (
+                        SELECT {expression} AS geom FROM source
+                    )
+                    SELECT ST_AsText(geom, 17) AS wkt,
+                           GeometryType(geom) AS tipo,
+                           ST_IsEmpty(geom) AS vacia,
+                           ST_IsValid(geom) AS valida
+                    FROM normalized
+                """),
+                {"geometry": payload},
+            ).mappings().one()
+    except (DBAPIError, ValueError, TypeError):
+        return None, [{
+            "codigo": "GEOMETRIA_IRRECUPERABLE",
+            "campo": "geometry",
+            "razon": reason,
+        }], warnings, transformations
+    if row["vacia"] or not row["valida"] or row["tipo"] != "MULTIPOLYGON":
+        return None, [{
+            "codigo": "GEOMETRIA_IRRECUPERABLE",
+            "campo": "geometry",
+            "razon": reason if not inspected["valida"] else "Sin componente poligonal valido",
+        }], warnings, transformations
+    if original_type == "Polygon":
+        transformations.append({"codigo": "POLYGON_A_MULTIPOLYGON"})
+    if not inspected["valida"]:
+        repair = {"codigo": "GEOMETRIA_REPARADA", "razon": reason}
+        warnings.append(repair)
+        transformations.append(repair)
+    return row["wkt"], [], warnings, transformations
+
+
+def _ddv_crs_identifiable(description: str) -> bool:
+    normalized = description.strip().upper()
+    if not normalized or normalized in {"EPSG:0", "EPSG:-1"}:
+        return False
+    return not (
+        normalized.startswith((
+            'GEOGCRS["UNDEFINED', 'GEOGCS["UNDEFINED',
+            'PROJCRS["UNDEFINED', 'PROJCS["UNDEFINED',
+            'GEOGCRS["UNKNOWN', 'GEOGCS["UNKNOWN',
+            'PROJCRS["UNKNOWN', 'PROJCS["UNKNOWN',
+        ))
+        or 'DATUM["UNKNOWN"' in normalized
+    )
+
+
+async def stage_ddv_import(
+    db: Session,
+    project_id: int,
+    source: str,
+    source_date: date | None,
+    upload: UploadFile,
+    user: models.Usuario,
+) -> models.ImportacionArchivo:
+    return await _stage_strict_gpkg_import(
+        db, project_id, source, source_date, upload, user,
+        target="derecho_via_proyecto",
+    )
+
+
+async def stage_nucleus_import(
+    db: Session,
+    project_id: int,
+    source: str,
+    source_date: date | None,
+    upload: UploadFile,
+    user: models.Usuario,
+    *, scope: str,
+) -> models.ImportacionArchivo:
+    return await _stage_strict_gpkg_import(
+        db, project_id, source, source_date, upload, user,
+        target=STRICT_NUCLEUS_TARGET, scope=scope,
+    )
+
+
+async def stage_parcel_import(
+    db: Session,
+    project_id: int,
+    source: str,
+    source_date: date | None,
+    upload: UploadFile,
+    user: models.Usuario,
+    *, scope: str,
+) -> models.ImportacionArchivo:
+    return await _stage_strict_gpkg_import(
+        db, project_id, source, source_date, upload, user,
+        target=STRICT_PARCEL_TARGET, scope=scope,
+    )
+
+
+def normalize_parcel_number(value: str) -> str:
+    """Coincide con el índice actual (espacios/caja) y el único formato Excel auditado.
+
+    No elimina sufijos ni signos generales: sólo P.-<dígitos> equivale a P-<dígitos>.
+    """
+    normalized = re.sub(r"\s+", " ", value.strip()).lower()
+    if re.fullmatch(r"p\.-[0-9]+", normalized):
+        return "p-" + normalized[3:]
+    return normalized
+
+
+async def _stage_strict_gpkg_import(db, project_id, source, source_date, upload, user, *, target, scope="completa"):
+    from .gis_reconciliation import stage
+    return await stage(db,project_id,source,source_date,upload,user,target=target,scope=scope)
+
+
 async def stage_import(
     db: Session,
     project_id: int,
@@ -161,6 +324,11 @@ async def stage_import(
     upload: UploadFile,
     user: models.Usuario,
 ) -> models.ImportacionArchivo:
+    if target in {"nucleo_agrario", "parcela"}:
+        if not mapping.get("id_destino"):
+            raise HTTPException(422, "Se requiere mapeo explícito de id_destino")
+        from .gis_reconciliation import stage
+        return await stage(db,project_id,source,source_date,upload,user,target=target,mapping=mapping,strict=False)
     require_project_access(db, user, project_id, mode="gis")
     if target not in ALLOWED_TARGETS:
         raise HTTPException(status_code=422, detail="Objetivo de importación no permitido")
@@ -313,6 +481,165 @@ def require_import_access(
     return record
 
 
+def _confirm_ddv_import(
+    db: Session,
+    record: models.ImportacionArchivo,
+    data: schemas.ImportacionConfirmarRequest,
+    user: models.Usuario,
+) -> models.ImportacionArchivo:
+    try:
+        db.query(models.Proyecto).filter_by(id_proyecto=record.id_proyecto).with_for_update().one()
+        require_project_access(db,user,record.id_proyecto,mode='gis')
+        from .gis_reconciliation import working_srid
+        if working_srid(db,record.id_proyecto)!=record.srid_trabajo:
+            raise HTTPException(409,"La configuración CRS cambió; reprocesar fuente")
+        record = db.query(models.ImportacionArchivo).filter(
+            models.ImportacionArchivo.id_importacion == record.id_importacion,
+            models.ImportacionArchivo.activo.is_(True),
+        ).populate_existing().with_for_update().one_or_none()
+        if record is None:
+            raise HTTPException(status_code=404, detail="Importación no encontrada")
+        if record.tipo_objetivo != "derecho_via_proyecto":
+            raise HTTPException(status_code=409, detail="Objetivo de importación inconsistente")
+        if record.estado == "completo":
+            db.commit()
+            return record
+        if record.estado != "previsualizado":
+            raise HTTPException(status_code=409, detail="La importación no está previsualizada")
+        if record.errores:
+            raise HTTPException(status_code=409, detail="Corrija los features con error")
+        if record.advertencias and not data.aceptar_advertencias:
+            raise HTTPException(status_code=409, detail="Debe aceptar las advertencias")
+
+        # La fila del proyecto serializa confirmaciones de importaciones DDV
+        # diferentes antes de consultar max(version) y cambiar la vigente.
+        db.query(models.Proyecto).filter(
+            models.Proyecto.id_proyecto == record.id_proyecto,
+            models.Proyecto.activo.is_(True),
+        ).with_for_update().one()
+        features = db.query(models.ImportacionFeature).filter(
+            models.ImportacionFeature.id_importacion == record.id_importacion,
+            models.ImportacionFeature.estado.in_(["valido", "advertencia"]),
+        ).order_by(models.ImportacionFeature.indice_feature).all()
+        if (
+            not features
+            or len(features) != record.total_features
+            or len(features) != record.features_procesados
+            or any(feature.geometria_normalizada is None for feature in features)
+        ):
+            raise HTTPException(status_code=409, detail="Staging DDV incompleto")
+
+        assembled = db.execute(
+            text(
+                """
+                WITH aggregate AS (
+                    SELECT ST_Multi(ST_CollectionExtract(
+                        ST_UnaryUnion(ST_Collect(geometria_normalizada)), 3
+                    )) AS geom
+                    FROM importacion_feature
+                    WHERE id_importacion = :id
+                      AND estado IN ('valido', 'advertencia')
+                )
+                SELECT ST_AsText(geom, 17) AS wkt,
+                       GeometryType(geom) AS tipo,
+                       ST_IsEmpty(geom) AS vacia,
+                       ST_IsValid(geom) AS valida
+                FROM aggregate
+                """
+            ),
+            {"id": record.id_importacion},
+        ).mappings().one()
+        if (
+            not assembled["wkt"]
+            or assembled["tipo"] != "MULTIPOLYGON"
+            or assembled["vacia"]
+            or not assembled["valida"]
+        ):
+            raise HTTPException(status_code=409, detail="DDV agregado inválido")
+
+        working = db.execute(text("""
+            WITH assembled AS (
+                SELECT ST_Multi(ST_CollectionExtract(ST_UnaryUnion(ST_Collect(
+                    COALESCE(geometria_trabajo,geometria_normalizada))),3)) AS geom
+                FROM importacion_feature WHERE id_importacion=:i
+            ) SELECT ST_AsText(geom,17) AS wkt,ST_IsValid(geom) AS valid,
+                ST_IsEmpty(geom) AS empty,ST_SRID(geom) AS srid FROM assembled
+        """),{"i":record.id_importacion}).mappings().one()
+        if not working["valid"] or working["empty"] or working["srid"]!=record.srid_trabajo:
+            raise HTTPException(409,"DDV agregado inválido en el CRS de trabajo")
+        now = datetime.now(timezone.utc)
+        set_audit_context(db, user.id_usuario)
+        previous = db.query(models.DerechoViaProyecto).filter(
+            models.DerechoViaProyecto.id_proyecto == record.id_proyecto,
+            models.DerechoViaProyecto.es_vigente.is_(True),
+        ).one_or_none()
+        if previous is not None:
+            previous.es_vigente = False
+            previous.actualizado_en = now
+            previous.actualizado_por = user.id_usuario
+            db.flush()
+        version = db.query(
+            func.coalesce(func.max(models.DerechoViaProyecto.version), 0)
+        ).filter(
+            models.DerechoViaProyecto.id_proyecto == record.id_proyecto
+        ).scalar() + 1
+        derecho_via = models.DerechoViaProyecto(
+            id_proyecto=record.id_proyecto,
+            version=version,
+            es_vigente=True,
+            activo=True,
+            geometria_poligono=WKTElement(assembled["wkt"], srid=4326),
+            fuente=record.fuente,
+            fecha_fuente=record.fecha_fuente,
+            creado_por=user.id_usuario,
+            id_importacion=record.id_importacion,
+            sha256=record.sha256,
+            srid_trabajo=record.srid_trabajo,
+            geometria_trabajo=WKTElement(working["wkt"],srid=record.srid_trabajo),
+            observaciones=f"Generado por importación {record.id_importacion}",
+        )
+        db.add(derecho_via)
+        db.flush()
+        for feature in features:
+            feature.estado_conciliacion = "confirmado"
+            feature.registro_destino_id = derecho_via.id_derecho_via
+            feature.estado = "confirmado"
+            feature.fecha_importacion = now
+            if feature.advertencias:
+                feature.advertencias_aceptadas = True
+                feature.id_usuario_revision = user.id_usuario
+                feature.fecha_revision = now
+        record.confirmacion_explicita = True
+        record.fecha_confirmacion = now
+        record.id_usuario_confirmacion = user.id_usuario
+        record.importados = len(features)
+        record.estado = "completo"
+        record.actualizado_en = now
+        record.actualizado_por = user.id_usuario
+        record.reporte = {
+            **(record.reporte or {}),
+            "confirmados": len(features),
+            "version_ddv": version,
+            "id_derecho_via": derecho_via.id_derecho_via,
+            "advertencias_aceptadas": bool(record.advertencias),
+            "confirmado_en": now.isoformat(),
+        }
+        from .gis_history import ddv_changed
+        ddv_changed(db,record,previous,derecho_via,user)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="La confirmación DDV se revirtió completamente",
+        ) from exc
+    db.refresh(record)
+    return record
+
+
 def confirm_import(
     db: Session,
     import_id: int,
@@ -322,6 +649,11 @@ def confirm_import(
     record = require_import_access(db, import_id, user, mode="gis")
     if not data.confirmacion_explicita:
         raise HTTPException(status_code=422, detail="Se requiere confirmación explícita")
+    if record.tipo_objetivo == "derecho_via_proyecto":
+        return _confirm_ddv_import(db, record, data, user)
+    if record.tipo_objetivo in {STRICT_NUCLEUS_TARGET, STRICT_PARCEL_TARGET, "nucleo_agrario", "parcela"}:
+        from .gis_reconciliation import finalize
+        return finalize(db,record,data,user)
     if record.estado != "previsualizado":
         raise HTTPException(status_code=409, detail="La importación no está previsualizada")
     if record.errores:
@@ -377,46 +709,6 @@ def confirm_import(
             db.flush()
             for feature in features:
                 feature.registro_destino_id = trace.id_trazo
-                feature.estado = "confirmado"
-                feature.fecha_importacion = now
-        else:
-            model = (
-                models.NucleoAgrario
-                if record.tipo_objetivo == "nucleo_agrario"
-                else models.Parcela
-            )
-            for feature in features:
-                destination_id = feature.atributos_normalizados.get("id_destino")
-                destination = (
-                    require_nucleus_access(
-                        db, user, destination_id, mode="gis"
-                    )
-                    if record.tipo_objetivo == "nucleo_agrario"
-                    else require_parcel_access(
-                        db, user, destination_id, mode="gis"
-                    )
-                )
-                destination_nucleus_id = (
-                    destination.id_nucleo
-                    if record.tipo_objetivo == "parcela"
-                    else destination.id_nucleo
-                )
-                in_project = db.query(models.ProyectoNucleo.id_proyecto_nucleo).filter(
-                    models.ProyectoNucleo.id_proyecto == record.id_proyecto,
-                    models.ProyectoNucleo.id_nucleo == destination_nucleus_id,
-                    models.ProyectoNucleo.activo.is_(True),
-                ).first()
-                if in_project is None:
-                    raise HTTPException(
-                        status_code=409,
-                        detail="El destino geoespacial no pertenece al proyecto de la importación",
-                    )
-                destination.geometria_poligono = feature.geometria_normalizada
-                destination.fuente_geometria = record.fuente
-                destination.fecha_fuente_geometria = record.fecha_fuente
-                destination.actualizado_en = now
-                destination.actualizado_por = user.id_usuario
-                feature.registro_destino_id = destination_id
                 feature.estado = "confirmado"
                 feature.fecha_importacion = now
         record.confirmacion_explicita = True

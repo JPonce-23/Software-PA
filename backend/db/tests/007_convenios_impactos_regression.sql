@@ -50,7 +50,7 @@ END $$;
 DO $$
 DECLARE
     v_user integer; v_pn integer; v_nucleo integer; v_af integer; v_convenio integer;
-    v_calidad bigint; v_acred bigint; v_organo bigint; v_cargo bigint; v_cal_orv bigint;
+    v_calidad bigint; v_acred bigint; v_organo bigint; v_cargo bigint; v_cal_orv bigint; v_fin bigint;
     v_orv_vigente integer; v_orv_vencida integer;
     v_persona_vigente integer; v_persona_vencida integer;
     v_persona_externa integer; v_persona_sin_doc integer;
@@ -101,10 +101,20 @@ BEGIN
     INSERT INTO orv(id_nucleo,numero_orv,inicio_vigencia,fin_vigencia,estatus_fuente,creado_por)
       VALUES(v_nucleo,'SINT-QA-007-VENCIDA','2020-01-01','2021-12-31','sintético QA',v_user)
       RETURNING id_orv INTO v_orv_vencida;
+    -- 018 requires an explicit reason when the synthetic membership has an end.
+    IF EXISTS (SELECT 1 FROM schema_migrations WHERE version='018') THEN
+      SELECT id_catalogo_opcion INTO STRICT v_fin FROM catalogo_operativo
+       WHERE tipo_catalogo='tipo_fin_orv_integrante' AND codigo='termino_periodo' AND activo;
+      INSERT INTO orv_integrante(id_orv,id_persona,fecha_inicio,fecha_fin,id_organo,id_cargo,id_calidad,id_tipo_fin,creado_por)
+        VALUES(v_orv_vigente,v_persona_vigente,'2024-01-01','2026-12-31',v_organo,v_cargo,v_cal_orv,v_fin,v_user);
+      INSERT INTO orv_integrante(id_orv,id_persona,fecha_inicio,fecha_fin,id_organo,id_cargo,id_calidad,id_tipo_fin,creado_por)
+        VALUES(v_orv_vencida,v_persona_vencida,'2020-01-01','2021-12-31',v_organo,v_cargo,v_cal_orv,v_fin,v_user);
+    ELSE
     INSERT INTO orv_integrante(id_orv,id_persona,fecha_inicio,fecha_fin,id_organo,id_cargo,id_calidad,creado_por)
       VALUES(v_orv_vigente,v_persona_vigente,'2024-01-01','2026-12-31',v_organo,v_cargo,v_cal_orv,v_user);
     INSERT INTO orv_integrante(id_orv,id_persona,fecha_inicio,fecha_fin,id_organo,id_cargo,id_calidad,creado_por)
       VALUES(v_orv_vencida,v_persona_vencida,'2020-01-01','2021-12-31',v_organo,v_cargo,v_cal_orv,v_user);
+    END IF;
 
     INSERT INTO convenio_compareciente(id_convenio,id_persona,id_tipo_calidad,
       nombre_en_instrumento,es_firmante,es_beneficiario_pago,requiere_revision,creado_por)

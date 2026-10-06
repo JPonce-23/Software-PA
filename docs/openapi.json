@@ -7862,6 +7862,162 @@
         }
       }
     },
+    "/api/proyectos/{id_proyecto}/geoespacial/ddv/importaciones": {
+      "post": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Stage Ddv Import",
+        "operationId": "stage_ddv_import_api_proyectos__id_proyecto__geoespacial_ddv_importaciones_post",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Proyecto"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_stage_ddv_import_api_proyectos__id_proyecto__geoespacial_ddv_importaciones_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportacionArchivoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{id_proyecto}/geoespacial/nucleos/importaciones": {
+      "post": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Stage Nucleus Import",
+        "operationId": "stage_nucleus_import_api_proyectos__id_proyecto__geoespacial_nucleos_importaciones_post",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Proyecto"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_stage_nucleus_import_api_proyectos__id_proyecto__geoespacial_nucleos_importaciones_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportacionArchivoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{id_proyecto}/geoespacial/parcelas/importaciones": {
+      "post": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Stage Parcel Import",
+        "operationId": "stage_parcel_import_api_proyectos__id_proyecto__geoespacial_parcelas_importaciones_post",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Proyecto"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_stage_parcel_import_api_proyectos__id_proyecto__geoespacial_parcelas_importaciones_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportacionArchivoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/importaciones/{id_importacion}": {
       "get": {
         "tags": [
@@ -7943,6 +8099,22 @@
               "default": 100,
               "title": "Limit"
             }
+          },
+          {
+            "name": "estado_conciliacion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado Conciliacion"
+            }
           }
         ],
         "responses": {
@@ -8008,6 +8180,800 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ImportacionArchivoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{id_proyecto}/geoespacial/configuracion": {
+      "get": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Get Gis Configuration",
+        "operationId": "get_gis_configuration_api_proyectos__id_proyecto__geoespacial_configuracion_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Proyecto"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionGisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Configure Gis",
+        "operationId": "configure_gis_api_proyectos__id_proyecto__geoespacial_configuracion_put",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Proyecto"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfiguracionGisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionGisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/importaciones/{id_importacion}/resumen": {
+      "get": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Get Reconciliation Summary",
+        "operationId": "get_reconciliation_summary_api_importaciones__id_importacion__resumen_get",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/importaciones/{id_importacion}/features/{id_feature}/candidatos": {
+      "get": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Get Feature Candidates",
+        "operationId": "get_feature_candidates_api_importaciones__id_importacion__features__id_feature__candidatos_get",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          },
+          {
+            "name": "id_feature",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Feature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CandidatoGisResponse"
+                  },
+                  "title": "Response Get Feature Candidates Api Importaciones  Id Importacion  Features  Id Feature  Candidatos Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/importaciones/{id_importacion}/features/{id_feature}/decisiones": {
+      "post": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Decide Feature",
+        "operationId": "decide_feature_api_importaciones__id_importacion__features__id_feature__decisiones_post",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          },
+          {
+            "name": "id_feature",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Feature"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionGisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportacionFeatureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Get Feature Decisions",
+        "operationId": "get_feature_decisions_api_importaciones__id_importacion__features__id_feature__decisiones_get",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          },
+          {
+            "name": "id_feature",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Feature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DecisionGisResponse"
+                  },
+                  "title": "Response Get Feature Decisions Api Importaciones  Id Importacion  Features  Id Feature  Decisiones Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/importaciones/{id_importacion}/features/{id_feature}/geometria": {
+      "get": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Get Feature Geometry",
+        "operationId": "get_feature_geometry_api_importaciones__id_importacion__features__id_feature__geometria_get",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          },
+          {
+            "name": "id_feature",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Feature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/importaciones/{id_importacion}/reconciliar": {
+      "post": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Reconcile Import",
+        "operationId": "reconcile_import_api_importaciones__id_importacion__reconciliar_post",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconciliarGisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CicloGisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/importaciones/{id_importacion}/conciliaciones": {
+      "get": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "List Cycles",
+        "operationId": "list_cycles_api_importaciones__id_importacion__conciliaciones_get",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CicloGisResponse"
+                  },
+                  "title": "Response List Cycles Api Importaciones  Id Importacion  Conciliaciones Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/importaciones/{id_importacion}/conciliaciones/{id_ciclo}": {
+      "get": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Get Cycle",
+        "operationId": "get_cycle_api_importaciones__id_importacion__conciliaciones__id_ciclo__get",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          },
+          {
+            "name": "id_ciclo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Ciclo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleCicloGisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{id_proyecto}/geoespacial/revisiones": {
+      "get": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "List Revisions",
+        "operationId": "list_revisions_api_proyectos__id_proyecto__geoespacial_revisiones_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Proyecto"
+            }
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pendiente",
+                    "revisado",
+                    "no_aplica",
+                    "aplicado"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "name": "tipo_cambio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tipo Cambio"
+            }
+          },
+          {
+            "name": "objetivo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ddv",
+                    "nucleo",
+                    "parcela"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Objetivo"
+            }
+          },
+          {
+            "name": "id_proyecto_nucleo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id Proyecto Nucleo"
+            }
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RevisionGisResponse"
+                  },
+                  "title": "Response List Revisions Api Proyectos  Id Proyecto  Geoespacial Revisiones Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geoespacial/revisiones/{id_revision}": {
+      "get": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Get Revision",
+        "operationId": "get_revision_api_geoespacial_revisiones__id_revision__get",
+        "parameters": [
+          {
+            "name": "id_revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleRevisionGisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geoespacial/revisiones/{id_revision}/decisiones": {
+      "post": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Decide Revision",
+        "operationId": "decide_revision_api_geoespacial_revisiones__id_revision__decisiones_post",
+        "parameters": [
+          {
+            "name": "id_revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Revision"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionGisDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionGisDecisionResponse"
                 }
               }
             }
@@ -12247,6 +13213,37 @@
         ],
         "title": "Body_create_auth_session_api_auth_sesiones_post"
       },
+      "Body_stage_ddv_import_api_proyectos__id_proyecto__geoespacial_ddv_importaciones_post": {
+        "properties": {
+          "fuente": {
+            "type": "string",
+            "title": "Fuente"
+          },
+          "fecha_fuente": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Fuente"
+          },
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fuente",
+          "archivo"
+        ],
+        "title": "Body_stage_ddv_import_api_proyectos__id_proyecto__geoespacial_ddv_importaciones_post"
+      },
       "Body_stage_import_api_proyectos__id_proyecto__importaciones_post": {
         "properties": {
           "tipo_objetivo": {
@@ -12288,6 +13285,86 @@
         ],
         "title": "Body_stage_import_api_proyectos__id_proyecto__importaciones_post"
       },
+      "Body_stage_nucleus_import_api_proyectos__id_proyecto__geoespacial_nucleos_importaciones_post": {
+        "properties": {
+          "fuente": {
+            "type": "string",
+            "title": "Fuente"
+          },
+          "alcance_entrega": {
+            "type": "string",
+            "enum": [
+              "completa",
+              "parcial"
+            ],
+            "title": "Alcance Entrega"
+          },
+          "fecha_fuente": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Fuente"
+          },
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fuente",
+          "alcance_entrega",
+          "archivo"
+        ],
+        "title": "Body_stage_nucleus_import_api_proyectos__id_proyecto__geoespacial_nucleos_importaciones_post"
+      },
+      "Body_stage_parcel_import_api_proyectos__id_proyecto__geoespacial_parcelas_importaciones_post": {
+        "properties": {
+          "fuente": {
+            "type": "string",
+            "title": "Fuente"
+          },
+          "alcance_entrega": {
+            "type": "string",
+            "enum": [
+              "completa",
+              "parcial"
+            ],
+            "title": "Alcance Entrega"
+          },
+          "fecha_fuente": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Fuente"
+          },
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fuente",
+          "alcance_entrega",
+          "archivo"
+        ],
+        "title": "Body_stage_parcel_import_api_proyectos__id_proyecto__geoespacial_parcelas_importaciones_post"
+      },
       "Body_upload_version_api_documentos__id_documento__versiones_post": {
         "properties": {
           "archivo": {
@@ -12301,6 +13378,91 @@
           "archivo"
         ],
         "title": "Body_upload_version_api_documentos__id_documento__versiones_post"
+      },
+      "CandidatoGisResponse": {
+        "properties": {
+          "id_candidato": {
+            "type": "integer",
+            "title": "Id Candidato"
+          },
+          "id_ciclo": {
+            "type": "integer",
+            "title": "Id Ciclo"
+          },
+          "id_importacion_feature": {
+            "type": "integer",
+            "title": "Id Importacion Feature"
+          },
+          "id_proyecto_nucleo": {
+            "type": "integer",
+            "title": "Id Proyecto Nucleo"
+          },
+          "id_parcela": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Parcela"
+          },
+          "criterio": {
+            "type": "string",
+            "title": "Criterio"
+          },
+          "clasificacion": {
+            "type": "string",
+            "title": "Clasificacion"
+          },
+          "coincidencias": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Coincidencias"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "id_usuario_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Usuario Revision"
+          },
+          "fecha_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_candidato",
+          "id_ciclo",
+          "id_importacion_feature",
+          "id_proyecto_nucleo",
+          "criterio",
+          "clasificacion",
+          "coincidencias",
+          "estado"
+        ],
+        "title": "CandidatoGisResponse"
       },
       "CatalogoOperativoCreate": {
         "properties": {
@@ -12703,6 +13865,120 @@
           "contrasena_nueva"
         ],
         "title": "ChangeOwnPasswordRequest"
+      },
+      "CicloGisResponse": {
+        "properties": {
+          "id_ciclo": {
+            "type": "integer",
+            "title": "Id Ciclo"
+          },
+          "id_importacion": {
+            "type": "integer",
+            "title": "Id Importacion"
+          },
+          "numero_ciclo": {
+            "type": "integer",
+            "title": "Numero Ciclo"
+          },
+          "tipo_ciclo": {
+            "type": "string",
+            "title": "Tipo Ciclo"
+          },
+          "motivo": {
+            "type": "string",
+            "title": "Motivo"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "fecha_inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Inicio"
+          },
+          "fecha_fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Fin"
+          },
+          "id_usuario": {
+            "type": "integer",
+            "title": "Id Usuario"
+          },
+          "version_algoritmo": {
+            "type": "string",
+            "title": "Version Algoritmo"
+          },
+          "universo_destinos": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Universo Destinos"
+          },
+          "resumen": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Resumen"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_ciclo",
+          "id_importacion",
+          "numero_ciclo",
+          "tipo_ciclo",
+          "motivo",
+          "estado",
+          "fecha_inicio",
+          "id_usuario",
+          "version_algoritmo",
+          "universo_destinos",
+          "resumen"
+        ],
+        "title": "CicloGisResponse"
+      },
+      "ConfiguracionGisRequest": {
+        "properties": {
+          "srid_trabajo": {
+            "type": "integer",
+            "maximum": 998999.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Srid Trabajo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "srid_trabajo"
+        ],
+        "title": "ConfiguracionGisRequest"
+      },
+      "ConfiguracionGisResponse": {
+        "properties": {
+          "id_proyecto": {
+            "type": "integer",
+            "title": "Id Proyecto"
+          },
+          "srid_trabajo": {
+            "type": "integer",
+            "title": "Srid Trabajo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_proyecto",
+          "srid_trabajo"
+        ],
+        "title": "ConfiguracionGisResponse"
       },
       "ConvenioAfectacionCreate": {
         "properties": {
@@ -14911,6 +16187,458 @@
         ],
         "title": "DashboardKpiResponse"
       },
+      "DecisionGisRequest": {
+        "properties": {
+          "accion": {
+            "type": "string",
+            "enum": [
+              "seleccionar",
+              "confirmar",
+              "rechazar",
+              "ignorar"
+            ],
+            "title": "Accion"
+          },
+          "id_candidato": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Candidato"
+          },
+          "confirmacion_explicita": {
+            "type": "boolean",
+            "title": "Confirmacion Explicita",
+            "default": false
+          },
+          "aceptar_advertencias": {
+            "type": "boolean",
+            "title": "Aceptar Advertencias",
+            "default": false
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 250
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accion"
+        ],
+        "title": "DecisionGisRequest"
+      },
+      "DecisionGisResponse": {
+        "properties": {
+          "id_decision": {
+            "type": "integer",
+            "title": "Id Decision"
+          },
+          "id_ciclo": {
+            "type": "integer",
+            "title": "Id Ciclo"
+          },
+          "id_importacion_feature": {
+            "type": "integer",
+            "title": "Id Importacion Feature"
+          },
+          "id_candidato": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Candidato"
+          },
+          "accion": {
+            "type": "string",
+            "title": "Accion"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "creado_por": {
+            "type": "integer",
+            "title": "Creado Por"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_decision",
+          "id_ciclo",
+          "id_importacion_feature",
+          "accion",
+          "creado_por",
+          "creado_en"
+        ],
+        "title": "DecisionGisResponse"
+      },
+      "DetalleCicloGisResponse": {
+        "properties": {
+          "id_ciclo": {
+            "type": "integer",
+            "title": "Id Ciclo"
+          },
+          "id_importacion": {
+            "type": "integer",
+            "title": "Id Importacion"
+          },
+          "numero_ciclo": {
+            "type": "integer",
+            "title": "Numero Ciclo"
+          },
+          "tipo_ciclo": {
+            "type": "string",
+            "title": "Tipo Ciclo"
+          },
+          "motivo": {
+            "type": "string",
+            "title": "Motivo"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "fecha_inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Inicio"
+          },
+          "fecha_fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Fin"
+          },
+          "id_usuario": {
+            "type": "integer",
+            "title": "Id Usuario"
+          },
+          "version_algoritmo": {
+            "type": "string",
+            "title": "Version Algoritmo"
+          },
+          "universo_destinos": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Universo Destinos"
+          },
+          "resumen": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Resumen"
+          },
+          "features": {
+            "items": {
+              "$ref": "#/components/schemas/ResultadoCicloGisResponse"
+            },
+            "type": "array",
+            "title": "Features"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_ciclo",
+          "id_importacion",
+          "numero_ciclo",
+          "tipo_ciclo",
+          "motivo",
+          "estado",
+          "fecha_inicio",
+          "id_usuario",
+          "version_algoritmo",
+          "universo_destinos",
+          "resumen",
+          "features"
+        ],
+        "title": "DetalleCicloGisResponse"
+      },
+      "DetalleRevisionGisResponse": {
+        "properties": {
+          "id_revision": {
+            "type": "integer",
+            "title": "Id Revision"
+          },
+          "id_proyecto": {
+            "type": "integer",
+            "title": "Id Proyecto"
+          },
+          "objetivo": {
+            "type": "string",
+            "enum": [
+              "ddv",
+              "nucleo",
+              "parcela"
+            ],
+            "title": "Objetivo"
+          },
+          "id_proyecto_nucleo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Proyecto Nucleo"
+          },
+          "id_parcela": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Parcela"
+          },
+          "id_feature_nueva": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Feature Nueva"
+          },
+          "id_importacion_anterior": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Importacion Anterior"
+          },
+          "id_importacion_nueva": {
+            "type": "integer",
+            "title": "Id Importacion Nueva"
+          },
+          "id_nucleo_geometria_anterior": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Nucleo Geometria Anterior"
+          },
+          "id_nucleo_geometria_nueva": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Nucleo Geometria Nueva"
+          },
+          "id_parcela_geometria_anterior": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Parcela Geometria Anterior"
+          },
+          "id_parcela_geometria_nueva": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Parcela Geometria Nueva"
+          },
+          "id_ddv_anterior": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Ddv Anterior"
+          },
+          "id_ddv_nueva": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Ddv Nueva"
+          },
+          "tipo_cambio": {
+            "type": "string",
+            "title": "Tipo Cambio"
+          },
+          "subtipo_cambio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtipo Cambio"
+          },
+          "estado_revision": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "revisado",
+              "no_aplica",
+              "aplicado"
+            ],
+            "title": "Estado Revision"
+          },
+          "srid_medicion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Srid Medicion"
+          },
+          "area_anterior_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Anterior M2"
+          },
+          "area_nueva_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Nueva M2"
+          },
+          "area_diferencia_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Diferencia M2"
+          },
+          "porcentaje_diferencia": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Porcentaje Diferencia"
+          },
+          "metricas": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metricas"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "creado_por": {
+            "type": "integer",
+            "title": "Creado Por"
+          },
+          "decisiones": {
+            "items": {
+              "$ref": "#/components/schemas/RevisionGisDecisionResponse"
+            },
+            "type": "array",
+            "title": "Decisiones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_revision",
+          "id_proyecto",
+          "objetivo",
+          "id_importacion_nueva",
+          "tipo_cambio",
+          "estado_revision",
+          "metricas",
+          "creado_en",
+          "creado_por",
+          "decisiones"
+        ],
+        "title": "DetalleRevisionGisResponse"
+      },
       "DocumentoCreate": {
         "properties": {
           "observaciones": {
@@ -16030,7 +17758,10 @@
             "enum": [
               "trazo_proyecto",
               "nucleo_agrario",
-              "parcela"
+              "parcela",
+              "derecho_via_proyecto",
+              "nucleo_agrario_gpkg",
+              "parcela_gpkg"
             ],
             "title": "Tipo Objetivo"
           },
@@ -16065,6 +17796,35 @@
               }
             ],
             "title": "Fecha Fuente"
+          },
+          "version_pipeline": {
+            "type": "string",
+            "title": "Version Pipeline",
+            "default": "legacy-v1"
+          },
+          "alcance_entrega": {
+            "type": "string",
+            "enum": [
+              "completa",
+              "parcial"
+            ],
+            "title": "Alcance Entrega"
+          },
+          "id_importacion_anterior": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Importacion Anterior"
+          },
+          "srid_trabajo": {
+            "type": "integer",
+            "title": "Srid Trabajo",
+            "default": 4326
           },
           "crs_original": {
             "anyOf": [
@@ -16135,6 +17895,7 @@
           "tamano_bytes",
           "sha256",
           "fuente",
+          "alcance_entrega",
           "crs_destino",
           "estado",
           "total_features",
@@ -16258,6 +18019,33 @@
               }
             ],
             "title": "Registro Destino Id"
+          },
+          "estado_conciliacion": {
+            "type": "string",
+            "title": "Estado Conciliacion",
+            "default": "pendiente"
+          },
+          "crs_fuente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crs Fuente"
+          },
+          "dimension_fuente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimension Fuente"
           }
         },
         "type": "object",
@@ -21367,6 +23155,37 @@
         "type": "object",
         "title": "ProyectoUpdate"
       },
+      "ReconciliarGisRequest": {
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Motivo"
+          },
+          "clave_solicitud": {
+            "type": "string",
+            "title": "Clave Solicitud",
+            "description": "UUID de idempotencia; reutilizarlo en reintentos"
+          },
+          "incluir_ambiguos": {
+            "type": "boolean",
+            "title": "Incluir Ambiguos",
+            "default": true
+          },
+          "reabrir_rechazados": {
+            "type": "boolean",
+            "title": "Reabrir Rechazados",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "motivo",
+          "clave_solicitud"
+        ],
+        "title": "ReconciliarGisRequest"
+      },
       "ReporteAvancePeriodoResponse": {
         "properties": {
           "id_proyecto": {
@@ -21846,6 +23665,380 @@
           "id_requisito"
         ],
         "title": "RequisitoDocumentalResponse"
+      },
+      "ResultadoCicloGisResponse": {
+        "properties": {
+          "id_importacion_feature": {
+            "type": "integer",
+            "title": "Id Importacion Feature"
+          },
+          "estado_matching": {
+            "type": "string",
+            "title": "Estado Matching"
+          },
+          "estado_resultado": {
+            "type": "string",
+            "title": "Estado Resultado"
+          },
+          "candidatos": {
+            "items": {
+              "$ref": "#/components/schemas/CandidatoGisResponse"
+            },
+            "type": "array",
+            "title": "Candidatos"
+          },
+          "decisiones": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionGisResponse"
+            },
+            "type": "array",
+            "title": "Decisiones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_importacion_feature",
+          "estado_matching",
+          "estado_resultado",
+          "candidatos",
+          "decisiones"
+        ],
+        "title": "ResultadoCicloGisResponse"
+      },
+      "RevisionGisDecisionRequest": {
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Motivo"
+          },
+          "clave_solicitud": {
+            "type": "string",
+            "title": "Clave Solicitud",
+            "description": "UUID de idempotencia; reutilizarlo en reintentos"
+          },
+          "accion": {
+            "type": "string",
+            "enum": [
+              "revisado",
+              "no_aplica",
+              "aplicado"
+            ],
+            "title": "Accion"
+          },
+          "id_seguimiento_evento": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Seguimiento Evento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "motivo",
+          "clave_solicitud",
+          "accion"
+        ],
+        "title": "RevisionGisDecisionRequest"
+      },
+      "RevisionGisDecisionResponse": {
+        "properties": {
+          "id_decision": {
+            "type": "integer",
+            "title": "Id Decision"
+          },
+          "id_revision": {
+            "type": "integer",
+            "title": "Id Revision"
+          },
+          "accion": {
+            "type": "string",
+            "title": "Accion"
+          },
+          "motivo": {
+            "type": "string",
+            "title": "Motivo"
+          },
+          "id_seguimiento_evento": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Seguimiento Evento"
+          },
+          "creado_por": {
+            "type": "integer",
+            "title": "Creado Por"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_decision",
+          "id_revision",
+          "accion",
+          "motivo",
+          "creado_por",
+          "creado_en"
+        ],
+        "title": "RevisionGisDecisionResponse"
+      },
+      "RevisionGisResponse": {
+        "properties": {
+          "id_revision": {
+            "type": "integer",
+            "title": "Id Revision"
+          },
+          "id_proyecto": {
+            "type": "integer",
+            "title": "Id Proyecto"
+          },
+          "objetivo": {
+            "type": "string",
+            "enum": [
+              "ddv",
+              "nucleo",
+              "parcela"
+            ],
+            "title": "Objetivo"
+          },
+          "id_proyecto_nucleo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Proyecto Nucleo"
+          },
+          "id_parcela": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Parcela"
+          },
+          "id_feature_nueva": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Feature Nueva"
+          },
+          "id_importacion_anterior": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Importacion Anterior"
+          },
+          "id_importacion_nueva": {
+            "type": "integer",
+            "title": "Id Importacion Nueva"
+          },
+          "id_nucleo_geometria_anterior": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Nucleo Geometria Anterior"
+          },
+          "id_nucleo_geometria_nueva": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Nucleo Geometria Nueva"
+          },
+          "id_parcela_geometria_anterior": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Parcela Geometria Anterior"
+          },
+          "id_parcela_geometria_nueva": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Parcela Geometria Nueva"
+          },
+          "id_ddv_anterior": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Ddv Anterior"
+          },
+          "id_ddv_nueva": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Ddv Nueva"
+          },
+          "tipo_cambio": {
+            "type": "string",
+            "title": "Tipo Cambio"
+          },
+          "subtipo_cambio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtipo Cambio"
+          },
+          "estado_revision": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "revisado",
+              "no_aplica",
+              "aplicado"
+            ],
+            "title": "Estado Revision"
+          },
+          "srid_medicion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Srid Medicion"
+          },
+          "area_anterior_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Anterior M2"
+          },
+          "area_nueva_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Nueva M2"
+          },
+          "area_diferencia_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Diferencia M2"
+          },
+          "porcentaje_diferencia": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Porcentaje Diferencia"
+          },
+          "metricas": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metricas"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "creado_por": {
+            "type": "integer",
+            "title": "Creado Por"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_revision",
+          "id_proyecto",
+          "objetivo",
+          "id_importacion_nueva",
+          "tipo_cambio",
+          "estado_revision",
+          "metricas",
+          "creado_en",
+          "creado_por"
+        ],
+        "title": "RevisionGisResponse"
       },
       "SeguimientoEventoCreate": {
         "properties": {

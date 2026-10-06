@@ -1,0 +1,40 @@
+# Disposable instance only. No host ports, production volumes or personal data.
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    command: [postgres, -c, cluster_name=software-pa-lineage-equivalence]
+    environment:
+      POSTGRES_DB: software_pa_test
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?}
+      POSTGRES_PASSWORD: lineage-disposable-only
+      DB_RUNTIME_USER: ${DB_RUNTIME_USER:?}
+      DB_RUNTIME_PASSWORD: lineage-runtime-disposable-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ../db/init/001_bootstrap_roles.sh:/docker-entrypoint-initdb.d/001_bootstrap_roles.sh:ro
+      - ../db:/opt/software-pa/db:ro
+      - ../scripts:/opt/software-pa/scripts:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d software_pa_test']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  worker:
+    image: software-pa-backend
+    working_dir: /app
+    environment:
+      APP_ENV: test
+      DB_NAME: software_pa_test
+      TEST_ALLOW_DATABASE: software_pa_test
+      LINEAGE_DISPOSABLE_INSTANCE: '1'
+      DB_HOST: db
+      DB_PORT: '5432'
+      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:?}
+      POSTGRES_ADMIN_PASSWORD: lineage-disposable-only
+      DB_RUNTIME_USER: ${DB_RUNTIME_USER:?}
+      DB_RUNTIME_PASSWORD: lineage-runtime-disposable-only
+      SECRET_KEY: disposable-lineage-test-secret-not-for-deployment
+    volumes:
+      - ..:/app
+      - ../../backups/lineage_gis_20261005:/evidence

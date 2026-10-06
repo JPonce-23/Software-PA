@@ -1,7 +1,7 @@
 # Diccionario de Datos — SOFTWARE-PA
 
 > **Autoridad:** Especificación canónica del modelo físico y lógico de datos de SOFTWARE-PA.  
-> **Validación:** Verificado contra `backend/app/models.py`, migraciones vigentes `001–019` y read-models de base de datos en PostgreSQL 15 / PostGIS.
+> **Validación:** Verificado contra `backend/app/models.py`, migraciones vigentes `001–025` y read-models de base de datos en PostgreSQL 15 / PostGIS.
 
 ---
 
@@ -62,8 +62,30 @@ Proyecto estratégico o ferroviario amparado por las tareas de liberación de v�
 | `fecha_inicio` | `DATE` | Sí | — | Fecha de arranque institucional del proyecto. | Calendario | Trazabilidad |
 | `fecha_fin_estimada` | `DATE` | Sí | — | Fecha meta de culminación. | Cronograma | Trazabilidad |
 
+### 2.3.1 `derecho_via_proyecto`
+
+DDV cartográfico canónico ligado directamente a `proyecto`. Admite historial de versiones y como máximo una versión vigente por proyecto. `es_vigente` expresa vigencia cartográfica; `activo` expresa baja lógica. Una versión anterior conserva `activo = true` al ser sustituida. `trazo_proyecto` (`MULTILINESTRING`) permanece como estructura legacy para consumidores actuales.
+
+| Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen | Uso |
+|---|---|---|---|---|---|---|
+| `id_derecho_via` | `INTEGER` | No | PK | Identificador de la versión. | Sistema | Auditoría |
+| `id_proyecto` | `INTEGER` | No | `proyecto.id_proyecto` | Proyecto propietario del DDV. | Proyecto | Alcance |
+| `version` | `INTEGER` | No | `UNIQUE(id_proyecto, version)`, `> 0` | Versión secuencial por proyecto. | Captura cartográfica | Historial |
+| `es_vigente` | `BOOLEAN` | No | Índice único parcial por proyecto; default `false` | Marca la versión cartográfica vigente; requiere `activo = true`. | Promoción explícita | Consulta futura |
+| `geometria_poligono` | `geometry(MULTIPOLYGON,4326)` | No | GiST; no vacía y válida | Polígono del Derecho de Vía. | Cartografía | Consulta espacial futura |
+| `fuente` | `VARCHAR(250)` | No | No vacía | Procedencia de la geometría. | Cartografía | Trazabilidad |
+| `fecha_fuente` | `DATE` | Sí | — | Fecha declarada de la fuente. | Cartografía | Trazabilidad |
+
+Incluye las columnas estándar de auditoría y baja lógica descritas en §1. Esta fase no sustituye superficies administrativas ni cambia los endpoints de trazo y mapa.
+
+### 2.3.2 Staging de importación DDV
+
+`importacion_archivo.tipo_objetivo = 'derecho_via_proyecto'` identifica el flujo estricto de GeoPackage. En este objetivo, `formato_detectado = 'gpkg'`, `mapeo` y `opciones_mapeo` son objetos vacíos, `id_perfil` es nulo y `crs_destino = 'EPSG:4326'`. `importacion_archivo` conserva nombre del archivo, tamaño, SHA-256, fuente, fecha, CRS original, capa en el reporte, contadores, usuario y fechas. `importacion_feature` conserva índice, capa, atributos originales, geometría normalizada, estado, errores, advertencias, transformaciones y, tras confirmar, `registro_destino_id` hacia el DDV del mismo proyecto. Una reparación válida registra `GEOMETRIA_REPARADA` y requiere aceptación explícita; una geometría irrecuperable queda en error. El staging no modifica `derecho_via_proyecto` ni entidades administrativas.
+
 ### 2.4 `nucleo_agrario`
 Catálogo maestro nacional de núcleos agrarios (ejidos y comunidades). Su identidad interna permanece en `id_nucleo`; para el catálogo RAN/PHINA, la `cve_unica` oficial se almacena físicamente en `id_nucleo_fuente` y se identifica junto con `fuente_datos = 'RAN_PHINA_CATALOGO_NUCLEOS'`. No existe una columna física `clave_ran`. `ProyectoNucleo` continúa siendo el vínculo operativo con cada proyecto, conforme al principio Excel-First.
+
+La conciliación vigente (025) usa `POST /api/proyectos/{id_proyecto}/geoespacial/nucleos/importaciones`. `cve_unica` es opcional: si está presente se verifica contra la identidad oficial; si falta se proponen candidatos por nombre y territorio dentro de los `ProyectoNucleo` existentes. Ninguna coincidencia guarda automáticamente geometría. La confirmación escribe únicamente `proyecto_nucleo_geometria`, conserva el campo global legacy y registra una decisión auditada. Véase el contrato 025 al final de este diccionario.
 
 | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|
@@ -77,7 +99,7 @@ Catálogo maestro nacional de núcleos agrarios (ejidos y comunidades). Su ident
 | `id_municipio_fuente` | `VARCHAR(120)` | Sí | — | Valor `scncve_mun` conservado desde la fuente RAN. | RAN/PHINA | Conciliación territorial |
 | `id_nucleo_fuente` | `VARCHAR(120)` | Sí | Identidad externa | Para RAN contiene `cve_unica` como texto, sin interpretar su estructura. Es único junto con `fuente_datos` cuando ambos existen. | RAN/PHINA | Identidad oficial |
 | `alcance_identidad_fuente` | `VARCHAR(20)` | Sí | — | Para el catálogo RAN se usa `nacional`. | RAN/PHINA | Alcance de identidad |
-| `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Perímetro del núcleo agrario. | Cartografía | Visor cartográfico de apoyo |
+| `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Perímetro global legacy; no recibe nuevas escrituras de importación GIS. | Cartografía | Visor cartográfico de apoyo |
 
 ### 2.5 `proyecto_nucleo`
 Eje operativo fundamental. Vincula el proyecto estratégico con el núcleo agrario específico.
@@ -149,13 +171,15 @@ La unidad operativa central de la ruta individual.
 
 La resolución del identificador sigue [MODELO_FUNCIONAL.md §6.1](MODELO_FUNCIONAL.md#61-identificador-funcional-canónico-único) y [FUENTES_Y_COBERTURA_EXCEL.md §3.1](FUENTES_Y_COBERTURA_EXCEL.md#31-unicidad-del-identificador-parcelario-no_parcela): equivalencia o diferencia de formato produce un único valor conservando ambos originales; un solo valor presente se utiliza con su procedencia exacta; divergencia sustantiva requiere **REVISAR** y aclaración humana sin crear automáticamente dos parcelas ni asumir prioridad PPT. Sin ambos valores, `no_parcela` puede quedar `NULL` y la ausencia se conserva en trazabilidad/revisión al importar, incluidas las 17 filas auditadas.
 
+La conciliación vigente (025) usa `POST /api/proyectos/{id_proyecto}/geoespacial/parcelas/importaciones`. `cve_unica_nucleo` es opcional y no se inventa. Sólo son destinos las parcelas previamente vinculadas al proyecto por la cadena administrativa de afectación. `PARCELA` y `Num_parcela` se conservan y comparan separadamente; letras, sufijos y otros signos permanecen distintos. La confirmación escribe `proyecto_parcela_geometria`, sin actualizar la geometría global ni superficies administrativas. Véase el contrato 025 al final de este diccionario.
+
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
 | `parcela` | `id_parcela` | `INTEGER` | No | PK | Identificador interno de la parcela. | Sistema | `/api/parcelas` |
 | `parcela` | `id_nucleo` | `INTEGER` | No | `nucleo_agrario` | Núcleo agrario al que pertenece. | NÚCLEO | Pertenencia agraria |
 | `parcela` | `no_parcela` | `VARCHAR(80)` | Sí | — | **Único identificador funcional canónico.** | NO. DE PARCELA / NO. DE PARCELA PPT | Identificación unívoca |
 | `parcela` | `tipo_parcela` | `VARCHAR(50)` | Sí | — | Ejidal, comunal, infraestructura, etc. | TIPO PARCELA | Clasificación |
-| `parcela` | `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Polígono cartográfico de la parcela. | Shapefile/GeoJSON | Visor cartográfico (opcional) |
+| `parcela` | `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Polígono global legacy; no recibe nuevas escrituras de importación GIS. | Legacy | Visor cartográfico (opcional) |
 | `parcela_titular` | `id_parcela` | `INTEGER` | No | `parcela.id_parcela` | Parcela correspondiente. | Fila titular | Vínculo de titularidad |
 | `parcela_titular` | `id_persona` | `BIGINT` | No | `persona.id_persona` | Sujeto de derecho acreditado. | TITULAR | Suscripción de convenios |
 | `parcela_titular` | `tipo_derecho` | `VARCHAR(50)` | No | — | Titular, posesionario, sucesor. | CALIDAD | Cláusulas contractuales |
@@ -321,3 +345,71 @@ La resolución del identificador sigue [MODELO_FUNCIONAL.md §6.1](MODELO_FUNCIO
 | `vw_reporte_snapshot_actual` | Corte fotográfico del estado presente. | `id_proyecto`, `id_entidad`, `ambito`, `indicador`, `tipo_cop_operativo`, `destino_superficie`, `cantidad`, `superficie_ha`, `monto`. | No acepta año/mes/trimestre. Reporta núcleos, parcelas intervenidas, superficies físicas y condición TUC acumulada. |
 | `vw_convenio_colectivo_destino` | Detalle por `id_convenio + destino_superficie`. | `id_convenio`, `destino_superficie`, `ambito`, `tipo_convenio`, `superficie_ha`, `superficie_declarada_ha`, `monto_declarado`, `fecha_firma`. | `monto_declarado` es **NO ADITIVO**; superficie física proviene de `AfectacionUnidadAgraria`. |
 | `vw_seguimiento_estado_actual` | Estado vigente por proyecto-núcleo y objetivo. | `id_proyecto_nucleo`, `entidad_tipo`, `entidad_id`, `estado_actual`, `tipo_ultimo_evento`, `motivo_actual`, `fecha_ultimo_evento`. | Computa deterministamente el estado vigente basándose en el evento más reciente sin alterar registros base. |
+
+
+## Conciliación GIS por proyecto — contrato 025
+
+### Entidades complementarias nuevas
+
+| Tabla | Clave y referencias | Campos funcionales | Restricciones y uso |
+|---|---|---|---|
+| `proyecto_configuracion_gis` | PK/FK `id_proyecto`; FK `srid_trabajo → spatial_ref_sys` | `srid_trabajo`, auditoría estándar | Una configuración explícita por proyecto; sin fila se usa 4326. Cambio bloqueado cuando hay geometrías confirmadas. |
+| `importacion_feature_candidato` | PK bigint `id_candidato`; FKs importación, feature/importación, `id_proyecto_nucleo`, `id_parcela` opcional | `criterio`, `clasificacion`, `coincidencias`, `estado`, `geometria_previa_hash`, `id_usuario_revision`, `fecha_revision`, auditoría estándar | 0..N destinos tipados. `clasificacion`: exacta/fuerte/revision; `estado`: propuesto/seleccionado/rechazado/confirmado. Una selección por feature y por destino/importación. Se valida ámbito y vínculo administrativo. |
+| `importacion_feature_decision` | PK bigint `id_decision`; FK feature; FK compuesta candidato/feature opcional; FK usuario | `accion`, `motivo`, `creado_por`, `creado_en` | Append-only. Acciones seleccionar/confirmar/rechazar/ignorar. Ignorar no lleva candidato. |
+| `proyecto_nucleo_geometria` | PK bigint `id_geometria`; FK `id_proyecto_nucleo`; FK única `id_importacion_feature` | `version`, `es_vigente`, `geometria_poligono`, `geometria_trabajo`, `srid_trabajo`, `fuente`, `fecha_fuente`, auditoría estándar | Versionado por vínculo administrativo, una vigente; geometrías no vacías/válidas. Procedencia se obtiene de feature/importación, incluyendo SHA y transformaciones. |
+| `proyecto_parcela_geometria` | Igual a núcleo, más FK `id_parcela` | Mismos campos geométricos y de auditoría | Versionado por `id_proyecto_nucleo + id_parcela`; requiere vínculo administrativo por afectación, no sólo pertenencia al núcleo. |
+
+Las geometrías web son `geometry(MULTIPOLYGON,4326)`. Las geometrías de trabajo son `geometry(MULTIPOLYGON)` con SRID explícito validado contra `srid_trabajo`, dimensión XY, validez y no vacío. Ambas representaciones cuentan con GiST. Estas entidades no duplican el modelo administrativo.
+
+`vw_gis_parcela_proyecto` contiene `id_proyecto`, `id_proyecto_nucleo`, `id_parcela`, `id_nucleo`. Deriva exclusivamente de `ProyectoNucleo → Afectacion → AfectacionUnidadAgraria → UnidadAgraria → Parcela`, con todos los registros activos y núcleos concordantes. No usa intersección espacial.
+
+### Ampliaciones de tablas existentes
+
+| Tabla | Campo nuevo | Tipo / significado |
+|---|---|---|
+| `importacion_archivo` | `version_pipeline` | varchar(40), no nulo; histórico `legacy-v1`, nuevo `conciliacion-v2`. |
+| `importacion_archivo` | `srid_trabajo` | integer no nulo, FK `spatial_ref_sys`; CRS de trabajo fijado al procesar. |
+| `importacion_archivo` | `crs_fuente_wkt` | text nullable; WKT del CRS leído por GDAL. |
+| `importacion_feature` | `geometria_original` | geometry nullable, sin typmod; conserva WKB/CRS/dimensión de origen. |
+| `importacion_feature` | `geometria_trabajo` | geometry(MULTIPOLYGON) nullable; XY válida/no vacía. |
+| `importacion_feature` | `crs_fuente` | text nullable; referencia del CRS fuente. |
+| `importacion_feature` | `dimension_fuente` | varchar(8), XY/XYZ/XYM/XYZM. |
+| `importacion_feature` | `estado_conciliacion` | varchar(30) no nulo: pendiente/coincidencia_exacta/candidato/ambiguo/sin_coincidencia/confirmado/rechazado/ignorado. |
+| `derecho_via_proyecto` | `id_importacion` | bigint nullable, FK importación; conserva compatibilidad de versiones anteriores. |
+| `derecho_via_proyecto` | `sha256` | char(64) nullable, SHA del archivo fuente. |
+| `derecho_via_proyecto` | `srid_trabajo` | integer nullable, FK `spatial_ref_sys`. |
+| `derecho_via_proyecto` | `geometria_trabajo` | geometry(MULTIPOLYGON) nullable, XY válida/no vacía, SRID concordante. |
+
+Se conserva en `importacion_archivo` el nombre original/almacenado, tamaño, SHA, proyecto, objetivo, fuente/fecha, estados, contadores y reporte existentes. El archivo almacenado es temporal: el reporte declara `archivo_original_retenido = false`; se conserva trazabilidad técnica mediante WKB y atributos autorizados, sin retener la copia con posibles datos personales.
+
+`importacion_feature` conserva índice, FID externo, capa, geometría 4326 normalizada, atributos originales/normalizados permitidos, errores, advertencias, transformaciones, aceptación y auditoría existentes. En `conciliacion-v2`, `registro_destino_id` sólo se establece al confirmar: para núcleos es `id_proyecto_nucleo`; para parcelas es `id_parcela` (el candidato conserva además el vínculo del proyecto); para DDV es `id_derecho_via`. Los triggers interpretan el campo según objetivo y versión, preservando el contrato histórico.
+
+La deduplicación activa usa `(id_proyecto, tipo_objetivo, sha256, version_pipeline, srid_trabajo)`. `PARCELA` y `Num_parcela` nunca se fusionan ni tienen precedencia global. `coincidencias` es un array de criterios observados, no un contenedor arbitrario de destinos: las relaciones administrativas permanecen normalizadas mediante FKs.
+
+Los endpoints de features filtran atributos mediante una lista permitida, también al leer filas históricas. No se almacenan ni se utilizan nombres personales, CURP, domicilios, fechas de nacimiento o certificados. `Name`, `NOM_SEDATU` y atributos de semántica personal incierta se excluyen. No se calculan superficies administrativas a partir de geometría.
+
+Referencias GIS renumeradas excepcionalmente desde 020–024 a 021–025; los originales
+y la correspondencia se conservan en [MIGRACIONES.md](MIGRACIONES.md). No cambió el
+modelo funcional GIS ni administrativo.
+
+### Historia técnica GIS (026)
+
+| Entidad / campo | Significado y reglas |
+|---|---|
+| importacion_archivo.alcance_entrega | completa o parcial, explícito en las rutas estrictas de núcleos/parcelas; histórico desconocido = parcial. Inmutable. |
+| importacion_archivo.id_importacion_anterior | FK a la última entrega finalizada del mismo proyecto/objetivo lógico al hacer staging. Inmutable. |
+| importacion_conciliacion_ciclo | Intento numerado por importación; tipo histórico/inicial/reconciliación, motivo, algoritmo, usuario, fechas, UUID de idempotencia, snapshot de universo y resumen. Identidad inmutable y cierre único. |
+| importacion_conciliacion_resultado | PK ciclo + feature, FK al staging y resultado de matching inmutable. Las decisiones explican el resultado posterior sin borrar el inicial. |
+| candidato.id_ciclo / decision.id_ciclo | FKs compuestas garantizan ciclo, importación y feature coherentes. Los ciclos antiguos no se sobrescriben. |
+| revision_cambio_gis | Observación inmutable: proyecto, objetivo ddv/nucleo/parcela, destino opcional, feature, importaciones y versiones con FKs tipadas. Tipos: geometria_modificada, aparece_en_nueva_version, desaparece_en_nueva_version, cambio_relacion_ddv. |
+| revisión.id_nucleo_geometria_*, id_parcela_geometria_*, id_ddv_* | FKs a versiones históricas existentes. Una desaparición no elimina ni desactiva ninguna de ellas. |
+| revisión.area_*_m2, porcentaje_diferencia, srid_medicion | Métricas GIS; NULL si no se acredita CRS proyectado con unidades en metros. Porcentaje de diferencia simétrica respecto del área anterior; no es superficie administrativa. |
+| revisión.metricas | Información descriptiva auxiliar (política, componentes, tipo de medida); las relaciones estructurales usan FKs. |
+| revision_cambio_gis_decision | Append-only: acción revisado/no_aplica/aplicado, motivo obligatorio, usuario, fecha, UUID único por revisión y FK opcional al evento existente. |
+| decisión.id_seguimiento_evento | Sólo con aplicado. Evento activo del mismo proyecto y núcleo cuando corresponda, entidad compatible. No se crea ni actualiza desde GIS. |
+| vw_revision_cambio_gis_estado | Estado pendiente o última acción por id_decision; no se guarda un estado administrativo ni otro estado físico. |
+
+Las tablas de versiones de núcleo/parcela/DDV de 025 se reutilizan, con payloads
+inmutables y una sola vigente. Las revisiones técnicas no cambian pertenencia,
+afectaciones, convenios, trámites, superficies, avalúos ni eventos. Se preserva
+TRANSVERSALES como tipo COP, sin implementar obras transversales GIS.
