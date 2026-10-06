@@ -43,7 +43,7 @@ def stage(api, project_id, content, *, name="parcelas.gpkg", expected=201, extra
     return api(
         "POST", f"/api/proyectos/{project_id}/geoespacial/parcelas/importaciones",
         expected=expected,
-        data={"fuente": "Cartografía parcelaria QA", "fecha_fuente": "2026-09-25", **(extra or {})},
+        data={"alcance_entrega": "parcial", "fuente": "Cartografía parcelaria QA", "fecha_fuente": "2026-09-25", **(extra or {})},
         files={"archivo": (name, content, "application/geopackage+sqlite3")},
     )
 

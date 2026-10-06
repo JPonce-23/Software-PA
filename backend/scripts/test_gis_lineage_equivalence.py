@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+import shutil
 
 ROOT=Path(__file__).resolve().parents[2]
 EVIDENCE=ROOT/'backups/lineage_gis_20261005'
@@ -36,7 +38,8 @@ def reset():
 
 def runner(legacy=False):
     setup=''
-    directory='/opt/software-pa/db/migrations'
+    directory='/tmp/canonical-gis-025'
+    setup='mkdir -p /tmp/canonical-gis-025; for f in /opt/software-pa/db/migrations/0[01][0-9]_*.sql /opt/software-pa/db/migrations/02[0-5]_*.sql; do test -f "$f" && ln -sf "$f" /tmp/canonical-gis-025/; done; '
     if legacy:
         directory='/tmp/legacy-gis'
         setup='mkdir -p /tmp/legacy-gis; for f in /opt/software-pa/db/migrations/0[01][0-9]_*.sql /opt/software-pa/db/lineage/gis_precanonical/*.sql; do test -f "$f" && ln -sf "$f" /tmp/legacy-gis/; done; '
@@ -52,6 +55,17 @@ def main():
     for key,value in {'APP_ENV':'test','DB_NAME':'software_pa_test','TEST_ALLOW_DATABASE':'software_pa_test'}.items():
         if os.getenv(key)!=value:raise RuntimeError('Missing explicit test guard: '+key)
     EVIDENCE.mkdir(parents=True,exist_ok=True)
+    # The exceptional reconciler deliberately rejects later releases. Test it
+    # against its frozen inventory, without weakening any production safeguard.
+    frozen=tempfile.TemporaryDirectory(prefix='software-pa-lineage-025-')
+    frozen_path=Path(frozen.name)
+    migrations=frozen_path/'migrations'
+    migrations.mkdir()
+    for item in json.loads((ROOT/'backend/db/lineage/gis_lineage_manifest.json').read_text())['common'] + json.loads((ROOT/'backend/db/lineage/gis_lineage_manifest.json').read_text())['canonical']:
+        shutil.copyfile(ROOT/'backend/db/migrations'/item['file'],migrations/item['file'])
+    override=frozen_path/'compose.yml'
+    override.write_text('services:\n  worker:\n    volumes:\n      - '+str(migrations)+':/app/db/migrations:ro\n')
+    COMPOSE.extend(['-f',str(override)])
     try:
         run(['up','-d','--wait','db'],'equivalence-start')
         reset();runner();a=snapshot('equivalence-a')
@@ -79,5 +93,6 @@ def main():
         print(json.dumps(result,indent=2))
     finally:
         run(['down','-v','--remove-orphans'],'equivalence-cleanup')
+        frozen.cleanup()
 
 if __name__=='__main__':main()

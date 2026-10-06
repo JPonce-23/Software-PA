@@ -15,7 +15,7 @@ from .common import set_audit_context
 from .gis_attributes import SAFE_FIELDS, sanitize_attributes
 from .gis_ingestion import IngestionError, inspect_dataset, iter_features
 
-PIPELINE_VERSION = 'conciliacion-v2'
+PIPELINE_VERSION = 'conciliacion-v3-historia'
 NUCLEUS_TARGETS = {'nucleo_agrario', 'nucleo_agrario_gpkg'}
 PARCEL_TARGETS = {'parcela', 'parcela_gpkg'}
 RECONCILIATION_TARGETS = NUCLEUS_TARGETS | PARCEL_TARGETS
@@ -128,9 +128,10 @@ def geometry_hash(db, pn_id, parcel_id=None):
     return query.scalar()
 
 
-def build_candidates(db, record, feature, properties, universe, user, *, direct_id=None):
+def build_candidates(db, record, feature, properties, universe, user, *, direct_id=None, cycle):
     from .geospatial_imports import normalize_parcel_number
     is_parcel = record.tipo_objetivo in PARCEL_TARGETS
+    candidates = []
     for pn, nucleus, parcel in universe:
         criteria = nucleus_criteria(properties, nucleus, parcel=is_parcel)
         if direct_id is not None:
@@ -149,18 +150,21 @@ def build_candidates(db, record, feature, properties, universe, user, *, direct_
         observations = criteria + number_criteria
         exact = 'clave_oficial' in criteria or 'id_administrativo_legacy' in criteria
         strong = {'PARCELA','Num_parcela'}.issubset(number_criteria)
-        db.add(models.ImportacionFeatureCandidato(
-            id_importacion=record.id_importacion, id_importacion_feature=feature.id_importacion_feature,
+        candidates.append(models.ImportacionFeatureCandidato(
+            id_ciclo=cycle.id_ciclo, id_importacion=record.id_importacion, id_importacion_feature=feature.id_importacion_feature,
             id_proyecto_nucleo=pn.id_proyecto_nucleo, id_parcela=parcel.id_parcela if parcel else None,
             criterio='ambos_numeros' if strong else number_criteria[0] if number_criteria else criteria[0],
             clasificacion='fuerte' if strong else 'exacta' if exact and not is_parcel else 'revision',
             coincidencias=observations, geometria_previa_hash=geometry_hash(db,pn.id_proyecto_nucleo,parcel.id_parcela if parcel else None),
             creado_por=user.id_usuario,
         ))
-    db.flush()
-    candidates = db.query(models.ImportacionFeatureCandidato).filter_by(id_importacion_feature=feature.id_importacion_feature).all()
     feature.estado_conciliacion = ('sin_coincidencia' if not candidates else 'ambiguo' if len(candidates)>1
         else 'coincidencia_exacta' if candidates[0].clasificacion=='exacta' else 'candidato')
+    db.add(models.ImportacionConciliacionResultado(id_ciclo=cycle.id_ciclo,
+        id_importacion_feature=feature.id_importacion_feature,estado_matching=feature.estado_conciliacion))
+    db.flush()
+    db.add_all(candidates)
+    db.flush()
 
 
 def reconciliation_summary(db, record):
@@ -181,10 +185,12 @@ def reconciliation_summary(db, record):
             'ignoradas':feature_states.get('ignorado',0), 'rechazadas':feature_states.get('rechazado',0)}
 
 
-async def stage(db, project_id, source, source_date, upload, user, *, target, mapping=None, strict=True):
+async def stage(db, project_id, source, source_date, upload, user, *, target, mapping=None, strict=True, scope="parcial"):
     from . import geospatial_imports as legacy
     project = require_project_access(db,user,project_id,mode='gis')
     if not source.strip(): raise HTTPException(422,'La fuente es obligatoria')
+    if target == 'derecho_via_proyecto': scope = 'completa'
+    if scope not in {'completa','parcial'}: raise HTTPException(422,'Alcance de entrega obligatorio')
     mapping = mapping or {}
     if mapping.get('id_destino') and mapping['id_destino'].casefold() not in {'record_id','id_destino','id_parcela','id_nucleo'}:
         raise HTTPException(422,'El mapeo debe usar un identificador administrativo técnico')
@@ -194,10 +200,14 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
     try:
         # Lock order shared with configuration and confirmation: project, then import.
         db.query(models.Proyecto).filter_by(id_proyecto=project.id_proyecto).with_for_update().one()
+        require_project_access(db,user,project_id,mode='gis')
         srid = working_srid(db,project_id)
         existing = db.query(models.ImportacionArchivo).filter_by(id_proyecto=project_id,tipo_objetivo=target,
             sha256=digest,version_pipeline=PIPELINE_VERSION,srid_trabajo=srid,activo=True).first()
-        if existing and existing.estado!='error': return existing
+        if existing and existing.estado!='error':
+            if existing.alcance_entrega != scope: raise HTTPException(409,'El mismo archivo ya fue procesado con otro alcance')
+            db.commit()
+            return existing
         set_audit_context(db,user.id_usuario)
         if existing:
             existing.activo=False; existing.fecha_baja=datetime.now(timezone.utc)
@@ -213,7 +223,10 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
             if any(c.casefold().startswith('__pa_') for c in layer.columns): raise HTTPException(422,'Columna técnica reservada')
             if strict and target in RECONCILIATION_TARGETS and {c.casefold() for c in layer.columns}&{'id_nucleo','id_parcela','id_destino'}:
                 raise HTTPException(422,'No se admiten identificadores internos en GPKG')
-        record=models.ImportacionArchivo(id_proyecto=project_id,tipo_objetivo=target,nombre_original=original,
+        from . import gis_history as history
+        previous = history.previous_delivery(db,project_id,target)
+        record=models.ImportacionArchivo(alcance_entrega=scope,
+            id_importacion_anterior=previous.id_importacion if previous else None,id_proyecto=project_id,tipo_objetivo=target,nombre_original=original,
             nombre_almacenado=path.name,formato_detectado=dataset.format if declared!='zip' else 'zip',tamano_bytes=size,
             sha256=digest,fuente=source.strip(),fecha_fuente=source_date,crs_original=dataset.crs_description,
             crs_fuente_wkt='\n'.join(l.crs_wkt for l in dataset.layers),crs_destino='EPSG:4326',
@@ -222,6 +235,7 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
             id_usuario_carga=user.id_usuario,creado_por=user.id_usuario,fecha_procesamiento_inicio=datetime.now(timezone.utc))
         db.add(record); db.flush()
         universe=administrative_universe(db,project_id,parcels=target in PARCEL_TARGETS) if target in RECONCILIATION_TARGETS else []
+        cycle = history.create_cycle(db,record,universe,user,reason='Conciliación inicial') if target in RECONCILIATION_TARGETS else None
         by_layer={l.name:l for l in dataset.layers}
         for index,(layer_name,item) in enumerate(iter_features(dataset_path,dataset,preserve_source_geometry=True)):
             layer=by_layer[layer_name]; raw=item.get('properties') or {}; geometry=item.get('geometry')
@@ -278,7 +292,7 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
                     try: direct_id=int(raw[mapping['id_destino']])
                     except (ValueError,TypeError,KeyError): direct_id=-1
                 if direct_id is not None: feature.atributos_normalizados={'id_destino':direct_id}
-                build_candidates(db,record,feature,attrs,universe,user,direct_id=direct_id)
+                build_candidates(db,record,feature,attrs,universe,user,direct_id=direct_id,cycle=cycle)
         counts=dict(db.query(models.ImportacionFeature.estado,func.count()).filter_by(id_importacion=record.id_importacion).group_by(models.ImportacionFeature.estado).all())
         record.validos=counts.get('valido',0); record.advertencias=counts.get('advertencia',0); record.errores=counts.get('error',0)
         record.features_procesados=sum(counts.values())
@@ -289,6 +303,9 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
             'crs_original':dataset.crs_description,'crs_destino':'EPSG:4326','srid_trabajo':srid,
             'archivo_original_retenido':False}
         if target in RECONCILIATION_TARGETS: record.reporte={**record.reporte,**reconciliation_summary(db,record)}
+        if cycle is not None:
+            cycle.resumen = reconciliation_summary(db,record)
+            history.appearances(db,record,user)
         db.commit(); db.refresh(record)
         return record
     except HTTPException:
@@ -309,6 +326,7 @@ def _locked_context(db,import_id,user):
     from .geospatial_imports import require_import_access
     record=require_import_access(db,import_id,user,mode='gis')
     db.query(models.Proyecto).filter_by(id_proyecto=record.id_proyecto).with_for_update().one()
+    require_project_access(db,user,record.id_proyecto,mode='gis')
     record=db.query(models.ImportacionArchivo).filter_by(id_importacion=import_id).populate_existing().with_for_update().one()
     if record.version_pipeline=='legacy-v1' or record.tipo_objetivo not in RECONCILIATION_TARGETS:
         raise HTTPException(409,'Esta importación no usa conciliación por proyecto')
@@ -323,10 +341,17 @@ def decide(db,import_id,feature_id,data,user):
         set_audit_context(db,user.id_usuario)
         feature=db.query(models.ImportacionFeature).filter_by(id_importacion=import_id,id_importacion_feature=feature_id).with_for_update().one_or_none()
         if feature is None: raise HTTPException(404,'Feature no encontrada')
-        if feature.estado_conciliacion in {'confirmado','ignorado'}: raise HTTPException(409,'La feature ya tiene decisión final')
+        from . import gis_history as history
+        cycle = history.feature_cycle(db,feature_id)
+        if cycle is None: raise HTTPException(409,'Feature sin ciclo de conciliación')
+        if feature.estado_conciliacion in {'confirmado','ignorado'}:
+            last = db.query(models.ImportacionFeatureDecision).filter_by(id_importacion_feature=feature_id).order_by(models.ImportacionFeatureDecision.id_decision.desc()).first()
+            if last and last.accion==data.accion and last.id_candidato==data.id_candidato and last.motivo==data.motivo and (data.accion!='confirmar' or data.confirmacion_explicita):
+                db.commit(); return feature
+            raise HTTPException(409,'La feature ya tiene decisión final')
         candidate=None; now=datetime.now(timezone.utc)
         if data.accion!='ignorar':
-            candidate=db.query(models.ImportacionFeatureCandidato).filter_by(id_candidato=data.id_candidato,id_importacion_feature=feature_id).with_for_update().one_or_none()
+            candidate=db.query(models.ImportacionFeatureCandidato).filter_by(id_candidato=data.id_candidato,id_importacion_feature=feature_id,id_ciclo=cycle.id_ciclo).with_for_update().one_or_none()
             if candidate is None: raise HTTPException(404,'Candidato no encontrado en esta feature')
             if candidate.estado=='rechazado': raise HTTPException(409,'El candidato fue rechazado')
         elif data.id_candidato is not None:
@@ -371,7 +396,8 @@ def decide(db,import_id,feature_id,data,user):
                 if warnings and not data.aceptar_advertencias: raise HTTPException(409,'Debe aceptar las advertencias de reparación o reemplazo')
             selected=db.query(models.ImportacionFeatureCandidato).filter(
                 models.ImportacionFeatureCandidato.id_importacion_feature==feature_id,
-                models.ImportacionFeatureCandidato.estado=='seleccionado').all()
+                models.ImportacionFeatureCandidato.estado=='seleccionado',
+                models.ImportacionFeatureCandidato.id_ciclo==cycle.id_ciclo).all()
             for item in selected:
                 if item.id_candidato!=candidate.id_candidato:
                     item.estado='propuesto'; item.actualizado_por=user.id_usuario; item.actualizado_en=now
@@ -396,20 +422,23 @@ def decide(db,import_id,feature_id,data,user):
                     geometria_trabajo=feature.geometria_trabajo,srid_trabajo=record.srid_trabajo,
                     fuente=record.fuente,fecha_fuente=record.fecha_fuente,creado_por=user.id_usuario)
                 if candidate.id_parcela is not None: values['id_parcela']=candidate.id_parcela
-                db.add(model(**values)); db.flush()
+                new_geometry = model(**values)
+                db.add(new_geometry); db.flush()
+                history.geometry_changed(db,record,previous,new_geometry,user)
         elif data.accion=='rechazar':
             candidate.estado='rechazado'; candidate.id_usuario_revision=user.id_usuario; candidate.fecha_revision=now
             candidate.actualizado_por=user.id_usuario; candidate.actualizado_en=now; db.flush()
             remaining=db.query(models.ImportacionFeatureCandidato).filter(
                 models.ImportacionFeatureCandidato.id_importacion_feature==feature_id,
-                models.ImportacionFeatureCandidato.estado!='rechazado').count()
+                models.ImportacionFeatureCandidato.estado!='rechazado',
+                models.ImportacionFeatureCandidato.id_ciclo==cycle.id_ciclo).count()
             feature.estado_conciliacion='rechazado' if not remaining else 'ambiguo' if remaining>1 else 'candidato'
         elif data.accion=='ignorar':
-            for item in db.query(models.ImportacionFeatureCandidato).filter_by(id_importacion_feature=feature_id,estado='seleccionado').all():
+            for item in db.query(models.ImportacionFeatureCandidato).filter_by(id_importacion_feature=feature_id,id_ciclo=cycle.id_ciclo,estado='seleccionado').all():
                 item.estado='propuesto'; item.actualizado_por=user.id_usuario; item.actualizado_en=now
             feature.estado='descartado'; feature.estado_conciliacion='ignorado'
             feature.id_usuario_revision=user.id_usuario; feature.fecha_revision=now
-        db.add(models.ImportacionFeatureDecision(id_importacion_feature=feature_id,
+        db.add(models.ImportacionFeatureDecision(id_ciclo=cycle.id_ciclo,id_importacion_feature=feature_id,
             id_candidato=candidate.id_candidato if candidate else None,accion=data.accion,motivo=data.motivo,creado_por=user.id_usuario))
         db.flush()
         record.advertencias=db.query(models.ImportacionFeature).filter(models.ImportacionFeature.id_importacion==import_id,func.jsonb_array_length(models.ImportacionFeature.advertencias)>0).count()
@@ -426,6 +455,8 @@ def decide(db,import_id,feature_id,data,user):
 
 def finalize(db,record,data,user):
     try:
+        if record.estado=='completo':
+            db.commit(); return record
         record=_locked_context(db,record.id_importacion,user)
         if not data.confirmacion_explicita: raise HTTPException(422,'Se requiere confirmación explícita')
         # Unmatched features are valid residuals. Proposed/ambiguous features
@@ -436,7 +467,11 @@ def finalize(db,record,data,user):
         if pending: raise HTTPException(409,'Resuelva o ignore los candidatos pendientes antes de finalizar')
         set_audit_context(db,user.id_usuario); now=datetime.now(timezone.utc)
         record.confirmacion_explicita=True; record.fecha_confirmacion=now; record.id_usuario_confirmacion=user.id_usuario
+        from . import gis_history as history
+        history.close_cycles(db,record)
         record.estado='completo'; record.actualizado_por=user.id_usuario; record.actualizado_en=now
+        db.flush()
+        history.disappearances(db,record,user)
         record.reporte={**record.reporte,**reconciliation_summary(db,record)}
         db.commit(); db.refresh(record); return record
     except HTTPException:

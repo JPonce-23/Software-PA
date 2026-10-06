@@ -1,8 +1,8 @@
 # Gestión de Migraciones de Base de Datos — SOFTWARE-PA
 
 > **Autoridad:** Documentación canónica del versionado del esquema de base de datos en PostgreSQL 15 / PostGIS.  
-> **Esquema ejecutable vigente:** **025** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base).
-> **Siguiente migración disponible:** **026** (reservada; no creada).
+> **Esquema ejecutable vigente:** **026** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base).
+> **Esta fase termina en 026.** No se crea 027.
 
 ---
 
@@ -13,13 +13,13 @@
 2. **Verificación de integridad por Checksum:**  
    El runner oficial (`backend/scripts/run_migrations.sh`) calcula el hash criptográfico SHA-256 de cada archivo `.sql`. Si un archivo ya registrado en `public.schema_migrations` sufre alteraciones en su contenido, el proceso de arranque se detiene de inmediato con error.
 3. **Evolución Forward-Only:**  
-   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** (comenzando en `026`, no creada en esta fase). No se modifican los archivos históricos `001` a `025`. La 025 conserva el contenido funcional del antiguo 024 GIS; su adopción excepcional se documenta abajo y se aplicó únicamente en `software_pa_test`.
+   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** posterior a la versión aplicada. No se modifican los archivos históricos `001` a `025`. La 025 conserva el contenido funcional del antiguo 024 GIS; su adopción excepcional se documenta abajo y se aplicó únicamente en `software_pa_test`.
 4. **Instalación limpia:**  
-   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `025_conciliacion_gis_proyecto.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
+   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `026_historia_cambios_gis.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
 
 ---
 
-## 2. Inventario Canónico de Migraciones Vigentes (001–025)
+## 2. Inventario Canónico de Migraciones Vigentes (001–026)
 
 | Versión | Archivo SQL | Checksum SHA-256 Verificado | Propósito y Contenido Principal |
 |---|---|---|---|
@@ -48,6 +48,7 @@
 | **023** | `023_importacion_nucleos_gpkg.sql` | `ede1ea43947cec0f9f9ba433319d69de21847c892985adbd03feed80ef0f051b` | Habilita `nucleo_agrario_gpkg` como objetivo de staging distinto del legacy, exige GPKG sin mapeo y valida que el destino sea un núcleo RAN activo vinculado activamente al proyecto. |
 | **024** | `024_importacion_parcelas_gpkg.sql` | `15f36ea78a591aeb0f587a84e7e2bddb21f53de455d80daaf8532422796bc2d6` | Habilita `parcela_gpkg` como objetivo de staging separado del legacy, exige GPKG sin mapeo y valida que el destino sea una parcela activa de un núcleo RAN activo vinculado al proyecto. No altera el índice de identidad parcelaria. |
 | **025** | `025_conciliacion_gis_proyecto.sql` | `8338aace95845761acf0f9b675064ca25a6b0da2117013178ed060f260ec372a` | Conciliación explícita contra destinos administrativos del proyecto; geometrías por proyecto, candidatos y decisiones auditadas; CRS configurable, trazabilidad WKB/Z e idempotencia por pipeline/CRS. Conserva las geometrías globales legacy y no crea entidades administrativas. |
+| **026** | `026_historia_cambios_gis.sql` | `6615a137655abbb2a6ea2620d7c8b5013f07d6fcdd81aae4270a4551904ea3fd` | Ciclos históricos, reconciliación tardía, alcance de entregas, revisiones técnicas y decisiones append-only; sin efectos administrativos automáticos. |
 
 ---
 
@@ -226,3 +227,96 @@ El contrato 001 verifica también dependencias transitivas de reporting, ya que
 005 y posteriores introdujeron vistas intermedias. La regresión sintética 007
 aporta `id_tipo_fin` cuando 018 está aplicada, sin alterar sus aserciones ni
 las migraciones de dominio.
+
+## Historia y cambios técnicos GIS — 026
+
+Esta fase posterior a la estabilización excepcional no cambia los SQL 001–025 ni
+vuelve a reconciliar su ledger. Depende de 025 canónica SHA
+`8338aace95845761acf0f9b675064ca25a6b0da2117013178ed060f260ec372a`.
+El runner aplica el DDL y registra 026 en una única transacción.
+
+`importacion_conciliacion_ciclo` conserva número, usuario, fechas, algoritmo, motivo
+y una instantánea de las identidades administrativas usadas. Sus resultados por
+feature son inmutables. Los candidatos y decisiones tienen FKs compuestas al ciclo,
+feature e importación. La unicidad de candidatos se extiende por ciclo; la
+confirmación sigue siendo única por feature y destino en la importación.
+
+El backfill crea un ciclo 1 histórico para las importaciones conciliables de 025 y
+asocia candidatos y decisiones existentes conservando sus IDs, fechas, usuarios y
+contenido. No reconstruye un universo pasado que 025 nunca guardó: queda señalado
+explícitamente como desconocido, sin sustituirlo por el universo actual. Las guardas
+de candidatos/decisiones se suspenden sólo durante ese backfill transaccional y
+quedan habilitadas antes del commit. Las entregas históricas de alcance desconocido
+se conservan como parciales. No cambia ninguna geometría ni registro administrativo.
+
+`POST /api/importaciones/{id}/reconciliar` requiere motivo y `clave_solicitud` UUID
+para reintentos idempotentes. Recalcula sólo features sin coincidencia, ambiguas
+si `incluir_ambiguos=true` (por defecto) y rechazadas únicamente si se solicita
+`reabrir_rechazados=true`. Confirmadas e ignoradas quedan excluidas. Cada intento
+conserva resultados previos y usa el staging retenido, sin exigir el GPKG original.
+La confirmación humana posterior crea exclusivamente una versión geométrica.
+`GET .../conciliaciones` y `GET .../conciliaciones/{id_ciclo}` permiten auditarlo.
+El detalle separa el resultado inicial del matching y el resultado derivado de
+las decisiones del ciclo.
+
+Las rutas estrictas de núcleos y parcelas exigen el campo multipart
+`alcance_entrega=completa|parcial`. Completa representa el universo del proyecto
+y objetivo; no se infiere del conteo. El endpoint genérico legacy mantiene su
+contrato y conserva alcance parcial. DDV representa por contrato una entrega
+completa. El mismo SHA/pipeline/CRS mantiene la idempotencia de 025: cambiar alcance
+con esa identidad produce 409. La referencia a la entrega anterior queda congelada
+al hacer staging, contra la última importación finalizada del mismo proyecto y
+objetivo lógico (los alias legacy/estrictos de cada objetivo son equivalentes).
+
+Aparición se diagnostica comparando identidades permitidas y candidatos previamente
+confirmados, sin dar precedencia global a PARCELA o Num_parcela. Se puede guardar un
+hallazgo con FK a la feature aunque no exista destino administrativo. Una identidad
+no verificable no se convierte en afirmación concluyente de aparición/desaparición.
+Desaparición se detecta sólo al finalizar dos entregas completas comparables, con
+el mismo CRS y una identidad previamente confirmada. Un candidato potencial o una
+identidad equivalente impiden atribuir ausencia, incluso si fue ignorada. Los
+candidatos/ambiguos pendientes impiden finalizar. Ninguna desaparición da de baja
+versiones ni destinos administrativos.
+
+La confirmación conserva las tablas/versiones de 025: cierra la vigencia anterior
+y crea una nueva fila. Las revisiones usan FKs tipadas a versiones de núcleo,
+parcela y DDV, importaciones y feature; no IDs polimórficos en JSON. Se registran
+geometría modificada, aparición, desaparición y cambio de relación DDV.
+`ST_Equals` determina igualdad topológica en el CRS de trabajo; no se compara WKB
+como criterio de cambio ni se aplica una tolerancia inventada. Una diferencia
+pequeña genera una observación técnica que requiere interpretación humana.
+
+Áreas y diferencia simétrica son métricas planas del CRS configurado, expresadas
+en m² sólo si spatial_ref_sys identifica una proyección con unidades explícitas
+metre/to_meter=1. Si no puede acreditarse medición métrica, quedan NULL. No son áreas
+geodésicas ni sustituyen superficies administrativas. El porcentaje es
+100 × área de diferencia simétrica / área anterior (NULL si ésta es cero); puede
+superar 100. En cambios de relación las áreas describen la intersección con DDV.
+No se utiliza geometry_columns para estas comparaciones o introspecciones.
+
+DDV nuevo se compara contra la versión previa y contra geometrías vigentes
+confirmadas del universo administrativo activo del proyecto. Se distinguen
+antes sí/ahora no, antes no/ahora sí y ambas intersecciones técnicamente diferentes.
+Un cambio fuera de la entidad que deja su intersección igual no genera cambio
+relacional para ella. No se examinan como destinos todas las features sin conciliar.
+
+`revision_cambio_gis` es inmutable e idempotente por identidad de comparación.
+`revision_cambio_gis_decision` agrega decisiones REVISADO, NO_APLICA o APLICADO con
+usuario, motivo, fecha y UUID de solicitud. El estado PENDIENTE o la última decisión
+se deriva mediante `vw_revision_cambio_gis_estado`, sin segundo estado físico.
+APLICADO documenta acción humana; admite FK opcional a SeguimientoEvento ya
+existente, activo, del mismo proyecto/núcleo y entidad compatible. GIS no crea ni
+modifica el evento. Lectura conserva los cuatro roles; escritura GIS conserva
+admin/geografo y acceso al proyecto. Las decisiones se validan también en SQL.
+
+Bloqueos de proyecto → importación → feature/destino serializan ciclos,
+confirmaciones y versiones. Revisiones/decisiones añaden índices únicos y advisory locks transaccionales
+de revisión (sin conceder UPDATE sobre observaciones inmutables); fallos revierten toda la operación. Los payloads de versiones GIS,
+resultados y decisiones históricos no pueden reescribirse. El reporting y los
+procesos no lineales de SeguimientoEvento/RAN/COP no se modifican.
+
+Pruebas de upgrade: `backend/scripts/test_gis_history_upgrade.py` crea un PostGIS
+tmpfs con única base software_pa_test, prueba 025→026, instala limpio hasta 026 y
+ejecuta casos funcionales y concurrentes; elimina la instancia en finally. El
+reconciliador excepcional conserva sus guardas: su propia prueba monta el
+inventario congelado 001–025. No se ejecuta contra la base persistente.

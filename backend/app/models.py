@@ -10,6 +10,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Float,
     Integer,
     Numeric,
     SmallInteger,
@@ -18,7 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import INET, JSONB
+from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 
@@ -1234,6 +1235,8 @@ class ImportacionArchivo(Base, AuditableMixin):
     version_pipeline = Column(String(40), nullable=False, default="legacy-v1")
     srid_trabajo = Column(Integer, nullable=False, default=4326)
     crs_fuente_wkt = Column(Text)
+    alcance_entrega = Column(String(10), nullable=False, default="parcial")
+    id_importacion_anterior = Column(BigInteger, ForeignKey("importacion_archivo.id_importacion"))
     crs_original = Column(Text)
     crs_destino = Column(String(30), nullable=False, default="EPSG:4326")
     columnas_detectadas = Column(JSONB, nullable=False, default=list)
@@ -1551,6 +1554,7 @@ class ProyectoConfiguracionGis(Base, AuditableMixin):
 class ImportacionFeatureCandidato(Base, AuditableMixin):
     __tablename__ = "importacion_feature_candidato"
     id_candidato = Column(BigInteger, primary_key=True)
+    id_ciclo = Column(BigInteger, ForeignKey("importacion_conciliacion_ciclo.id_ciclo"), nullable=False)
     id_importacion = Column(BigInteger, ForeignKey("importacion_archivo.id_importacion"), nullable=False)
     id_importacion_feature = Column(BigInteger, ForeignKey("importacion_feature.id_importacion_feature"), nullable=False)
     id_proyecto_nucleo = Column(Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"), nullable=False)
@@ -1567,6 +1571,7 @@ class ImportacionFeatureCandidato(Base, AuditableMixin):
 class ImportacionFeatureDecision(Base):
     __tablename__ = "importacion_feature_decision"
     id_decision = Column(BigInteger, primary_key=True)
+    id_ciclo = Column(BigInteger, ForeignKey("importacion_conciliacion_ciclo.id_ciclo"), nullable=False)
     id_importacion_feature = Column(BigInteger, ForeignKey("importacion_feature.id_importacion_feature"), nullable=False)
     id_candidato = Column(BigInteger, ForeignKey("importacion_feature_candidato.id_candidato"))
     accion = Column(String(20), nullable=False)
@@ -1595,3 +1600,70 @@ class ProyectoNucleoGeometria(Base, GeometriaProyectoMixin):
 class ProyectoParcelaGeometria(Base, GeometriaProyectoMixin):
     __tablename__ = "proyecto_parcela_geometria"
     id_parcela = Column(Integer, ForeignKey("parcela.id_parcela"), nullable=False)
+
+
+class ImportacionConciliacionCiclo(Base):
+    __tablename__ = "importacion_conciliacion_ciclo"
+    id_ciclo = Column(BigInteger, primary_key=True)
+    id_importacion = Column(BigInteger, ForeignKey("importacion_archivo.id_importacion"), nullable=False)
+    numero_ciclo = Column(Integer, nullable=False)
+    tipo_ciclo = Column(String(20), nullable=False)
+    motivo = Column(String(250), nullable=False)
+    estado = Column(String(20), nullable=False, default="abierto")
+    fecha_inicio = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    fecha_fin = Column(DateTime(timezone=True))
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    version_algoritmo = Column(String(40), nullable=False)
+    universo_destinos = Column(JSONB, nullable=False, default=list)
+    resumen = Column(JSONB, nullable=False, default=dict)
+    clave_solicitud = Column(UUID(as_uuid=False))
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ImportacionConciliacionResultado(Base):
+    __tablename__ = "importacion_conciliacion_resultado"
+    id_ciclo = Column(BigInteger, ForeignKey("importacion_conciliacion_ciclo.id_ciclo"), primary_key=True)
+    id_importacion_feature = Column(BigInteger, ForeignKey("importacion_feature.id_importacion_feature"), primary_key=True)
+    estado_matching = Column(String(30), nullable=False)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class RevisionCambioGis(Base):
+    __tablename__ = "revision_cambio_gis"
+    id_revision = Column(BigInteger, primary_key=True)
+    clave_comparacion = Column(CHAR(64), nullable=False)
+    id_proyecto = Column(Integer, ForeignKey("proyecto.id_proyecto"), nullable=False)
+    objetivo = Column(String(10), nullable=False)
+    id_proyecto_nucleo = Column(Integer, ForeignKey("proyecto_nucleo.id_proyecto_nucleo"))
+    id_parcela = Column(Integer, ForeignKey("parcela.id_parcela"))
+    id_feature_nueva = Column(BigInteger, ForeignKey("importacion_feature.id_importacion_feature"))
+    id_importacion_anterior = Column(BigInteger, ForeignKey("importacion_archivo.id_importacion"))
+    id_importacion_nueva = Column(BigInteger, ForeignKey("importacion_archivo.id_importacion"), nullable=False)
+    id_nucleo_geometria_anterior = Column(BigInteger, ForeignKey("proyecto_nucleo_geometria.id_geometria"))
+    id_nucleo_geometria_nueva = Column(BigInteger, ForeignKey("proyecto_nucleo_geometria.id_geometria"))
+    id_parcela_geometria_anterior = Column(BigInteger, ForeignKey("proyecto_parcela_geometria.id_geometria"))
+    id_parcela_geometria_nueva = Column(BigInteger, ForeignKey("proyecto_parcela_geometria.id_geometria"))
+    id_ddv_anterior = Column(Integer, ForeignKey("derecho_via_proyecto.id_derecho_via"))
+    id_ddv_nueva = Column(Integer, ForeignKey("derecho_via_proyecto.id_derecho_via"))
+    tipo_cambio = Column(String(40), nullable=False)
+    subtipo_cambio = Column(String(40))
+    srid_medicion = Column(Integer)
+    area_anterior_m2 = Column(Float)
+    area_nueva_m2 = Column(Float)
+    area_diferencia_m2 = Column(Float)
+    porcentaje_diferencia = Column(Float)
+    metricas = Column(JSONB, nullable=False, default=dict)
+    creado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    creado_por = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+
+
+class RevisionCambioGisDecision(Base):
+    __tablename__ = "revision_cambio_gis_decision"
+    id_decision = Column(BigInteger, primary_key=True)
+    id_revision = Column(BigInteger, ForeignKey("revision_cambio_gis.id_revision"), nullable=False)
+    accion = Column(String(20), nullable=False)
+    motivo = Column(String(250), nullable=False)
+    clave_solicitud = Column(UUID(as_uuid=False), nullable=False)
+    id_seguimiento_evento = Column(BigInteger, ForeignKey("seguimiento_evento.id_seguimiento_evento"))
+    creado_por = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    creado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

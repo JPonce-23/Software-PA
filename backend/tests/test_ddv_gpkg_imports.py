@@ -134,7 +134,13 @@ def test_ddv_polygon_and_multipolygon_versions_preserve_history(
     ]
     assert rows[0][3:] == ("ST_MultiPolygon", 2)
     assert rows[1][3:] == ("ST_MultiPolygon", 1)
-    _confirm(api, second_staged["id_importacion"], expected=409)
+    # 026 makes a retry idempotent: return the confirmed import without a new
+    # DDV version or another technical observation.
+    repeated = _confirm(api, second_staged["id_importacion"]).json()
+    assert repeated["reporte"]["version_ddv"] == 2
+    assert connection.execute(text(
+        "SELECT count(*) FROM revision_cambio_gis WHERE id_importacion_nueva=:id"
+    ), {"id": second_staged["id_importacion"]}).scalar_one() == 1
     assert connection.execute(text(
         "SELECT count(*) FROM derecho_via_proyecto WHERE id_proyecto=:id"
     ), {"id": project_id}).scalar_one() == 2

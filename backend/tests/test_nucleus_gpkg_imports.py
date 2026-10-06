@@ -97,7 +97,7 @@ def stage(api, project_id, content, *, name="nucleos.gpkg", expected=201, extra=
     return api(
         "POST", f"/api/proyectos/{project_id}/geoespacial/nucleos/importaciones",
         expected=expected,
-        data={"fuente": "Cartografía QA", "fecha_fuente": "2026-09-25", **(extra or {})},
+        data={"alcance_entrega": "parcial", "fuente": "Cartografía QA", "fecha_fuente": "2026-09-25", **(extra or {})},
         files={"archivo": (name, content, "application/geopackage+sqlite3")},
     )
 

@@ -12,8 +12,22 @@ import reconcile_gis_migration_lineage as r
 from lineage_inspection import data_signature, ledger, schema_signature
 
 
-def test_frozen_files_and_functional_gis_bodies():
-    r.check_files(r.manifest())
+def test_frozen_files_and_functional_gis_bodies(tmp_path,monkeypatch):
+    # The reconciler is an exceptional historical tool, whose exact inventory
+    # guard remains intact even when the current application adds 026 or later.
+    import shutil
+    root=r.ROOT
+    manifest=r.manifest()
+    migrations=tmp_path/'db/migrations'
+    migrations.mkdir(parents=True)
+    for item in manifest['common']+manifest['canonical']:
+        shutil.copyfile(root/'db/migrations'/item['file'],migrations/item['file'])
+    (tmp_path/'db/lineage').symlink_to(root/'db/lineage',target_is_directory=True)
+    monkeypatch.setattr(r,'ROOT',tmp_path)
+    r.check_files(manifest)
+    (migrations/'026_unexpected.sql').write_text('-- later release')
+    with pytest.raises(r.ReconciliationError,match='Inventario ejecutable'):
+        r.check_files(manifest)
 
 @pytest.mark.parametrize('key,value',[('APP_ENV','development'),('DB_NAME','other'),('TEST_ALLOW_DATABASE','other')])
 def test_wrong_environment_is_rejected(monkeypatch,key,value):

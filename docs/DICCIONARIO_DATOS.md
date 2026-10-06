@@ -391,3 +391,25 @@ Los endpoints de features filtran atributos mediante una lista permitida, tambi�
 Referencias GIS renumeradas excepcionalmente desde 020–024 a 021–025; los originales
 y la correspondencia se conservan en [MIGRACIONES.md](MIGRACIONES.md). No cambió el
 modelo funcional GIS ni administrativo.
+
+### Historia técnica GIS (026)
+
+| Entidad / campo | Significado y reglas |
+|---|---|
+| importacion_archivo.alcance_entrega | completa o parcial, explícito en las rutas estrictas de núcleos/parcelas; histórico desconocido = parcial. Inmutable. |
+| importacion_archivo.id_importacion_anterior | FK a la última entrega finalizada del mismo proyecto/objetivo lógico al hacer staging. Inmutable. |
+| importacion_conciliacion_ciclo | Intento numerado por importación; tipo histórico/inicial/reconciliación, motivo, algoritmo, usuario, fechas, UUID de idempotencia, snapshot de universo y resumen. Identidad inmutable y cierre único. |
+| importacion_conciliacion_resultado | PK ciclo + feature, FK al staging y resultado de matching inmutable. Las decisiones explican el resultado posterior sin borrar el inicial. |
+| candidato.id_ciclo / decision.id_ciclo | FKs compuestas garantizan ciclo, importación y feature coherentes. Los ciclos antiguos no se sobrescriben. |
+| revision_cambio_gis | Observación inmutable: proyecto, objetivo ddv/nucleo/parcela, destino opcional, feature, importaciones y versiones con FKs tipadas. Tipos: geometria_modificada, aparece_en_nueva_version, desaparece_en_nueva_version, cambio_relacion_ddv. |
+| revisión.id_nucleo_geometria_*, id_parcela_geometria_*, id_ddv_* | FKs a versiones históricas existentes. Una desaparición no elimina ni desactiva ninguna de ellas. |
+| revisión.area_*_m2, porcentaje_diferencia, srid_medicion | Métricas GIS; NULL si no se acredita CRS proyectado con unidades en metros. Porcentaje de diferencia simétrica respecto del área anterior; no es superficie administrativa. |
+| revisión.metricas | Información descriptiva auxiliar (política, componentes, tipo de medida); las relaciones estructurales usan FKs. |
+| revision_cambio_gis_decision | Append-only: acción revisado/no_aplica/aplicado, motivo obligatorio, usuario, fecha, UUID único por revisión y FK opcional al evento existente. |
+| decisión.id_seguimiento_evento | Sólo con aplicado. Evento activo del mismo proyecto y núcleo cuando corresponda, entidad compatible. No se crea ni actualiza desde GIS. |
+| vw_revision_cambio_gis_estado | Estado pendiente o última acción por id_decision; no se guarda un estado administrativo ni otro estado físico. |
+
+Las tablas de versiones de núcleo/parcela/DDV de 025 se reutilizan, con payloads
+inmutables y una sola vigente. Las revisiones técnicas no cambian pertenencia,
+afectaciones, convenios, trámites, superficies, avalúos ni eventos. Se preserva
+TRANSVERSALES como tipo COP, sin implementar obras transversales GIS.

@@ -274,3 +274,31 @@ El inventario real y las pruebas están en [INFORME_CONCILIACION_GIS_2026-10-05.
 Referencias GIS renumeradas excepcionalmente desde 020–024 a 021–025; los originales
 y la correspondencia se conservan en [MIGRACIONES.md](MIGRACIONES.md). No cambió el
 modelo funcional GIS ni administrativo.
+
+### Historia de conciliación y cambios GIS — 026
+
+`gis_reconciliation.py` conserva el matching y la confirmación de 025;
+`gis_history.py` añade ciclos, reanálisis del staging y observaciones técnicas. No
+hay un segundo importador ni arquitectura de pertenencia por geometría. La
+migración 026 depende por SHA de 025, agrega contexto a candidatos/decisiones y
+hace backfill determinista sin cambiar su contenido histórico.
+
+Las entregas estrictas tienen alcance explícito y una referencia previa fija. La
+aparición puede existir sin destino administrativo; desaparición exige dos
+entregas completas comparables, identidad confirmada y conciliación finalizada.
+Las versiones confirmadas se conservan; ST_Equals evita falsos cambios por
+serialización. No existe tolerancia numérica nueva. Las áreas son diagnósticos
+métricos del CRS de trabajo acreditado, nunca escrituras de superficies de dominio.
+
+Cada confirmación y sus observaciones se escriben atómicamente bajo el bloqueo de
+proyecto, importación y destino existente. Ciclos y solicitudes usan unicidades
+para concurrencia/idempotencia. Revisiones y decisiones son append-only; el estado
+se deriva de la última decisión. La API sólo vincula SeguimientoEvento existente
+tras validar proyecto/núcleo/entidad, manteniendo el flujo administrativo separado.
+El servicio GIS no contiene creación de esos eventos ni de afectaciones.
+
+Lectura: roles existentes con acceso al proyecto. Escritura GIS: admin/geografo.
+La autorización se revalida tras adquirir el bloqueo del proyecto. El contrato
+OpenAPI incorpora ciclos, revisiones y alcance multipart explícito. Se conservan
+/mapa, frontend, RAN y lógica de seguimiento; geometry_columns y obras transversales
+GIS permanecen fuera del alcance.

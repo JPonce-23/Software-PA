@@ -275,10 +275,11 @@ async def stage_nucleus_import(
     source_date: date | None,
     upload: UploadFile,
     user: models.Usuario,
+    *, scope: str,
 ) -> models.ImportacionArchivo:
     return await _stage_strict_gpkg_import(
         db, project_id, source, source_date, upload, user,
-        target=STRICT_NUCLEUS_TARGET,
+        target=STRICT_NUCLEUS_TARGET, scope=scope,
     )
 
 
@@ -289,10 +290,11 @@ async def stage_parcel_import(
     source_date: date | None,
     upload: UploadFile,
     user: models.Usuario,
+    *, scope: str,
 ) -> models.ImportacionArchivo:
     return await _stage_strict_gpkg_import(
         db, project_id, source, source_date, upload, user,
-        target=STRICT_PARCEL_TARGET,
+        target=STRICT_PARCEL_TARGET, scope=scope,
     )
 
 
@@ -307,9 +309,9 @@ def normalize_parcel_number(value: str) -> str:
     return normalized
 
 
-async def _stage_strict_gpkg_import(db, project_id, source, source_date, upload, user, *, target):
+async def _stage_strict_gpkg_import(db, project_id, source, source_date, upload, user, *, target, scope="completa"):
     from .gis_reconciliation import stage
-    return await stage(db,project_id,source,source_date,upload,user,target=target)
+    return await stage(db,project_id,source,source_date,upload,user,target=target,scope=scope)
 
 
 async def stage_import(
@@ -487,6 +489,7 @@ def _confirm_ddv_import(
 ) -> models.ImportacionArchivo:
     try:
         db.query(models.Proyecto).filter_by(id_proyecto=record.id_proyecto).with_for_update().one()
+        require_project_access(db,user,record.id_proyecto,mode='gis')
         from .gis_reconciliation import working_srid
         if working_srid(db,record.id_proyecto)!=record.srid_trabajo:
             raise HTTPException(409,"La configuración CRS cambió; reprocesar fuente")
@@ -498,6 +501,9 @@ def _confirm_ddv_import(
             raise HTTPException(status_code=404, detail="Importación no encontrada")
         if record.tipo_objetivo != "derecho_via_proyecto":
             raise HTTPException(status_code=409, detail="Objetivo de importación inconsistente")
+        if record.estado == "completo":
+            db.commit()
+            return record
         if record.estado != "previsualizado":
             raise HTTPException(status_code=409, detail="La importación no está previsualizada")
         if record.errores:
@@ -618,6 +624,8 @@ def _confirm_ddv_import(
             "advertencias_aceptadas": bool(record.advertencias),
             "confirmado_en": now.isoformat(),
         }
+        from .gis_history import ddv_changed
+        ddv_changed(db,record,previous,derecho_via,user)
         db.commit()
     except HTTPException:
         db.rollback()

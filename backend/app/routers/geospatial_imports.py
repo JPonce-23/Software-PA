@@ -1,7 +1,8 @@
 """Staging, preview and explicit confirmation for all GIS targets."""
 
 import json
-from datetime import date
+from datetime import date, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from .. import auth, models, schemas
 from ..database import get_db
 from ..services import geospatial_imports as service
 from ..services import gis_reconciliation as reconciliation
+from ..services import gis_history as history
 from ..services.access import require_project_access
 
 
@@ -72,6 +74,7 @@ async def stage_nucleus_import(
     id_proyecto: int,
     request: Request,
     fuente: str = Form(...),
+    alcance_entrega: Literal["completa", "parcial"] = Form(...),
     fecha_fuente: date | None = Form(default=None),
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -79,14 +82,14 @@ async def stage_nucleus_import(
 ):
     fields = [key for key, _ in (await request.form()).multi_items()]
     if sorted(fields) != sorted(set(fields)) or set(fields) - {
-        "fuente", "fecha_fuente", "archivo"
+        "fuente", "fecha_fuente", "archivo", "alcance_entrega"
     }:
         raise HTTPException(
             status_code=422,
-            detail="Los núcleos solo admiten archivo, fuente y fecha_fuente",
+            detail="Los núcleos solo admiten archivo, fuente, fecha_fuente y alcance_entrega",
         )
     return await service.stage_nucleus_import(
-        db, id_proyecto, fuente, fecha_fuente, archivo, user
+        db, id_proyecto, fuente, fecha_fuente, archivo, user, scope=alcance_entrega
     )
 
 
@@ -99,6 +102,7 @@ async def stage_parcel_import(
     id_proyecto: int,
     request: Request,
     fuente: str = Form(...),
+    alcance_entrega: Literal["completa", "parcial"] = Form(...),
     fecha_fuente: date | None = Form(default=None),
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -106,14 +110,14 @@ async def stage_parcel_import(
 ):
     fields = [key for key, _ in (await request.form()).multi_items()]
     if sorted(fields) != sorted(set(fields)) or set(fields) - {
-        "fuente", "fecha_fuente", "archivo"
+        "fuente", "fecha_fuente", "archivo", "alcance_entrega"
     }:
         raise HTTPException(
             status_code=422,
-            detail="Las parcelas solo admiten archivo, fuente y fecha_fuente",
+            detail="Las parcelas solo admiten archivo, fuente, fecha_fuente y alcance_entrega",
         )
     return await service.stage_parcel_import(
-        db, id_proyecto, fuente, fecha_fuente, archivo, user
+        db, id_proyecto, fuente, fecha_fuente, archivo, user, scope=alcance_entrega
     )
 
 
@@ -246,3 +250,56 @@ def get_feature_geometry(id_importacion: int,id_feature: int,db: Session=Depends
             id_importacion=id_importacion,id_importacion_feature=id_feature).one_or_none()
     if row is None: raise HTTPException(404,'Feature no encontrada')
     return {'type':'Feature','id':row[0],'properties':{},'geometry':json.loads(row[1]) if row[1] else None}
+
+
+@router.post('/importaciones/{id_importacion}/reconciliar', response_model=schemas.CicloGisResponse, status_code=201)
+def reconcile_import(id_importacion: int, data: schemas.ReconciliarGisRequest,
+                     db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+    return history.reconcile(db,id_importacion,data,user)
+
+
+@router.get('/importaciones/{id_importacion}/conciliaciones', response_model=list[schemas.CicloGisResponse])
+def list_cycles(id_importacion: int, skip: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200),
+                db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    service.require_import_access(db,id_importacion,user)
+    return db.query(models.ImportacionConciliacionCiclo).filter_by(id_importacion=id_importacion).order_by(
+        models.ImportacionConciliacionCiclo.numero_ciclo).offset(skip).limit(limit).all()
+
+
+@router.get('/importaciones/{id_importacion}/conciliaciones/{id_ciclo}',response_model=schemas.DetalleCicloGisResponse)
+def get_cycle(id_importacion: int, id_ciclo: int, db: Session=Depends(get_db),
+              user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    return history.cycle_detail(db,service.require_import_access(db,id_importacion,user),id_ciclo)
+
+
+@router.get('/proyectos/{id_proyecto}/geoespacial/revisiones',response_model=list[schemas.RevisionGisResponse])
+def list_revisions(id_proyecto: int, estado: Literal['pendiente','revisado','no_aplica','aplicado'] | None=None,
+                   tipo_cambio: str | None=None, objetivo: Literal['ddv','nucleo','parcela'] | None=None,
+                   id_proyecto_nucleo: int | None=None, desde: datetime | None=None, hasta: datetime | None=None,
+                   skip: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200),
+                   db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    from sqlalchemy import text
+    require_project_access(db,user,id_proyecto)
+    clauses=['id_proyecto=:project']
+    params={'project':id_proyecto,'skip':skip,'limit':limit}
+    for name,value in [('estado_revision',estado),('tipo_cambio',tipo_cambio),('objetivo',objetivo),('id_proyecto_nucleo',id_proyecto_nucleo)]:
+        if value is not None:
+            clauses.append(f'{name}=:{name}')
+            params[name]=value
+    for name,value,operator in [('desde',desde,'>='),('hasta',hasta,'<=')]:
+        if value is not None:
+            clauses.append(f'creado_en {operator} :{name}')
+            params[name]=value
+    return [dict(row) for row in db.execute(text('SELECT * FROM vw_revision_cambio_gis_estado WHERE '+
+        ' AND '.join(clauses)+' ORDER BY id_revision DESC OFFSET :skip LIMIT :limit'),params).mappings()]
+
+
+@router.get('/geoespacial/revisiones/{id_revision}',response_model=schemas.DetalleRevisionGisResponse)
+def get_revision(id_revision: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    return history.revision_detail(db,id_revision,user)
+
+
+@router.post('/geoespacial/revisiones/{id_revision}/decisiones', response_model=schemas.RevisionGisDecisionResponse, status_code=201)
+def decide_revision(id_revision: int, data: schemas.RevisionGisDecisionRequest,
+                    db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+    return history.decide_revision(db,id_revision,data,user)
