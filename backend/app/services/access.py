@@ -470,6 +470,7 @@ def project_ids_for_document_target(
         )
     elif entity_type in {
         "afectacion",
+        "actividad_campo",
         "asamblea",
         "convenio",
         "tramite_fifonafe",
@@ -477,6 +478,7 @@ def project_ids_for_document_target(
     }:
         model, pk = {
             "afectacion": (models.Afectacion, models.Afectacion.id_afectacion),
+            "actividad_campo": (models.ActividadCampo, models.ActividadCampo.id_actividad),
             "asamblea": (models.Asamblea, models.Asamblea.id_asamblea),
             "convenio": (models.Convenio, models.Convenio.id_convenio),
             "tramite_fifonafe": (

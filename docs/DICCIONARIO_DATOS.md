@@ -148,6 +148,8 @@ Eje operativo fundamental. Vincula el proyecto estratégico con el núcleo agrar
 ### 3.2 `actividad_campo`
 Sensibilización comunitaria y caminamientos técnicos.
 
+Desde 027 también es objetivo documental directo: `documento_vinculo.entidad_tipo = 'actividad_campo'` y `entidad_id = actividad_campo.id_actividad`. El acceso se deriva de `id_proyecto_nucleo` hacia el proyecto, con actividad y vínculo ProyectoNucleo activos; `id_afectacion` es opcional y no determina la autorización documental.
+
 | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|
 | `id_actividad` | `BIGINT` | No | PK | Identificador primario de la actividad. | Sistema | `/api/actividades-campo` |
@@ -316,7 +318,9 @@ La conciliación vigente (025) usa `POST /api/proyectos/{id_proyecto}/geoespacia
 | `documento` | `numero_folio` | `VARCHAR(100)` | Sí | — | Número de oficio, acta o folio impreso. | FOLIO / NO. OFICIO | Identificación documental |
 | `documento_version` | `id_version` | `BIGINT` | No | PK | Versión inmutable del archivo digital. | Sistema | Descarga de archivos |
 | `documento_version` | `sha256` | `CHAR(64)` | No | — | Hash criptográfico para integridad. | Archivo | Detección de alteración |
-| `documento_vinculo` | `entidad_tipo` / `entidad_id` | `VARCHAR` / `BIGINT` | No | Polimórfico | Entidad asociada (convenio, asamblea...). | Asociación | Vinculación y aislamiento |
+| `documento_vinculo` | `entidad_tipo` / `entidad_id` | `VARCHAR(50)` / `INTEGER` | No | Polimórfico | Entidad asociada (convenio, asamblea, actividad_campo...). | Asociación | Vinculación y aislamiento |
+
+`chk_documento_vinculo_tipo` admite desde 027 los 22 tipos de 026 más `actividad_campo`. El trigger de objetivo reutiliza `fn_objetivo_controlado_existe`; `fn_objetivo_requisito_en_pn` y el CHECK de `expediente_requisito` ya admitían actividades y permanecen intactos. El vínculo conserva auditoría y baja lógica.
 
 ### 11.2 `seguimiento_evento` y `trazabilidad_fuente`
 

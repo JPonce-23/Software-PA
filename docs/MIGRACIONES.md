@@ -1,8 +1,8 @@
 # Gestión de Migraciones de Base de Datos — SOFTWARE-PA
 
 > **Autoridad:** Documentación canónica del versionado del esquema de base de datos en PostgreSQL 15 / PostGIS.  
-> **Esquema ejecutable vigente:** **026** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base).
-> **Esta fase termina en 026.** No se crea 027.
+> **Esquema ejecutable vigente:** **027** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base).
+> **B-04:** La 027 permite `actividad_campo` como objetivo documental directo.
 
 ---
 
@@ -13,13 +13,13 @@
 2. **Verificación de integridad por Checksum:**  
    El runner oficial (`backend/scripts/run_migrations.sh`) calcula el hash criptográfico SHA-256 de cada archivo `.sql`. Si un archivo ya registrado en `public.schema_migrations` sufre alteraciones en su contenido, el proceso de arranque se detiene de inmediato con error.
 3. **Evolución Forward-Only:**  
-   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** posterior a la versión aplicada. No se modifican los archivos históricos `001` a `025`. La 025 conserva el contenido funcional del antiguo 024 GIS; su adopción excepcional se documenta abajo y se aplicó únicamente en `software_pa_test`.
+   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** posterior a la versión aplicada. No se modifican los archivos históricos `001` a `026`. La 025 conserva el contenido funcional del antiguo 024 GIS; su adopción excepcional se documenta abajo y se aplicó únicamente en `software_pa_test`.
 4. **Instalación limpia:**  
-   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `026_historia_cambios_gis.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
+   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `027_actividad_campo_objetivo_documental.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
 
 ---
 
-## 2. Inventario Canónico de Migraciones Vigentes (001–026)
+## 2. Inventario Canónico de Migraciones Vigentes (001–027)
 
 | Versión | Archivo SQL | Checksum SHA-256 Verificado | Propósito y Contenido Principal |
 |---|---|---|---|
@@ -49,6 +49,7 @@
 | **024** | `024_importacion_parcelas_gpkg.sql` | `15f36ea78a591aeb0f587a84e7e2bddb21f53de455d80daaf8532422796bc2d6` | Habilita `parcela_gpkg` como objetivo de staging separado del legacy, exige GPKG sin mapeo y valida que el destino sea una parcela activa de un núcleo RAN activo vinculado al proyecto. No altera el índice de identidad parcelaria. |
 | **025** | `025_conciliacion_gis_proyecto.sql` | `8338aace95845761acf0f9b675064ca25a6b0da2117013178ed060f260ec372a` | Conciliación explícita contra destinos administrativos del proyecto; geometrías por proyecto, candidatos y decisiones auditadas; CRS configurable, trazabilidad WKB/Z e idempotencia por pipeline/CRS. Conserva las geometrías globales legacy y no crea entidades administrativas. |
 | **026** | `026_historia_cambios_gis.sql` | `6615a137655abbb2a6ea2620d7c8b5013f07d6fcdd81aae4270a4551904ea3fd` | Ciclos históricos, reconciliación tardía, alcance de entregas, revisiones técnicas y decisiones append-only; sin efectos administrativos automáticos. |
+| **027** | `027_actividad_campo_objetivo_documental.sql` | `d5371660b3d0f6a257bcdffe453feb72984b225d24804991e6b4cf7c1ce68665` | Añade únicamente `actividad_campo` a `chk_documento_vinculo_tipo`, preservando sus 22 tipos anteriores. No modifica datos ni el contrato de `ExpedienteRequisito`. |
 
 ---
 
@@ -91,11 +92,11 @@ Puede comprobarse el esquema vigente mediante una llamada HTTP simple:
 curl --fail http://localhost:8000/health
 ```
 
-Respuesta esperada:
+Respuesta esperada para una base canónica con 027 aplicada (el backend de desarrollo puede consultar otra base):
 ```json
 {
   "status": "ok",
-  "schema": 25
+  "schema": 27
 }
 ```
 
@@ -154,6 +155,14 @@ En esta entrega sólo se aplicó a `software_pa_test`, después de `SELECT curre
 
 La política de CRS, el inventario real de los cuatro GPKG y la validación están en [INFORME_CONCILIACION_GIS_2026-10-05.md](INFORME_CONCILIACION_GIS_2026-10-05.md).
 
+
+### 3.10 Actividad de campo como objetivo documental — 027
+
+La migración exige la 026 canónica exacta y el CHECK validado con los 22 tipos documentales vigentes. Reemplaza únicamente `chk_documento_vinculo_tipo` para incorporar `actividad_campo`; conserva las funciones de existencia/pertenencia, triggers y contrato de requisitos. No modifica filas del dominio.
+
+Aplicación de esta fase: exclusivamente en `software_pa_test`, tras verificar `current_database()`, ledger completo 001–026 y checksums, con configuración temporal `APP_ENV=test`, `DB_NAME=software_pa_test` y `TEST_ALLOW_DATABASE=software_pa_test`. El runner no ofrece dry-run; se ensayó el DDL en una transacción con `ROLLBACK` antes de su aplicación. Para el contenedor `db`, su directorio montado debe indicarse como `MIGRATIONS_DIR=/opt/software-pa/migrations`. `db_pruebas_alfredo` no se migra ni se reconfigura.
+
+El contrato `backend/db/tests/027_actividad_campo_objetivo_documental_contract.sql` exige `software_pa_test` y termina con `ROLLBACK`. Comprueba todos los tipos documentales anteriores, el nuevo tipo, rechazo de tipos inválidos y persistencia transaccional de un vínculo y requisito de actividad. Las pruebas Python de objetivos documentales reutilizan `transactional_api`, sin credenciales de login y con rollback externo.
 
 ## RECONCILIACIÓN EXCEPCIONAL DEL LINAJE GIS
 

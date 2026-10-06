@@ -1,8 +1,8 @@
 # Contrato y Especificación de la API — SOFTWARE-PA
 
 > **Autoridad:** Especificación técnica del contrato de integración HTTP entre el cliente web (frontend) y el servidor de aplicaciones (backend).  
-> **Alineación:** Validado contra `backend/app/routers/`, `schemas.py`, `services/`, migraciones `001–020` y el esquema OpenAPI formal en `docs/openapi.json`.
-> **Esquema de base de datos vigente:** **020** (`GET /health` responde `{"status": "ok", "schema": 20}`).
+> **Alineación:** Referencia de backend y OpenAPI en `docs/openapi.json`; B-04 incorpora la migración `027` al esquema canónico `001–027`.
+> **Esquema de base de datos vigente:** **027** (`GET /health` responde `{"status": "ok", "schema": 27}` cuando la base consultada tiene 027 aplicada).
 
 ---
 
@@ -173,6 +173,14 @@ seguimiento ni asignaciones automáticas.
 - `PATCH /api/actividades/{id_actividad}`: Actualiza metadatos y resultado de la actividad.
 - `tipo_actividad` admite únicamente `sensibilizacion` o `caminamiento`.
 - Parámetros clave: `id_proyecto_nucleo`, `id_tipo_cop_operativo`, `fecha_programada`, `fecha_realizada`, `responsable`, `resultado`.
+
+Desde 027, una actividad puede ser objetivo documental directo con las rutas genéricas:
+
+- `GET /api/documentos/objetivos/actividad_campo/{id_actividad}`: lista documentos y vínculos activos.
+- `POST /api/documentos/objetivos/actividad_campo/{id_actividad}`: crea metadatos `DocumentoCreate` y su vínculo; responde `201`.
+- `POST /api/documentos/{id_documento}/vinculos/actividad_campo/{id_actividad}`: vincula un documento existente, comprobando acceso al documento y a la actividad.
+
+La pertenencia se resuelve por `ActividadCampo → ProyectoNucleo → Proyecto`, sin depender de `id_afectacion`. Actividad inexistente/inactiva o ProyectoNucleo inactivo: `404`, `Objetivo documental no encontrado`. Proyecto inactivo o fuera del alcance: `403`, `Proyecto fuera del alcance autorizado`. Lectura: admin, operador, visualizador y geógrafo; captura: admin y operador, con asignación de proyecto para usuarios no administradores. Versiones, baja lógica y trazabilidad usan el mecanismo documental existente. `ExpedienteRequisito` conserva su contrato previo.
 
 ### 3.6 Asambleas y Convocatorias (Ruta Colectiva)
 - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/asambleas`: Consulta y crea la entidad colectiva de asamblea. Requiere `id_tipo_asamblea`, `id_tipo_cop_operativo`, `proposito`, `resultado` y opcionalmente una lista inicial de `convocatorias`.
