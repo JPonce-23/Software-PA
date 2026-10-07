@@ -896,16 +896,31 @@ class Pago(Base, AuditableMixin):
     persona_beneficiaria = relationship("Persona")
 
 
+class CatalogoTipoDocumento(Base, AuditableMixin):
+    __tablename__ = "catalogo_tipo_documento"
+
+    id_tipo_documento = Column(BigInteger, primary_key=True)
+    codigo = Column(String(80), nullable=False, unique=True)
+    nombre = Column(String(250), nullable=False)
+    descripcion = Column(Text)
+    orden = Column(Integer, nullable=False, default=0)
+
+
 class Documento(Base, AuditableMixin):
     __tablename__ = "documento"
 
     id_documento = Column(Integer, primary_key=True)
     tipo_documento = Column(String(80), nullable=False)
+    id_tipo_documento = Column(
+        BigInteger, ForeignKey("catalogo_tipo_documento.id_tipo_documento")
+    )
     estado = Column(String(20), nullable=False)
     titulo = Column(String(250))
     fecha_documento = Column(Date)
     numero_folio = Column(String(150))
     descripcion = Column(Text)
+
+    clasificacion = relationship("CatalogoTipoDocumento", lazy="joined")
 
     versiones = relationship(
         "DocumentoVersion", back_populates="documento", lazy="selectin"

@@ -383,15 +383,67 @@ La selección no crea relaciones y no amplía permisos de captura o edición.
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `documento` | `id_documento` | `BIGINT` | No | PK | Identidad lógica del documento. | Sistema | `/api/documentos` |
-| `documento` | `tipo_documento` | `VARCHAR(50)` | No | — | Clasificación documental (acta, convenio, etc.). | Tipo soporte | Catálogo |
+| `documento` | `id_documento` | `INTEGER` | No | PK | Identidad lógica del documento. | Sistema | Rutas genéricas de documentos por objetivo |
+| `documento` | `tipo_documento` | `VARCHAR(80)` | No | — | Texto legado/compatibilidad. No vacío según `btrim`; API rechaza NULL explícito y sólo espacios. | Tipo soporte | Nuevas capturas por ID guardan el nombre del catálogo; los históricos conservan su texto. |
+| `documento` | `id_tipo_documento` | `BIGINT` | Sí | `catalogo_tipo_documento` | Clasificación autoritativa cuando existe; no se infiere a partir del texto legado. | Taxonomía V1 revisada | FK sin cascada; 028 no realiza backfill. |
+| `documento` | `descripcion` | `TEXT` | Sí | — | Detalle libre del documento; obligatorio y no vacío para OTRO. | Detalle/observación | Validación Python y trigger SQL. |
 | `documento` | `fecha_documento` | `DATE` | Sí | — | Fecha propia del documento físico. | FECHA OFICIO | Metadato jurídico |
-| `documento` | `numero_folio` | `VARCHAR(100)` | Sí | — | Número de oficio, acta o folio impreso. | FOLIO / NO. OFICIO | Identificación documental |
+| `documento` | `numero_folio` | `VARCHAR(150)` | Sí | — | Número de oficio, acta o folio impreso. | FOLIO / NO. OFICIO | Identificación documental |
 | `documento_version` | `id_version` | `BIGINT` | No | PK | Versión inmutable del archivo digital. | Sistema | Descarga de archivos |
 | `documento_version` | `sha256` | `CHAR(64)` | No | — | Hash criptográfico para integridad. | Archivo | Detección de alteración |
 | `documento_vinculo` | `entidad_tipo` / `entidad_id` | `VARCHAR(50)` / `INTEGER` | No | Polimórfico | Entidad asociada (convenio, asamblea, actividad_campo...). | Asociación | Vinculación y aislamiento |
 
 `chk_documento_vinculo_tipo` admite desde 027 los 22 tipos de 026 más `actividad_campo`. El trigger de objetivo reutiliza `fn_objetivo_controlado_existe`; `fn_objetivo_requisito_en_pn` y el CHECK de `expediente_requisito` ya admitían actividades y permanecen intactos. El vínculo conserva auditoría y baja lógica.
+
+### 11.1.1 `catalogo_tipo_documento` (028)
+
+Tabla con `id_tipo_documento BIGINT` identity, `codigo VARCHAR(80)` único e inmutable,
+`nombre VARCHAR(250)` no vacío, `descripcion TEXT` nullable, `orden INTEGER >= 0`,
+`activo BOOLEAN` y los campos comunes de auditoría/baja lógica. El código admite
+ASCII mayúscula inicial y luego mayúsculas, números o underscore. No permite DELETE
+físico; la baja requiere fecha, actor y motivo. Utiliza la auditoría existente.
+
+Taxonomía V1: los 27 valores siguientes nacen activos. No incluye actividades,
+estados, resultados registrales ni subtipos de convenio/COP.
+
+| Código | Nombre | Descripción funcional | Orden |
+|---|---|---|---|
+| `MINUTA` | Minuta | Registro escrito de reunión o actividad. | 10 |
+| `FOTOGRAFIA` | Fotografía | Evidencia fotográfica; la actividad respaldada se identifica en el contexto. | 20 |
+| `ACTA_ASAMBLEA` | Acta de asamblea | Acta de acuerdos de asamblea, salvo los tipos específicos del catálogo. | 30 |
+| `PADRON` | Padrón de ejidatarios/comuneros | Documento que identifica integrantes del núcleo; no equivale a cualquier lista de personas. | 40 |
+| `ACTA_ELECCION_ORV` | Acta de elección de ORV | Acta que documenta la elección de órganos de representación y vigilancia. | 50 |
+| `ACTA_REMOCION_ORV` | Acta de remoción de ORV | Acta de remoción, distinta del acto de elección. | 60 |
+| `ACTA_NO_VERIFICATIVO` | Acta de no verificativo | Acta que acredita que una asamblea no se verificó. | 70 |
+| `ACTA_COMPLEMENTARIA` | Acta complementaria | Documento complementario de un acto previo, identificado en la descripción. | 80 |
+| `ACTA_DELIMITACION_DESTINO_ASIGNACION` | Acta de delimitación, destino y asignación de tierras | Acta específica sobre delimitación, destino y asignación de tierras. | 90 |
+| `CONVOCATORIA_PRIMERA` | Primera convocatoria | Documento de primera convocatoria de asamblea. | 100 |
+| `CONVOCATORIA_SEGUNDA` | Segunda convocatoria | Documento de segunda convocatoria de asamblea. | 110 |
+| `CONVENIO` | Convenio | Instrumento de convenio/COP; el subtipo jurídico pertenece a la entidad Convenio. | 120 |
+| `ACUSE_RAN` | Acuse de ingreso al RAN | Evidencia de recepción de un ingreso al RAN, distinta de la solicitud. | 130 |
+| `SOLICITUD_RAN` | Solicitud de ingreso al RAN | Documento de solicitud de ingreso o reingreso al Registro Agrario Nacional. | 140 |
+| `AVISO_INSCRIPCION_RAN` | Aviso de inscripción RAN | Aviso que comunica la inscripción de un instrumento. | 150 |
+| `CONSTANCIA_INSCRIPCION_RAN` | Constancia de inscripción RAN | Constancia acreditativa de inscripción, distinta del aviso cuando sea identificable. | 160 |
+| `FOLIO_EJIDOS_COMUNIDADES` | Documento de folio de ejidos/comunidades | Impresión o extracto del folio; un número aislado es metadato. | 170 |
+| `CREDENCIAL_INE` | Credencial INE | Identificación oficial INE. | 180 |
+| `CREDENCIAL_RAN` | Credencial RAN | Credencial expedida en contexto RAN, distinta de la identificación INE. | 190 |
+| `CERTIFICADO_PARCELARIO` | Certificado parcelario | Documento de acreditación parcelaria. | 200 |
+| `CERTIFICADO_DERECHOS_AGRARIOS` | Certificado de derechos agrarios | Medio de acreditación agraria distinto del certificado parcelario. | 210 |
+| `CONSTANCIA_VIGENCIA_DERECHOS` | Constancia de vigencia de derechos | Constancia que acredita la vigencia del derecho. | 220 |
+| `OFICIO` | Oficio | Comunicación formal identificada como oficio; emisor, destinatario y asunto son contexto. | 230 |
+| `RESPUESTA` | Respuesta documental | Respuesta cuyo soporte no se identifica como oficio u otro tipo más concreto. | 240 |
+| `VALIDACION` | Documento de validación | Documento que acredita una validación; no representa un estado de cumplimiento. | 250 |
+| `AVALUO` | Avalúo | Documento de valoración; monto y contexto permanecen separados. | 260 |
+| `OTRO` | Otro documento | Documento identificado no cubierto por los tipos anteriores; requiere descripción. | 999 |
+
+`GET /api/catalogos/tipos-documento` sólo expone ID, código, nombre, descripción,
+orden y activo. Una opción inactiva sigue siendo legible en documentos ya
+clasificados y admite edición de sus otros metadatos, pero no nuevas selecciones.
+La API serializa `clasificacion` con ID, código, nombre y activo, sin auditoría.
+`OTRO` utiliza `Documento.descripcion`; no se crea otra columna de detalle.
+`documento.estado`, `RequisitoDocumental`, `ExpedienteRequisito`, actividades y
+vínculos conservan sus dominios separados. La transición futura de históricos
+necesitará un mapeo aprobado; ni OTRO ni CONVENIO se asignan automáticamente.
 
 ### 11.2 `seguimiento_evento` y `trazabilidad_fuente`
 

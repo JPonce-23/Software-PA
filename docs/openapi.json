@@ -7352,6 +7352,54 @@
         }
       }
     },
+    "/api/catalogos/tipos-documento": {
+      "get": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "List Document Types",
+        "description": "Catálogo documental sin paginación. Sólo activos por defecto; lectura para los cuatro roles.",
+        "operationId": "list_document_types_api_catalogos_tipos_documento_get",
+        "parameters": [
+          {
+            "name": "incluir_inactivos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivos"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TipoDocumentoResponse"
+                  },
+                  "title": "Response List Document Types Api Catalogos Tipos Documento Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/documentos/objetivos/{entidad_tipo}/{entidad_id}": {
       "get": {
         "tags": [
@@ -7411,6 +7459,7 @@
           "Documentos"
         ],
         "summary": "Create Document",
+        "description": "Exactamente uno de id_tipo_documento activo o tipo_documento legado. OTRO exige descripcion; selecciones inválidas producen 422.",
         "operationId": "create_document_api_documentos_objetivos__entidad_tipo___entidad_id__post",
         "parameters": [
           {
@@ -7472,6 +7521,7 @@
           "Documentos"
         ],
         "summary": "Update Document",
+        "description": "Omitir selectores conserva la clasificación. No permite NULL, ambos selectores ni texto legado con FK. Reclasificar exige ID activo; OTRO exige descripción final válida.",
         "operationId": "update_document_api_documentos__id_documento__patch",
         "parameters": [
           {
@@ -16774,7 +16824,47 @@
         ],
         "title": "DetalleRevisionGisResponse"
       },
+      "DocumentoClasificacionResponse": {
+        "properties": {
+          "id_tipo_documento": {
+            "type": "integer",
+            "title": "Id Tipo Documento"
+          },
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_tipo_documento",
+          "codigo",
+          "nombre",
+          "activo"
+        ],
+        "title": "DocumentoClasificacionResponse"
+      },
       "DocumentoCreate": {
+        "oneOf": [
+          {
+            "required": [
+              "tipo_documento"
+            ]
+          },
+          {
+            "required": [
+              "id_tipo_documento"
+            ]
+          }
+        ],
         "properties": {
           "observaciones": {
             "anyOf": [
@@ -16786,12 +16876,6 @@
               }
             ],
             "title": "Observaciones"
-          },
-          "tipo_documento": {
-            "type": "string",
-            "maxLength": 80,
-            "minLength": 1,
-            "title": "Tipo Documento"
           },
           "estado": {
             "type": "string",
@@ -16848,12 +16932,24 @@
               }
             ],
             "title": "Descripcion"
+          },
+          "tipo_documento": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Tipo Documento",
+            "description": "Texto legado no vacío; exactamente uno de texto o ID. Se conserva sin normalizar."
+          },
+          "id_tipo_documento": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Id Tipo Documento",
+            "description": "Tipo existente y activo; rellena tipo_documento con su nombre. OTRO exige descripcion."
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "tipo_documento",
           "estado"
         ],
         "title": "DocumentoCreate"
@@ -16948,6 +17044,10 @@
             ],
             "title": "Observaciones"
           },
+          "id_documento": {
+            "type": "integer",
+            "title": "Id Documento"
+          },
           "tipo_documento": {
             "type": "string",
             "maxLength": 80,
@@ -17010,23 +17110,47 @@
             ],
             "title": "Descripcion"
           },
-          "id_documento": {
-            "type": "integer",
-            "title": "Id Documento"
+          "id_tipo_documento": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Tipo Documento",
+            "description": "NULL en documentos legados sin clasificar."
+          },
+          "clasificacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentoClasificacionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clasificación autoritativa por FK; incluye tipos inactivos ya asociados."
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "activo",
           "creado_en",
+          "id_documento",
           "tipo_documento",
-          "estado",
-          "id_documento"
+          "estado"
         ],
         "title": "DocumentoResponse"
       },
       "DocumentoUpdate": {
+        "not": {
+          "required": [
+            "tipo_documento",
+            "id_tipo_documento"
+          ]
+        },
         "properties": {
           "observaciones": {
             "anyOf": [
@@ -17040,17 +17164,17 @@
             "title": "Observaciones"
           },
           "tipo_documento": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 80,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tipo Documento"
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Tipo Documento",
+            "description": "Sólo editable sin FK. Omisión conserva; NULL y sólo espacios se rechazan."
+          },
+          "id_tipo_documento": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Id Tipo Documento",
+            "description": "Clasifica/reclasifica con tipo activo preservando texto legado; NULL se rechaza."
           },
           "estado": {
             "anyOf": [
@@ -24684,6 +24808,50 @@
           "sesiones_revocadas"
         ],
         "title": "SessionRevocationResponse"
+      },
+      "TipoDocumentoResponse": {
+        "properties": {
+          "id_tipo_documento": {
+            "type": "integer",
+            "title": "Id Tipo Documento"
+          },
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_tipo_documento",
+          "codigo",
+          "nombre",
+          "activo",
+          "orden"
+        ],
+        "title": "TipoDocumentoResponse"
       },
       "TramiteFifonafeAfectacionCreate": {
         "properties": {

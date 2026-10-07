@@ -349,9 +349,10 @@ Detalle de convenios colectivos desglosados por destino de suelo:
   ```json
   {
     "status": "ok",
-    "schema": 20
+    "schema": 28
   }
   ```
+
 - `GET /`:  
   Retorna los metadatos del servicio:
   ```json
@@ -361,3 +362,56 @@ Detalle de convenios colectivos desglosados por destino de suelo:
     "version": "2.0.0"
   }
   ```
+
+## 10. Clasificación documental (B-03, esquema 028)
+
+### Catálogo
+
+`GET /api/catalogos/tipos-documento?incluir_inactivos=false` permite lectura a admin,
+operador, visualizador y geógrafo. Devuelve, sin paginación, únicamente
+`id_tipo_documento`, `codigo`, `nombre`, `descripcion`, `orden` y `activo`.
+Por defecto sólo incluye opciones activas; `incluir_inactivos=true` también incluye
+las bajas. Orden: activo descendente, orden, nombre, código e ID. Un booleano
+inválido produce `422`. No existe CRUD público del catálogo.
+
+### Captura y compatibilidad
+
+`POST /api/documentos/objetivos/{entidad_tipo}/{entidad_id}` conserva permisos y
+vínculos existentes. Debe recibir **exactamente uno** de `id_tipo_documento` o
+`tipo_documento`, además de los metadatos existentes (`estado` requerido).
+
+- Un ID existente y activo crea la FK y rellena el texto de compatibilidad con el
+  **nombre** del catálogo: ACTA_ASAMBLEA produce `"Acta de asamblea"`.
+  Durante la coexistencia el nombre debe caber en los 80 caracteres del campo
+  legado; todos los nombres de la taxonomía V1 cumplen ese límite.
+- Un texto legado válido crea el documento con FK NULL y conserva exactamente el
+  texto enviado (máximo 80 caracteres, sin normalización).
+- Ambos selectores, ninguno, NULL explícito, texto vacío/sólo espacios, ID
+  inexistente o inactivo producen `422`.
+- OTRO exige `descripcion` no NULL y con contenido distinto de espacios ordinarios;
+  se valida antes de persistir y también en PostgreSQL. La descripción se conserva
+  tal como se recibe.
+
+`PATCH /api/documentos/{id_documento}` conserva permisos existentes:
+
+- Omitir ambos selectores no cambia la clasificación.
+- `id_tipo_documento` permite clasificar o reclasificar usando una opción activa;
+  siempre conserva el `tipo_documento` anterior, incluidos los históricos.
+- El texto legado sólo puede actualizarse mientras la FK sea NULL.
+- No se permite quitar la clasificación ni enviar NULL explícito en un selector.
+  Tampoco se permiten ambos selectores en el mismo PATCH; estos casos producen `422`.
+- Una clasificación inactiva sigue siendo legible y permite editar otros
+  metadatos. Seleccionarla de nuevo o reclasificar hacia ella produce `422`.
+- Si la clasificación final es OTRO, la descripción final debe seguir siendo válida,
+  tanto si se recibe en ese PATCH como si se conserva la anterior.
+
+### Lectura e históricos
+
+`DocumentoResponse` conserva sus campos y añade `id_tipo_documento` nullable y
+`clasificacion` nullable. Esta última expone sólo ID, código, nombre y activo;
+la descripción del tipo se consulta en el endpoint del catálogo.
+La clasificación es autoritativa cuando existe FK. Los históricos conservan
+`tipo_documento` original, `id_tipo_documento=null` y `clasificacion=null`; no se
+infiere una clasificación por semejanza del texto y 028 no realiza backfill.
+No cambian `estado`, requisitos, actividades, versiones ni objetivos documentales.
+La taxonomía V1 completa se describe en el diccionario de datos.
