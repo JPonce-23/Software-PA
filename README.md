@@ -197,11 +197,12 @@ Resumen para una instalación nueva:
 ```bash
 docker compose up -d --build db
 set -a; source .env; set +a
+# Crear primero el administrador con el bootstrap owner explícito anterior.
+# El fixture territorial requiere un administrador activo para su auditoría.
 # Cargar el catálogo territorial reproducible.
 docker compose exec -T db sh -lc \
   'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f -' \
   < backend/db/fixtures/001_catalogo_territorial_inegi.sql
-# Crear el primer administrador con el bootstrap owner explícito anterior.
 backend/scripts/utils/set_runtime_credentials.sh
 docker compose up -d backend
 curl --fail http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/health
@@ -210,6 +211,68 @@ curl --fail http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/health
 `schema_migrations` registra `001`, el nombre `baseline_v1` y el SHA-256
 del archivo. Las migraciones nuevas comienzan en `002`; el runner rechaza una
 migración aplicada si su archivo fue modificado.
+
+### Catálogo nacional RAN en cada servidor
+
+Git incluye el dataset aprobado en `backend/db/fixtures/catalogo_nucleos_ran.csv`,
+su manifiesto de integridad y el crosswalk RAN→INEGI. Son **32,278 claves externas**;
+no incluye los 51 registros sintéticos QA/GIS adicionales de la base de pruebas.
+No hace falta copiar `software_pa_test`, copiar un CSV manualmente ni acceder a
+`fuentes_locales/`. Las migraciones crean estructura; el importador sincroniza
+este dataset maestro por separado. No existe una migración 029 para esta carga.
+
+Prerrequisitos: DB destino explícita en la configuración, migraciones hasta 028,
+administrador activo creado con el bootstrap existente y catálogo territorial
+cargado **después** de ese administrador. En un volumen existente ejecutar el
+runner oficial; el init de PostgreSQL no se repite. Ver
+[MIGRACIONES](docs/MIGRACIONES.md) y [fixtures](backend/db/fixtures/README.md).
+
+Después de actualizar el servidor, ejecutar desde la raíz del repositorio:
+
+```bash
+git pull --ff-only
+# Valores reales propios de este servidor; DB_NAME en .env debe apuntar al destino.
+TARGET_DATABASE="nombre_real_de_la_base"
+IMPORT_ACTOR_EMAIL="correo_del_administrador_activo"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build backend
+
+# Siempre revisar el plan primero. No escribe en PostgreSQL.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm --no-deps \
+  backend bash scripts/sync_catalogo_ran.sh \
+  --expected-database "$TARGET_DATABASE"
+
+# Autorización explícita de la carga; resuelve el ID del actor en esta misma DB.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm --no-deps \
+  backend bash scripts/sync_catalogo_ran.sh \
+  --expected-database "$TARGET_DATABASE" \
+  --actor-email "$IMPORT_ACTOR_EMAIL" --apply
+
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps backend
+curl --fail http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/health
+```
+
+`/health` debe reportar schema 28. Después comprobar autenticado
+`GET /api/catalogos/nucleos?limit=20` y un filtro territorial conocido; comparar
+con SQL si es necesario. El endpoint conserva su autenticación y sus cuatro roles.
+En desarrollo usar consistentemente la configuración Compose de desarrollo.
+
+También puede ejecutarse directamente en un entorno Python con `psycopg2` y
+conexión configurada mediante `DB_*` o `DATABASE_URL`:
+
+```bash
+./backend/scripts/sync_catalogo_ran.sh \
+  --expected-database "$TARGET_DATABASE" \
+  --actor-email "$IMPORT_ACTOR_EMAIL" --apply
+```
+
+El script verifica manifiesto, bytes, conteos, crosswalk y base real antes de
+importar. Si `DATABASE_URL` contradice las variables `DB_*`, aborta. Sin `--apply`
+sólo informa el plan. Con cero altas/cambios informa
+`CATALOGO RAN YA SINCRONIZADO` y omite apply. Después de escribir exige otro dry-run
+sin altas/cambios y verifica cobertura de todas las claves del CSV.
+No borra registros adicionales ni reactiva bajas administrativas. Informa por
+separado cobertura, claves activas del dataset y claves extra; el conteo global
+de `nucleo_agrario` puede ser mayor que 32,278.
 
 Los datos de prueba son opcionales y deben cargarse después del administrador:
 

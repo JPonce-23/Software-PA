@@ -57,6 +57,44 @@
 
 ## 3. Procedimiento de Ejecución y Aplicación
 
+### Catálogo RAN: sincronización de datos después del esquema
+
+Las migraciones hasta 028 instalan estructura y catálogos estructurales, pero no
+cargan el dataset nacional RAN. B-06 distribuye el CSV aprobado, su manifiesto y
+crosswalk bajo `backend/db/fixtures/`; no añade migración 029 ni cambia 001–028.
+
+Orden de una instalación limpia: provisionar PostgreSQL/runtime, ejecutar el
+runner canónico, verificar ledger/schema 028, crear administrador con el bootstrap
+owner, cargar el fixture territorial y sincronizar RAN. El fixture territorial
+requiere que el administrador exista. En una base existente comprobar esos
+prerrequisitos; el init de PostgreSQL no sustituye la ejecución del runner.
+
+Después de `git pull --ff-only` y de construir la imagen del nuevo código, con
+PostgreSQL disponible y configuración de producción consistente:
+
+```bash
+TARGET_DATABASE="nombre_real_de_la_base"
+IMPORT_ACTOR_EMAIL="correo_del_administrador_activo"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm --no-deps \
+  backend bash scripts/sync_catalogo_ran.sh --expected-database "$TARGET_DATABASE"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm --no-deps \
+  backend bash scripts/sync_catalogo_ran.sh --expected-database "$TARGET_DATABASE" \
+  --actor-email "$IMPORT_ACTOR_EMAIL" --apply
+```
+
+`DB_NAME` de la configuración debe identificar ese destino. No copiar la base de
+pruebas ni archivos de `fuentes_locales/`. El script comprueba integridad antes de
+conectar, requiere destino explícito, resuelve el actor local y exige dry-run
+antes de apply. Si no hay cambios, omite apply; después de escribir exige otro
+dry-run limpio y cobertura completa de las **32,278 claves externas** aprobadas.
+No exige total global ni reproduce los 51 registros QA/GIS extra de la DB de test.
+
+La carga es idempotente y transaccional, conserva IDs y no elimina ausentes ni
+reactiva bajas. Es independiente del ledger de migraciones: el manifiesto es la
+fuente de integridad del dataset. Ver [fixtures](../backend/db/fixtures/README.md)
+para actualización y prueba aislada. Tras sincronizar, iniciar/reiniciar backend,
+verificar `/health` (schema 28) y `GET /api/catalogos/nucleos` autenticado.
+
 ### Expansión documental 028 y despliegue
 
 Aplicar primero 028 en la base destino con el runner oficial y una conexión

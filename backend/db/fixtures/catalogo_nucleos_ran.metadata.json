@@ -1,0 +1,22 @@
+{
+  "name": "Catálogo nacional de núcleos agrarios RAN/PHINA",
+  "filename": "catalogo_nucleos_ran.csv",
+  "source": "RAN_PHINA_CATALOGO_NUCLEOS",
+  "source_name": "Registro Agrario Nacional (RAN) - Datos Abiertos",
+  "source_url": "https://datos.ran.gob.mx/conjuntoDatosPublico.php",
+  "dataset": "Catálogo de Núcleos Agrarios",
+  "resource": "Listado del total de los Núcleos Agrarios que conforman la Propiedad Social",
+  "provenance": "Dataset del portal oficial de Datos Abiertos del Registro Agrario Nacional. Snapshot local auditado y aprobado por Software-PA para B-06, sin registros sintéticos QA/GIS.",
+  "snapshot_integrity_note": "El SHA-256 identifica exactamente el snapshot aprobado por Software-PA; no acredita identidad byte por byte con la descarga actualmente publicada en el portal RAN, que no se ha descargado y comparado en esta fase.",
+  "sha256": "863d31fff0f9b0338a103c7858872d4f531fe2b2593aade514dac2233d2fa6c3",
+  "size_bytes": 2341409,
+  "rows": 32278,
+  "unique_keys": 32278,
+  "encoding": "cp1252",
+  "external_identity": "cve_unica",
+  "columns": ["cve_unica", "scncve_edo", "Estado", "scncve_mun", "Municipio", "SCNNom_Nuc", "tipo"],
+  "expected_types": {"EJIDO": 29852, "COMUNIDAD": 2426},
+  "expected_entities": 32,
+  "crosswalk_filename": "ran_municipio_inegi_crosswalk.csv",
+  "crosswalk_sha256": "ddadabf417571722b50289724486045037f020c7e6fc2e49db69585d6c6651cb"
+}
