@@ -387,9 +387,9 @@ class OrvIntegrante(Base, AuditableMixin):
     id_orv_integrante = Column(Integer, primary_key=True)
     id_orv = Column(Integer, ForeignKey("orv.id_orv"), nullable=False)
     id_persona = Column(Integer, ForeignKey("persona.id_persona"), nullable=False)
-    id_organo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
-    id_cargo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
-    id_calidad = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    id_organo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False)
+    id_cargo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False)
+    id_calidad = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False)
     fecha_inicio = Column(Date)
     fecha_fin = Column(Date)
     id_tipo_fin = Column(
