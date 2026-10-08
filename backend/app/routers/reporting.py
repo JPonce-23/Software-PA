@@ -6,7 +6,7 @@ import json
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, literal
+from sqlalchemy import and_, column, func, literal, table
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -534,33 +534,69 @@ def project_map(
         models.TrazoProyecto.id_proyecto == id_proyecto,
         models.TrazoProyecto.activo.is_(True),
     ).all()
+    rights_of_way = db.query(
+        models.DerechoViaProyecto.id_derecho_via.label("id"),
+        models.DerechoViaProyecto.version.label("nombre"),
+        func.ST_AsGeoJSON(models.DerechoViaProyecto.geometria_poligono).label("geometry"),
+    ).filter(
+        models.DerechoViaProyecto.id_proyecto == id_proyecto,
+        models.DerechoViaProyecto.activo.is_(True),
+        models.DerechoViaProyecto.es_vigente.is_(True),
+    ).all()
     nuclei = db.query(
         models.NucleoAgrario.id_nucleo.label("id"),
         models.NucleoAgrario.nombre_nucleo.label("nombre"),
-        func.ST_AsGeoJSON(models.NucleoAgrario.geometria_poligono).label("geometry"),
+        func.ST_AsGeoJSON(func.coalesce(
+            models.ProyectoNucleoGeometria.geometria_poligono,
+            models.NucleoAgrario.geometria_poligono,
+        )).label("geometry"),
     ).join(
         models.ProyectoNucleo,
         models.ProyectoNucleo.id_nucleo == models.NucleoAgrario.id_nucleo,
+    ).outerjoin(
+        models.ProyectoNucleoGeometria,
+        and_(
+            models.ProyectoNucleoGeometria.id_proyecto_nucleo
+            == models.ProyectoNucleo.id_proyecto_nucleo,
+            models.ProyectoNucleoGeometria.activo.is_(True),
+            models.ProyectoNucleoGeometria.es_vigente.is_(True),
+        ),
     ).filter(
         models.ProyectoNucleo.id_proyecto == id_proyecto,
         models.ProyectoNucleo.activo.is_(True),
         models.NucleoAgrario.activo.is_(True),
     ).distinct().all()
+    # Reuse administrative membership; sharing a nucleus is insufficient.
+    parcel_universe = table(
+        "vw_gis_parcela_proyecto",
+        column("id_proyecto"), column("id_proyecto_nucleo"), column("id_parcela"),
+    )
+    parcel_geometry = func.coalesce(
+        models.ProyectoParcelaGeometria.geometria_poligono,
+        models.Parcela.geometria_poligono,
+    )
     parcels = db.query(
         models.Parcela.id_parcela.label("id"),
         func.coalesce(
             models.Parcela.no_parcela,
             func.concat("Parcela ", models.Parcela.id_parcela),
         ).label("nombre"),
-        func.ST_AsGeoJSON(models.Parcela.geometria_poligono).label("geometry"),
+        func.ST_AsGeoJSON(parcel_geometry).label("geometry"),
     ).join(
-        models.ProyectoNucleo,
-        models.ProyectoNucleo.id_nucleo == models.Parcela.id_nucleo,
+        parcel_universe,
+        parcel_universe.c.id_parcela == models.Parcela.id_parcela,
+    ).outerjoin(
+        models.ProyectoParcelaGeometria,
+        and_(
+            models.ProyectoParcelaGeometria.id_proyecto_nucleo
+            == parcel_universe.c.id_proyecto_nucleo,
+            models.ProyectoParcelaGeometria.id_parcela == models.Parcela.id_parcela,
+            models.ProyectoParcelaGeometria.activo.is_(True),
+            models.ProyectoParcelaGeometria.es_vigente.is_(True),
+        ),
     ).filter(
-        models.ProyectoNucleo.id_proyecto == id_proyecto,
-        models.ProyectoNucleo.activo.is_(True),
-        models.Parcela.activo.is_(True),
-        models.Parcela.geometria_poligono.is_not(None),
+        parcel_universe.c.id_proyecto == id_proyecto,
+        parcel_geometry.is_not(None),
     ).distinct().all()
 
     def feature(kind: str, row) -> dict:
@@ -575,6 +611,7 @@ def project_map(
         "type": "FeatureCollection",
         "features": [
             *(feature("trazo_proyecto", row) for row in traces),
+            *(feature("derecho_via_proyecto", row) for row in rights_of_way),
             *(feature("nucleo_agrario", row) for row in nuclei if row.geometry),
             *(feature("parcela", row) for row in parcels),
         ],
