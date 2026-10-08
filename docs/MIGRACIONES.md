@@ -1,8 +1,9 @@
 # Gestión de Migraciones de Base de Datos — SOFTWARE-PA
 
 > **Autoridad:** Documentación canónica del versionado del esquema de base de datos en PostgreSQL 15 / PostGIS.  
-> **Esquema ejecutable vigente:** **026** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base).
-> **Esta fase termina en 026.** No se crea 027.
+> **Esquema ejecutable vigente:** **028** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base).
+> **B-04:** La 027 permite `actividad_campo` como objetivo documental directo.
+> **B-03:** La 028 incorpora clasificación documental controlada y conserva el texto legado sin backfill.
 
 ---
 
@@ -13,13 +14,13 @@
 2. **Verificación de integridad por Checksum:**  
    El runner oficial (`backend/scripts/run_migrations.sh`) calcula el hash criptográfico SHA-256 de cada archivo `.sql`. Si un archivo ya registrado en `public.schema_migrations` sufre alteraciones en su contenido, el proceso de arranque se detiene de inmediato con error.
 3. **Evolución Forward-Only:**  
-   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** posterior a la versión aplicada. No se modifican los archivos históricos `001` a `025`. La 025 conserva el contenido funcional del antiguo 024 GIS; su adopción excepcional se documenta abajo y se aplicó únicamente en `software_pa_test`.
+   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** posterior a la versión aplicada. No se modifican los archivos históricos `001` a `027`. La 025 conserva el contenido funcional del antiguo 024 GIS; su adopción excepcional se documenta abajo y se aplicó únicamente en `software_pa_test`.
 4. **Instalación limpia:**  
-   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `026_historia_cambios_gis.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
+   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `028_catalogo_tipo_documento.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
 
 ---
 
-## 2. Inventario Canónico de Migraciones Vigentes (001–026)
+## 2. Inventario Canónico de Migraciones Vigentes (001–028)
 
 | Versión | Archivo SQL | Checksum SHA-256 Verificado | Propósito y Contenido Principal |
 |---|---|---|---|
@@ -49,10 +50,88 @@
 | **024** | `024_importacion_parcelas_gpkg.sql` | `15f36ea78a591aeb0f587a84e7e2bddb21f53de455d80daaf8532422796bc2d6` | Habilita `parcela_gpkg` como objetivo de staging separado del legacy, exige GPKG sin mapeo y valida que el destino sea una parcela activa de un núcleo RAN activo vinculado al proyecto. No altera el índice de identidad parcelaria. |
 | **025** | `025_conciliacion_gis_proyecto.sql` | `8338aace95845761acf0f9b675064ca25a6b0da2117013178ed060f260ec372a` | Conciliación explícita contra destinos administrativos del proyecto; geometrías por proyecto, candidatos y decisiones auditadas; CRS configurable, trazabilidad WKB/Z e idempotencia por pipeline/CRS. Conserva las geometrías globales legacy y no crea entidades administrativas. |
 | **026** | `026_historia_cambios_gis.sql` | `6615a137655abbb2a6ea2620d7c8b5013f07d6fcdd81aae4270a4551904ea3fd` | Ciclos históricos, reconciliación tardía, alcance de entregas, revisiones técnicas y decisiones append-only; sin efectos administrativos automáticos. |
+| **027** | `027_actividad_campo_objetivo_documental.sql` | `d5371660b3d0f6a257bcdffe453feb72984b225d24804991e6b4cf7c1ce68665` | Añade únicamente `actividad_campo` a `chk_documento_vinculo_tipo`, preservando sus 22 tipos anteriores. No modifica datos ni el contrato de `ExpedienteRequisito`. |
+| **028** | `028_catalogo_tipo_documento.sql` | `1395d96c59af2fe2192598af13bd5e4f88ca675d4d35e9ba4f19d25cfc7bc845` | Catálogo documental V1 de 27 opciones y FK nullable en Documento; conserva texto legado y todos los históricos sin backfill. Protege OTRO, tipos inactivos, inmutabilidad de código y baja lógica. |
 
 ---
 
 ## 3. Procedimiento de Ejecución y Aplicación
+
+### Catálogo RAN: sincronización de datos después del esquema
+
+Las migraciones hasta 028 instalan estructura y catálogos estructurales, pero no
+cargan el dataset nacional RAN. B-06 distribuye el CSV aprobado, su manifiesto y
+crosswalk bajo `backend/db/fixtures/`; no añade migración 029 ni cambia 001–028.
+
+Orden de una instalación limpia: provisionar PostgreSQL/runtime, ejecutar el
+runner canónico, verificar ledger/schema 028, crear administrador con el bootstrap
+owner, cargar el fixture territorial y sincronizar RAN. El fixture territorial
+requiere que el administrador exista. En una base existente comprobar esos
+prerrequisitos; el init de PostgreSQL no sustituye la ejecución del runner.
+
+Después de `git pull --ff-only` y de construir la imagen del nuevo código, con
+PostgreSQL disponible y configuración de producción consistente:
+
+```bash
+TARGET_DATABASE="nombre_real_de_la_base"
+IMPORT_ACTOR_EMAIL="correo_del_administrador_activo"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm --no-deps \
+  backend bash scripts/sync_catalogo_ran.sh --expected-database "$TARGET_DATABASE"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm --no-deps \
+  backend bash scripts/sync_catalogo_ran.sh --expected-database "$TARGET_DATABASE" \
+  --actor-email "$IMPORT_ACTOR_EMAIL" --apply
+```
+
+`DB_NAME` de la configuración debe identificar ese destino. No copiar la base de
+pruebas ni archivos de `fuentes_locales/`. El script comprueba integridad antes de
+conectar, requiere destino explícito, resuelve el actor local y exige dry-run
+antes de apply. Si no hay cambios, omite apply; después de escribir exige otro
+dry-run limpio y cobertura completa de las **32,278 claves externas** aprobadas.
+No exige total global ni reproduce los 51 registros QA/GIS extra de la DB de test.
+
+La carga es idempotente y transaccional, conserva IDs y no elimina ausentes ni
+reactiva bajas. Es independiente del ledger de migraciones: el manifiesto es la
+fuente de integridad del dataset. Ver [fixtures](../backend/db/fixtures/README.md)
+para actualización y prueba aislada. Tras sincronizar, iniciar/reiniciar backend,
+verificar `/health` (schema 28) y `GET /api/catalogos/nucleos` autenticado.
+
+### Expansión documental 028 y despliegue
+
+Aplicar primero 028 en la base destino con el runner oficial y una conexión
+explícita; después desplegar el backend que consulta la nueva tabla/FK. La
+migración exige la 027 exacta, verifica el texto legado VARCHAR(80) NOT NULL,
+siembra los 27 tipos y añade `id_tipo_documento` nullable. Compara cantidad y
+huella de los documentos antes/después: ninguna fila histórica se reclasifica.
+Las semillas son inicialización de esquema; las posteriores escrituras del
+catálogo usan la auditoría/baja lógica existente.
+
+Ejemplo de conexión temporal explícita para la base canónica de pruebas:
+
+```bash
+docker compose exec -T \
+  -e APP_ENV=test -e DB_NAME=software_pa_test \
+  -e TEST_ALLOW_DATABASE=software_pa_test -e POSTGRES_DB=software_pa_test \
+  -e POSTGRES_USER=pa_app -e DATABASE_URL= \
+  -e MIGRATIONS_DIR=/opt/software-pa/migrations \
+  db bash /opt/software-pa/scripts/run_migrations.sh
+```
+
+No cambia `.env` ni la conexión del backend permanente de desarrollo.
+
+La transición conserva clientes que escriben texto legado. Nuevas capturas pueden
+usar catálogo y guardar su nombre en el campo de compatibilidad; clasificar
+históricos conserva el texto original. Un mapeo histórico y la eventual retirada
+del VARCHAR quedan para una fase posterior aprobada. No hay migración inversa:
+una reversión de aplicación conserva la expansión y sus datos. El backend previo
+puede leer el campo legado; editar ese texto en documentos ya clasificados será
+rechazado por SQL y requiere el backend nuevo.
+
+El contrato de upgrade `backend/db/tests/028_catalogo_tipo_documento_contract.sql`
+usa BEGIN/ROLLBACK y exige `expected_checksum` (hash del archivo 028) y
+`expected_documents` (cantidad previa). Opcionalmente recibe
+`expected_document_hash` (MD5 de filas completas previas a la expansión). Se
+ejecuta sobre `software_pa_test` antes de captura persistente con catálogo:
+confirma semilla exacta, documentos sin backfill, FK nullable y restricciones.
 
 El script `backend/scripts/run_migrations.sh` es la herramienta estándar para aplicar y verificar migraciones en cualquier entorno.
 
@@ -91,11 +170,11 @@ Puede comprobarse el esquema vigente mediante una llamada HTTP simple:
 curl --fail http://localhost:8000/health
 ```
 
-Respuesta esperada:
+Respuesta esperada para una base canónica con 028 aplicada (el backend de desarrollo puede consultar otra base):
 ```json
 {
   "status": "ok",
-  "schema": 25
+  "schema": 28
 }
 ```
 
@@ -154,6 +233,14 @@ En esta entrega sólo se aplicó a `software_pa_test`, después de `SELECT curre
 
 La política de CRS, el inventario real de los cuatro GPKG y la validación están en [INFORME_CONCILIACION_GIS_2026-10-05.md](INFORME_CONCILIACION_GIS_2026-10-05.md).
 
+
+### 3.10 Actividad de campo como objetivo documental — 027
+
+La migración exige la 026 canónica exacta y el CHECK validado con los 22 tipos documentales vigentes. Reemplaza únicamente `chk_documento_vinculo_tipo` para incorporar `actividad_campo`; conserva las funciones de existencia/pertenencia, triggers y contrato de requisitos. No modifica filas del dominio.
+
+Aplicación de esta fase: exclusivamente en `software_pa_test`, tras verificar `current_database()`, ledger completo 001–026 y checksums, con configuración temporal `APP_ENV=test`, `DB_NAME=software_pa_test` y `TEST_ALLOW_DATABASE=software_pa_test`. El runner no ofrece dry-run; se ensayó el DDL en una transacción con `ROLLBACK` antes de su aplicación. Para el contenedor `db`, su directorio montado debe indicarse como `MIGRATIONS_DIR=/opt/software-pa/migrations`. `db_pruebas_alfredo` no se migra ni se reconfigura.
+
+El contrato `backend/db/tests/027_actividad_campo_objetivo_documental_contract.sql` exige `software_pa_test` y termina con `ROLLBACK`. Comprueba todos los tipos documentales anteriores, el nuevo tipo, rechazo de tipos inválidos y persistencia transaccional de un vínculo y requisito de actividad. Las pruebas Python de objetivos documentales reutilizan `transactional_api`, sin credenciales de login y con rollback externo.
 
 ## RECONCILIACIÓN EXCEPCIONAL DEL LINAJE GIS
 

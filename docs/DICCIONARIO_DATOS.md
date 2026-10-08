@@ -137,16 +137,46 @@ Eje operativo fundamental. Vincula el proyecto estratégico con el núcleo agrar
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `orv` | `numero_orv` | `VARCHAR(50)` | No | — | Número de acta o registro del ORV. | ORV | `/api/orvs` |
+| `orv` | `numero_orv` | `VARCHAR(50)` | Sí | — | Número de acta o registro del ORV. | ORV | `/api/proyecto-nucleo/{id_proyecto_nucleo}/orv` |
 | `orv` | `inicio_vigencia` / `fin_vigencia` | `DATE` | Sí | — | Periodo de ejercicio legal del Comisariado. | VIGENCIA ORV | Validación jurídica |
 | `orv` | `id_estado_registral` | `BIGINT` | Sí | `catalogo_operativo` | Estado registral de la mesa directiva. | ESTATUS ORV | Evidencia institucional |
-| `orv_integrante` | `id_persona` | `BIGINT` | No | `persona.id_persona` | Persona que ostenta el cargo ejidal. | INTEGRANTES | Acreditación en convenios |
-| `orv_integrante` | `cargo` | `VARCHAR(100)` | No | — | Presidente, Secretario, Tesorero, Consejo. | CARGO | Cláusulas de convenio |
+| `orv_integrante` | `id_persona` | `INTEGER` | No | `persona.id_persona` | Persona que ostenta el cargo ejidal. | INTEGRANTES | Acreditación en convenios |
+| `orv_integrante` | `id_organo` / `id_cargo` / `id_calidad` | `BIGINT` | No | `catalogo_operativo` | Órgano, cargo y calidad según sus catálogos; no existe columna `cargo` de texto libre. | CARGO | `/api/orv/{id_orv}/integrantes` |
+| `orv_integrante` | `fecha_inicio` / `fecha_fin` | `DATE` | Sí | — | Periodo funcional con límites inclusivos. | Vigencia del cargo | Histórico funcional |
+| `orv_integrante` | `id_tipo_fin` / `detalle_fin` | `BIGINT` / `TEXT` | Sí | `catalogo_operativo` para tipo | Causa y detalle del cierre; fecha de fin y tipo deben coexistir. | Cierre funcional | `/api/orv-integrantes/{id_orv_integrante}/finalizar` |
+| `orv_integrante` | `activo` | `BOOLEAN` | No | — | Estado administrativo; un periodo finalizado puede conservar `true`. | Sistema | Baja lógica y restauración |
+| `orv_integrante` | `fecha_baja` / `motivo_baja` / `id_usuario_baja` | `TIMESTAMPTZ` / `TEXT` / `INTEGER` | Sí | `usuario` para actor | Obligatorios en baja administrativa y nulos cuando activo. | Auditoría | DELETE / reactivar |
 | `padron_historial` | `fecha_padron` | `DATE` | No | — | Fecha de expedición del padrón ejidal. | FECHA PADRÓN | Quórum de asamblea |
 | `padron_historial` | `numero_ejidatarios_comuneros` | `INTEGER` | No | — | Total de sujetos de derecho reconocidos. | NO. SUJETOS | Verificación de mayorías |
 
+`vigente` es una propiedad calculada, no una columna: activo, inicio alcanzado
+y fin no vencido, incluyendo ambos límites. No incorpora el periodo del ORV
+padre. `finalizar` conserva el estado activo; la baja administrativa conserva el
+periodo y la causa del cierre. `reactivar` limpia únicamente los campos de baja,
+sin eliminar `fecha_fin`, `id_tipo_fin` ni `detalle_fin`.
+
+El listado conserva `OrvIntegranteDetailResponse`, incluidos los campos de baja
+ya existentes, y el orden por órgano, cargo y nombre. `incluir_historico=false`
+y `incluir_bajas=false` son los valores predeterminados:
+
+| Histórico | Bajas | Universo |
+|---|---|---|
+| false | false | Activos vigentes |
+| true | false | Todos los activos |
+| false | true | Activos vigentes más todas las bajas, independientemente de sus fechas |
+| true | true | Todos los activos y todas las bajas |
+
+La Persona permanece obligatoriamente activa. El ORV y núcleo deben estar
+activos y se conserva el acceso de lectura para admin, operador, visualizador
+y geógrafo; la opción de bajas no amplía el alcance por proyecto. No resuelve
+el actor a datos de perfil. La baja y reactivación siguen siendo exclusivas de
+admin. No se modifica la exclusión temporal por ORV/órgano/cargo/calidad para
+filas activas, ni se introduce reapertura o cambio de esquema.
+
 ### 3.2 `actividad_campo`
 Sensibilización comunitaria y caminamientos técnicos.
+
+Desde 027 también es objetivo documental directo: `documento_vinculo.entidad_tipo = 'actividad_campo'` y `entidad_id = actividad_campo.id_actividad`. El acceso se deriva de `id_proyecto_nucleo` hacia el proyecto, con actividad y vínculo ProyectoNucleo activos; `id_afectacion` es opcional y no determina la autorización documental.
 
 | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|
@@ -188,6 +218,49 @@ La conciliación vigente (025) usa `POST /api/proyectos/{id_proyecto}/geoespacia
 | `parcela_titular` | `constancia_vigencia` | `VARCHAR(80)` | Sí | — | Referencia de constancia emitida por RAN. | CONSTANCIA | Soporte de vigencia |
 
 ---
+
+### 4.2 `persona` — búsqueda y reutilización
+
+Persona es una identidad compartida; su alcance por proyecto se deriva de
+relaciones de negocio activas (ORV, titulares parcelarios y de unidad agraria
+directos/indirectos, comparecientes, intervinientes FIFONAFE y beneficiarios de
+pago), respetando los padres activos de cada camino. No existe un vínculo
+Persona–Proyecto creado automáticamente por el POST de Persona o la búsqueda.
+
+`GET /api/personas` devuelve la proyección `PersonaBusquedaResponse`:
+
+| Campo | Tipo del dato fuente | Nullable | Uso |
+|---|---|---|---|
+| `id_persona` | `INTEGER` | No | Seleccionar una Persona existente |
+| `nombre` | `VARCHAR(300)` | No | Identificación |
+| `apellido_paterno` | `VARCHAR(200)` | Sí | Identificación |
+| `apellido_materno` | `VARCHAR(200)` | Sí | Identificación |
+| `curp` | `VARCHAR(18)` | Sí | Búsqueda exacta e identificación |
+| `rfc` | `VARCHAR(13)` | Sí | Búsqueda exacta; no es único |
+
+No expone contacto, observaciones, origen, auditoría ni relaciones. Exige
+exactamente un criterio: `q` (2–300 caracteres, todas las palabras en nombres o
+apellidos, sin distinguir caja ni eliminar acentos), `curp` (no vacío, máximo
+18) o `rfc` (no vacío, máximo 13). Se retiran espacios ordinarios exteriores;
+CURP/RFC se comparan mediante `upper(btrim(...))`, sin modificar datos.
+En `q`, `%`, `_` y `\` son literales. `limit` vale 20 por defecto (1–100) y
+`skip` vale 0 por defecto (mínimo 0). Orden estable por apellidos, nombre e id,
+sin distinguir caja y con apellidos nulos al final; visibilidad antes del límite.
+
+Admin ve todas las Personas activas; operador, visualizador y geógrafo ven las
+relacionadas con algún proyecto activo autorizado. Sólo el operador creador,
+con algún proyecto activo autorizado, obtiene además sus verdaderas huérfanas:
+sin proyectos derivados y sin referencias activas según
+`fn_persona_tiene_relaciones_activas()`. Padres inactivos no bastan para esa
+excepción. Personas inactivas y coincidencias fuera de alcance no se devuelven
+(lista vacía, HTTP 200). El criterio ausente, vacío, combinado o inválido y la
+paginación inválida producen 422; siguen aplicándose autenticación y roles.
+
+`uq_persona_curp` conserva su definición: único sobre `upper(curp)` para
+Personas activas con CURP no nulo, sin `btrim`. Por ello la búsqueda normalizada
+puede devolver varias coincidencias visibles. No se introduce unicidad de RFC,
+normalización de escrituras ni cambios de esquema; el esquema continúa en 027.
+La selección no crea relaciones y no amplía permisos de captura o edición.
 
 ## 5. Afectaciones y Unidades Agrarias
 
@@ -310,13 +383,67 @@ La conciliación vigente (025) usa `POST /api/proyectos/{id_proyecto}/geoespacia
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `documento` | `id_documento` | `BIGINT` | No | PK | Identidad lógica del documento. | Sistema | `/api/documentos` |
-| `documento` | `tipo_documento` | `VARCHAR(50)` | No | — | Clasificación documental (acta, convenio, etc.). | Tipo soporte | Catálogo |
+| `documento` | `id_documento` | `INTEGER` | No | PK | Identidad lógica del documento. | Sistema | Rutas genéricas de documentos por objetivo |
+| `documento` | `tipo_documento` | `VARCHAR(80)` | No | — | Texto legado/compatibilidad. No vacío según `btrim`; API rechaza NULL explícito y sólo espacios. | Tipo soporte | Nuevas capturas por ID guardan el nombre del catálogo; los históricos conservan su texto. |
+| `documento` | `id_tipo_documento` | `BIGINT` | Sí | `catalogo_tipo_documento` | Clasificación autoritativa cuando existe; no se infiere a partir del texto legado. | Taxonomía V1 revisada | FK sin cascada; 028 no realiza backfill. |
+| `documento` | `descripcion` | `TEXT` | Sí | — | Detalle libre del documento; obligatorio y no vacío para OTRO. | Detalle/observación | Validación Python y trigger SQL. |
 | `documento` | `fecha_documento` | `DATE` | Sí | — | Fecha propia del documento físico. | FECHA OFICIO | Metadato jurídico |
-| `documento` | `numero_folio` | `VARCHAR(100)` | Sí | — | Número de oficio, acta o folio impreso. | FOLIO / NO. OFICIO | Identificación documental |
+| `documento` | `numero_folio` | `VARCHAR(150)` | Sí | — | Número de oficio, acta o folio impreso. | FOLIO / NO. OFICIO | Identificación documental |
 | `documento_version` | `id_version` | `BIGINT` | No | PK | Versión inmutable del archivo digital. | Sistema | Descarga de archivos |
 | `documento_version` | `sha256` | `CHAR(64)` | No | — | Hash criptográfico para integridad. | Archivo | Detección de alteración |
-| `documento_vinculo` | `entidad_tipo` / `entidad_id` | `VARCHAR` / `BIGINT` | No | Polimórfico | Entidad asociada (convenio, asamblea...). | Asociación | Vinculación y aislamiento |
+| `documento_vinculo` | `entidad_tipo` / `entidad_id` | `VARCHAR(50)` / `INTEGER` | No | Polimórfico | Entidad asociada (convenio, asamblea, actividad_campo...). | Asociación | Vinculación y aislamiento |
+
+`chk_documento_vinculo_tipo` admite desde 027 los 22 tipos de 026 más `actividad_campo`. El trigger de objetivo reutiliza `fn_objetivo_controlado_existe`; `fn_objetivo_requisito_en_pn` y el CHECK de `expediente_requisito` ya admitían actividades y permanecen intactos. El vínculo conserva auditoría y baja lógica.
+
+### 11.1.1 `catalogo_tipo_documento` (028)
+
+Tabla con `id_tipo_documento BIGINT` identity, `codigo VARCHAR(80)` único e inmutable,
+`nombre VARCHAR(250)` no vacío, `descripcion TEXT` nullable, `orden INTEGER >= 0`,
+`activo BOOLEAN` y los campos comunes de auditoría/baja lógica. El código admite
+ASCII mayúscula inicial y luego mayúsculas, números o underscore. No permite DELETE
+físico; la baja requiere fecha, actor y motivo. Utiliza la auditoría existente.
+
+Taxonomía V1: los 27 valores siguientes nacen activos. No incluye actividades,
+estados, resultados registrales ni subtipos de convenio/COP.
+
+| Código | Nombre | Descripción funcional | Orden |
+|---|---|---|---|
+| `MINUTA` | Minuta | Registro escrito de reunión o actividad. | 10 |
+| `FOTOGRAFIA` | Fotografía | Evidencia fotográfica; la actividad respaldada se identifica en el contexto. | 20 |
+| `ACTA_ASAMBLEA` | Acta de asamblea | Acta de acuerdos de asamblea, salvo los tipos específicos del catálogo. | 30 |
+| `PADRON` | Padrón de ejidatarios/comuneros | Documento que identifica integrantes del núcleo; no equivale a cualquier lista de personas. | 40 |
+| `ACTA_ELECCION_ORV` | Acta de elección de ORV | Acta que documenta la elección de órganos de representación y vigilancia. | 50 |
+| `ACTA_REMOCION_ORV` | Acta de remoción de ORV | Acta de remoción, distinta del acto de elección. | 60 |
+| `ACTA_NO_VERIFICATIVO` | Acta de no verificativo | Acta que acredita que una asamblea no se verificó. | 70 |
+| `ACTA_COMPLEMENTARIA` | Acta complementaria | Documento complementario de un acto previo, identificado en la descripción. | 80 |
+| `ACTA_DELIMITACION_DESTINO_ASIGNACION` | Acta de delimitación, destino y asignación de tierras | Acta específica sobre delimitación, destino y asignación de tierras. | 90 |
+| `CONVOCATORIA_PRIMERA` | Primera convocatoria | Documento de primera convocatoria de asamblea. | 100 |
+| `CONVOCATORIA_SEGUNDA` | Segunda convocatoria | Documento de segunda convocatoria de asamblea. | 110 |
+| `CONVENIO` | Convenio | Instrumento de convenio/COP; el subtipo jurídico pertenece a la entidad Convenio. | 120 |
+| `ACUSE_RAN` | Acuse de ingreso al RAN | Evidencia de recepción de un ingreso al RAN, distinta de la solicitud. | 130 |
+| `SOLICITUD_RAN` | Solicitud de ingreso al RAN | Documento de solicitud de ingreso o reingreso al Registro Agrario Nacional. | 140 |
+| `AVISO_INSCRIPCION_RAN` | Aviso de inscripción RAN | Aviso que comunica la inscripción de un instrumento. | 150 |
+| `CONSTANCIA_INSCRIPCION_RAN` | Constancia de inscripción RAN | Constancia acreditativa de inscripción, distinta del aviso cuando sea identificable. | 160 |
+| `FOLIO_EJIDOS_COMUNIDADES` | Documento de folio de ejidos/comunidades | Impresión o extracto del folio; un número aislado es metadato. | 170 |
+| `CREDENCIAL_INE` | Credencial INE | Identificación oficial INE. | 180 |
+| `CREDENCIAL_RAN` | Credencial RAN | Credencial expedida en contexto RAN, distinta de la identificación INE. | 190 |
+| `CERTIFICADO_PARCELARIO` | Certificado parcelario | Documento de acreditación parcelaria. | 200 |
+| `CERTIFICADO_DERECHOS_AGRARIOS` | Certificado de derechos agrarios | Medio de acreditación agraria distinto del certificado parcelario. | 210 |
+| `CONSTANCIA_VIGENCIA_DERECHOS` | Constancia de vigencia de derechos | Constancia que acredita la vigencia del derecho. | 220 |
+| `OFICIO` | Oficio | Comunicación formal identificada como oficio; emisor, destinatario y asunto son contexto. | 230 |
+| `RESPUESTA` | Respuesta documental | Respuesta cuyo soporte no se identifica como oficio u otro tipo más concreto. | 240 |
+| `VALIDACION` | Documento de validación | Documento que acredita una validación; no representa un estado de cumplimiento. | 250 |
+| `AVALUO` | Avalúo | Documento de valoración; monto y contexto permanecen separados. | 260 |
+| `OTRO` | Otro documento | Documento identificado no cubierto por los tipos anteriores; requiere descripción. | 999 |
+
+`GET /api/catalogos/tipos-documento` sólo expone ID, código, nombre, descripción,
+orden y activo. Una opción inactiva sigue siendo legible en documentos ya
+clasificados y admite edición de sus otros metadatos, pero no nuevas selecciones.
+La API serializa `clasificacion` con ID, código, nombre y activo, sin auditoría.
+`OTRO` utiliza `Documento.descripcion`; no se crea otra columna de detalle.
+`documento.estado`, `RequisitoDocumental`, `ExpedienteRequisito`, actividades y
+vínculos conservan sus dominios separados. La transición futura de históricos
+necesitará un mapeo aprobado; ni OTRO ni CONVENIO se asignan automáticamente.
 
 ### 11.2 `seguimiento_evento` y `trazabilidad_fuente`
 

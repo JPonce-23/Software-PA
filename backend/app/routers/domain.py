@@ -1,5 +1,7 @@
 """REST API for the ProyectoNucleo administrative domain."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -477,6 +479,22 @@ def create_person(
     return service.create_person(db, data, user)
 
 
+@router.get(
+    "/personas", response_model=list[schemas.PersonaBusquedaResponse],
+    description="Busca Personas activas legibles por el usuario. Exactamente uno de q, curp o rfc. "
+                "q exige todas las palabras, sin distinguir caja ni eliminar acentos; %, _ y \\ son literales. "
+                "Sin coincidencias visibles devuelve []; no revela Personas fuera de alcance.",
+    responses={401: {"description": "Autenticación requerida"},
+               403: {"description": "Rol no permitido"}},
+)
+def search_persons(
+    criteria: Annotated[schemas.PersonaBusquedaParametros, Query()],
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    return service.search_persons(db, criteria, user)
+
+
 @router.get("/personas/{id_persona}", response_model=schemas.PersonaResponse)
 def get_person(
     id_persona: int,
@@ -583,17 +601,22 @@ def add_orv_member(
 @router.get(
     "/orv/{id_orv}/integrantes",
     response_model=list[schemas.OrvIntegranteDetailResponse],
+    description="Lista integrantes de un ORV activo dentro del alcance de lectura del núcleo. "
+                "incluir_historico elimina el filtro temporal de los integrantes activos. "
+                "incluir_bajas añade bajas administrativas sin filtrar sus fechas. "
+                "La Persona debe permanecer activa en todos los casos.",
 )
 def list_orv_members(
     id_orv: int,
     incluir_historico: bool = False,
+    incluir_bajas: bool = False,
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     orv = _active_or_404(db, models.Orv, models.Orv.id_orv, id_orv, "ORV no encontrado")
     require_nucleus_access(db, user, orv.id_nucleo)
     return service.list_orv_members(
-        db, id_orv, include_history=incluir_historico
+        db, id_orv, include_history=incluir_historico, include_deactivated=incluir_bajas
     )
 
 

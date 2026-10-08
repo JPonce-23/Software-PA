@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import json
 import os
 import sys
 from collections import Counter
@@ -681,6 +682,31 @@ def print_report(
         print(f"  - {warning}")
 
 
+def print_json_report(audit: FileAudit, crosswalk: CrosswalkAudit,
+                      plan: ImportPlan | None, database: str | None,
+                      mode: str, success: bool,
+                      extra_errors: list[str] | None = None,
+                      applied: tuple[int, int] | None = None) -> None:
+    errors = [*audit.errors, *crosswalk.errors,
+              *(plan.errors if plan else []), *(extra_errors or [])]
+    insertions, updates = applied if applied is not None else (
+        (plan.new_records, plan.records_to_update) if plan else (0, 0)
+    )
+    print(json.dumps({
+        "database": database,
+        "dataset_sha256": audit.sha256,
+        "rows": audit.total_rows,
+        "insertions": insertions,
+        "updates": updates,
+        "unchanged": audit.total_rows - insertions - updates if plan else 0,
+        "errors": len(errors),
+        "error_details": errors,
+        "unresolved_crosswalk": len(plan.missing_municipalities) if plan else 0,
+        "success": success,
+        "mode": mode,
+    }, ensure_ascii=False))
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Audita o importa el catálogo nacional RAN/PHINA"
@@ -705,6 +731,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Usuario activo responsable; también IMPORT_ACTOR_USER_ID",
     )
+    parser.add_argument(
+        "--report-json", action="store_true",
+        help="Emite un único objeto JSON para automatización",
+    )
     return parser.parse_args(argv)
 
 
@@ -728,11 +758,23 @@ def main(argv: list[str] | None = None) -> int:
         audit = audit_file(args.csv_path)
         crosswalk = audit_crosswalk(args.crosswalk_path)
     except (OSError, ValueError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        if args.report_json:
+            print_json_report(FileAudit(args.csv_path, ""), CrosswalkAudit(args.crosswalk_path),
+                              None, None, "apply" if args.apply else "dry-run", False,
+                              ["No se pudieron leer los artefactos"])
+        else:
+            print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
     connection = None
     plan = None
+    current_database = None
+
+    def report_json(success: bool, extra_errors: list[str] | None = None,
+                    applied: tuple[int, int] | None = None) -> None:
+        print_json_report(audit, crosswalk, plan, current_database,
+                          "apply" if args.apply else "dry-run", success, extra_errors, applied)
+
     try:
         if not audit.errors and not crosswalk.errors:
             connection = connect_database()
@@ -740,8 +782,10 @@ def main(argv: list[str] | None = None) -> int:
             if args.apply:
                 acquire_import_lock(connection)
             plan = build_plan(connection, audit, crosswalk)
-            print(f"base de datos: {current_database}")
-        print_report(audit, crosswalk, plan)
+            if not args.report_json:
+                print(f"base de datos: {current_database}")
+        if not args.report_json:
+            print_report(audit, crosswalk, plan)
 
         if (
             audit.errors
@@ -752,24 +796,37 @@ def main(argv: list[str] | None = None) -> int:
         ):
             if connection is not None:
                 connection.rollback()
-            print("Resultado: ABORTADO; no se modificó la base de datos")
+            if args.report_json:
+                report_json(False)
+            else:
+                print("Resultado: ABORTADO; no se modificó la base de datos")
             return 1
         if not args.apply:
             connection.rollback()
-            print("Resultado: DRY-RUN correcto; no se modificó la base de datos")
+            if args.report_json:
+                report_json(True)
+            else:
+                print("Resultado: DRY-RUN correcto; no se modificó la base de datos")
             return 0
 
         inserted, updated = apply_plan(connection, plan, actor_user_id)
         connection.commit()
-        print(f"insertados: {inserted}")
-        print(f"actualizados: {updated}")
-        print("Resultado: APPLY confirmado")
+        if args.report_json:
+            report_json(True, applied=(inserted, updated))
+        else:
+            print(f"insertados: {inserted}")
+            print(f"actualizados: {updated}")
+            print("Resultado: APPLY confirmado")
         return 0
     except Exception as exc:
         if connection is not None:
             connection.rollback()
-        print(f"ERROR: {exc}", file=sys.stderr)
-        print("Resultado: ABORTADO; transacción revertida")
+        if args.report_json:
+            # No incluir DSN/credenciales en un reporte de error de conexión.
+            report_json(False, [f"Importación abortada: {type(exc).__name__}"])
+        else:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            print("Resultado: ABORTADO; transacción revertida")
         return 1
     finally:
         if connection is not None:

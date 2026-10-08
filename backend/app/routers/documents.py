@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services import documents as service
-from ..services import domain as domain_service
 from ..services.access import (
     require_document_access,
     require_document_target_access,
@@ -17,6 +16,18 @@ from ..services.access import (
 router = APIRouter(tags=["Documentos"])
 READ_ROLES = ["admin", "operador", "visualizador", "geografo"]
 CAPTURE_ROLES = ["admin", "operador"]
+
+
+@router.get(
+    "/catalogos/tipos-documento", response_model=list[schemas.TipoDocumentoResponse],
+    description="Catálogo documental sin paginación. Sólo activos por defecto; lectura para los cuatro roles.",
+)
+def list_document_types(
+    incluir_inactivos: bool = False,
+    db: Session = Depends(get_db),
+    _: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    return service.list_document_types(db, include_inactive=incluir_inactivos)
 
 
 @router.get(
@@ -42,6 +53,7 @@ def list_documents(
     "/documentos/objetivos/{entidad_tipo}/{entidad_id}",
     response_model=schemas.DocumentoResponse,
     status_code=201,
+    description="Exactamente uno de id_tipo_documento activo o tipo_documento legado. OTRO exige descripcion; selecciones inválidas producen 422.",
 )
 def create_document(
     entidad_tipo: str,
@@ -53,7 +65,10 @@ def create_document(
     return service.create_document(db, entidad_tipo, entidad_id, data, user)
 
 
-@router.patch("/documentos/{id_documento}", response_model=schemas.DocumentoResponse)
+@router.patch(
+    "/documentos/{id_documento}", response_model=schemas.DocumentoResponse,
+    description="Omitir selectores conserva la clasificación. No permite NULL, ambos selectores ni texto legado con FK. Reclasificar exige ID activo; OTRO exige descripción final válida.",
+)
 def update_document(
     id_documento: int,
     data: schemas.DocumentoUpdate,
@@ -61,7 +76,7 @@ def update_document(
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
 ):
     document = require_document_access(db, user, id_documento, mode="capture")
-    return domain_service.update_entity(db, document, data, user)
+    return service.update_document(db, document, data, user)
 
 
 @router.get(

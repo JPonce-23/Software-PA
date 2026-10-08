@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from .access import require_document_access, require_document_target_access
-from .common import commit_or_conflict, mark_inactive, set_audit_context
+from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_context
 
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png"}
@@ -41,9 +41,16 @@ def create_document(
     require_document_target_access(
         db, user, entity_type, entity_id, mode="capture"
     )
+    values = data.model_dump(exclude={"observaciones"})
+    if data.id_tipo_documento is not None:
+        option = require_document_type(db, data.id_tipo_documento)
+        validate_other_description(option, data.descripcion)
+        if len(option.nombre) > 80:
+            raise HTTPException(status_code=422, detail="El nombre del tipo excede el texto legado")
+        values["tipo_documento"] = option.nombre
     set_audit_context(db, user.id_usuario)
     document = models.Documento(
-        **data.model_dump(exclude={"observaciones"}),
+        **values,
         observaciones=data.observaciones,
         creado_por=user.id_usuario,
     )
@@ -64,6 +71,55 @@ def create_document(
         raise HTTPException(
             status_code=409, detail="No fue posible crear el documento y su vínculo"
         ) from exc
+    db.refresh(document)
+    return document
+
+
+def list_document_types(db: Session, *, include_inactive: bool = False):
+    query = db.query(models.CatalogoTipoDocumento)
+    if not include_inactive:
+        query = query.filter(models.CatalogoTipoDocumento.activo.is_(True))
+    return query.order_by(
+        models.CatalogoTipoDocumento.activo.desc(),
+        models.CatalogoTipoDocumento.orden,
+        models.CatalogoTipoDocumento.nombre,
+        models.CatalogoTipoDocumento.codigo,
+        models.CatalogoTipoDocumento.id_tipo_documento,
+    ).all()
+
+
+def require_document_type(db: Session, option_id: int) -> models.CatalogoTipoDocumento:
+    # FOR SHARE also serializes against administrative deactivation.
+    option = db.query(models.CatalogoTipoDocumento).filter(
+        models.CatalogoTipoDocumento.id_tipo_documento == option_id,
+        models.CatalogoTipoDocumento.activo.is_(True),
+    ).with_for_update(read=True).first()
+    if option is None:
+        raise HTTPException(status_code=422, detail="Tipo documental activo inválido")
+    return option
+
+
+def validate_other_description(option: models.CatalogoTipoDocumento, description: str | None):
+    if option.codigo == "OTRO" and (description is None or not description.strip(" ")):
+        raise HTTPException(status_code=422, detail="OTRO requiere descripción no vacía")
+
+
+def update_document(
+    db: Session, document: models.Documento, data: schemas.DocumentoUpdate,
+    user: models.Usuario,
+) -> models.Documento:
+    fields = data.model_fields_set
+    if "tipo_documento" in fields and document.id_tipo_documento is not None:
+        raise HTTPException(status_code=422, detail="Reclasifique mediante id_tipo_documento")
+    option = document.clasificacion
+    if "id_tipo_documento" in fields:
+        option = require_document_type(db, data.id_tipo_documento)
+    if option is not None:
+        description = data.descripcion if "descripcion" in fields else document.descripcion
+        validate_other_description(option, description)
+    set_audit_context(db, user.id_usuario)
+    apply_update(document, data, user.id_usuario)
+    commit_or_conflict(db)
     db.refresh(document)
     return document
 

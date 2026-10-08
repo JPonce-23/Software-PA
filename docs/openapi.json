@@ -2383,6 +2383,130 @@
         }
       }
     },
+    "/api/personas": {
+      "get": {
+        "summary": "Search Persons",
+        "description": "Busca Personas activas legibles por el usuario. Exactamente uno de q, curp o rfc. q exige todas las palabras, sin distinguir caja ni eliminar acentos; %, _ y \\ son literales. Sin coincidencias visibles devuelve []; no revela Personas fuera de alcance.",
+        "operationId": "search_persons_api_personas_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre/apellidos; longitud tras retirar espacios exteriores. Exactamente un criterio.",
+              "title": "Q"
+            },
+            "description": "Nombre/apellidos; longitud tras retirar espacios exteriores. Exactamente un criterio."
+          },
+          {
+            "name": "curp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 18
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Igualdad en mayúsculas sin espacios exteriores; no exige 18 caracteres.",
+              "title": "Curp"
+            },
+            "description": "Igualdad en mayúsculas sin espacios exteriores; no exige 18 caracteres."
+          },
+          {
+            "name": "rfc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 13
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Igualdad en mayúsculas sin espacios exteriores; no implica unicidad.",
+              "title": "Rfc"
+            },
+            "description": "Igualdad en mayúsculas sin espacios exteriores; no implica unicidad."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PersonaBusquedaResponse"
+                  },
+                  "title": "Response Search Persons Api Personas Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticación requerida"
+          },
+          "403": {
+            "description": "Rol no permitido"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/personas/{id_persona}": {
       "get": {
         "summary": "Get Person",
@@ -2744,6 +2868,7 @@
       },
       "get": {
         "summary": "List Orv Members",
+        "description": "Lista integrantes de un ORV activo dentro del alcance de lectura del núcleo. incluir_historico elimina el filtro temporal de los integrantes activos. incluir_bajas añade bajas administrativas sin filtrar sus fechas. La Persona debe permanecer activa en todos los casos.",
         "operationId": "list_orv_members_api_orv__id_orv__integrantes_get",
         "parameters": [
           {
@@ -2763,6 +2888,16 @@
               "type": "boolean",
               "default": false,
               "title": "Incluir Historico"
+            }
+          },
+          {
+            "name": "incluir_bajas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Bajas"
             }
           }
         ],
@@ -7217,6 +7352,54 @@
         }
       }
     },
+    "/api/catalogos/tipos-documento": {
+      "get": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "List Document Types",
+        "description": "Catálogo documental sin paginación. Sólo activos por defecto; lectura para los cuatro roles.",
+        "operationId": "list_document_types_api_catalogos_tipos_documento_get",
+        "parameters": [
+          {
+            "name": "incluir_inactivos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivos"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TipoDocumentoResponse"
+                  },
+                  "title": "Response List Document Types Api Catalogos Tipos Documento Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/documentos/objetivos/{entidad_tipo}/{entidad_id}": {
       "get": {
         "tags": [
@@ -7276,6 +7459,7 @@
           "Documentos"
         ],
         "summary": "Create Document",
+        "description": "Exactamente uno de id_tipo_documento activo o tipo_documento legado. OTRO exige descripcion; selecciones inválidas producen 422.",
         "operationId": "create_document_api_documentos_objetivos__entidad_tipo___entidad_id__post",
         "parameters": [
           {
@@ -7337,6 +7521,7 @@
           "Documentos"
         ],
         "summary": "Update Document",
+        "description": "Omitir selectores conserva la clasificación. No permite NULL, ambos selectores ni texto legado con FK. Reclasificar exige ID activo; OTRO exige descripción final válida.",
         "operationId": "update_document_api_documentos__id_documento__patch",
         "parameters": [
           {
@@ -16639,7 +16824,47 @@
         ],
         "title": "DetalleRevisionGisResponse"
       },
+      "DocumentoClasificacionResponse": {
+        "properties": {
+          "id_tipo_documento": {
+            "type": "integer",
+            "title": "Id Tipo Documento"
+          },
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_tipo_documento",
+          "codigo",
+          "nombre",
+          "activo"
+        ],
+        "title": "DocumentoClasificacionResponse"
+      },
       "DocumentoCreate": {
+        "oneOf": [
+          {
+            "required": [
+              "tipo_documento"
+            ]
+          },
+          {
+            "required": [
+              "id_tipo_documento"
+            ]
+          }
+        ],
         "properties": {
           "observaciones": {
             "anyOf": [
@@ -16651,12 +16876,6 @@
               }
             ],
             "title": "Observaciones"
-          },
-          "tipo_documento": {
-            "type": "string",
-            "maxLength": 80,
-            "minLength": 1,
-            "title": "Tipo Documento"
           },
           "estado": {
             "type": "string",
@@ -16713,12 +16932,24 @@
               }
             ],
             "title": "Descripcion"
+          },
+          "tipo_documento": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Tipo Documento",
+            "description": "Texto legado no vacío; exactamente uno de texto o ID. Se conserva sin normalizar."
+          },
+          "id_tipo_documento": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Id Tipo Documento",
+            "description": "Tipo existente y activo; rellena tipo_documento con su nombre. OTRO exige descripcion."
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "tipo_documento",
           "estado"
         ],
         "title": "DocumentoCreate"
@@ -16813,6 +17044,10 @@
             ],
             "title": "Observaciones"
           },
+          "id_documento": {
+            "type": "integer",
+            "title": "Id Documento"
+          },
           "tipo_documento": {
             "type": "string",
             "maxLength": 80,
@@ -16875,23 +17110,47 @@
             ],
             "title": "Descripcion"
           },
-          "id_documento": {
-            "type": "integer",
-            "title": "Id Documento"
+          "id_tipo_documento": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Tipo Documento",
+            "description": "NULL en documentos legados sin clasificar."
+          },
+          "clasificacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentoClasificacionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clasificación autoritativa por FK; incluye tipos inactivos ya asociados."
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "activo",
           "creado_en",
+          "id_documento",
           "tipo_documento",
-          "estado",
-          "id_documento"
+          "estado"
         ],
         "title": "DocumentoResponse"
       },
       "DocumentoUpdate": {
+        "not": {
+          "required": [
+            "tipo_documento",
+            "id_tipo_documento"
+          ]
+        },
         "properties": {
           "observaciones": {
             "anyOf": [
@@ -16905,17 +17164,17 @@
             "title": "Observaciones"
           },
           "tipo_documento": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 80,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tipo Documento"
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Tipo Documento",
+            "description": "Sólo editable sin FK. Omisión conserva; NULL y sólo espacios se rechazan."
+          },
+          "id_tipo_documento": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Id Tipo Documento",
+            "description": "Clasifica/reclasifica con tipo activo preservando texto legado; NULL se rechaza."
           },
           "estado": {
             "anyOf": [
@@ -21279,6 +21538,72 @@
         "type": "object",
         "title": "ParcelaUpdate"
       },
+      "PersonaBusquedaResponse": {
+        "properties": {
+          "id_persona": {
+            "type": "integer",
+            "title": "Id Persona"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "apellido_paterno": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido Paterno"
+          },
+          "apellido_materno": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido Materno"
+          },
+          "curp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Curp"
+          },
+          "rfc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rfc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_persona",
+          "nombre",
+          "apellido_paterno",
+          "apellido_materno",
+          "curp",
+          "rfc"
+        ],
+        "title": "PersonaBusquedaResponse"
+      },
       "PersonaCreate": {
         "properties": {
           "observaciones": {
@@ -24483,6 +24808,50 @@
           "sesiones_revocadas"
         ],
         "title": "SessionRevocationResponse"
+      },
+      "TipoDocumentoResponse": {
+        "properties": {
+          "id_tipo_documento": {
+            "type": "integer",
+            "title": "Id Tipo Documento"
+          },
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_tipo_documento",
+          "codigo",
+          "nombre",
+          "activo",
+          "orden"
+        ],
+        "title": "TipoDocumentoResponse"
       },
       "TramiteFifonafeAfectacionCreate": {
         "properties": {

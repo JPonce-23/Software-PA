@@ -3,8 +3,9 @@
 from typing import Literal
 
 from fastapi import HTTPException
-from sqlalchemy import exists, select, text, union
+from sqlalchemy import and_, exists, false, func, or_, select, text, union
 from sqlalchemy.orm import Query, Session
+from sqlalchemy.sql import ColumnElement, Select
 
 from .. import models
 
@@ -12,12 +13,8 @@ from .. import models
 AccessMode = Literal["read", "capture", "gis"]
 
 
-def person_project_ids(db: Session, person_id: int) -> set[int]:
-    """Follow actual active business links, including indirect unit holders.
-
-    Inactive projects remain in the set: editing shared identity must not
-    silently bypass their scope. authorized_project_ids excludes them.
-    """
+def _person_project_statements(person_id: int | ColumnElement[int]) -> list[Select]:
+    """Canonical relationship paths, also usable with a correlated person id."""
     pn, nucleus = models.ProyectoNucleo, models.NucleoAgrario
 
     def in_nucleus(relation, parent, parent_id, nucleus_id):
@@ -62,7 +59,47 @@ def person_project_ids(db: Session, person_id: int) -> set[int]:
         ).where(payment.id_persona_beneficiaria == person_id, payment.activo.is_(True),
                 indemnity.activo.is_(True), affectation.activo.is_(True), pn.activo.is_(True)),
     ]
-    return set(db.execute(union(*statements)).scalars())
+    return statements
+
+
+def person_project_ids(db: Session, person_id: int) -> set[int]:
+    """Follow actual active business links, including indirect unit holders.
+
+    Inactive projects remain in the set: editing shared identity must not
+    silently bypass their scope. authorized_project_ids excludes them.
+    """
+    return set(db.execute(union(*_person_project_statements(person_id))).scalars())
+
+
+def _person_orphan_access_clause(
+    user: models.Usuario, authorized_projects_exist: bool | ColumnElement[bool],
+) -> ColumnElement[bool]:
+    """Creator fallback; callers must additionally require no derived projects."""
+    if user.rol != "operador":
+        return false()
+    return and_(
+        authorized_projects_exist,
+        models.Persona.creado_por == user.id_usuario,
+        func.fn_persona_tiene_relaciones_activas(models.Persona.id_persona).is_(False),
+    )
+
+
+def filter_persons_by_read_access(query: Query, db: Session, user: models.Usuario) -> Query:
+    """Apply the existing read policy before ordering or paginating a projection."""
+    query = query.filter(models.Persona.activo.is_(True))
+    if user.rol == "admin":
+        return query
+    if not _role_allows(user, "read"):
+        return query.filter(false())
+    authorized = authorized_project_ids(db, user)
+    statements = [statement.correlate(models.Persona) for statement in
+                  _person_project_statements(models.Persona.id_persona)]
+    related = or_(*(statement.exists() for statement in statements))
+    readable = or_(*(statement.where(
+        models.ProyectoNucleo.id_proyecto.in_(authorized)
+    ).exists() for statement in statements))
+    orphan = and_(~related, _person_orphan_access_clause(user, authorized.exists()))
+    return query.filter(or_(readable, orphan))
 
 
 def lock_person_relations(db: Session, person_id: int) -> None:
@@ -102,10 +139,11 @@ def require_person_access(
         raise denied
     # A disconnected active business reference is not an orphan. Do not turn
     # an inactive parent/project into permission through the creator fallback.
-    has_relations = db.execute(text("SELECT fn_persona_tiene_relaciones_activas(:id)"),
-                               {"id": person_id}).scalar_one()
-    if (not has_relations and user.rol == "operador" and authorized
-            and person.creado_por == user.id_usuario):
+    orphan = db.query(models.Persona.id_persona).filter(
+        models.Persona.id_persona == person_id,
+        _person_orphan_access_clause(user, bool(authorized)),
+    ).first()
+    if orphan is not None:
         return person
     raise denied
 
@@ -470,6 +508,7 @@ def project_ids_for_document_target(
         )
     elif entity_type in {
         "afectacion",
+        "actividad_campo",
         "asamblea",
         "convenio",
         "tramite_fifonafe",
@@ -477,6 +516,7 @@ def project_ids_for_document_target(
     }:
         model, pk = {
             "afectacion": (models.Afectacion, models.Afectacion.id_afectacion),
+            "actividad_campo": (models.ActividadCampo, models.ActividadCampo.id_actividad),
             "asamblea": (models.Asamblea, models.Asamblea.id_asamblea),
             "convenio": (models.Convenio, models.Convenio.id_convenio),
             "tramite_fifonafe": (

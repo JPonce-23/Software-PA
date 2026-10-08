@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from .access import (
+    filter_persons_by_read_access,
     require_affectation_access,
     require_agreement_access,
     require_agricultural_unit_access,
@@ -400,6 +401,33 @@ def create_responsible(
     return _persist(db, entity, user.id_usuario, "El responsable no es válido")
 
 
+def search_persons(
+    db: Session, criteria: schemas.PersonaBusquedaParametros, user: models.Usuario,
+):
+    """Search a minimal projection of readable active people in one SQL query."""
+    person = models.Persona
+    query = db.query(person.id_persona, person.nombre, person.apellido_paterno,
+                     person.apellido_materno, person.curp, person.rfc)
+    query = filter_persons_by_read_access(query, db, user)
+    if criteria.curp is not None:
+        query = query.filter(func.upper(func.btrim(person.curp)) == criteria.curp)
+    elif criteria.rfc is not None:
+        query = query.filter(func.upper(func.btrim(person.rfc)) == criteria.rfc)
+    else:
+        for word in criteria.q.split():
+            # Explicit escape character; %, _ and backslash are literal input.
+            literal = word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{literal}%"
+            query = query.filter(or_(*(column.ilike(pattern, escape="\\") for column in (
+                person.nombre, person.apellido_paterno, person.apellido_materno,
+            ))))
+    return query.order_by(
+        func.lower(person.apellido_paterno).asc().nulls_last(),
+        func.lower(person.apellido_materno).asc().nulls_last(),
+        func.lower(person.nombre), person.id_persona,
+    ).offset(criteria.skip).limit(criteria.limit).all()
+
+
 def create_person(
     db: Session, data: schemas.PersonaCreate, user: models.Usuario
 ) -> models.Persona:
@@ -710,24 +738,26 @@ def current_validity_expression(model: Any, start: Any, end: Any):
 
 
 def list_orv_members(
-    db: Session, orv_id: int, *, include_history: bool
+    db: Session, orv_id: int, *, include_history: bool, include_deactivated: bool = False
 ) -> list[dict[str, Any]]:
     query = db.query(models.OrvIntegrante, models.Persona).join(
         models.Persona,
         models.Persona.id_persona == models.OrvIntegrante.id_persona,
     ).filter(
         models.OrvIntegrante.id_orv == orv_id,
-        models.OrvIntegrante.activo.is_(True),
         models.Persona.activo.is_(True),
     )
+    if not include_deactivated:
+        query = query.filter(models.OrvIntegrante.activo.is_(True))
     if not include_history:
-        query = query.filter(
-            current_validity_expression(
-                models.OrvIntegrante,
-                models.OrvIntegrante.fecha_inicio,
-                models.OrvIntegrante.fecha_fin,
-            )
+        validity = current_validity_expression(
+            models.OrvIntegrante,
+            models.OrvIntegrante.fecha_inicio,
+            models.OrvIntegrante.fecha_fin,
         )
+        if include_deactivated:
+            validity = or_(models.OrvIntegrante.activo.is_(False), validity)
+        query = query.filter(validity)
     rows = query.order_by(
         models.OrvIntegrante.id_organo,
         models.OrvIntegrante.id_cargo,

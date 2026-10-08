@@ -404,6 +404,44 @@ class PersonaUpdate(AuditInput):
     datos_identidad_incompletos: bool | None = None
 
 
+class PersonaBusquedaParametros(BaseModel):
+    q: str | None = Field(default=None, min_length=2, max_length=300,
+                         description="Nombre/apellidos; longitud tras retirar espacios exteriores. Exactamente un criterio.")
+    curp: str | None = Field(default=None, min_length=1, max_length=18,
+                            description="Igualdad en mayúsculas sin espacios exteriores; no exige 18 caracteres.")
+    rfc: str | None = Field(default=None, min_length=1, max_length=13,
+                           description="Igualdad en mayúsculas sin espacios exteriores; no implica unicidad.")
+    limit: int = Field(default=20, ge=1, le=100)
+    skip: int = Field(default=0, ge=0)
+
+    @field_validator("q", "curp", "rfc", mode="before")
+    @classmethod
+    def normalize_search(cls, value, info):
+        if not isinstance(value, str):
+            return value
+        value = value.strip(" ")
+        if info.field_name == "q":
+            if not value.split():
+                raise ValueError("q debe contener al menos una palabra")
+            return value
+        return value.upper()
+
+    @model_validator(mode="after")
+    def require_one_criterion(self):
+        if sum(value is not None for value in (self.q, self.curp, self.rfc)) != 1:
+            raise ValueError("Debe proporcionar exactamente uno de q, curp o rfc")
+        return self
+
+
+class PersonaBusquedaResponse(ORMModel):
+    id_persona: int
+    nombre: str
+    apellido_paterno: str | None
+    apellido_materno: str | None
+    curp: str | None
+    rfc: str | None
+
+
 class PersonaResponse(PersonaCreate, AuditRead):
     id_persona: int
 
@@ -1256,8 +1294,7 @@ class PagoResponse(PagoCreate, AuditRead):
     id_indemnizacion: int
 
 
-class DocumentoCreate(AuditInput):
-    tipo_documento: str = Field(min_length=1, max_length=80)
+class DocumentoMetadata(AuditInput):
     estado: Literal["disponible", "faltante", "referenciado"]
     titulo: str | None = Field(default=None, max_length=250)
     fecha_documento: date | None = None
@@ -1265,17 +1302,98 @@ class DocumentoCreate(AuditInput):
     descripcion: str | None = None
 
 
-class DocumentoResponse(DocumentoCreate, AuditRead):
+def _document_selector_schema(schema: dict, model: type[BaseModel]) -> None:
+    # Omisión y NULL tienen semánticas distintas; los selectores presentes no son nullable.
+    for name in ("tipo_documento", "id_tipo_documento"):
+        field = schema["properties"][name]
+        options = field.pop("anyOf", [])
+        if options:
+            field.update(next(option for option in options if option.get("type") != "null"))
+        field.pop("default", None)
+    if model.__name__ == "DocumentoCreate":
+        schema["oneOf"] = [
+            {"required": ["tipo_documento"]}, {"required": ["id_tipo_documento"]}
+        ]
+    else:
+        schema["not"] = {"required": ["tipo_documento", "id_tipo_documento"]}
+
+
+class DocumentoCreate(DocumentoMetadata):
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_document_selector_schema)
+    tipo_documento: str | None = Field(
+        default=None, min_length=1, max_length=80,
+        description="Texto legado no vacío; exactamente uno de texto o ID. Se conserva sin normalizar.",
+    )
+    id_tipo_documento: int | None = Field(
+        default=None, gt=0,
+        description="Tipo existente y activo; rellena tipo_documento con su nombre. OTRO exige descripcion.",
+    )
+
+    @field_validator("tipo_documento", "id_tipo_documento")
+    @classmethod
+    def validar_selector(cls, value):
+        if value is None or (isinstance(value, str) and not value.strip(" ")):
+            raise ValueError("El selector documental no puede ser NULL ni vacío")
+        return value
+
+    @model_validator(mode="after")
+    def validar_un_selector(self):
+        if len(self.model_fields_set & {"tipo_documento", "id_tipo_documento"}) != 1:
+            raise ValueError("Proporcione exactamente uno de tipo_documento o id_tipo_documento")
+        return self
+
+
+class DocumentoClasificacionResponse(ORMModel):
+    id_tipo_documento: int
+    codigo: str
+    nombre: str
+    activo: bool
+
+
+class TipoDocumentoResponse(DocumentoClasificacionResponse):
+    descripcion: str | None = None
+    orden: int
+
+
+class DocumentoResponse(AuditRead):
     id_documento: int
+    tipo_documento: str = Field(min_length=1, max_length=80)
+    estado: Literal["disponible", "faltante", "referenciado"]
+    titulo: str | None = Field(default=None, max_length=250)
+    fecha_documento: date | None = None
+    numero_folio: str | None = Field(default=None, max_length=150)
+    descripcion: str | None = None
+    id_tipo_documento: int | None = Field(default=None, description="NULL en documentos legados sin clasificar.")
+    clasificacion: DocumentoClasificacionResponse | None = Field(
+        default=None, description="Clasificación autoritativa por FK; incluye tipos inactivos ya asociados.",
+    )
 
 
 class DocumentoUpdate(AuditInput):
-    tipo_documento: str | None = Field(default=None, min_length=1, max_length=80)
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_document_selector_schema)
+    tipo_documento: str | None = Field(
+        default=None, min_length=1, max_length=80,
+        description="Sólo editable sin FK. Omisión conserva; NULL y sólo espacios se rechazan.",
+    )
+    id_tipo_documento: int | None = Field(
+        default=None, gt=0,
+        description="Clasifica/reclasifica con tipo activo preservando texto legado; NULL se rechaza.",
+    )
     estado: Literal["disponible", "faltante", "referenciado"] | None = None
     titulo: str | None = Field(default=None, max_length=250)
     fecha_documento: date | None = None
     numero_folio: str | None = Field(default=None, max_length=150)
     descripcion: str | None = None
+
+    _validar_selector = field_validator("tipo_documento", "id_tipo_documento")(
+        DocumentoCreate.validar_selector.__func__
+    )
+
+    @model_validator(mode="after")
+    def validar_selectores(self):
+        if {"tipo_documento", "id_tipo_documento"} <= self.model_fields_set:
+            raise ValueError("No combine tipo_documento con id_tipo_documento")
+        return self
 
 
 class DocumentoVinculoResponse(AuditRead):

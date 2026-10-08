@@ -1,8 +1,8 @@
 # Contrato y Especificación de la API — SOFTWARE-PA
 
 > **Autoridad:** Especificación técnica del contrato de integración HTTP entre el cliente web (frontend) y el servidor de aplicaciones (backend).  
-> **Alineación:** Validado contra `backend/app/routers/`, `schemas.py`, `services/`, migraciones `001–020` y el esquema OpenAPI formal en `docs/openapi.json`.
-> **Esquema de base de datos vigente:** **020** (`GET /health` responde `{"status": "ok", "schema": 20}`).
+> **Alineación:** Referencia de backend y OpenAPI en `docs/openapi.json`; B-04 incorpora la migración `027` al esquema canónico `001–027`.
+> **Esquema de base de datos vigente:** **027** (`GET /health` responde `{"status": "ok", "schema": 27}` cuando la base consultada tiene 027 aplicada).
 
 ---
 
@@ -130,6 +130,48 @@ Repetir DELETE sin una nueva asignación activa responde `404`, sin actualizar e
   - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/responsables`: Brigadistas y enlaces institucionales. Edición en `PATCH /api/responsables/{id_responsable}`.
   - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/padrones`: Registro del padrón agrario oficial. Edición en `PATCH /api/padrones/{id_padron}`.
 
+#### Integrantes ORV: vigencia e histórico administrativo
+
+`GET /api/orv/{id_orv}/integrantes` conserva los roles de lectura `admin`,
+`operador`, `visualizador` y `geografo`. Acepta dos booleanos, ambos `false`
+por defecto:
+
+| `incluir_historico` | `incluir_bajas` | Integrantes devueltos |
+|---|---|---|
+| false | false | Activos y funcionalmente vigentes |
+| true | false | Todos los activos, sin filtro temporal |
+| false | true | Activos vigentes y todas las bajas administrativas, sin filtrar fechas de las bajas |
+| true | true | Todos los activos y todas las bajas administrativas |
+
+Omitir `incluir_bajas` o enviarlo como `false` conserva los resultados anteriores.
+La Persona debe estar activa incluso al consultar bajas. Se exige ORV activo,
+núcleo activo y el acceso vigente al núcleo; no hay excepciones históricas para
+padres inactivos o proyectos fuera del alcance. Admin conserva el alcance del
+listado existente. Autenticación ausente: `401`; alcance no autorizado: `403`;
+ORV o núcleo inexistente/inactivo: `404`; booleano inválido: `422`.
+
+La respuesta sigue siendo `OrvIntegranteDetailResponse` y el orden sigue siendo
+órgano, cargo y nombre. Una baja se identifica por `activo=false`, `vigente=false`,
+`fecha_baja`, `motivo_baja` e `id_usuario_baja`. No se añade nombre, correo ni
+perfil del actor. Ejemplo para localizar todas las bajas junto con el histórico
+funcional: `GET /api/orv/42/integrantes?incluir_historico=true&incluir_bajas=true`.
+
+`vigente` se calcula con el estado activo y las fechas propias del integrante,
+con inicio y fin inclusivos. Un fin hoy o futuro puede seguir siendo vigente;
+la vigencia del ORV padre no se incorpora a esta propiedad.
+
+`POST /api/orv-integrantes/{id_orv_integrante}/finalizar` termina el periodo
+funcional mediante `fecha_fin`, `id_tipo_fin` y `detalle_fin`, conservando
+`activo=true`. Sigue disponible para admin y operador con captura autorizada.
+`DELETE /api/orv-integrantes/{id_orv_integrante}` es una baja administrativa,
+exclusiva de admin: conserva el periodo y registra los campos de baja.
+`POST /api/orv-integrantes/{id_orv_integrante}/reactivar`, también exclusivo de
+admin, restaura `activo=true` y limpia esos campos de baja; conserva el cierre
+funcional y puede responder `409` por conflicto. No reabre un periodo finalizado.
+Si el registro ya está activo responde `409`, tenga o no cierre. No existe una
+operación de reapertura; una nueva participación se registra con el POST
+existente del ORV, sujeto a la protección temporal vigente.
+
 ### 3.4 Parcelas y Derechos Individuales
 - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/parcelas`: Consulta y alta parcelaria dentro del proyecto-núcleo.
 - `GET/PATCH /api/parcelas/{id_parcela}`: Consulta y actualización de datos de la parcela.
@@ -139,6 +181,43 @@ Repetir DELETE sin una nueva asignación activa responde `404`, sin actualizar e
 - La geometría (`geometria_poligono`) es opcional y su ausencia no restringe ninguna operación de negocio.
 
 #### Acceso a Persona y datos compartidos
+
+`GET /api/personas` busca Personas activas dentro del alcance de lectura del
+usuario. Admite los roles `admin`, `operador`, `visualizador` y `geografo`.
+Debe enviarse **exactamente uno** de `q`, `curp` o `rfc`; la ausencia de criterio,
+los valores vacíos o la combinación de criterios producen HTTP `422`.
+
+- `q`: entre 2 y 300 caracteres después de retirar espacios ordinarios exteriores.
+  Se divide en palabras: todas deben aparecer en alguno de `nombre`,
+  `apellido_paterno` o `apellido_materno`, sin depender del orden ni distinguir
+  mayúsculas. No elimina acentos: `PEREZ` no equivale a `PÉREZ`. `%`, `_` y `\`
+  se comparan literalmente; no hay búsqueda fuzzy.
+- `curp`: valor no vacío, máximo 18 caracteres después de retirar espacios
+  ordinarios exteriores y convertir a mayúsculas; igualdad contra
+  `upper(btrim(curp))`. No admite búsqueda parcial ni exige 18 caracteres.
+- `rfc`: misma comparación por igualdad, máximo 13 caracteres normalizados.
+  No supone unicidad. La normalización sólo se usa para comparar; no cambia
+  datos almacenados ni la persistencia de POST/PATCH.
+- `limit`: predeterminado 20, entre 1 y 100; `skip`: predeterminado 0, mínimo 0.
+
+Devuelve una lista con únicamente `id_persona`, `nombre`, `apellido_paterno`,
+`apellido_materno`, `curp` y `rfc`; apellidos e identificadores admiten `null`.
+Ordena por apellidos, nombre e id, sin distinguir caja y con apellidos nulos
+al final. Aplica visibilidad antes de paginar y no duplica Personas compartidas.
+
+Admin encuentra todas las Personas activas. Los demás roles sólo encuentran
+Personas relacionadas con algún proyecto activo autorizado, más la excepción
+del creador operador descrita abajo. Una referencia activa con padre inactivo
+no convierte a la Persona en huérfana recuperable por el creador. Las Personas
+inactivas se excluyen para todos, incluido admin. Una coincidencia fuera de
+alcance devuelve `200 []`, igual que una búsqueda sin resultados; no revela id
+ni existencia. Autenticación ausente: `401`; rol no admitido: `403`.
+
+Ejemplos: `GET /api/personas?q=Juan%20P%C3%A9rez&limit=20&skip=0` y
+`GET /api/personas?curp=ABCD1234`. Buscar o seleccionar no crea relaciones.
+La vinculación posterior vuelve a comprobar permisos y reglas de negocio.
+El conflicto de creación conserva `409 {"detail":"La persona ya existe"}`
+sin devolver identidad; buscar previamente no sustituye la restricción SQL.
 
 `GET /api/personas/{id_persona}` requiere lectura y un proyecto autorizado
 vinculado mediante ORV, titularidad parcelaria, titularidad de unidad agraria
@@ -173,6 +252,14 @@ seguimiento ni asignaciones automáticas.
 - `PATCH /api/actividades/{id_actividad}`: Actualiza metadatos y resultado de la actividad.
 - `tipo_actividad` admite únicamente `sensibilizacion` o `caminamiento`.
 - Parámetros clave: `id_proyecto_nucleo`, `id_tipo_cop_operativo`, `fecha_programada`, `fecha_realizada`, `responsable`, `resultado`.
+
+Desde 027, una actividad puede ser objetivo documental directo con las rutas genéricas:
+
+- `GET /api/documentos/objetivos/actividad_campo/{id_actividad}`: lista documentos y vínculos activos.
+- `POST /api/documentos/objetivos/actividad_campo/{id_actividad}`: crea metadatos `DocumentoCreate` y su vínculo; responde `201`.
+- `POST /api/documentos/{id_documento}/vinculos/actividad_campo/{id_actividad}`: vincula un documento existente, comprobando acceso al documento y a la actividad.
+
+La pertenencia se resuelve por `ActividadCampo → ProyectoNucleo → Proyecto`, sin depender de `id_afectacion`. Actividad inexistente/inactiva o ProyectoNucleo inactivo: `404`, `Objetivo documental no encontrado`. Proyecto inactivo o fuera del alcance: `403`, `Proyecto fuera del alcance autorizado`. Lectura: admin, operador, visualizador y geógrafo; captura: admin y operador, con asignación de proyecto para usuarios no administradores. Versiones, baja lógica y trazabilidad usan el mecanismo documental existente. `ExpedienteRequisito` conserva su contrato previo.
 
 ### 3.6 Asambleas y Convocatorias (Ruta Colectiva)
 - `GET/POST /api/proyecto-nucleo/{id_proyecto_nucleo}/asambleas`: Consulta y crea la entidad colectiva de asamblea. Requiere `id_tipo_asamblea`, `id_tipo_cop_operativo`, `proposito`, `resultado` y opcionalmente una lista inicial de `convocatorias`.
@@ -262,9 +349,10 @@ Detalle de convenios colectivos desglosados por destino de suelo:
   ```json
   {
     "status": "ok",
-    "schema": 20
+    "schema": 28
   }
   ```
+
 - `GET /`:  
   Retorna los metadatos del servicio:
   ```json
@@ -274,3 +362,56 @@ Detalle de convenios colectivos desglosados por destino de suelo:
     "version": "2.0.0"
   }
   ```
+
+## 10. Clasificación documental (B-03, esquema 028)
+
+### Catálogo
+
+`GET /api/catalogos/tipos-documento?incluir_inactivos=false` permite lectura a admin,
+operador, visualizador y geógrafo. Devuelve, sin paginación, únicamente
+`id_tipo_documento`, `codigo`, `nombre`, `descripcion`, `orden` y `activo`.
+Por defecto sólo incluye opciones activas; `incluir_inactivos=true` también incluye
+las bajas. Orden: activo descendente, orden, nombre, código e ID. Un booleano
+inválido produce `422`. No existe CRUD público del catálogo.
+
+### Captura y compatibilidad
+
+`POST /api/documentos/objetivos/{entidad_tipo}/{entidad_id}` conserva permisos y
+vínculos existentes. Debe recibir **exactamente uno** de `id_tipo_documento` o
+`tipo_documento`, además de los metadatos existentes (`estado` requerido).
+
+- Un ID existente y activo crea la FK y rellena el texto de compatibilidad con el
+  **nombre** del catálogo: ACTA_ASAMBLEA produce `"Acta de asamblea"`.
+  Durante la coexistencia el nombre debe caber en los 80 caracteres del campo
+  legado; todos los nombres de la taxonomía V1 cumplen ese límite.
+- Un texto legado válido crea el documento con FK NULL y conserva exactamente el
+  texto enviado (máximo 80 caracteres, sin normalización).
+- Ambos selectores, ninguno, NULL explícito, texto vacío/sólo espacios, ID
+  inexistente o inactivo producen `422`.
+- OTRO exige `descripcion` no NULL y con contenido distinto de espacios ordinarios;
+  se valida antes de persistir y también en PostgreSQL. La descripción se conserva
+  tal como se recibe.
+
+`PATCH /api/documentos/{id_documento}` conserva permisos existentes:
+
+- Omitir ambos selectores no cambia la clasificación.
+- `id_tipo_documento` permite clasificar o reclasificar usando una opción activa;
+  siempre conserva el `tipo_documento` anterior, incluidos los históricos.
+- El texto legado sólo puede actualizarse mientras la FK sea NULL.
+- No se permite quitar la clasificación ni enviar NULL explícito en un selector.
+  Tampoco se permiten ambos selectores en el mismo PATCH; estos casos producen `422`.
+- Una clasificación inactiva sigue siendo legible y permite editar otros
+  metadatos. Seleccionarla de nuevo o reclasificar hacia ella produce `422`.
+- Si la clasificación final es OTRO, la descripción final debe seguir siendo válida,
+  tanto si se recibe en ese PATCH como si se conserva la anterior.
+
+### Lectura e históricos
+
+`DocumentoResponse` conserva sus campos y añade `id_tipo_documento` nullable y
+`clasificacion` nullable. Esta última expone sólo ID, código, nombre y activo;
+la descripción del tipo se consulta en el endpoint del catálogo.
+La clasificación es autoritativa cuando existe FK. Los históricos conservan
+`tipo_documento` original, `id_tipo_documento=null` y `clasificacion=null`; no se
+infiere una clasificación por semejanza del texto y 028 no realiza backfill.
+No cambian `estado`, requisitos, actividades, versiones ni objetivos documentales.
+La taxonomía V1 completa se describe en el diccionario de datos.
