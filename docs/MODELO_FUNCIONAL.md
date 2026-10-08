@@ -118,6 +118,8 @@ Proyecto
 - **Desacoplamiento de Tramo:** Históricamente se consideró el "Tramo" como jerarquía estructural estricta. En el modelo vigente, **Tramo NO es una entidad jerárquica obligatoria**. Las referencias a tramo (`CLAVE DEL TRAMO`, `NÚMERO DE TRAMO`, `CONSECUTIVO`) se capturan como referencias administrativas repetibles asociadas a `ProyectoNucleo`, sin condicionar la navegación ni restringir permisos.
 - **Eliminación de conceptos históricos obsoletos:** `TramoNucleo` como expediente maestro obligatorio y `AfectacionCiclo` no forman parte del modelo funcional. La trazabilidad temporal se preserva mediante los instrumentos jurídicos y los eventos fechados.
 - **Autorización por proyecto:** La asignación de permisos a operadores y analistas se realiza a nivel Proyecto (`UsuarioProyecto`), garantizando un aislamiento estricto y seguro.
+- **Identidades separadas:** Usuario es la cuenta de acceso; Responsable operativo es un registro del expediente. No existe vínculo Responsable↔Usuario ni número de empleado en Usuario.
+- **Estado del proyecto implementado:** `Proyecto.activo` representa baja lógica. No existe un ciclo de proyecto activo/completado/reabierto; los eventos de cierre/reapertura del seguimiento no implementan ese ciclo.
 
 ---
 
@@ -136,10 +138,10 @@ Aplica sobre superficies que pertenecen a la colectividad del ejido o comunidad.
   - La asamblea puede autorizar uno o múltiples convenios colectivos.
 - **RAN del Acta:** Trámite registral específico para inscribir el acta de asamblea de anuencia ante el Registro Agrario Nacional.
 - **Convenios Colectivos:** Instrumentos suscritos con el Comisariado Ejidal o de Bienes Comunales.
-  - Tipos válidos: `cop_original`, `modificatorio`, `superficie_adicional`, `obras_complementarias`.
+  - Tipos vigentes: `cop_original`, `modificatorio`, `obras_complementarias`. La etiqueta histórica `superficie_adicional` se normalizó a `modificatorio` en 016; `ADICIONAL` y `2A_ADICIONAL` permanecen como dimensiones operativas de la afectación.
 - **RAN del Convenio:** Trámite registral específico para el convenio colectivo, independiente del trámite del acta.
 - **Retiro de fondos:** Proceso especial que requiere asamblea específica de retiro de fondos y su consecuente inscripción en RAN.
-- **FIFONAFE Colectivo:** Trámite institucional que resguarda los fondos depositados por la entidad promovente; requiere la comprobación de una cadena estricta de cuatro oficios y el análisis de no conflictos.
+- **FIFONAFE Colectivo:** Trámite institucional que resguarda los fondos depositados por la entidad promovente; conserva la cadena histórica de cuatro oficios y el análisis de no conflictos. Las altas vigentes utilizan el flujo v2 de 008, cuya acreditación integral se distingue del legado en §9.
 - **Indemnización y Pago Colectivo:** Asignación de montos resueltos y registro de pagos efectivos a favor del núcleo.
 
 ### 5.2 Ruta Individual (Parcelas Tituladas o Posesiones)
@@ -188,13 +190,16 @@ Los convenios de ocupación previa son instrumentos jurídicos repetibles en el 
 | Ámbito | Tipo de Convenio (`tipo_convenio`) | Significado Operativo |
 |---|---|---|
 | **Colectivo** | `cop_original` | Convenio inicial de ocupación sobre uso común. |
-| **Colectivo** | `modificatorio` | Instrumento que ajusta cláusulas o especificaciones sin agregar superficie sustancial. |
-| **Colectivo** | `superficie_adicional` | Convenio que incorpora nueva superficie de uso común al proyecto. |
+| **Colectivo** | `modificatorio` | Instrumento modificatorio; incluye los convenios de superficie adicional normalizados por 016, conservando su clasificación operativa. |
 | **Colectivo** | `obras_complementarias` | Convenio enfocado en mitigaciones, pasos o infraestructura pactada. |
 | **Individual** | `cop_original` | Convenio inicial firmado con el titular de la parcela. |
 | **Individual** | `modificatorio` | Modificación a las condiciones del convenio parcelario inicial. |
 | **Individual** | `ampliacion` | Incremento de superficie afectada en la misma parcela. |
 | **Individual** | `ampliacion_remanente` | Afectación de fracciones remanentes no útiles para el titular. |
+
+`superficie_adicional` se conserva como referencia histórica y como indicador
+de reporting de modificatorios ADICIONAL/2A_ADICIONAL, no como tipo vigente de
+Convenio. Esta distinción documenta 016; no cambia los hechos capturados en Excel.
 
 ### 7.3 Modalidades especiales: La Permuta
 
@@ -254,7 +259,7 @@ El Fideicomiso Fondo Nacional de Fomento Ejidal (FIFONAFE) interviene como custo
 - **Pertenencia:** El trámite (`TramiteFifonafe`) se asocia a `ProyectoNucleo`, diferenciando su `ambito` (`colectivo` o `individual`).
 - **Cobertura múltiple:** Un solo trámite FIFONAFE puede dar cobertura a múltiples afectaciones del mismo núcleo (`TramiteFifonafeAfectacion`). Esto refleja la práctica operativa donde un solo oficio de consulta ampara diversas parcelas o polígonos sin multiplicar trámites innecesariamente.
 
-### 9.2 Cadena Colectiva de Cuatro Oficios
+### 9.2 Cadena Colectiva de Cuatro Oficios — legado v1
 
 Para el ámbito colectivo, el seguimiento de la consulta de no conflictos requiere la verificación cronológica de cuatro oficios formales:
 1. Oficio de solicitud / consulta de FIFONAFE a DGAOPR o Representación Estatal.
@@ -262,13 +267,25 @@ Para el ámbito colectivo, el seguimiento de la consulta de no conflictos requie
 3. Oficio de informe / respuesta de la Representación Estatal a DGAOPR.
 4. Oficio de respuesta y desahogo de DGAOPR o Representación ante el FIFONAFE.
 
-**Hito de culminación:** El trámite colectivo se reporta como "completo" únicamente cuando los cuatro oficios cuentan con registro y fecha documental. Su fecha realizada corresponde a `MAX(fecha_oficio)`.
+**Hito legado:** Para `version_flujo = 1`, el indicador `fifonafe` conserva la cadena de cuatro oficios registrados y fechados; su fecha realizada corresponde a `MAX(fecha_oficio)`. Esta condición histórica no basta para completar una solicitud v2.
 
 ### 9.3 Independencia del Informe de No Conflictos
 
 - El atributo `hay_conflictos` (triestado: Sí, No, Pendiente) y el informe de no conflictos constituyen un resultado de evaluación jurídica y social.
 - **La emisión del informe de no conflictos es un hito independiente** de la completitud de la correspondencia de los cuatro oficios. No debe asumirse equivalencia automática entre ambos hechos.
 - FIFONAFE **NO es el contenedor padre obligatorio de la indemnización ni del pago**.
+
+### 9.4 Flujo vigente v2 — implementación existente de 008
+
+Las nuevas solicitudes tienen `version_flujo = 2`. La validación SQL existente
+exige evidencia integral de una ruta aplicable para `estatus = 'completo'`:
+en la ruta administrativa, solicitud, resolución, entrega y comprobación
+acreditadas, consulta por ronda sin impedimento o dispensa acreditada, y asamblea
+de retiro acreditada para el ámbito colectivo; la ruta judicial excepcional
+requiere requerimiento y cumplimiento acreditados. El contrato exacto se conserva
+en `fn_validar_fifonafe_completo` de 008, sin introducir otra regla aquí.
+El reporting v2 usa hitos separados de `vw_fifonafe_hito_008`; no confunde
+completitud de cuatro oficios, consulta concluida, no conflictos, entrega y Pago.
 
 ---
 
@@ -284,13 +301,13 @@ Pago → Indemnizacion → Afectacion → ProyectoNucleo → Proyecto
 
 - La entidad `Indemnizacion` representa el acto administrativo mediante el cual se formaliza y autoriza el monto compensatorio derivado de una afectación.
 - Está vinculada directamente a la `Afectacion` (máximo una indemnización activa por afectación).
-- Conserva el avalúo institucional de referencia (monto INDAABIN simple), el monto total resuelto y la fecha de entrega del expediente por parte de SICT a la Procuraduría Agraria (`fecha_entrega_expediente_pa`).
+- La implementación conserva estatus, descripción y fechas de programación, resolución y entrega del expediente SICT a PA (`fecha_entrega_expediente_pa`). El avalúo simple reside en `Afectacion.avaluo_monto`; los montos pactados y desembolsados están en Convenio y Pago. No existe `Indemnizacion.monto_total` ni debe inferirse un monto resuelto por equivalencia con esos importes.
 - **Fecha de realización:** En los reportes de avance, el hito de indemnización resuelta se acredita exclusivamente mediante `fecha_resolucion`. Un estatus `pagado` sin fecha de resolución no se proyecta a periodos temporales.
 
 ### 10.2 Pagos Reales
 
 - La entidad `Pago` representa cada desembolso económico efectivamente materializado a favor de los titulares o del núcleo agrario.
-- Campos obligatorios: `fecha_pago`, `monto`, `beneficiario_nombre`, referencia documental del pago y observaciones.
+- Campos obligatorios en PagoCreate: `fecha_pago`, `monto` y `beneficiario_nombre`. `referencia`, `medio_pago`, `id_persona_beneficiaria` y `observaciones` son opcionales.
 - **Diferenciación estricta:**
   - Un Pago es un hecho financiero concreto (`indicador = 'pagos'`).
   - No debe confundirse con el estatus administrativo de la indemnización (`estatus = 'pagado'`).
@@ -371,6 +388,8 @@ SOFTWARE-PA utiliza PostgreSQL con la extensión espacial PostGIS para brindar c
    No se requiere que el polígono de una parcela corte geométricamente la línea del trazo para permitir el alta del expediente, reconociendo discrepancias cartográficas históricas entre el plano de proyecto y el parcelamiento del RAN.
 4. **Superficie administrativa capturada vs área calculada (`ST_Area`):**  
    El cálculo computacional del área mediante funciones espaciales (`ST_Area`) tiene carácter meramente indicativo y de apoyo cartográfico. Los cómputos, convenios, afectaciones, avalúos y pagos se rigen estrictamente por la **superficie administrativa capturada** (`superficie_afectada_ha` en afectaciones y unidades agrarias, o `superficie_ha` en convenios) proveniente de los documentos, convenios y actas de campo.
+5. **Conciliación y proyecciones:**
+   GIS no crea proyectos, vínculos administrativos, núcleos, parcelas ni afectaciones; `ST_Intersects` no determina pertenencia administrativa. Los nombres, etiquetas, documentos consolidados y totales documentados en API.md son read-models para consumo del cliente, no nuevas entidades ni reglas Excel-First.
 
 ---
 

@@ -14,7 +14,7 @@
 2. **Verificación de integridad por Checksum:**  
    El runner oficial (`backend/scripts/run_migrations.sh`) calcula el hash criptográfico SHA-256 de cada archivo `.sql`. Si un archivo ya registrado en `public.schema_migrations` sufre alteraciones en su contenido, el proceso de arranque se detiene de inmediato con error.
 3. **Evolución Forward-Only:**  
-   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** posterior a la versión aplicada. No se modifican los archivos históricos `001` a `027`. La 025 conserva el contenido funcional del antiguo 024 GIS; su adopción excepcional se documenta abajo y se aplicó únicamente en `software_pa_test`.
+   Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** posterior a la versión aplicada. No se modifican los archivos históricos `001` a `028`. La 025 conserva el contenido funcional del antiguo 024 GIS; su adopción excepcional se documenta abajo y se aplicó únicamente en `software_pa_test`.
 4. **Instalación limpia:**  
    En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `028_catalogo_tipo_documento.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
 
@@ -209,9 +209,14 @@ La carga es transaccional e idempotente, conserva `id_nucleo` en actualizaciones
 
 La migración 021 agrega `derecho_via_proyecto` sin migrar ni eliminar `trazo_proyecto`. Para cada proyecto se conservan versiones numeradas; `es_vigente` selecciona como máximo una. Al promover una versión, la operación debe desmarcar la anterior y marcar la nueva dentro de la misma transacción. Una versión que deja de estar vigente conserva `activo = true`; `activo = false` corresponde exclusivamente a baja lógica con usuario, fecha y motivo. La geometría obligatoria debe ser un `MULTIPOLYGON` válido y no vacío en SRID 4326.
 
-### 3.6 Importación DDV GeoPackage
+### 3.6 Importación DDV GeoPackage — contrato original 022
 
-La migración 022 habilita el objetivo `derecho_via_proyecto` en las tablas de staging existentes. Impone `formato_detectado = 'gpkg'`, mapeos vacíos y destino EPSG:4326 sólo para este objetivo; los objetivos legacy conservan su contrato. El endpoint `POST /api/proyectos/{id_proyecto}/geoespacial/ddv/importaciones` recibe exclusivamente `archivo` `.gpkg`, `fuente` y `fecha_fuente` opcional. El preflight exige driver GeoPackage, una capa, features y CRS identificable. Desde 025, «una capa» significa exactamente una capa espacial de datos; `layer_styles` no cuenta. Los GET de importación/features y `POST /api/importaciones/{id_importacion}/confirmar` se reutilizan para preview y confirmación. La confirmación bloquea importación y proyecto, une las geometrías poligonales en un MultiPolygon y actualiza las versiones DDV en una transacción. Las advertencias de reparación exigen `aceptar_advertencias = true`; los errores impiden confirmar. `/mapa` y `trazo_proyecto` siguen usando su flujo legacy.
+El párrafo siguiente describe el contrato original de 022. El código actual
+mantiene esa ruta y la amplía por 025–026: utiliza `conciliacion-v3-historia`
+y acepta también el alcance/contexto de entrega definidos en el OpenAPI vigente.
+Los parámetros originales no son una lista exhaustiva del contrato actual.
+
+La migración 022 habilita el objetivo `derecho_via_proyecto` en las tablas de staging existentes. Impone `formato_detectado = 'gpkg'`, mapeos vacíos y destino EPSG:4326 sólo para este objetivo; los objetivos legacy conservan su contrato. El endpoint `POST /api/proyectos/{id_proyecto}/geoespacial/ddv/importaciones` recibe exclusivamente `archivo` `.gpkg`, `fuente` y `fecha_fuente` opcional. El preflight exige driver GeoPackage, una capa, features y CRS identificable. Desde 025, «una capa» significa exactamente una capa espacial de datos; `layer_styles` no cuenta. Los GET de importación/features y `POST /api/importaciones/{id_importacion}/confirmar` se reutilizan para preview y confirmación. La confirmación bloquea importación y proyecto, une las geometrías poligonales en un MultiPolygon y actualiza las versiones DDV en una transacción. Las advertencias de reparación exigen `aceptar_advertencias = true`; los errores impiden confirmar. Desde B-07, `/mapa` publica el DDV activo y vigente y las geometrías activas y vigentes por proyecto de 025, con fallback global legacy y pertenencia parcelaria por `vw_gis_parcela_proyecto`. El trazo legacy continúa como capa independiente. Esta corrección de lectura no añade migración ni modifica los SQL existentes.
 
 ### 3.7 Contrato histórico 023 de núcleos (sustituido por 025)
 
@@ -223,7 +228,7 @@ La migración 024 añade sólo el objetivo `parcela_gpkg` al staging y conserva 
 
 ### 3.9 Conciliación GIS por proyecto — 025
 
-Los contratos descritos en 3.7 y 3.8 documentan el desarrollo histórico. El código vigente utiliza `conciliacion-v2`: una clave oficial es opcional y una coincidencia nunca escribe automáticamente la geometría. Las importaciones poligonales anteriores en staging deben reprocesarse; sus datos no se borran. Los endpoints de creación, consulta y finalización se reutilizan, con decisiones explícitas por feature antes de finalizar.
+Los contratos descritos en 3.7 y 3.8 documentan el desarrollo histórico. La 025 introdujo históricamente `conciliacion-v2`; desde 026 el código vigente utiliza `conciliacion-v3-historia`: una clave oficial es opcional y una coincidencia nunca escribe automáticamente la geometría. Las importaciones poligonales anteriores en staging deben reprocesarse; sus datos no se borran. Los endpoints de creación, consulta y finalización se reutilizan, con decisiones explícitas por feature antes de finalizar.
 
 La migración crea `proyecto_configuracion_gis`, `proyecto_nucleo_geometria`, `proyecto_parcela_geometria`, `importacion_feature_candidato` e `importacion_feature_decision`, y la vista `vw_gis_parcela_proyecto`. Esta última exige la cadena administrativa activa `ProyectoNucleo → Afectacion → AfectacionUnidadAgraria → UnidadAgraria → Parcela`; una parcela que sólo pertenece al mismo núcleo no es destino del proyecto.
 
@@ -407,3 +412,18 @@ tmpfs con única base software_pa_test, prueba 025→026, instala limpio hasta 0
 ejecuta casos funcionales y concurrentes; elimina la instancia en finally. El
 reconciliador excepcional conserva sus guardas: su propia prueba monta el
 inventario congelado 001–025. No se ejecuta contra la base persistente.
+
+
+### Proyecciones de API posteriores a 028, sin migración
+
+Los nombres mínimos de actores GIS, las etiquetas derivadas de revisiones,
+el soporte documental consolidado por ProyectoNucleo y `X-Total-Count` se
+resuelven exclusivamente mediante consultas/proyecciones. No alteran tablas,
+columnas, vistas SQL, funciones, permisos ni archivos de migración. El linaje
+canónico permanece en 001–028. El pipeline actual sigue siendo
+`conciliacion-v3-historia`; `legacy-v1` y `conciliacion-v2` identifican contratos
+históricos y no se reescriben sus registros.
+Sus contratos de lectura y la publicación B-07 se describen en [API.md](API.md).
+Las áreas calculadas por GIS/ST_Area son auxiliares/cartográficas; no son
+superficie oficial ni modifican las superficies administrativas provenientes
+de Excel/documentos.

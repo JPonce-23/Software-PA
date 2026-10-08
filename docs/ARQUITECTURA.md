@@ -28,10 +28,10 @@ SOFTWARE-PA está implementado como una aplicación web modular desacoplada, ori
 ┌───────────────────────────▼────────────────────────────┐
 │                 Base de Datos Persistente              │
 │               PostgreSQL 15 + PostGIS 3.3              │
-│  - Schema Canónico (Migraciones 001–015)               │
+│  - Schema Canónico (Migraciones 001–028)               │
 │  - Constraints de Dominio y Triggers de Integridad     │
 │  - Bitácora Append-Only (SECURITY DEFINER)             │
-│  - Read-Models Materializados en Vistas SQL            │
+│  - Read-Models mediante Vistas SQL                    │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -41,11 +41,11 @@ SOFTWARE-PA está implementado como una aplicación web modular desacoplada, ori
   - **Framework:** FastAPI con Python 3.11+.
   - **ORM:** SQLAlchemy 2.0 con soporte relacional y geoespacial (`GeoAlchemy2`).
   - **Validación y Contratos:** Pydantic v2.
-  - **Seguridad Criptográfica:** Passlib / Bcrypt para almacenamiento de hashes de contraseña y generación segura de tokens de sesión opacos.
+  - **Seguridad Criptográfica:** Bcrypt para hashes de contraseña y `secrets` para tokens de sesión opacos.
 - **Base de datos:**
   - **Motor:** PostgreSQL 15.
   - **Extensión Espacial:** PostGIS 3.3.
-  - **Versionado de Esquema:** Motor de migraciones SQL secuenciales y verificadas por SHA-256 (`backend/scripts/run_migrations.sh`). Esquema vigente: **015**.
+  - **Versionado de Esquema:** Motor de migraciones SQL secuenciales y verificadas por SHA-256 (`backend/scripts/run_migrations.sh`). Linaje canónico vigente: **001–028**.
 - **Frontend:**
   - **Librería de Interfaz:** React 19.
   - **Herramienta de Construcción:** Vite.
@@ -54,7 +54,7 @@ SOFTWARE-PA está implementado como una aplicación web modular desacoplada, ori
   - **Componentes Cartográficos:** Leaflet y React-Leaflet con utilerías WKT (`wellknown`).
   - **Iconografía:** Lucide React.
 - **Entorno e Infraestructura:**
-  - Orquestación local mediante Docker Compose con cinco servicios: `db`, `backend`, `frontend`, `alertas_scheduler` y `pgadmin`.
+  - Orquestación local mediante Docker Compose con cuatro servicios base: `db`, `backend`, `frontend` y `pgadmin`. No hay un servicio `alertas_scheduler` en la configuración vigente.
 
 ---
 
@@ -76,8 +76,8 @@ El backend se organiza en capas arquitectónicas bien definidas:
 ```text
 backend/app/
 ├── main.py             # Configuración FastAPI, middlewares (CORS, CSRF), manejadores de error y montaje de routers
-├── config.py           # Variables de configuración del entorno (AUTH_SETTINGS, DATABASE_URL)
-├── database.py         # Conexión SQLAlchemy, pool de conexiones y sesión por petición (SessionLocal)
+├── config.py           # Configuración de autenticación (AUTH_SETTINGS)
+├── database.py         # DATABASE_URL, conexión SQLAlchemy y sesión por petición (SessionLocal)
 ├── models.py           # Modelos ORM relacionales y geoespaciales con AuditableMixin
 ├── schemas.py          # Schemas Pydantic de entrada, salida y validación de tipos
 ├── auth.py             # Dependencias de seguridad (get_current_user, RoleChecker)
@@ -103,18 +103,18 @@ El centro del dominio articula el seguimiento administrativo en torno a `Proyect
 2. `ProyectoNucleo` contiene:
    - `ProyectoNucleoResponsable` (responsables institucionales con vigencia).
    - `ProyectoNucleoReferencia` (consecutivos y claves históricas de tramo).
-   - `PadronHistorial` y `Orv` (evidencia de órganos ejidales).
+   - Acceso a `PadronHistorial` y `Orv` por el núcleo; estos registros pertenecen a `NucleoAgrario`, no directamente a `ProyectoNucleo`.
    - `ActividadCampo` (sensibilizaciones y caminamientos con tipo de COP operativo).
 3. **Ruta Colectiva:**
    - `Asamblea` (1:N) → `AsambleaConvocatoria` (primera, segunda, ulterior).
-   - `Asamblea` (1:1 opcional) → `TramiteRan` (acta de asamblea).
+   - `Asamblea` (1:N) → `TramiteRan` (trámites del acta de asamblea).
    - `Afectacion` (ámbito colectivo) vinculada a `ProyectoNucleo`.
    - `Convenio` colectivo (autorizado opcionalmente por `Asamblea`, con trámites `TramiteRan`).
    - `ConvenioAfectacion` (relación N:M que asocia convenios y afectaciones sin duplicar montos).
 4. **Ruta Individual:**
    - `Parcela` (único `no_parcela`) asociada al `NucleoAgrario`.
    - `ParcelaTitular` (titulares verificables con certificados y vigencias).
-   - `Afectacion` (ámbito individual) vinculada a la `Parcela` y `ProyectoNucleo`.
+   - `Afectacion` individual vinculada a `ProyectoNucleo`; la parcela se obtiene mediante `AfectacionUnidadAgraria → UnidadAgraria → Parcela`, sin FK directa en Afectacion.
    - `Convenio` individual (con trámites `TramiteRan`).
 5. **Cadena Financiera:**
    - `Afectacion` (1:1 activa) → `Indemnizacion` (1:N) → `Pago`.
@@ -135,7 +135,7 @@ El sistema rechaza el uso de tokens Bearer/JWT en almacenamiento local de navega
   - Cookie de sesión: `pa_session_dev` (desarrollo) o `__Host-pa_session` (producción), con atributos `HttpOnly`, `SameSite=Lax` y `Secure` en producción.
   - Cookie CSRF: `pa_csrf_dev` o `__Host-pa_csrf`, accesible por JavaScript para ser enviada en la cabecera `X-CSRF-Token`.
 - **Protección CSRF:**  
-  Middleware en FastAPI que intercepta todas las peticiones mutables (`POST`, `PUT`, `PATCH`, `DELETE`). Valida que el encabezado `X-CSRF-Token` coincida exactamente con el token de la sesión activa.
+  Middleware que controla peticiones mutables bajo `/api/`: el login exige `Origin` permitido; las demás peticiones con cookie de sesión validan origen, cookie y encabezado `X-CSRF-Token` contra la sesión. Sin cookie, la dependencia de autenticación conserva el rechazo por falta de sesión.
 - **Políticas de credenciales:**  
   Mínimo 8 caracteres, al menos una letra y un número, longitud máxima estricta de 72 bytes UTF-8 (compatibilidad bcrypt). Bloqueo temporal automático tras intentos fallidos consecutivos.
 
@@ -173,7 +173,7 @@ Todas las entidades de dominio heredan las columnas estándar de auditoría:
 ### 5.2 Bitácora Append-Only y Eventos de Acceso
 
 - **Bitácora de mutaciones (`bitacora`):**  
-  Almacena el historial cronológico de cambios sobre tablas críticas mediante un trigger PL/pgSQL configurado con `SECURITY DEFINER`. Los usuarios y la aplicación solo tienen permisos de inserción; las filas son estrictamente inmutables.
+  Almacena el historial cronológico de cambios mediante el trigger `fn_audit_log` con `SECURITY DEFINER`. Desde 009, `software_pa_app` sólo tiene SELECT sobre `bitacora`: la inserción corresponde al trigger; INSERT, UPDATE, DELETE y TRUNCATE directos están revocados.
 - **Eventos de acceso (`evento_acceso`):**  
   Registro inmutable de eventos de autenticación (inicios de sesión exitosos, fallidos, bloqueos y cierres de sesión).
 
@@ -184,7 +184,7 @@ Todas las entidades de dominio heredan las columnas estándar de auditoría:
 El subsistema gestiona la evidencia jurídica que respalda cada actuación:
 - **`Documento`:** Identidad lógica del documento (tipo, estado, fecha propia del instrumento y número de folio u oficio).
 - **`DocumentoVersion`:** Archivos físicos almacenados en disco/volumen con su respectivo hash criptográfico SHA-256 inmutable.
-- **`DocumentoVinculo`:** Relaciona un documento con una o más entidades del dominio (asambleas, convenios, parcelas, trámites). Incluye validación de aislamiento para impedir vincular documentos entre proyectos distintos.
+- **`DocumentoVinculo`:** Relaciona un documento con una o más entidades del dominio. La API comprueba acceso al documento y al objetivo por separado; no impone una prohibición general de compartir documentos entre proyectos autorizados. El listado consolidado sólo publica procedencias dentro del alcance consultado.
 - **`ExpedienteRequisito`:** Seguimiento del checklist documental por objetivo, admitiendo estados `disponible`, `parcial`, `pendiente_validacion`, `faltante` y `no_aplica`.
 
 ---
@@ -192,7 +192,7 @@ El subsistema gestiona la evidencia jurídica que respalda cada actuación:
 ## 7. Seguimiento Funcional y Máquina de Hechos
 
 Para gestionar la no linealidad del proceso agrario sin mutar destructivamente los expedientes:
-- **`SeguimientoEvento`:** Tabla append-only asociada a `ProyectoNucleo` y opcionalmente a un objetivo tipado.
+- **`SeguimientoEvento`:** Historia funcional asociada a `ProyectoNucleo` y opcionalmente a un objetivo tipado. La API permite alta, edición y baja lógica; la bitácora de esas mutaciones sí es append-only.
 - **Catálogos asociados:**
   - `tipo_evento_seguimiento`: `inicio`, `suspension`, `reapertura`, `cierre`, `cambio_alcance`, `reunion`, `negociacion`, `consulta_indigena`, `continuacion_asamblea`, `medicion_bdt`, `otro`.
   - `motivo_seguimiento`: `expropiacion_directa`, `no_afectacion`, `comunidad_indigena`, `dominio_pleno`, `juicio_agrario`, `conflicto_titularidad`, `rechazo`, `cambio_trazo`, `nueva_informacion`, `calificacion_negativa`, `falta_pago`, `otro`.
@@ -239,15 +239,19 @@ Tablas Transaccionales
 
 ## 9. Componente Geoespacial y Cartografía
 
-La verdad administrativa sigue en Software-PA. GIS busca geometrías para registros existentes; ninguna feature crea proyectos, vínculos, núcleos, parcelas, afectaciones o expedientes. `ST_Intersects` y `ST_Area` no determinan pertenencia ni sustituyen superficies administrativas.
+La verdad administrativa sigue en Software-PA. GIS busca geometrías para registros existentes; ninguna feature crea proyectos, vínculos administrativos, núcleos, parcelas, afectaciones o expedientes. `ST_Intersects` no determina pertenencia administrativa. `ST_Area` y las áreas GIS son métricas auxiliares/cartográficas, nunca superficie oficial ni sustitutos de superficies administrativas capturadas.
 
 ### Destinos y legado
 
 DDV representa superficie y permanece en `derecho_via_proyecto`, con `MultiPolygon`, versiones históricas y una sola vigente; `activo` y `es_vigente` conservan significados distintos. Un núcleo del proyecto recibe geometría en `proyecto_nucleo_geometria`, ligada al `ProyectoNucleo` existente. Una parcela recibe geometría en `proyecto_parcela_geometria`, ligada a `ProyectoNucleo + Parcela`, sólo si ya existe el vínculo activo por afectación. Estas tablas son complementos cartográficos, no nuevos registros administrativos.
 
-Los campos globales `NucleoAgrario.geometria_poligono` y `Parcela.geometria_poligono` permanecen para compatibilidad; las nuevas importaciones no escriben en ellos. Se mantienen los endpoints directos legacy y el flujo lineal `trazo_proyecto`. `/api/proyectos/{id}/mapa` no cambia en esta fase y todavía usa el legado. Las importaciones poligonales legacy pendientes deben reprocesarse para usar la conciliación por proyecto.
+Los campos globales `NucleoAgrario.geometria_poligono` y `Parcela.geometria_poligono` permanecen para compatibilidad; las nuevas importaciones no escriben en ellos. Se mantienen los endpoints directos legacy y el flujo lineal `trazo_proyecto`. Desde la corrección B-07, `/api/proyectos/{id_proyecto}/mapa` publica las geometrías activas y vigentes de núcleo/parcela por `ProyectoNucleo`, con precedencia sobre los campos globales. Estos últimos se usan sólo cuando no existe geometría vigente del proyecto. Las parcelas, incluido el fallback, deben pertenecer a `vw_gis_parcela_proyecto`; compartir núcleo no basta. El DDV activo y vigente se publica como capa poligonal `derecho_via_proyecto`, independiente del trazo lineal legacy activo. Las importaciones poligonales legacy pendientes deben reprocesarse para usar la conciliación por proyecto.
 
 ### Staging y conciliación
+
+El código vigente usa `conciliacion-v3-historia` (`gis_history.ALGORITHM`).
+`conciliacion-v2` identifica el contrato histórico introducido por 025; 026
+incorpora la historia técnica sin cambiar la autoridad administrativa.
 
 `gis_ingestion.py` identifica sólo capas espaciales y mantiene `COORDINATE_PRECISION=15` en GeoJSONSeq. Un GPKG debe tener exactamente una capa espacial de datos; tablas como `layer_styles` son auxiliares. Se conserva WKB original, FID, capa, CRS/WKT, dimensión y atributos autorizados. El archivo cargado se elimina tras staging para evitar retener datos personales innecesarios; su nombre y SHA permanecen como trazabilidad. Los originales locales de los geógrafos no se alteran.
 
@@ -267,9 +271,9 @@ No se permite confirmar staging con un CRS de proyecto cambiado. Una vez existen
 
 ### Alcance y API
 
-Se reutilizan creación de importaciones DDV/núcleos/parcelas, preview y finalización. Se agregan configuración GIS, resumen, candidatos, decisiones y GeoJSON 4326 de staging; `features?estado_conciliacion=ambiguo` reutiliza el listado existente. Lectura mantiene `admin/operador/visualizador/geografo`; escritura GIS mantiene `admin/geografo`, sin ampliar permisos. No se implementan frontend, adaptación de `/mapa`, obras transversales ni DDV lineal.
+Se reutilizan creación de importaciones DDV/núcleos/parcelas, preview y finalización. Se agregan configuración GIS, resumen, candidatos, decisiones y GeoJSON 4326 de staging; `features?estado_conciliacion=ambiguo` reutiliza el listado existente. Lectura mantiene `admin/operador/visualizador/geografo`; escritura GIS mantiene `admin/geografo`, sin ampliar permisos. B-07 adapta únicamente la lectura del endpoint `/mapa` existente, sin migración ni escrituras administrativas. El pipeline poligonal no incorpora obras transversales ni un nuevo flujo DDV lineal; el trazo lineal legacy permanece disponible.
 
-El inventario real y las pruebas están en [INFORME_CONCILIACION_GIS_2026-10-05.md](INFORME_CONCILIACION_GIS_2026-10-05.md).
+El inventario y las pruebas de la etapa previa están en [INFORME_CONCILIACION_GIS_2026-10-05.md](INFORME_CONCILIACION_GIS_2026-10-05.md); su alcance histórico no sustituye el contrato actual de [API.md](API.md).
 
 Referencias GIS renumeradas excepcionalmente desde 020–024 a 021–025; los originales
 y la correspondencia se conservan en [MIGRACIONES.md](MIGRACIONES.md). No cambió el
@@ -299,6 +303,18 @@ El servicio GIS no contiene creación de esos eventos ni de afectaciones.
 
 Lectura: roles existentes con acceso al proyecto. Escritura GIS: admin/geografo.
 La autorización se revalida tras adquirir el bloqueo del proyecto. El contrato
-OpenAPI incorpora ciclos, revisiones y alcance multipart explícito. Se conservan
-/mapa, frontend, RAN y lógica de seguimiento; geometry_columns y obras transversales
+OpenAPI incorpora ciclos, revisiones y alcance multipart explícito. B-07 conserva
+el contrato GeoJSON de /mapa y conecta su lectura con las geometrías del proyecto.
+Se conservan frontend, RAN y lógica de seguimiento; geometry_columns y obras transversales
 GIS permanecen fuera del alcance.
+
+### Proyecciones de lectura posteriores a 028
+
+[API.md §11](API.md#11-proyecciones-de-lectura-para-el-frontend-esquema-028)
+describe nombres opcionales de actores GIS, `destino` legible en revisiones,
+documentos consolidados por ProyectoNucleo y `X-Total-Count` en los cuatro
+listados GIS paginados indicados allí, expuesto por CORS. Son consultas sobre
+entidades existentes, sin persistencia ni reglas nuevas. Los candidatos reutilizan
+las etiquetas del snapshot `universo_destinos`; no se duplican por fila.
+Usuario y Responsable operativo permanecen separados. `Proyecto.activo`
+representa baja lógica; no existe un ciclo de proyecto activo/completado/reabierto.

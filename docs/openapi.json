@@ -7352,6 +7352,53 @@
         }
       }
     },
+    "/api/proyecto-nucleo/{id_proyecto_nucleo}/documentos": {
+      "get": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "List Consolidated Documents",
+        "description": "Soporte documental consolidado de sólo lectura por procedencia. Incluye vínculos activos y referencias de requisitos con vínculo autorizado dentro del alcance; versión vigente = mayor numero_version existente.",
+        "operationId": "list_consolidated_documents_api_proyecto_nucleo__id_proyecto_nucleo__documentos_get",
+        "parameters": [
+          {
+            "name": "id_proyecto_nucleo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Proyecto Nucleo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentoConsolidadoResponse"
+                  },
+                  "title": "Response List Consolidated Documents Api Proyecto Nucleo  Id Proyecto Nucleo  Documentos Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/catalogos/tipos-documento": {
       "get": {
         "tags": [
@@ -7982,6 +8029,15 @@
                   "title": "Response List Imports Api Proyectos  Id Proyecto  Importaciones Get"
                 }
               }
+            },
+            "headers": {
+              "X-Total-Count": {
+                "description": "Total de registros autorizados con los mismos filtros, antes de skip/limit.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
             }
           },
           "422": {
@@ -8313,6 +8369,15 @@
                     "$ref": "#/components/schemas/ImportacionFeatureResponse"
                   },
                   "title": "Response Preview Features Api Importaciones  Id Importacion  Features Get"
+                }
+              }
+            },
+            "headers": {
+              "X-Total-Count": {
+                "description": "Total de registros autorizados con los mismos filtros, antes de skip/limit.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             }
@@ -8838,6 +8903,15 @@
                   "title": "Response List Cycles Api Importaciones  Id Importacion  Conciliaciones Get"
                 }
               }
+            },
+            "headers": {
+              "X-Total-Count": {
+                "description": "Total de registros autorizados con los mismos filtros, antes de skip/limit.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
             }
           },
           "422": {
@@ -9065,6 +9139,15 @@
                     "$ref": "#/components/schemas/RevisionGisResponse"
                   },
                   "title": "Response List Revisions Api Proyectos  Id Proyecto  Geoespacial Revisiones Get"
+                }
+              }
+            },
+            "headers": {
+              "X-Total-Count": {
+                "description": "Total de registros autorizados con los mismos filtros, antes de skip/limit.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             }
@@ -13634,6 +13717,17 @@
               }
             ],
             "title": "Fecha Revision"
+          },
+          "usuario_revision_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Revision Nombre"
           }
         },
         "type": "object",
@@ -14114,6 +14208,17 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Resumen"
+          },
+          "usuario_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Nombre"
           }
         },
         "type": "object",
@@ -16472,6 +16577,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Creado En"
+          },
+          "creado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado Por Nombre"
           }
         },
         "type": "object",
@@ -16484,6 +16600,56 @@
           "creado_en"
         ],
         "title": "DecisionGisResponse"
+      },
+      "DestinoGisResponse": {
+        "properties": {
+          "nombre_nucleo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre Nucleo"
+          },
+          "municipio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Municipio"
+          },
+          "entidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entidad"
+          },
+          "numero_parcela": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Parcela"
+          }
+        },
+        "type": "object",
+        "title": "DestinoGisResponse"
       },
       "DetalleCicloGisResponse": {
         "properties": {
@@ -16548,6 +16714,17 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Resumen"
+          },
+          "usuario_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Nombre"
           },
           "features": {
             "items": {
@@ -16801,6 +16978,27 @@
             "type": "integer",
             "title": "Creado Por"
           },
+          "creado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado Por Nombre"
+          },
+          "destino": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DestinoGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "decisiones": {
             "items": {
               "$ref": "#/components/schemas/RevisionGisDecisionResponse"
@@ -16851,6 +17049,74 @@
           "activo"
         ],
         "title": "DocumentoClasificacionResponse"
+      },
+      "DocumentoConsolidadoResponse": {
+        "properties": {
+          "entidad_tipo": {
+            "type": "string",
+            "title": "Entidad Tipo"
+          },
+          "entidad_id": {
+            "type": "integer",
+            "title": "Entidad Id"
+          },
+          "origen": {
+            "type": "string",
+            "title": "Origen"
+          },
+          "fuente_relacion": {
+            "type": "string",
+            "enum": [
+              "vinculo",
+              "expediente_requisito"
+            ],
+            "title": "Fuente Relacion"
+          },
+          "id_documento_vinculo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Documento Vinculo"
+          },
+          "id_expediente_requisito": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Expediente Requisito"
+          },
+          "documento": {
+            "$ref": "#/components/schemas/DocumentoResponse"
+          },
+          "version_vigente": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentoVersionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "entidad_tipo",
+          "entidad_id",
+          "origen",
+          "fuente_relacion",
+          "documento"
+        ],
+        "title": "DocumentoConsolidadoResponse"
       },
       "DocumentoCreate": {
         "oneOf": [
@@ -24110,6 +24376,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Creado En"
+          },
+          "creado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado Por Nombre"
           }
         },
         "type": "object",
@@ -24349,6 +24626,27 @@
           "creado_por": {
             "type": "integer",
             "title": "Creado Por"
+          },
+          "creado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado Por Nombre"
+          },
+          "destino": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DestinoGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

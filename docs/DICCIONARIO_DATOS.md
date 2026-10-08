@@ -1,7 +1,7 @@
 # Diccionario de Datos — SOFTWARE-PA
 
 > **Autoridad:** Especificación canónica del modelo físico y lógico de datos de SOFTWARE-PA.  
-> **Validación:** Verificado contra `backend/app/models.py`, migraciones vigentes `001–025` y read-models de base de datos en PostgreSQL 15 / PostGIS.
+> **Validación:** Verificado contra `backend/app/models.py`, migraciones canónicas `001–028` y read-models de base de datos en PostgreSQL 15 / PostGIS.
 
 ---
 
@@ -56,11 +56,11 @@ Proyecto estratégico o ferroviario amparado por las tareas de liberación de v�
 | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|
 | `id_proyecto` | `INTEGER` | No | PK | Identificador primario del proyecto. | Sistema | `/api/proyectos` |
-| `clave_proyecto` | `VARCHAR(50)` | No | UNIQUE | Código institucional del proyecto. | PROYECTO | Identificador de negocio |
+| `clave_proyecto` | `VARCHAR(30)` | No | UNIQUE | Código institucional del proyecto. | PROYECTO | Identificador de negocio |
 | `nombre_proyecto` | `VARCHAR(200)` | No | — | Nombre descriptivo oficial. | PROYECTO | Encabezados y reportes |
 | `descripcion` | `TEXT` | Sí | — | Alcance y notas descriptivas. | Notas | Interfaz |
 | `fecha_inicio` | `DATE` | Sí | — | Fecha de arranque institucional del proyecto. | Calendario | Trazabilidad |
-| `fecha_fin_estimada` | `DATE` | Sí | — | Fecha meta de culminación. | Cronograma | Trazabilidad |
+| `fecha_fin` | `DATE` | Sí | — | Fecha final registrada; no implementa un estado de proyecto completado. | Cronograma | Trazabilidad |
 
 ### 2.3.1 `derecho_via_proyecto`
 
@@ -71,12 +71,12 @@ DDV cartográfico canónico ligado directamente a `proyecto`. Admite historial d
 | `id_derecho_via` | `INTEGER` | No | PK | Identificador de la versión. | Sistema | Auditoría |
 | `id_proyecto` | `INTEGER` | No | `proyecto.id_proyecto` | Proyecto propietario del DDV. | Proyecto | Alcance |
 | `version` | `INTEGER` | No | `UNIQUE(id_proyecto, version)`, `> 0` | Versión secuencial por proyecto. | Captura cartográfica | Historial |
-| `es_vigente` | `BOOLEAN` | No | Índice único parcial por proyecto; default `false` | Marca la versión cartográfica vigente; requiere `activo = true`. | Promoción explícita | Consulta futura |
-| `geometria_poligono` | `geometry(MULTIPOLYGON,4326)` | No | GiST; no vacía y válida | Polígono del Derecho de Vía. | Cartografía | Consulta espacial futura |
+| `es_vigente` | `BOOLEAN` | No | Índice único parcial por proyecto; default `false` | Marca la versión cartográfica vigente; requiere `activo = true`. | Promoción explícita | Selección de la versión publicada en `/mapa` |
+| `geometria_poligono` | `geometry(MULTIPOLYGON,4326)` | No | GiST; no vacía y válida | Polígono del Derecho de Vía. | Cartografía | Capa poligonal DDV en `/mapa` |
 | `fuente` | `VARCHAR(250)` | No | No vacía | Procedencia de la geometría. | Cartografía | Trazabilidad |
 | `fecha_fuente` | `DATE` | Sí | — | Fecha declarada de la fuente. | Cartografía | Trazabilidad |
 
-Incluye las columnas estándar de auditoría y baja lógica descritas en §1. Esta fase no sustituye superficies administrativas ni cambia los endpoints de trazo y mapa.
+Incluye las columnas estándar de auditoría y baja lógica descritas en §1. No sustituye superficies administrativas. Desde B-07, el endpoint `/mapa` publica el DDV activo y vigente como capa independiente de `trazo_proyecto`; los endpoints de trazo no cambian.
 
 ### 2.3.2 Staging de importación DDV
 
@@ -85,7 +85,7 @@ Incluye las columnas estándar de auditoría y baja lógica descritas en §1. Es
 ### 2.4 `nucleo_agrario`
 Catálogo maestro nacional de núcleos agrarios (ejidos y comunidades). Su identidad interna permanece en `id_nucleo`; para el catálogo RAN/PHINA, la `cve_unica` oficial se almacena físicamente en `id_nucleo_fuente` y se identifica junto con `fuente_datos = 'RAN_PHINA_CATALOGO_NUCLEOS'`. No existe una columna física `clave_ran`. `ProyectoNucleo` continúa siendo el vínculo operativo con cada proyecto, conforme al principio Excel-First.
 
-La conciliación vigente (025) usa `POST /api/proyectos/{id_proyecto}/geoespacial/nucleos/importaciones`. `cve_unica` es opcional: si está presente se verifica contra la identidad oficial; si falta se proponen candidatos por nombre y territorio dentro de los `ProyectoNucleo` existentes. Ninguna coincidencia guarda automáticamente geometría. La confirmación escribe únicamente `proyecto_nucleo_geometria`, conserva el campo global legacy y registra una decisión auditada. Véase el contrato 025 al final de este diccionario.
+La conciliación vigente usa `conciliacion-v3-historia` (base 025 ampliada por 026) en `POST /api/proyectos/{id_proyecto}/geoespacial/nucleos/importaciones`. `cve_unica` es opcional: si está presente se verifica contra la identidad oficial; si falta se proponen candidatos por nombre y territorio dentro de los `ProyectoNucleo` existentes. Ninguna coincidencia guarda automáticamente geometría. La confirmación escribe únicamente `proyecto_nucleo_geometria`, conserva el campo global legacy y registra una decisión auditada. Véanse la base 025 y la historia técnica 026 al final de este diccionario.
 
 | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|
@@ -99,7 +99,7 @@ La conciliación vigente (025) usa `POST /api/proyectos/{id_proyecto}/geoespacia
 | `id_municipio_fuente` | `VARCHAR(120)` | Sí | — | Valor `scncve_mun` conservado desde la fuente RAN. | RAN/PHINA | Conciliación territorial |
 | `id_nucleo_fuente` | `VARCHAR(120)` | Sí | Identidad externa | Para RAN contiene `cve_unica` como texto, sin interpretar su estructura. Es único junto con `fuente_datos` cuando ambos existen. | RAN/PHINA | Identidad oficial |
 | `alcance_identidad_fuente` | `VARCHAR(20)` | Sí | — | Para el catálogo RAN se usa `nacional`. | RAN/PHINA | Alcance de identidad |
-| `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Perímetro global legacy; no recibe nuevas escrituras de importación GIS. | Cartografía | Visor cartográfico de apoyo |
+| `geometria_poligono` | `geometry(MULTIPOLYGON,4326)` | Sí | SRID 4326 | Perímetro global legacy; no recibe nuevas escrituras de importación GIS. | Cartografía | Visor cartográfico de apoyo |
 
 ### 2.5 `proyecto_nucleo`
 Eje operativo fundamental. Vincula el proyecto estratégico con el núcleo agrario específico.
@@ -146,8 +146,8 @@ Eje operativo fundamental. Vincula el proyecto estratégico con el núcleo agrar
 | `orv_integrante` | `id_tipo_fin` / `detalle_fin` | `BIGINT` / `TEXT` | Sí | `catalogo_operativo` para tipo | Causa y detalle del cierre; fecha de fin y tipo deben coexistir. | Cierre funcional | `/api/orv-integrantes/{id_orv_integrante}/finalizar` |
 | `orv_integrante` | `activo` | `BOOLEAN` | No | — | Estado administrativo; un periodo finalizado puede conservar `true`. | Sistema | Baja lógica y restauración |
 | `orv_integrante` | `fecha_baja` / `motivo_baja` / `id_usuario_baja` | `TIMESTAMPTZ` / `TEXT` / `INTEGER` | Sí | `usuario` para actor | Obligatorios en baja administrativa y nulos cuando activo. | Auditoría | DELETE / reactivar |
-| `padron_historial` | `fecha_padron` | `DATE` | No | — | Fecha de expedición del padrón ejidal. | FECHA PADRÓN | Quórum de asamblea |
-| `padron_historial` | `numero_ejidatarios_comuneros` | `INTEGER` | No | — | Total de sujetos de derecho reconocidos. | NO. SUJETOS | Verificación de mayorías |
+| `padron_historial` | `fecha_padron` | `DATE` | Sí | — | Fecha de expedición del padrón ejidal. | FECHA PADRÓN | Quórum de asamblea |
+| `padron_historial` | `numero_ejidatarios_comuneros` | `INTEGER` | Sí | — | Total de sujetos de derecho reconocidos. | NO. SUJETOS | Verificación de mayorías |
 
 `vigente` es una propiedad calculada, no una columna: activo, inicio alcanzado
 y fin no vencido, incluyendo ambos límites. No incorpora el periodo del ORV
@@ -180,14 +180,14 @@ Desde 027 también es objetivo documental directo: `documento_vinculo.entidad_ti
 
 | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|
-| `id_actividad` | `BIGINT` | No | PK | Identificador primario de la actividad. | Sistema | `/api/actividades-campo` |
+| `id_actividad` | `INTEGER` | No | PK | Identificador primario de la actividad. | Sistema | `/api/proyecto-nucleo/{id_proyecto_nucleo}/actividades` |
 | `id_proyecto_nucleo` | `INTEGER` | No | `proyecto_nucleo` | Proyecto-núcleo donde se efectuó. | Fila Excel | Agrupador operativo |
-| `tipo_actividad` | `VARCHAR(50)` | No | — | Solo `sensibilizacion` o `caminamiento`. | Bloques W:AH | Hito de avance |
+| `tipo_actividad` | `VARCHAR(30)` | No | — | Solo `sensibilizacion` o `caminamiento`. | Bloques W:AH | Hito de avance |
 | `id_tipo_cop_operativo` | `BIGINT` | Sí | `catalogo_operativo` | Dimensión COP asociada (`ORIGEN`, etc.). | TIPO COP | Reporting dimensional |
-| `contexto_actividad` | `VARCHAR(50)` | Sí | — | Contexto específico (`general`, etc.). | Notas | Trazabilidad |
+| `contexto_actividad` | `VARCHAR(40)` | No | — | Contexto específico (`general`, etc.). | Notas | Trazabilidad |
 | `fecha_programada` | `DATE` | Sí | — | Fecha agendada para el evento. | PROGRAMADA | Indicador de programación |
 | `fecha_realizada` | `DATE` | Sí | — | Fecha efectiva de ejecución en campo. | REALIZADA | Indicador de avance real |
-| `responsable` | `VARCHAR(250)` | Sí | — | Brigadista que condujo la actividad. | RESPONSABLE | Auditoría operativa |
+| `responsable` | `VARCHAR(300)` | Sí | — | Brigadista que condujo la actividad. | RESPONSABLE | Auditoría operativa |
 | `resultado` | `TEXT` | Sí | — | Minuta o acuerdos alcanzados. | RESULTADO | Despliegue en expediente |
 
 ---
@@ -201,21 +201,21 @@ La unidad operativa central de la ruta individual.
 
 La resolución del identificador sigue [MODELO_FUNCIONAL.md §6.1](MODELO_FUNCIONAL.md#61-identificador-funcional-canónico-único) y [FUENTES_Y_COBERTURA_EXCEL.md §3.1](FUENTES_Y_COBERTURA_EXCEL.md#31-unicidad-del-identificador-parcelario-no_parcela): equivalencia o diferencia de formato produce un único valor conservando ambos originales; un solo valor presente se utiliza con su procedencia exacta; divergencia sustantiva requiere **REVISAR** y aclaración humana sin crear automáticamente dos parcelas ni asumir prioridad PPT. Sin ambos valores, `no_parcela` puede quedar `NULL` y la ausencia se conserva en trazabilidad/revisión al importar, incluidas las 17 filas auditadas.
 
-La conciliación vigente (025) usa `POST /api/proyectos/{id_proyecto}/geoespacial/parcelas/importaciones`. `cve_unica_nucleo` es opcional y no se inventa. Sólo son destinos las parcelas previamente vinculadas al proyecto por la cadena administrativa de afectación. `PARCELA` y `Num_parcela` se conservan y comparan separadamente; letras, sufijos y otros signos permanecen distintos. La confirmación escribe `proyecto_parcela_geometria`, sin actualizar la geometría global ni superficies administrativas. Véase el contrato 025 al final de este diccionario.
+La conciliación vigente usa `conciliacion-v3-historia` (base 025 ampliada por 026) en `POST /api/proyectos/{id_proyecto}/geoespacial/parcelas/importaciones`. `cve_unica_nucleo` es opcional y no se inventa. Sólo son destinos las parcelas previamente vinculadas al proyecto por la cadena administrativa de afectación. `PARCELA` y `Num_parcela` se conservan y comparan separadamente; letras, sufijos y otros signos permanecen distintos. La confirmación escribe `proyecto_parcela_geometria`, sin actualizar la geometría global ni superficies administrativas. Véanse la base 025 y la historia técnica 026 al final de este diccionario.
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `parcela` | `id_parcela` | `INTEGER` | No | PK | Identificador interno de la parcela. | Sistema | `/api/parcelas` |
+| `parcela` | `id_parcela` | `INTEGER` | No | PK | Identificador interno de la parcela. | Sistema | `/api/parcelas/{id_parcela}` |
 | `parcela` | `id_nucleo` | `INTEGER` | No | `nucleo_agrario` | Núcleo agrario al que pertenece. | NÚCLEO | Pertenencia agraria |
 | `parcela` | `no_parcela` | `VARCHAR(80)` | Sí | — | **Único identificador funcional canónico.** | NO. DE PARCELA / NO. DE PARCELA PPT | Identificación unívoca |
-| `parcela` | `tipo_parcela` | `VARCHAR(50)` | Sí | — | Ejidal, comunal, infraestructura, etc. | TIPO PARCELA | Clasificación |
-| `parcela` | `geometria_poligono`| `MULTIPOLYGON` | Sí | SRID 4326 | Polígono global legacy; no recibe nuevas escrituras de importación GIS. | Legacy | Visor cartográfico (opcional) |
+| `parcela` | `tipo_parcela` | `VARCHAR(30)` | No | — | Ejidal, comunal, infraestructura, etc. | TIPO PARCELA | Clasificación |
+| `parcela` | `geometria_poligono` | `geometry(MULTIPOLYGON,4326)` | Sí | SRID 4326 | Polígono global legacy; no recibe nuevas escrituras de importación GIS. | Legacy | Visor cartográfico (opcional) |
 | `parcela_titular` | `id_parcela` | `INTEGER` | No | `parcela.id_parcela` | Parcela correspondiente. | Fila titular | Vínculo de titularidad |
-| `parcela_titular` | `id_persona` | `BIGINT` | No | `persona.id_persona` | Sujeto de derecho acreditado. | TITULAR | Suscripción de convenios |
+| `parcela_titular` | `id_persona` | `INTEGER` | No | `persona.id_persona` | Sujeto de derecho acreditado. | TITULAR | Suscripción de convenios |
 | `parcela_titular` | `tipo_derecho` | `VARCHAR(50)` | No | — | Titular, posesionario, sucesor. | CALIDAD | Cláusulas contractuales |
-| `parcela_titular` | `certificado_parcelario` | `VARCHAR(80)` | Sí | — | Folio del certificado parcelario oficial. | CERTIFICADO | Acreditación jurídica |
-| `parcela_titular` | `folio_derechos` | `VARCHAR(80)` | Sí | — | Folio registral de derechos agrarios. | FOLIO | Acreditación jurídica |
-| `parcela_titular` | `constancia_vigencia` | `VARCHAR(80)` | Sí | — | Referencia de constancia emitida por RAN. | CONSTANCIA | Soporte de vigencia |
+| `parcela` | `certificado_parcelario` | `VARCHAR(120)` | Sí | — | Folio del certificado parcelario oficial. | CERTIFICADO | Acreditación jurídica |
+| `parcela` | `folio_derechos` | `VARCHAR(120)` | Sí | — | Folio registral de derechos agrarios. | FOLIO | Acreditación jurídica |
+| `parcela` | `constancia_vigencia_fecha` | `DATE` | Sí | — | Fecha validada de la constancia emitida por RAN; textos mixtos permanecen en trazabilidad. | CONSTANCIA | Soporte de vigencia |
 
 ---
 
@@ -259,7 +259,7 @@ paginación inválida producen 422; siguen aplicándose autenticación y roles.
 `uq_persona_curp` conserva su definición: único sobre `upper(curp)` para
 Personas activas con CURP no nulo, sin `btrim`. Por ello la búsqueda normalizada
 puede devolver varias coincidencias visibles. No se introduce unicidad de RFC,
-normalización de escrituras ni cambios de esquema; el esquema continúa en 027.
+normalización de escrituras ni cambios de esquema; el esquema vigente es 028.
 La selección no crea relaciones y no amplía permisos de captura o edición.
 
 ## 5. Afectaciones y Unidades Agrarias
@@ -268,16 +268,16 @@ La selección no crea relaciones y no amplía permisos de captura o edición.
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `afectacion` | `id_afectacion` | `INTEGER` | No | PK | Identificador del subexpediente de afectación. | Sistema | `/api/afectaciones` |
+| `afectacion` | `id_afectacion` | `INTEGER` | No | PK | Identificador del subexpediente de afectación. | Sistema | `/api/afectaciones/{id_afectacion}` |
 | `afectacion` | `id_proyecto_nucleo` | `INTEGER` | No | `proyecto_nucleo` | Proyecto-núcleo propietario. | Fila Excel | Agrupador maestro |
-| `afectacion` | `id_parcela` | `INTEGER` | Sí | `parcela.id_parcela` | Parcela afectada (sólo en ruta individual). | NO PARCELA | Null en colectivos |
-| `afectacion` | `tipo_afectacion` | `VARCHAR(30)` | No | — | `colectiva` o `individual`. | Ámbito | Bifurcación funcional |
+| `unidad_agraria` | `id_parcela` | `INTEGER` | Sí | `parcela.id_parcela` | Parcela del destino, cuando corresponde. | NO PARCELA | Afectacion se relaciona mediante AfectacionUnidadAgraria, sin FK directa a Parcela |
+| `afectacion` | `tipo_afectacion` | `VARCHAR(20)` | No | — | `colectivo` o `individual`. | Ámbito | Bifurcación funcional |
 | `afectacion` | `id_tipo_cop_operativo` | `BIGINT` | Sí | `catalogo_operativo` | Clasificación COP (`ORIGEN`, etc.). | TIPO COP | Reporting dimensional |
-| `afectacion` | `superficie_preliminar_ha` | `NUMERIC(14,7)` | Sí | — | Superficie estimada inicialmente en campo. | SUP. PRELIMINAR | Referencia técnica |
-| `afectacion` | `superficie_afectada_ha` | `NUMERIC(14,7)` | Sí | — | **Superficie administrativa capturada.** | SUP. AFECTADA | Cómputo y reporting administrativo |
-| `afectacion` | `avaluo_monto` | `NUMERIC(14,2)` | Sí | — | Monto determinado por INDAABIN. | AVALÚO MAESTRO | Referencia indemnizatoria |
-| `unidad_agraria` | `id_destino_superficie` | `BIGINT` | No | `catalogo_operativo` | Destino de suelo (TUC, canal, camino, etc.). | DESTINO | Catálogo operativo |
-| `afectacion_unidad_agraria` | `superficie_afectada_ha` | `NUMERIC(14,7)` | No | — | Superficie física exacta por destino de suelo. | SUP. DESTINO | Desglose multidestino |
+| `afectacion` | `superficie_preliminar_ha` | `NUMERIC(15,7)` | Sí | — | Superficie estimada inicialmente en campo. | SUP. PRELIMINAR | Referencia técnica |
+| `afectacion` | `superficie_afectada_ha` | `NUMERIC(15,7)` | Sí | — | **Superficie administrativa capturada.** | SUP. AFECTADA | Cómputo y reporting administrativo |
+| `afectacion` | `avaluo_monto` | `NUMERIC(18,2)` | Sí | — | Monto determinado por INDAABIN. | AVALÚO MAESTRO | Referencia indemnizatoria |
+| `unidad_agraria` | `id_destino_superficie` | `BIGINT` | Sí | `catalogo_operativo` | Destino de suelo (TUC, canal, camino, etc.). | DESTINO | Catálogo operativo |
+| `afectacion_unidad_agraria` | `superficie_afectada_ha` | `NUMERIC(15,7)` | Sí | — | Superficie física exacta por destino de suelo. | SUP. DESTINO | Desglose multidestino |
 
 ---
 
@@ -293,7 +293,7 @@ La selección no crea relaciones y no amplía permisos de captura o edición.
 | `asamblea` | `id_tipo_cop_operativo` | `BIGINT` | Sí | `catalogo_operativo` | Dimensión COP (`ORIGEN`, `ADICIONAL`, etc.). | TIPO COP | Reporting dimensional |
 | `asamblea` | `proposito` / `resultado` | `TEXT` | Sí | — | Objetivo y acta sintética de la asamblea. | Celdas notas | Expediente |
 | `asamblea_convocatoria` | `id_convocatoria` | `BIGINT` | No | PK | Identificador de la convocatoria. | Sistema | `/api/asambleas/{id}/convocatorias` |
-| `asamblea_convocatoria` | `ordinal` | `SMALLINT` | No | — | Número de convocatoria (1 = 1ª, 2 = 2ª, etc.). | 1A / 2A | Quórum legal Ley Agraria |
+| `asamblea_convocatoria` | `ordinal` | `INTEGER` | No | — | Número de convocatoria (1 = 1ª, 2 = 2ª, etc.). | 1A / 2A | Quórum legal Ley Agraria |
 | `asamblea_convocatoria` | `fecha_expedicion` | `DATE` | Sí | — | Fecha en que se fijó la convocatoria. | EXPEDICIÓN | Validez temporal |
 | `asamblea_convocatoria` | `fecha_programada` | `DATE` | Sí | — | Fecha agendada para la asamblea. | PROGRAMADA | Hito programado |
 | `asamblea_convocatoria` | `fecha_realizacion` | `DATE` | Sí | — | Fecha en que efectivamente se desahogó. | REALIZADA | Hito de asamblea |
@@ -307,17 +307,17 @@ La selección no crea relaciones y no amplía permisos de captura o edición.
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `convenio` | `id_convenio` | `INTEGER` | No | PK | Identificador del convenio celebrado. | Sistema | `/api/convenios` |
-| `convenio` | `ambito` | `VARCHAR(30)` | No | — | `colectivo` o `individual`. | Ámbito | Bifurcación funcional |
-| `convenio` | `tipo_convenio` | `VARCHAR(50)` | No | — | `cop_original`, `modificatorio`, `ampliacion`... | TIPO CONVENIO | Catálogo contractual |
-| `convenio` | `modalidad_especial` | `VARCHAR(50)` | Sí | — | `permuta` u otras modalidades excepcionales. | MODALIDAD | Tratamiento de permuta |
+| `convenio` | `id_convenio` | `INTEGER` | No | PK | Identificador del convenio celebrado. | Sistema | `/api/convenios/{id_convenio}` |
+| `convenio` | `ambito` | `VARCHAR(20)` | No | — | `colectivo` o `individual`. | Ámbito | Bifurcación funcional |
+| `convenio` | `tipo_convenio` | `VARCHAR(40)` | Sí | — | `cop_original`, `modificatorio`, `ampliacion`... | TIPO CONVENIO | Catálogo contractual |
+| `convenio` | `modalidad_especial` | `VARCHAR(30)` | Sí | — | `permuta` u otras modalidades excepcionales. | MODALIDAD | Tratamiento de permuta |
 | `convenio` | `id_asamblea_autorizacion` | `INTEGER` | Sí | `asamblea.id_asamblea` | Asamblea que autorizó la firma (colectivo). | ASAMBLEA | Null en individuales |
 | `convenio` | `fecha_programada_firma` | `DATE` | Sí | — | Fecha meta de formalización. | PROG. FIRMA | Programación de convenio |
 | `convenio` | `fecha_firma` | `DATE` | Sí | — | **Fecha real de firma del convenio.** | FIRMA REAL | Hito de formalización |
-| `convenio` | `superficie_ha` | `NUMERIC(14,7)` | Sí | — | Superficie total amparada en el instrumento. | SUPERFICIE | Declarado en instrumento |
-| `convenio` | `monto_100` | `NUMERIC(14,2)` | Sí | — | **Importe pactado total del convenio.** | MONTO 100% | **NO ADITIVO** en multidestino |
-| `convenio_afectacion` | `id_convenio` / `id_afectacion` | `INTEGER` | No | PK compuesta | Relación N:M entre convenios y afectaciones. | Cruce operativo | Cobertura sin duplicar montos |
-| `convenio_compareciente` | `id_persona` | `BIGINT` | No | `persona.id_persona` | Comparecientes (titulares o comisariados). | FIRMANTES | Acreditación de partes |
+| `convenio` | `superficie_ha` | `NUMERIC(15,7)` | Sí | — | Superficie total amparada en el instrumento. | SUPERFICIE | Declarado en instrumento |
+| `convenio` | `monto_100` | `NUMERIC(18,2)` | Sí | — | **Importe pactado total del convenio.** | MONTO 100% | **NO ADITIVO** en multidestino |
+| `convenio_afectacion` | `id_convenio` / `id_afectacion` | `INTEGER` | No | FKs; pareja única cuando activa | Relación N:M entre convenios y afectaciones. | Cruce operativo | Cobertura sin duplicar montos |
+| `convenio_compareciente` | `id_persona` | `INTEGER` | No | `persona.id_persona` | Comparecientes (titulares o comisariados). | FIRMANTES | Acreditación de partes |
 
 ---
 
@@ -327,15 +327,15 @@ La selección no crea relaciones y no amplía permisos de captura o edición.
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `tramite_ran` | `id_tramite_ran` | `INTEGER` | No | PK | Identificador del expediente registral. | Sistema | `/api/tramites-ran` |
+| `tramite_ran` | `id_tramite_ran` | `BIGINT` | No | PK | Identificador del expediente registral. | Sistema | `/api/tramites-ran` |
 | `tramite_ran` | `id_asamblea` | `INTEGER` | Sí | `asamblea.id_asamblea` | Vinculado a acta de asamblea (exclusivo). | RAN ACTA | Inscripción de asamblea |
 | `tramite_ran` | `id_convenio` | `INTEGER` | Sí | `convenio.id_convenio` | Vinculado a convenio COP (exclusivo). | RAN CONVENIO | Inscripción de convenio |
 | `tramite_ran` | `id_orv` | `INTEGER` | Sí | `orv.id_orv` | Vinculado a acta de elección ORV. | RAN ORV | Inscripción de directiva |
 | `tramite_ran` | `fecha_programada_ingreso` | `DATE` | Sí | — | Fecha agendada de presentación ante el RAN. | PROG. INGRESO | Planificación registral |
 | `tramite_ran_evento` | `id_tipo_evento` | `BIGINT` | No | `catalogo_operativo` | `ingreso`, `prevencion`, `inscripcion`, etc. | Hitos RAN | Línea de tiempo registral |
-| `tramite_ran_evento` | `fecha_evento` | `DATE` | No | — | Fecha formal del sello o actuación del RAN. | FECHA INGRESO / INSCRIPCIÓN | Fechas de hito oficiales |
-| `tramite_ran_evento` | `numero_solicitud` | `VARCHAR(100)` | Sí | — | Número oficial de trámite / código de barras. | NO. SOLICITUD | Seguimiento en portal RAN |
-| `tramite_ran_evento` | `calificacion` | `VARCHAR(50)` | Sí | — | Calificación intermedia (favorable / observaciones). | CALIFICACIÓN | No equivale a inscripción |
+| `tramite_ran_evento` | `fecha_evento` | `DATE` | Sí | — | Fecha formal del sello o actuación del RAN. | FECHA INGRESO / INSCRIPCIÓN | Fechas de hito oficiales |
+| `tramite_ran_evento` | `numero_solicitud` | `VARCHAR(150)` | Sí | — | Número oficial de trámite / código de barras. | NO. SOLICITUD | Seguimiento en portal RAN |
+| `tramite_ran_evento` | `calificacion` | `TEXT` | Sí | — | Calificación intermedia (favorable / observaciones). | CALIFICACIÓN | No equivale a inscripción |
 
 ---
 
@@ -345,15 +345,15 @@ La selección no crea relaciones y no amplía permisos de captura o edición.
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `tramite_fifonafe` | `id_tramite_fifonafe` | `INTEGER` | No | PK | Identificador de la solicitud fiduciaria. | Sistema | `/api/fifonafe` |
+| `tramite_fifonafe` | `id_tramite_fifonafe` | `INTEGER` | No | PK | Identificador de la solicitud fiduciaria. | Sistema | `/api/fifonafe/{id_tramite_fifonafe}` |
 | `tramite_fifonafe` | `id_proyecto_nucleo` | `INTEGER` | No | `proyecto_nucleo` | Proyecto-núcleo propietario. | Fila Excel | Alcance institucional |
-| `tramite_fifonafe` | `ambito` | `VARCHAR(30)` | No | — | `colectivo` o `individual`. | Ámbito | Regla de los 4 oficios |
+| `tramite_fifonafe` | `ambito` | `VARCHAR(20)` | No | — | `colectivo` o `individual`. | Ámbito | Cadena histórica v1; v2 aplica evidencia integral de 008 |
 | `tramite_fifonafe` | `hay_conflictos` | `BOOLEAN` | Sí | Triestado | Resultado del análisis de conflictos sociales. | NO CONFLICTOS | Semántica independiente |
 | `tramite_fifonafe` | `acuse_fifonafe_fecha` | `DATE` | Sí | — | Fecha del sello de recepción de FIFONAFE. | ACUSE | Evidencia fiduciaria |
-| `tramite_fifonafe_evento` | `id_tipo_evento` | `BIGINT` | No | `catalogo_operativo` | Identifica uno de los 4 oficios formales. | CC:CF | Cadena de correspondencia |
-| `tramite_fifonafe_evento` | `numero_oficio` | `VARCHAR(100)` | Sí | — | Número oficial de correspondencia. | NO. OFICIO | Trazabilidad documental |
-| `tramite_fifonafe_evento` | `fecha_oficio` | `DATE` | Sí | — | Fecha asentada en el oficio. | FECHA OFICIO | `MAX(fecha_oficio)` para cierre |
-| `tramite_fifonafe_afectacion` | `id_tramite_fifonafe` / `id_afectacion` | `INTEGER` | No | PK compuesta | Afectaciones y parcelas cubiertas. | Cruce fiduciario | Cobertura N:M sin duplicar |
+| `tramite_fifonafe_evento` | `id_tipo_evento` | `BIGINT` | No | `catalogo_operativo` | Tipo catalogado: oficios históricos y eventos v2 de 008. | CC:CF | Cadena de correspondencia |
+| `tramite_fifonafe_evento` | `numero_oficio` | `VARCHAR(150)` | Sí | — | Número oficial de correspondencia. | NO. OFICIO | Trazabilidad documental |
+| `tramite_fifonafe_evento` | `fecha_oficio` | `DATE` | Sí | — | Fecha asentada en el oficio. | FECHA OFICIO | Fecha documental; MAX en indicador legado, hitos separados en v2 |
+| `tramite_fifonafe_afectacion` | `id_tramite_fifonafe` / `id_afectacion` | `INTEGER` | No | FKs; pareja única cuando activa | Afectaciones y parcelas cubiertas. | Cruce fiduciario | Cobertura N:M sin duplicar |
 
 ---
 
@@ -361,18 +361,24 @@ La selección no crea relaciones y no amplía permisos de captura o edición.
 
 ### 10.1 `indemnizacion` y `pago`
 
+Indemnizacion aplica a afectaciones colectivas e individuales. Su estatus admite
+`pendiente`, `programado`, `en_proceso`, `completo`, `pagado`, `cancelado` y `otro`
+(con descripción). No tiene columna `monto_total`: el avalúo está en Afectacion,
+el monto pactado en Convenio y los desembolsos en Pago, sin equivalencia automática.
+El bloque/estatus de ambos Excel se revalidó en
+[FUENTES_Y_COBERTURA_EXCEL.md §3.4](FUENTES_Y_COBERTURA_EXCEL.md#34-indemnización-colectiva-e-individual-evidencia-revalidada).
+
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `indemnizacion` | `id_indemnizacion` | `INTEGER` | No | PK | Identificador del expediente indemnizatorio. | Sistema | `/api/indemnizaciones` |
+| `indemnizacion` | `id_indemnizacion` | `INTEGER` | No | PK | Identificador del expediente indemnizatorio. | Sistema | `/api/afectaciones/{id_afectacion}/indemnizacion` |
 | `indemnizacion` | `id_afectacion` | `INTEGER` | No | `afectacion.id_afectacion` | Afectación compensada (máximo 1 activa). | Fila Excel | Vínculo físico |
-| `indemnizacion` | `estatus` | `VARCHAR(50)` | No | — | `pendiente`, `en_proceso`, `pagado`, etc. | ESTATUS PAGO | Estado administrativo |
+| `indemnizacion` | `estatus` | `VARCHAR(30)` | No | — | `pendiente`, `en_proceso`, `pagado`, etc. | ESTATUS PAGO | Estado administrativo |
 | `indemnizacion` | `fecha_resolucion` | `DATE` | Sí | — | **Fecha legal en que se resolvió la indemnización.** | FECHA RESOLUCIÓN | **Hito de indemnización resuelta** |
-| `indemnizacion` | `monto_total` | `NUMERIC(14,2)` | Sí | — | Importe global determinado a indemnizar. | MONTO INDEMNIZACIÓN | Balance económico |
 | `indemnizacion` | `fecha_entrega_expediente_pa` | `DATE` | Sí | — | Fecha de entrega del expediente SICT a PA. | ENTREGA SICT/PA | Trazabilidad interinstitucional |
-| `pago` | `id_pago` | `BIGINT` | No | PK | Identificador del desembolso real. | Sistema | `/api/pagos` |
+| `pago` | `id_pago` | `INTEGER` | No | PK | Identificador del desembolso real. | Sistema | `/api/indemnizaciones/{id_indemnizacion}/pagos` |
 | `pago` | `id_indemnizacion` | `INTEGER` | No | `indemnizacion` | Indemnización amparada. | Vínculo pago | Cadena canónica financiera |
 | `pago` | `fecha_pago` | `DATE` | No | — | **Fecha real de entrega/dispersión del recurso.** | FECHA PAGO | **Hito de pago efectivo** |
-| `pago` | `monto` | `NUMERIC(14,2)` | No | — | Cantidad líquida pagada en el evento. | MONTO PAGADO | Agregación económica |
+| `pago` | `monto` | `NUMERIC(18,2)` | No | — | Cantidad líquida pagada en el evento. | MONTO PAGADO | Agregación económica |
 | `pago` | `beneficiario_nombre` | `VARCHAR(300)` | No | — | Persona o núcleo que recibió el recurso. | BENEFICIARIO | Comprobación de entrega |
 
 ---
@@ -389,8 +395,8 @@ La selección no crea relaciones y no amplía permisos de captura o edición.
 | `documento` | `descripcion` | `TEXT` | Sí | — | Detalle libre del documento; obligatorio y no vacío para OTRO. | Detalle/observación | Validación Python y trigger SQL. |
 | `documento` | `fecha_documento` | `DATE` | Sí | — | Fecha propia del documento físico. | FECHA OFICIO | Metadato jurídico |
 | `documento` | `numero_folio` | `VARCHAR(150)` | Sí | — | Número de oficio, acta o folio impreso. | FOLIO / NO. OFICIO | Identificación documental |
-| `documento_version` | `id_version` | `BIGINT` | No | PK | Versión inmutable del archivo digital. | Sistema | Descarga de archivos |
-| `documento_version` | `sha256` | `CHAR(64)` | No | — | Hash criptográfico para integridad. | Archivo | Detección de alteración |
+| `documento_version` | `id_documento_version` | `BIGINT` | No | PK | Versión inmutable del archivo digital. | Sistema | Descarga de archivos |
+| `documento_version` | `hash_sha256` | `CHAR(64)` | No | — | Hash criptográfico para integridad. | Archivo | Detección de alteración |
 | `documento_vinculo` | `entidad_tipo` / `entidad_id` | `VARCHAR(50)` / `INTEGER` | No | Polimórfico | Entidad asociada (convenio, asamblea, actividad_campo...). | Asociación | Vinculación y aislamiento |
 
 `chk_documento_vinculo_tipo` admite desde 027 los 22 tipos de 026 más `actividad_campo`. El trigger de objetivo reutiliza `fn_objetivo_controlado_existe`; `fn_objetivo_requisito_en_pn` y el CHECK de `expediente_requisito` ya admitían actividades y permanecen intactos. El vínculo conserva auditoría y baja lógica.
@@ -449,11 +455,11 @@ necesitará un mapeo aprobado; ni OTRO ni CONVENIO se asignan automáticamente.
 
 | Entidad | Campo / Relación | Tipo SQL | Nullable | FK / Ref | Significado Funcional | Origen Excel | Uso / API / Reporting |
 |---|---|---|---|---|---|---|---|
-| `seguimiento_evento` | `id_seguimiento_evento` | `BIGINT` | No | PK | Identificador del evento histórico. | Sistema | `/api/seguimiento` |
+| `seguimiento_evento` | `id_seguimiento_evento` | `BIGINT` | No | PK | Identificador del evento histórico. | Sistema | `/api/seguimiento/{id_seguimiento_evento}` |
 | `seguimiento_evento` | `id_proyecto_nucleo` | `INTEGER` | No | `proyecto_nucleo` | Proyecto-núcleo sobre el que incide. | Fila Excel | Pertenencia |
 | `seguimiento_evento` | `id_tipo_evento` | `BIGINT` | No | `catalogo_operativo` | `suspension`, `reapertura`, `cierre`, etc. | Hechos de campo | Transiciones |
 | `seguimiento_evento` | `id_motivo` | `BIGINT` | Sí | `catalogo_operativo` | `expropiacion_directa`, `juicio`, etc. | Motivos Excel | Justificación |
-| `seguimiento_evento` | `fecha_evento` | `DATE` | No | — | Fecha en que ocurrió el suceso. | FECHA EVENTO | Cronología determinista |
+| `seguimiento_evento` | `fecha_evento` | `DATE` | Sí | — | Fecha en que ocurrió el suceso. | FECHA EVENTO | Cronología determinista |
 | `trazabilidad_fuente` | `archivo` | `VARCHAR(255)` | No | — | Nombre del libro Excel de origen; conserva la procedencia de cada columna parcelaria. | Archivo auditado | Trazabilidad de ingesta |
 | `trazabilidad_fuente` | `hoja` / `fila` / `columna` | `VARCHAR` / `INTEGER` | Sí | — | Coordenadas exactas de cada valor fuente en el libro Excel. | Hoja / Columna | Auditoría de migración |
 | `trazabilidad_fuente` | `tratamiento` | `VARCHAR(30)` | No | — | `PERSISTIR`, `DERIVAR`, `REVISAR`, etc. | Matriz cobertura | Verificación de integridad |
@@ -474,9 +480,14 @@ necesitará un mapeo aprobado; ni OTRO ni CONVENIO se asignan automáticamente.
 | `vw_seguimiento_estado_actual` | Estado vigente por proyecto-núcleo y objetivo. | `id_proyecto_nucleo`, `entidad_tipo`, `entidad_id`, `estado_actual`, `tipo_ultimo_evento`, `motivo_actual`, `fecha_ultimo_evento`. | Computa deterministamente el estado vigente basándose en el evento más reciente sin alterar registros base. |
 
 
-## Conciliación GIS por proyecto — contrato 025
+## Conciliación GIS por proyecto — base 025 e historia 026
 
-### Entidades complementarias nuevas
+Las tablas y reglas de 025 se conservan y amplían por 026. La versión actualmente
+utilizada por el código es `conciliacion-v3-historia`; `conciliacion-v2` permanece
+como identificador histórico. Las métricas `ST_Area`/áreas GIS son auxiliares,
+nunca superficie oficial ni sustitutos de `superficie_afectada_ha` o `superficie_ha`.
+
+### Entidades cartográficas introducidas por 025
 
 | Tabla | Clave y referencias | Campos funcionales | Restricciones y uso |
 |---|---|---|---|
@@ -490,11 +501,13 @@ Las geometrías web son `geometry(MULTIPOLYGON,4326)`. Las geometrías de trabaj
 
 `vw_gis_parcela_proyecto` contiene `id_proyecto`, `id_proyecto_nucleo`, `id_parcela`, `id_nucleo`. Deriva exclusivamente de `ProyectoNucleo → Afectacion → AfectacionUnidadAgraria → UnidadAgraria → Parcela`, con todos los registros activos y núcleos concordantes. No usa intersección espacial.
 
+Desde B-07, `/mapa` lee la geometría activa y vigente por proyecto de núcleo/parcela; sólo si falta utiliza el campo global legacy del registro administrativo. Las parcelas se filtran siempre mediante `vw_gis_parcela_proyecto`, también para el fallback. Las versiones no vigentes no se publican y la lectura no modifica datos administrativos.
+
 ### Ampliaciones de tablas existentes
 
 | Tabla | Campo nuevo | Tipo / significado |
 |---|---|---|
-| `importacion_archivo` | `version_pipeline` | varchar(40), no nulo; histórico `legacy-v1`, nuevo `conciliacion-v2`. |
+| `importacion_archivo` | `version_pipeline` | varchar(40), no nulo; históricos `legacy-v1` y `conciliacion-v2`; vigente desde 026 `conciliacion-v3-historia`. |
 | `importacion_archivo` | `srid_trabajo` | integer no nulo, FK `spatial_ref_sys`; CRS de trabajo fijado al procesar. |
 | `importacion_archivo` | `crs_fuente_wkt` | text nullable; WKT del CRS leído por GDAL. |
 | `importacion_feature` | `geometria_original` | geometry nullable, sin typmod; conserva WKB/CRS/dimensión de origen. |
@@ -509,7 +522,7 @@ Las geometrías web son `geometry(MULTIPOLYGON,4326)`. Las geometrías de trabaj
 
 Se conserva en `importacion_archivo` el nombre original/almacenado, tamaño, SHA, proyecto, objetivo, fuente/fecha, estados, contadores y reporte existentes. El archivo almacenado es temporal: el reporte declara `archivo_original_retenido = false`; se conserva trazabilidad técnica mediante WKB y atributos autorizados, sin retener la copia con posibles datos personales.
 
-`importacion_feature` conserva índice, FID externo, capa, geometría 4326 normalizada, atributos originales/normalizados permitidos, errores, advertencias, transformaciones, aceptación y auditoría existentes. En `conciliacion-v2`, `registro_destino_id` sólo se establece al confirmar: para núcleos es `id_proyecto_nucleo`; para parcelas es `id_parcela` (el candidato conserva además el vínculo del proyecto); para DDV es `id_derecho_via`. Los triggers interpretan el campo según objetivo y versión, preservando el contrato histórico.
+`importacion_feature` conserva índice, FID externo, capa, geometría 4326 normalizada, atributos originales/normalizados permitidos, errores, advertencias, transformaciones, aceptación y auditoría existentes. Desde el contrato histórico `conciliacion-v2`, conservado en el vigente `conciliacion-v3-historia`, `registro_destino_id` sólo se establece al confirmar: para núcleos es `id_proyecto_nucleo`; para parcelas es `id_parcela` (el candidato conserva además el vínculo del proyecto); para DDV es `id_derecho_via`. Los triggers interpretan el campo según objetivo y versión, preservando el contrato histórico.
 
 La deduplicación activa usa `(id_proyecto, tipo_objetivo, sha256, version_pipeline, srid_trabajo)`. `PARCELA` y `Num_parcela` nunca se fusionan ni tienen precedencia global. `coincidencias` es un array de criterios observados, no un contenedor arbitrario de destinos: las relaciones administrativas permanecen normalizadas mediante FKs.
 
@@ -540,3 +553,16 @@ Las tablas de versiones de núcleo/parcela/DDV de 025 se reutilizan, con payload
 inmutables y una sola vigente. Las revisiones técnicas no cambian pertenencia,
 afectaciones, convenios, trámites, superficies, avalúos ni eventos. Se preserva
 TRANSVERSALES como tipo COP, sin implementar obras transversales GIS.
+
+
+### Campos de API derivados, sin almacenamiento adicional
+
+Las proyecciones de lectura descritas en [API.md §11](API.md#11-proyecciones-de-lectura-para-el-frontend-esquema-028)
+añaden nombres mínimos de actores GIS y `destino` legible de revisiones, un
+listado documental por procedencia y totales de paginación por header.
+No son columnas, tablas ni relaciones nuevas. Usuario permanece intacto;
+los nombres se consultan en bloque y las etiquetas de candidatos se obtienen
+del snapshot existente `importacion_conciliacion_ciclo.universo_destinos`.
+La versión documental vigente de la proyección es el máximo `numero_version`
+de DocumentoVersion. Los vínculos y referencias de ExpedienteRequisito mantienen
+su identidad, procedencia y autorizaciones actuales. No se añade migración 029.
