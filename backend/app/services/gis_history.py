@@ -131,34 +131,8 @@ def reconcile(db, import_id, data, user):
 
 
 def cycle_detail(db, record, cycle_id):
-    cycle = db.query(models.ImportacionConciliacionCiclo).filter_by(
-        id_importacion=record.id_importacion,id_ciclo=cycle_id).first()
-    if cycle is None: raise HTTPException(404, "Ciclo no encontrado en la importación")
-    results = db.query(models.ImportacionConciliacionResultado).filter_by(id_ciclo=cycle_id).order_by(
-        models.ImportacionConciliacionResultado.id_importacion_feature).all()
-    items=[]
-    for result in results:
-        decisions = db.query(models.ImportacionFeatureDecision).filter_by(
-            id_ciclo=cycle_id,id_importacion_feature=result.id_importacion_feature).order_by(
-            models.ImportacionFeatureDecision.id_decision).all()
-        candidates = db.query(models.ImportacionFeatureCandidato).filter_by(
-            id_ciclo=cycle_id,id_importacion_feature=result.id_importacion_feature).order_by(
-            models.ImportacionFeatureCandidato.id_candidato).all()
-        from ..schemas import CandidatoGisResponse,DecisionGisResponse,CicloGisResponse
-        state=result.estado_matching
-        if decisions:
-            last=decisions[-1].accion
-            if last in {'confirmar','ignorar','seleccionar'}:
-                state={'confirmar':'confirmado','ignorar':'ignorado','seleccionar':'seleccionado'}[last]
-            elif last=='rechazar':
-                remaining=[c for c in candidates if c.estado!='rechazado']
-                state='rechazado' if not remaining else 'ambiguo' if len(remaining)>1 else 'candidato'
-        items.append({"id_importacion_feature":result.id_importacion_feature,
-                      "estado_matching":result.estado_matching,
-                      "estado_resultado":state,
-                      "candidatos":[CandidatoGisResponse.model_validate(c).model_dump(mode="json") for c in candidates],
-                      "decisiones":[DecisionGisResponse.model_validate(d).model_dump(mode="json") for d in decisions]})
-    return {**CicloGisResponse.model_validate(cycle).model_dump(mode="json"),"features":items}
+    from .gis_read_models import cycle_detail as project_cycle
+    return project_cycle(db, record, cycle_id)
 
 
 def record_revision(db, user, **values):
@@ -322,11 +296,8 @@ def require_revision(db, revision_id, user, *, mode="read"):
 
 
 def revision_detail(db, revision_id, user):
-    revision = require_revision(db,revision_id,user)
-    row = db.execute(text("SELECT * FROM vw_revision_cambio_gis_estado WHERE id_revision=:r"),{"r":revision.id_revision}).mappings().one()
-    from ..schemas import RevisionGisDecisionResponse
-    decisions = db.query(models.RevisionCambioGisDecision).filter_by(id_revision=revision_id).order_by(models.RevisionCambioGisDecision.id_decision).all()
-    return {**dict(row),"decisiones":[RevisionGisDecisionResponse.model_validate(d).model_dump(mode="json") for d in decisions]}
+    from .gis_read_models import revision_detail as project_revision
+    return project_revision(db, revision_id, user)
 
 
 def decide_revision(db, revision_id, data, user):

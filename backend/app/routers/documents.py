@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services import documents as service
+from ..services.document_read_models import consolidated_documents
 from ..services.access import (
     require_document_access,
     require_document_target_access,
@@ -16,6 +17,19 @@ from ..services.access import (
 router = APIRouter(tags=["Documentos"])
 READ_ROLES = ["admin", "operador", "visualizador", "geografo"]
 CAPTURE_ROLES = ["admin", "operador"]
+
+
+@router.get(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/documentos",
+    response_model=list[schemas.DocumentoConsolidadoResponse],
+    description="Soporte documental consolidado de sólo lectura por procedencia. Incluye vínculos activos y referencias de requisitos con vínculo autorizado dentro del alcance; versión vigente = mayor numero_version existente.",
+)
+def list_consolidated_documents(
+    id_proyecto_nucleo: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    return consolidated_documents(db, id_proyecto_nucleo, user)
 
 
 @router.get(
