@@ -1,5 +1,7 @@
 # QA: auditoría de actividad de sesión — migración 020
 
+> **Alcance histórico (aclaración documental, 2026-10-08):** Evidencia histórica del 1 de octubre de 2026, centrada en 020. Los HEAD, bases, numeraciones GIS y máximos de esquema citados corresponden a ese corte. El linaje canónico vigente es 001–028, documentado en [MIGRACIONES.md](MIGRACIONES.md); los resultados originales se conservan.
+
 Fecha: 2026-10-01. Rama: `fix/auditoria-heartbeat-sesion`.
 
 ## Diagnóstico

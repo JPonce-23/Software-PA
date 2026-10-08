@@ -1,5 +1,7 @@
 # Informe de conciliación GIS — 2026-10-05
 
+> **Alcance histórico (aclaración documental, 2026-10-08):** Informe histórico de la fase previa a la renumeración canónica y a 026. Las referencias a 024 GIS y los límites de publicación del mapa describen aquel corte. El contrato vigente usa `conciliacion-v3-historia`, incluye ciclos/revisiones y B-07 publica geometrías vigentes por proyecto con fallback legacy; véanse [MIGRACIONES.md](MIGRACIONES.md), [ARQUITECTURA.md](ARQUITECTURA.md) y [API.md](API.md). Se conservan los inventarios y resultados originales.
+
 Repositorio Software-PA; rama `feature/backend-importacion-geoespacial`. Sin commit ni push. La única base utilizada para migraciones y tests fue `software_pa_test`.
 
 ## 1. AUDITORÍA DE LOS CUATRO GPKG

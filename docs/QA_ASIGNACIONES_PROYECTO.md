@@ -1,5 +1,7 @@
 # QA: ciclo administrativo de asignaciones a proyectos
 
+> **Alcance histórico (aclaración documental, 2026-10-08):** Evidencia histórica del 2 de octubre de 2026. Las referencias a esquema 020, HEAD, bases y pruebas describen aquella validación, no el máximo canónico actual (028). Véanse [API.md](API.md) y [MIGRACIONES.md](MIGRACIONES.md); se conservan los resultados y el informe anterior.
+
 ## Correcciones de auditoría — validación actual, 2026-10-02
 
 Se conserva la implementación anterior y se trabaja exclusivamente en
