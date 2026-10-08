@@ -1414,6 +1414,17 @@ class DocumentoVersionResponse(ORMModel):
     fecha_carga: datetime
 
 
+class DocumentoConsolidadoResponse(BaseModel):
+    entidad_tipo: str
+    entidad_id: int
+    origen: str
+    fuente_relacion: Literal["vinculo", "expediente_requisito"]
+    id_documento_vinculo: int | None = None
+    id_expediente_requisito: int | None = None
+    documento: DocumentoResponse
+    version_vigente: DocumentoVersionResponse | None = None
+
+
 class TrazabilidadFuenteCreate(BaseModel):
     archivo: str = Field(min_length=1, max_length=255)
     hoja: str | None = Field(default=None, max_length=255)
@@ -1805,6 +1816,7 @@ class CandidatoGisResponse(ORMModel):
     estado: str
     id_usuario_revision: int | None = None
     fecha_revision: datetime | None = None
+    usuario_revision_nombre: str | None = None
 
 
 class DecisionGisRequest(BaseModel):
@@ -1824,6 +1836,7 @@ class DecisionGisResponse(ORMModel):
     motivo: str | None = None
     creado_por: int
     creado_en: datetime
+    creado_por_nombre: str | None = None
 
 
 class SolicitudGisRequest(BaseModel):
@@ -1862,6 +1875,7 @@ class CicloGisResponse(ORMModel):
     version_algoritmo: str
     universo_destinos: list[dict[str, Any]]
     resumen: dict[str, Any]
+    usuario_nombre: str | None = None
 
 
 class RevisionGisDecisionRequest(SolicitudGisRequest):
@@ -1877,6 +1891,7 @@ class RevisionGisDecisionResponse(ORMModel):
     id_seguimiento_evento: int | None = None
     creado_por: int
     creado_en: datetime
+    creado_por_nombre: str | None = None
 
 
 class ResultadoCicloGisResponse(BaseModel):
@@ -1889,6 +1904,13 @@ class ResultadoCicloGisResponse(BaseModel):
 
 class DetalleCicloGisResponse(CicloGisResponse):
     features: list[ResultadoCicloGisResponse]
+
+
+class DestinoGisResponse(BaseModel):
+    nombre_nucleo: str | None = None
+    municipio: str | None = None
+    entidad: str | None = None
+    numero_parcela: str | None = None
 
 
 class RevisionGisResponse(BaseModel):
@@ -1917,6 +1939,8 @@ class RevisionGisResponse(BaseModel):
     metricas: dict[str,Any]
     creado_en: datetime
     creado_por: int
+    creado_por_nombre: str | None = None
+    destino: DestinoGisResponse | None = None
 
 
 class DetalleRevisionGisResponse(RevisionGisResponse):

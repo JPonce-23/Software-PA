@@ -4,7 +4,7 @@ import json
 from datetime import date, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -12,6 +12,7 @@ from ..database import get_db
 from ..services import geospatial_imports as service
 from ..services import gis_reconciliation as reconciliation
 from ..services import gis_history as history
+from ..services import gis_read_models as reads
 from ..services.access import require_project_access
 
 
@@ -23,19 +24,23 @@ GIS_ROLES = ["admin", "geografo"]
 @router.get(
     "/proyectos/{id_proyecto}/importaciones",
     response_model=list[schemas.ImportacionArchivoResponse],
+    responses=reads.TOTAL_COUNT_RESPONSE,
 )
 def list_imports(
     id_proyecto: int,
+    response: Response,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     require_project_access(db, user, id_proyecto)
-    return db.query(models.ImportacionArchivo).filter(
+    query = db.query(models.ImportacionArchivo).filter(
         models.ImportacionArchivo.id_proyecto == id_proyecto,
         models.ImportacionArchivo.activo.is_(True),
-    ).order_by(models.ImportacionArchivo.fecha_carga.desc()).offset(skip).limit(limit).all()
+    )
+    response.headers["X-Total-Count"] = str(query.count())
+    return query.order_by(models.ImportacionArchivo.fecha_carga.desc()).offset(skip).limit(limit).all()
 
 
 @router.post(
@@ -172,9 +177,11 @@ def get_import(
 @router.get(
     "/importaciones/{id_importacion}/features",
     response_model=list[schemas.ImportacionFeatureResponse],
+    responses=reads.TOTAL_COUNT_RESPONSE,
 )
 def preview_features(
     id_importacion: int,
+    response: Response,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     estado_conciliacion: str | None = Query(default=None),
@@ -187,6 +194,7 @@ def preview_features(
     )
     if estado_conciliacion is not None:
         query = query.filter(models.ImportacionFeature.estado_conciliacion == estado_conciliacion)
+    response.headers["X-Total-Count"] = str(query.count())
     return query.order_by(models.ImportacionFeature.indice_feature).offset(skip).limit(limit).all()
 
 
@@ -225,7 +233,8 @@ def get_reconciliation_summary(id_importacion: int, db: Session=Depends(get_db),
 @router.get("/importaciones/{id_importacion}/features/{id_feature}/candidatos", response_model=list[schemas.CandidatoGisResponse])
 def get_feature_candidates(id_importacion: int, id_feature: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
     service.require_import_access(db,id_importacion,user)
-    return db.query(models.ImportacionFeatureCandidato).filter_by(id_importacion=id_importacion,id_importacion_feature=id_feature).order_by(models.ImportacionFeatureCandidato.id_candidato).all()
+    records = db.query(models.ImportacionFeatureCandidato).filter_by(id_importacion=id_importacion,id_importacion_feature=id_feature).order_by(models.ImportacionFeatureCandidato.id_candidato).all()
+    return reads.with_actor(db, records, schemas.CandidatoGisResponse, "id_usuario_revision", "usuario_revision_nombre")
 
 
 @router.post("/importaciones/{id_importacion}/features/{id_feature}/decisiones", response_model=schemas.ImportacionFeatureResponse)
@@ -238,7 +247,8 @@ def get_feature_decisions(id_importacion: int, id_feature: int, db: Session=Depe
     service.require_import_access(db,id_importacion,user)
     feature=db.query(models.ImportacionFeature).filter_by(id_importacion=id_importacion,id_importacion_feature=id_feature).first()
     if feature is None: raise HTTPException(404,"Feature no encontrada")
-    return db.query(models.ImportacionFeatureDecision).filter_by(id_importacion_feature=id_feature).order_by(models.ImportacionFeatureDecision.id_decision).all()
+    records = db.query(models.ImportacionFeatureDecision).filter_by(id_importacion_feature=id_feature).order_by(models.ImportacionFeatureDecision.id_decision).all()
+    return reads.with_actor(db, records, schemas.DecisionGisResponse)
 
 
 @router.get('/importaciones/{id_importacion}/features/{id_feature}/geometria')
@@ -255,25 +265,28 @@ def get_feature_geometry(id_importacion: int,id_feature: int,db: Session=Depends
 @router.post('/importaciones/{id_importacion}/reconciliar', response_model=schemas.CicloGisResponse, status_code=201)
 def reconcile_import(id_importacion: int, data: schemas.ReconciliarGisRequest,
                      db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
-    return history.reconcile(db,id_importacion,data,user)
+    cycle = history.reconcile(db,id_importacion,data,user)
+    return reads.with_actor(db, [cycle], schemas.CicloGisResponse, "id_usuario", "usuario_nombre")[0]
 
 
-@router.get('/importaciones/{id_importacion}/conciliaciones', response_model=list[schemas.CicloGisResponse])
-def list_cycles(id_importacion: int, skip: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200),
+@router.get('/importaciones/{id_importacion}/conciliaciones', response_model=list[schemas.CicloGisResponse], responses=reads.TOTAL_COUNT_RESPONSE)
+def list_cycles(id_importacion: int, response: Response, skip: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200),
                 db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
     service.require_import_access(db,id_importacion,user)
-    return db.query(models.ImportacionConciliacionCiclo).filter_by(id_importacion=id_importacion).order_by(
-        models.ImportacionConciliacionCiclo.numero_ciclo).offset(skip).limit(limit).all()
+    query = db.query(models.ImportacionConciliacionCiclo).filter_by(id_importacion=id_importacion)
+    response.headers["X-Total-Count"] = str(query.count())
+    records = query.order_by(models.ImportacionConciliacionCiclo.numero_ciclo).offset(skip).limit(limit).all()
+    return reads.with_actor(db, records, schemas.CicloGisResponse, "id_usuario", "usuario_nombre")
 
 
 @router.get('/importaciones/{id_importacion}/conciliaciones/{id_ciclo}',response_model=schemas.DetalleCicloGisResponse)
 def get_cycle(id_importacion: int, id_ciclo: int, db: Session=Depends(get_db),
               user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
-    return history.cycle_detail(db,service.require_import_access(db,id_importacion,user),id_ciclo)
+    return reads.cycle_detail(db,service.require_import_access(db,id_importacion,user),id_ciclo)
 
 
-@router.get('/proyectos/{id_proyecto}/geoespacial/revisiones',response_model=list[schemas.RevisionGisResponse])
-def list_revisions(id_proyecto: int, estado: Literal['pendiente','revisado','no_aplica','aplicado'] | None=None,
+@router.get('/proyectos/{id_proyecto}/geoespacial/revisiones',response_model=list[schemas.RevisionGisResponse], responses=reads.TOTAL_COUNT_RESPONSE)
+def list_revisions(id_proyecto: int, response: Response, estado: Literal['pendiente','revisado','no_aplica','aplicado'] | None=None,
                    tipo_cambio: str | None=None, objetivo: Literal['ddv','nucleo','parcela'] | None=None,
                    id_proyecto_nucleo: int | None=None, desde: datetime | None=None, hasta: datetime | None=None,
                    skip: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200),
@@ -290,16 +303,21 @@ def list_revisions(id_proyecto: int, estado: Literal['pendiente','revisado','no_
         if value is not None:
             clauses.append(f'creado_en {operator} :{name}')
             params[name]=value
-    return [dict(row) for row in db.execute(text('SELECT * FROM vw_revision_cambio_gis_estado WHERE '+
-        ' AND '.join(clauses)+' ORDER BY id_revision DESC OFFSET :skip LIMIT :limit'),params).mappings()]
+    where = ' AND '.join(clauses)
+    response.headers["X-Total-Count"] = str(db.execute(text(
+        'SELECT count(*) FROM vw_revision_cambio_gis_estado WHERE ' + where), params).scalar_one())
+    rows = [dict(row) for row in db.execute(text('SELECT * FROM vw_revision_cambio_gis_estado WHERE '+
+        where+' ORDER BY id_revision DESC OFFSET :skip LIMIT :limit'),params).mappings()]
+    return reads.revisions(db, rows)
 
 
 @router.get('/geoespacial/revisiones/{id_revision}',response_model=schemas.DetalleRevisionGisResponse)
 def get_revision(id_revision: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
-    return history.revision_detail(db,id_revision,user)
+    return reads.revision_detail(db,id_revision,user)
 
 
 @router.post('/geoespacial/revisiones/{id_revision}/decisiones', response_model=schemas.RevisionGisDecisionResponse, status_code=201)
 def decide_revision(id_revision: int, data: schemas.RevisionGisDecisionRequest,
                     db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
-    return history.decide_revision(db,id_revision,data,user)
+    decision = history.decide_revision(db,id_revision,data,user)
+    return reads.with_actor(db, [decision], schemas.RevisionGisDecisionResponse)[0]
