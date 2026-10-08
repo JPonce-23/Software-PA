@@ -1,4 +1,4 @@
-"""SQLAlchemy mappings for the ProyectoNucleo target model (migrations 031-033)."""
+"""SQLAlchemy mappings for the ProyectoNucleo target model (canonical schema 001–028)."""
 
 from datetime import date as date_type
 
@@ -109,7 +109,7 @@ class CatalogoOperativoAlias(Base, AuditableMixin):
 
 
 class Usuario(Base):
-    """Existing authentication principal retained by migration 031."""
+    """Existing authentication principal retained by the canonical baseline 001."""
 
     __tablename__ = "usuario"
 
