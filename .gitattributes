@@ -13,3 +13,4 @@ Dockerfile.* text eol=lf
 *.ps1 text eol=crlf
 
 backend/db/fixtures/catalogo_nucleos_ran.csv -text whitespace=cr-at-eol
+backend/db/fixtures/ran_municipio_inegi_crosswalk.csv -text
