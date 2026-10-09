@@ -1610,7 +1610,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 const etiqueta =
                     documento.titulo ||
-                    documento.tipo_documento ||
+                    window.DocumentosAPI.nombreTipo(documento) ||
                     "Documento";
 
                 const option =

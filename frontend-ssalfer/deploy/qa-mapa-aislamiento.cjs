@@ -15,6 +15,7 @@ const assert=require('node:assert/strict');
             if(pid===a){recibida();await espera;}
             await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'LineString',coordinates:[[-99,19],[-99.01,19.01]]},properties:{tipo:'trazo_proyecto',id:pid,nombre:'Trazo de prueba de aislamiento'}}]})});
         });
+        if (process.env.QA_LOCAL_FILES === '1') await require('./qa-gis-ux-2026-10-06.cjs').locales(page);
         await page.goto(base+'/pages/mapa.html');await page.waitForLoadState('networkidle');
         await page.evaluate(()=>{window.qaCapas=[];const original=L.geoJSON;L.geoJSON=function(feature,...args){if(feature?.properties)qaCapas.push(feature.properties.id_proyecto);return original.call(this,feature,...args);};});
         await page.locator('#selectorProyectoMapa').selectOption(String(a));await solicitud;

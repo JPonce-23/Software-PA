@@ -2,6 +2,7 @@
 <html lang="es">
 
 <head>
+    <script src="/js/utils/proteccion.js"></script>
 
     <meta charset="UTF-8">
 
@@ -24,12 +25,12 @@
 
     <link
         rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+        href="/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css"
     >
 
     <link
         rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        href="/js/vendor/leaflet-1.9.4/leaflet.css"
     >
 
     <link
@@ -39,6 +40,7 @@
         href="/img/LOGOS VERDE/IMAGOTIPO.png"
     >
 
+<link rel="stylesheet" href="/styles/marco.css">
 </head>
 
 
@@ -51,13 +53,7 @@
 
     <aside class="aside">
 
-        <button
-            class="btn-menu"
-            type="button"
-            aria-label="Contraer menú"
-        >
-            <i class="bi bi-list"></i>
-        </button>
+
 
 
         <div class="logo-aside">
@@ -268,6 +264,7 @@
     ====================================================== -->
 
     <main class="contenedor mapa-pagina">
+<p class="ssalfer-mapa-leyenda">Capas oficiales publicadas: las disponibles en el mapa del proyecto. La previsualización se distingue en naranja y aún no está confirmada. El mapa publicado muestra la geometría vigente confirmada; el trazo y el derecho de vía son capas independientes.</p>
 
 
         <!-- ENCABEZADO DEL MAPA -->
@@ -408,6 +405,7 @@
 
                 <div class="mapa-lista-capas">
 
+                    <label class="mapa-opcion-capa mapa-opcion-ddv"><input type="checkbox" id="capaDdv" checked><span><i class="bi bi-bounding-box"></i>Derecho de vía vigente</span></label>
                     <label class="mapa-opcion-capa">
 
                         <input
@@ -465,8 +463,7 @@
                     </h3>
 
                     <p>
-                        El visor representa únicamente las geometrías vigentes
-                        registradas para el proyecto seleccionado.  
+                        Las capas oficiales muestran las geometrías publicadas del proyecto. La capa temporal naranja muestra únicamente la previsualización del archivo.
                     </p>
 
                 </div>
@@ -490,7 +487,6 @@
                     <i class="bi bi-arrow-repeat"></i>
 
                     <div
-                        id="mapaEstadoCarga"
                         class="mapa-estado-carga"
                         role="status"
                     >
@@ -593,7 +589,7 @@
         </div>
 
 
-    
+
         <!-- RESUMEN DEL PROYECTO SELECCIONADO -->
 
         <section
@@ -716,14 +712,7 @@
                             FOOTER
     ====================================================== -->
 
-    <footer class="footer">
-
-        <p>
-            &copy; 2026 Procuraduría Agraria.
-            Todos los derechos reservados.
-        </p>
-
-    </footer>
+    <footer class="footer"><p>© 2026 Procuraduría Agraria. Todos los derechos reservados.</p></footer>
 
 
 
@@ -749,14 +738,16 @@
         colapsado del menú y navegación común. Su bloque de dashboard no se
         ejecuta porque esta página no contiene listaProyectosDashboard.
     -->
-    <script src="/js/dashboard.js"></script>
+    <script src="/js/utils/marco.js"></script>
+<script src="/js/dashboard.js"></script>
 
     <script
-        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        src="/js/vendor/leaflet-1.9.4/leaflet.js"
     ></script>
 
     <!-- Se implementará en la siguiente etapa -->
-    <script src="/js/mapa.js"></script>
+    <script src="/js/api/geoespacial.js"></script>
+<script src="/js/mapa.js"></script>
 
 </body>
 

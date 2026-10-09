@@ -199,6 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     const TIPOS_OBJETIVO = new Set([
+        "ddv", "nucleos", "parcelas",
         "trazo_proyecto",
         "nucleo_agrario",
         "parcela"
@@ -302,6 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function etiquetaTipo(tipo) {
 
         const tipos = {
+            derecho_via_proyecto: "Derecho de vía", nucleo_agrario_gpkg: "Núcleos agrarios", parcela_gpkg: "Parcelas",
 
             trazo_proyecto:
                 "Trazo del proyecto",
@@ -806,7 +808,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
-        return resultados;
+        return window.ProyectosAPI.ordenar(resultados);
 
     }
 
@@ -853,6 +855,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     function seleccionarProyecto(idProyecto) {
+        window.SSALFER_GIS.cambiarProyecto(idProyecto);
         ++revisionProyecto;
         ++revisionHistorial;
         ++revisionPreview;
@@ -925,6 +928,10 @@ document.addEventListener("DOMContentLoaded", () => {
             elementos.tipoObjetivo?.value;
 
 
+        const alcance = document.getElementById("alcanceEntregaGis");
+        alcance.closest("label").hidden = !["nucleos", "parcelas"].includes(tipo);
+        alcance.required = ["nucleos", "parcelas"].includes(tipo);
+        elementos.inputArchivo.accept = tipo === "trazo_proyecto" ? ".geojson,.json,.kml,.gpkg,.zip" : ".gpkg";
         const requiereMapeo =
             tipo === "nucleo_agrario" ||
             tipo === "parcela";
@@ -1162,56 +1169,6 @@ document.addEventListener("DOMContentLoaded", () => {
        IMPORTACIONES - API
     ====================================================== */
 
-    async function obtenerImportacionesProyecto(
-        idProyecto
-    ) {
-
-        const limite = 200;
-
-        const importaciones = [];
-
-        let skip = 0;
-
-
-        while (true) {
-
-            const pagina =
-                await window.ClienteAPI.get(
-                    `/proyectos/${idProyecto}/importaciones?skip=${skip}&limit=${limite}`
-                );
-
-
-            const registros =
-                Array.isArray(pagina)
-                    ? pagina
-                    : [];
-
-
-            importaciones.push(
-                ...registros
-            );
-
-
-            if (
-                registros.length <
-                limite
-            ) {
-
-                break;
-
-            }
-
-
-            skip += limite;
-
-        }
-
-
-        return importaciones;
-
-    }
-
-
     async function obtenerImportacion(
         idImportacion
     ) {
@@ -1223,55 +1180,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    async function obtenerFeatures(
-        idImportacion
-    ) {
-
-        const limite = 500;
-
-        const features = [];
-
-        let skip = 0;
-
-
-        while (true) {
-
-            const pagina =
-                await window.ClienteAPI.get(
-                    `/importaciones/${idImportacion}/features?skip=${skip}&limit=${limite}`
-                );
-
-
-            const registros =
-                Array.isArray(pagina)
-                    ? pagina
-                    : [];
-
-
-            features.push(
-                ...registros
-            );
-
-
-            if (
-                registros.length <
-                limite
-            ) {
-
-                break;
-
-            }
-
-
-            skip += limite;
-
-        }
-
-
-        return features;
-
+    async function obtenerFeatures(idImportacion) {
+        const features=[];
+        for(let skip=0;;skip+=500){const p=await window.GeoespacialAPI.paginaElementos(idImportacion,{skip,limit:500});features.push(...p.items);if(window.GeoespacialAPI.fin(p,skip,500))return features;}
     }
-
 
     /* =====================================================
        HISTORIAL
@@ -1418,7 +1330,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    async function cargarHistorial() {
+    async function cargarHistorial(skip=0) {
         const revision = ++revisionHistorial;
         const idProyectoConsulta = proyectoActivo?.id_proyecto;
 
@@ -1462,12 +1374,20 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
-        const importaciones =
-            await obtenerImportacionesProyecto(
-                proyectoActivo.id_proyecto
-            );
+        const pagina = await window.GeoespacialAPI.paginaImportaciones(idProyectoConsulta,{skip,limit:25});
+        const importaciones = pagina.items;
 
         if (revision !== revisionHistorial || idProyectoConsulta !== proyectoActivo?.id_proyecto) return;
+        document.getElementById("paginacionImportaciones")?.remove();
+        const controles=document.createElement("div");controles.id="paginacionImportaciones";controles.className="ssalfer-gestion-barra";
+        const anterior=document.createElement("button"),siguiente=document.createElement("button"),total=document.createElement("span");
+        anterior.textContent="Anterior";siguiente.textContent="Siguiente";
+        for(const boton of [anterior,siguiente]){boton.type="button";boton.className="btn-secundario";}
+        anterior.disabled=skip===0;siguiente.disabled=window.GeoespacialAPI.fin(pagina,skip,25);
+        anterior.onclick=()=>cargarHistorial(skip-25).catch(window.ClienteAPI.mostrarErrorAPI);siguiente.onclick=()=>cargarHistorial(skip+25).catch(window.ClienteAPI.mostrarErrorAPI);
+        total.textContent=pagina.total==null?`${importaciones.length} importaciones · total no informado`:`${importaciones.length?skip+1:0}–${skip+importaciones.length} de ${pagina.total} importaciones`;
+        controles.append(anterior,siguiente,total);elementos.listaImportaciones.after(controles);
+
 
 
         if (
@@ -2055,6 +1975,10 @@ document.addEventListener("DOMContentLoaded", () => {
         importacion
     ) {
         if (Number(importacion.id_proyecto) !== Number(proyectoActivo?.id_proyecto)) return;
+        if (importacion.version_pipeline !== "legacy-v1" && importacion.tipo_objetivo !== "trazo_proyecto") {
+            importacionActiva = importacion; elementos.seccionPreview.hidden = true;
+            await window.SSALFER_GIS.mostrar(importacion); return;
+        }
         const revision = ++revisionPreview, contexto = revisionProyecto;
 
         importacionActiva =
@@ -2233,11 +2157,10 @@ document.addEventListener("DOMContentLoaded", () => {
         validarArchivo(
             archivoActivo
         );
+        if (["ddv", "nucleos", "parcelas"].includes(tipo) && obtenerExtension(archivoActivo.name) !== "gpkg") throw new Error("Para esta carga selecciona un archivo GeoPackage (.gpkg).");
 
 
-        if (
-            tipo !== "trazo_proyecto"
-        ) {
+        if (["nucleo_agrario", "parcela"].includes(tipo)) {
 
             const campo =
                 elementos.campoIdDestino
@@ -2304,9 +2227,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let mapeo = {};
 
 
-        if (
-            tipo !== "trazo_proyecto"
-        ) {
+        if (["nucleo_agrario", "parcela"].includes(tipo)) {
 
             mapeo = {
 
@@ -2335,6 +2256,10 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
 
+        if (["ddv", "nucleos", "parcelas"].includes(tipo)) {
+            formData.delete("tipo_objetivo"); formData.delete("mapeo");
+            if (tipo !== "ddv") formData.set("alcance_entrega", document.getElementById("alcanceEntregaGis").value);
+        }
         return formData;
 
     }
@@ -2371,10 +2296,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
             const importacion =
-                await window.ClienteAPI.post(
-                    `/proyectos/${idProyectoSeleccionado}/importaciones`,
-                    formData
-                );
+                await (["ddv", "nucleos", "parcelas"].includes(elementos.tipoObjetivo.value)
+                    ? window.GeoespacialAPI.cargar(idProyectoSeleccionado, elementos.tipoObjetivo.value, formData)
+                    : window.ClienteAPI.post(`/proyectos/${idProyectoSeleccionado}/importaciones`, formData));
 
 
             importacionActiva =

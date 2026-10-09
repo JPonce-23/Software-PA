@@ -663,6 +663,7 @@ configurarAccesoMapa();
              */
             const esAdmin =
                 usuario.rol === "admin";
+            document.dispatchEvent(new CustomEvent("ssalfer:usuario", {detail:usuario}));
 
 
             document
@@ -1137,6 +1138,8 @@ configurarAccesoMapa();
                     );
 
 
+                let copResumen = null;
+                try { copResumen = await window.SSALFER_DASHBOARD_EXCEL?.contarConvenios(listaNucleos); } catch { /* Se presenta sin dato, nunca cero inventado. */ }
                 const copsFormalizados =
                     sumarCampoKpi(
                         kpisDashboard,
@@ -1350,19 +1353,13 @@ configurarAccesoMapa();
                                     <span
                                         class="dashboard-kpi-etiqueta"
                                     >
-                                        COPs formalizados
+                                        Convenios COP
                                     </span>
-
-                                    <strong
-                                        class="dashboard-kpi-valor"
-                                    >
-                                        ${formatearEntero(copsFormalizados)}
-                                    </strong>
-
-                                    <small>
-                                        Con fecha de firma registrada
-                                    </small>
-
+                                    <div class="dashboard-cop-tres" title="Formalizados: convenios individuales y colectivos con fecha de firma">
+                                        <span>Individuales<strong>${copResumen ? formatearEntero(copResumen.individuales) : 'Sin dato'}</strong></span>
+                                        <span>Colectivos<strong>${copResumen ? formatearEntero(copResumen.colectivos) : 'Sin dato'}</strong></span>
+                                        <span>Formalizados<strong>${copResumen ? formatearEntero(copResumen.formalizados) : 'Sin dato'}</strong></span>
+                                    </div>
                                 </div>
 
                             </div>
@@ -1529,7 +1526,9 @@ configurarAccesoMapa();
                 listaProyectos.appendChild(
                     articulo
                 );
+                window.SSALFER_DASHBOARD_EXCEL?.registrar({proyecto,nucleos:listaNucleos,kpis:kpisDashboard.filter(k=>k.id_proyecto===proyecto.id_proyecto),cop:copResumen,elemento:articulo});
             }
+            window.SSALFER_DASHBOARD_EXCEL?.listo();
 
 
         } catch (error) {
@@ -1569,7 +1568,7 @@ configurarAccesoMapa();
 
 
     if (
-        botonMenu &&
+        !window.SSALFER_MARCO && botonMenu &&
         aside
     ) {
 
@@ -1631,7 +1630,7 @@ configurarAccesoMapa();
 
 
     if (
-        usuarioBtn &&
+        !window.SSALFER_MARCO && usuarioBtn &&
         opcionesUsuario
     ) {
 
@@ -1803,10 +1802,7 @@ configurarAccesoMapa();
                         );
 
 
-                        localStorage.setItem(
-                            "sidebarColapsado",
-                            "true"
-                        );
+                        try { localStorage.setItem("sidebarColapsado", "true"); } catch { /* Opcional. */ }
                     }
                 }
             );

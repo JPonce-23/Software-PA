@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", async () => {
+    if (!/\/(usuarios|fichaProyecto)\.html$/.test(location.pathname)) return;
+    const proyectoFijo = location.pathname.includes("fichaProyecto") ? Number(new URLSearchParams(location.search).get("id")) : null;
     "use strict";
     const sesion = await window.AuthAPI.requerirSesion();
     if (sesion?.user?.rol !== "admin") return;
@@ -7,10 +9,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     let revision = 0, usuarios = [], asignados = [], ocupado = false;
     const nombre = u => [u.nombre, u.apellido_paterno, u.apellido_materno].filter(Boolean).join(" ") || u.correo;
     try {
-        const proyectos = [];
-        for (let skip = 0; ; skip += 200) { const lote = await window.ProyectosAPI.listar({ skip, limit: 200 }); proyectos.push(...lote); if (lote.length < 200) break; }
+        const proyectos = await window.ProyectosAPI.listar();
         for (let skip = 0; ; skip += 50) { const lote = await window.UsuariosAPI.listar({ skip, limit: 50, estado: "todos" }); usuarios.push(...lote); if (lote.length < 50) break; }
-        seccion.innerHTML = `<h2>Proyectos asignados</h2><p>Administra el acceso de usuarios al proyecto. Esta asignación es independiente de los responsables del núcleo.</p><label class="ssalfer-gestion-campo">Proyecto<select data-asignacion-proyecto><option value="">Selecciona un proyecto</option>${proyectos.map(p => `<option value="${p.id_proyecto}">${g.e(p.nombre_proyecto)}</option>`).join("")}</select></label><div data-asignaciones aria-live="polite"></div>`;
+        seccion.innerHTML = `<h2>${proyectoFijo ? "Usuarios responsables" : "Proyectos asignados"}</h2><p>Administra el acceso de usuarios al proyecto. Esta asignación es independiente de los responsables del núcleo.</p><label class="ssalfer-gestion-campo">Proyecto<select data-asignacion-proyecto><option value="">Selecciona un proyecto</option>${proyectos.map(p => `<option value="${p.id_proyecto}">${g.e(p.nombre_proyecto)}</option>`).join("")}</select></label><div data-asignaciones aria-live="polite"></div>`;
         const proyecto = seccion.querySelector("[data-asignacion-proyecto]"), salida = seccion.querySelector("[data-asignaciones]");
         async function cargar() {
             const actual = ++revision, pid = Number(proyecto.value); salida.replaceChildren(); asignados = []; if (!pid) return;
@@ -19,6 +20,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 salida.innerHTML = `${g.boton("Asignar usuario", "asignar")}${g.tabla([{ titulo: "Usuario", valor: r => nombre(usuarios.find(u => u.id_usuario === r.id_usuario) || {}) || "Usuario sin ficha disponible" }, { titulo: "Correo", valor: r => usuarios.find(u => u.id_usuario === r.id_usuario)?.correo }, { titulo: "Estado de usuario", valor: r => usuarios.find(u => u.id_usuario === r.id_usuario)?.activo === false ? "Inactivo" : "Activo" }], asignados, r => g.boton("Revocar asignación", "revocar", r.id_usuario), "Aún no hay usuarios asignados a este proyecto.")}`;
             } catch(error) { if (actual === revision) salida.innerHTML = `<p role="alert">${g.e(error.message)}</p>${g.boton("Reintentar", "reintentar")}`; }
         }
+        if (proyectoFijo) { proyecto.value=String(proyectoFijo); proyecto.closest("label").hidden=true; await cargar(); }
         proyecto.addEventListener("change", cargar);
         salida.addEventListener("click", async event => {
             const b = event.target.closest("[data-gestion]"); if (!b || ocupado) return; ocupado = true; proyecto.disabled = true;

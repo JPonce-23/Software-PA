@@ -177,20 +177,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
     function escaparCsv(valor) {
-
-        const texto =
-            valor === null ||
-            valor === undefined
-                ? ""
-                : String(valor);
-
-        return `"${texto.replaceAll(
-            '"',
-            '""'
-        )}"`;
-
+        let texto=String(valor??'');if(typeof valor!=='number'&&/^[\s]*[=+@-]/.test(texto))texto="'"+texto;
+        return '"'+texto.replaceAll('"','""')+'"';
     }
-
 
     function numero(valor) {
 
@@ -1246,9 +1235,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             "cantidad",
 
-            "superficie_ha",
+            "Superficie (ha)",
 
-            "monto"
+            "Monto (MXN)"
 
         ];
 
@@ -1297,15 +1286,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                     fila.indicador,
 
-                    fila.programado,
+                    (fila.programado == null || fila.programado === "" ? "" : Number(fila.programado)),
 
-                    fila.realizado,
+                    (fila.realizado == null || fila.realizado === "" ? "" : Number(fila.realizado)),
 
-                    fila.cantidad,
+                    (fila.cantidad == null || fila.cantidad === "" ? "" : Number(fila.cantidad)),
 
-                    fila.superficie_ha,
+                    (fila.superficie_ha == null || fila.superficie_ha === "" ? "" : Number(fila.superficie_ha)),
 
-                    fila.monto
+                    (fila.monto == null || fila.monto === "" ? "" : Number(fila.monto))
 
                 ];
 

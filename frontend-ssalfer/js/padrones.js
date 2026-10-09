@@ -366,7 +366,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 option.textContent =
                     `${documento.titulo ||
-                        documento.tipo_documento ||
+                        window.DocumentosAPI.nombreTipo(documento) ||
                         "Documento"
                     }`;
 

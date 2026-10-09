@@ -3,3 +3,9 @@
 .colectivo-detalle [data-colectivo-detalle] { padding: 16px; }
 .colectivo-detalle h3 { margin-top: 20px; }
 #reporteColectivo form { margin-bottom: 16px; }
+.ssalfer-gestion-tabla th { text-align:center; }
+#respaldoColectivo { grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; }
+#respaldoColectivo > div { padding:12px; background:#f3f7f4; border:1px solid #d5e2d9; border-radius:8px; }
+#respaldoColectivo h3 { font-size:1rem; margin:0 0 8px; }
+.pagina-header { align-items:flex-start; }
+.pagina-header .ssalfer-volver { align-self:flex-start; }

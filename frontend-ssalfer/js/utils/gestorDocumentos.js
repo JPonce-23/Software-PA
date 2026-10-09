@@ -7,6 +7,7 @@
     async function montar(raiz, idNucleo, inicial = {}) {
         const { e, boton, tabla, formulario, opciones } = g();
         const contexto = window.SSALFER_CONTEXTO.crear(idNucleo);
+        const sesion=await window.AuthAPI.requerirSesion(),puedeCapturar=["admin","operador"].includes(sesion?.user?.rol);
         let revision = 0, registros = [], documentos = [], ocupado = false;
         raiz.innerHTML = `<div class="ssalfer-gestion-campos"><label class="ssalfer-gestion-campo">Tipo de registro<select data-doc-tipo>${Object.entries(window.SSALFER_CONTEXTO.nombres).map(([valor, nombre]) => `<option value="${valor}">${e(nombre)}</option>`).join("")}</select></label><label class="ssalfer-gestion-campo">Registro<select data-doc-registro disabled></select></label></div><div data-doc-contenido aria-live="polite"></div>`;
         const tipo = raiz.querySelector("[data-doc-tipo]"), registro = raiz.querySelector("[data-doc-registro]"), contenido = raiz.querySelector("[data-doc-contenido]");
@@ -37,7 +38,7 @@
                 const respuesta = await api().listarPorEntidad(destino.tipo, destino.id);
                 if (actual !== revision) return;
                 documentos = respuesta;
-                contenido.innerHTML = `<h2>Documentos de ${e(destino.nombre)}</h2><div class="ssalfer-gestion-barra">${boton("Registrar documento", "crear")}${boton("Vincular documento existente", "vincular")}${boton("Consultar procedencia", "fuentes")}</div>${tabla([{ titulo: "Documento", valor: d => d.titulo || d.tipo_documento }, { titulo: "Tipo", valor: d => d.tipo_documento }, { titulo: "Estado", valor: d => window.SSALFER_FORMAT.etiquetaCodigo(d.estado) }, { titulo: "Fecha", valor: d => fecha(d.fecha_documento) }, { titulo: "Folio", valor: d => d.numero_folio }], documentos, d => boton("Editar", "editar", d.id_documento) + boton("Versiones y archivos", "versiones", d.id_documento), "Aún no hay documentos. Puedes registrar uno o vincular uno existente.")}`;
+                contenido.innerHTML = `<h2>Documentos de ${e(destino.nombre)}</h2><div class="ssalfer-gestion-barra">${puedeCapturar?boton("Registrar documento", "crear")+boton("Vincular documento existente", "vincular"):""}${boton("Consultar procedencia", "fuentes")}</div>${tabla([{ titulo: "Documento", valor: d => d.titulo || api().nombreTipo(d) }, { titulo: "Tipo", valor: d => api().nombreTipo(d) }, { titulo: "Estado", valor: d => window.SSALFER_FORMAT.etiquetaCodigo(d.estado) }, { titulo: "Fecha", valor: d => fecha(d.fecha_documento) }, { titulo: "Folio", valor: d => d.numero_folio }], documentos, d => (puedeCapturar?boton("Editar", "editar", d.id_documento):"") + boton("Versiones y archivos", "versiones", d.id_documento), "Aún no hay documentos. Puedes registrar uno o vincular uno existente.")}`;
             } catch (error) { if (actual === revision) errorVisible(error, "reintentar"); }
         }
         async function notificar(destino) {
@@ -46,18 +47,26 @@
             await cargar();
         }
         async function editar(destino, documento) {
-            const campos = [campo("tipo_documento", "Tipo de documento", { requerido: true, maximo: 80 }), campo("estado", "Estado", { requerido: true, opciones: opciones(["disponible", "faltante", "referenciado"]) }), campo("titulo", "Título", { maximo: 250 }), campo("fecha_documento", "Fecha del documento", { tipo: "date" }), campo("numero_folio", "Folio", { maximo: 150 }), campo("descripcion", "Descripción", { tipo: "textarea" })];
-            const catalogo = await api().listarCatalogoRequisitos();
-            const tipos = [...new Set([...documentos.map(d => d.tipo_documento), ...catalogo.map(r => r.nombre)].filter(Boolean))];
-            const resultado = await formulario({ titulo: documento ? "Editar documento" : "Registrar documento", campos, inicial: documento || {}, editar: Boolean(documento), introduccion: `Registro: ${destino.nombre}. Selecciona un tipo existente o escribe uno nuevo. El archivo se agrega en Versiones y archivos.`, preparar: form => {
-                const lista = document.createElement("datalist"); lista.id = `tiposDocumento-${Date.now()}`;
-                tipos.forEach(t => lista.appendChild(new Option(t, t))); form.appendChild(lista); form.elements.tipo_documento.setAttribute("list", lista.id);
-            }, guardar: datos => documento ? api().actualizar(documento.id_documento, datos) : api().crearParaEntidad(destino.tipo, destino.id, datos) });
+            const tipos=await window.CatalogosAPI.tiposDocumento();
+            const activos=tipos.filter(t=>t.activo),opcionesTipo=activos.map(t=>({valor:t.id_tipo_documento,texto:t.nombre}));
+            const campos=[...(documento?.id_tipo_documento?[]:documento?[campo('tipo_documento','Tipo histórico',{maximo:80,requerido:true})]:[]),campo('id_tipo_documento',documento?'Clasificar o reclasificar con catálogo (opcional)':'Tipo de documento',{opciones:opcionesTipo,numerico:true,requerido:!documento}),campo('estado','Estado',{requerido:true,opciones:opciones(['disponible','faltante','referenciado'])}),campo('titulo','Título',{maximo:250}),campo('fecha_documento','Fecha del documento',{tipo:'date'}),campo('numero_folio','Folio',{maximo:150}),campo('descripcion','Descripción',{tipo:'textarea'})];
+            const inicial=documento?{...documento,id_tipo_documento:null}:{};
+            const resultado=await formulario({titulo:documento?'Editar documento':'Registrar documento',campos,inicial,editar:Boolean(documento),introduccion:`Registro: ${destino.nombre}.${documento?' Clasificación actual: '+api().nombreTipo(documento)+'. Conserva la selección vacía para mantenerla.':''} El archivo se agrega en Versiones y archivos.`,preparar:form=>{
+                const tipo=form.elements.id_tipo_documento,descripcion=form.elements.descripcion;
+                const actualizar=()=>{const codigo=activos.find(t=>t.id_tipo_documento===Number(tipo.value))?.codigo || (!tipo.value?documento?.clasificacion?.codigo:null);descripcion.required=codigo==='OTRO';if(form.elements.tipo_documento)form.elements.tipo_documento.disabled=Boolean(tipo.value);};tipo.addEventListener('change',actualizar);actualizar();
+            },validar:d=>{
+                const codigo=activos.find(t=>t.id_tipo_documento===Number(d.id_tipo_documento))?.codigo || documento?.clasificacion?.codigo;
+                return codigo==='OTRO'&&!(Object.hasOwn(d,'descripcion')?d.descripcion:documento?.descripcion)?.trim()?'Para Otro, escribe una descripción.':null;
+            },guardar:datos=>{
+                if(!datos.id_tipo_documento)delete datos.id_tipo_documento;else delete datos.tipo_documento;
+                if(documento?.id_tipo_documento)delete datos.tipo_documento;
+                return documento?api().actualizar(documento.id_documento,datos):api().crearParaEntidad(destino.tipo,destino.id,datos);
+            }});
             if (resultado) await notificar(destino);
         }
         async function versiones(documento) {
             const lista = await api().listarVersiones(documento.id_documento);
-            await window.SSALFER_UI.abrirModal({ titulo: `Archivos: ${documento.titulo || documento.tipo_documento}`, contenido: `${boton("Subir nueva versión", "subir")}${tabla([{ titulo: "Versión", valor: v => v.numero_version }, { titulo: "Archivo", valor: v => v.nombre_original }, { titulo: "Tamaño", valor: v => `${Number(v.tamano_bytes).toLocaleString("es-MX")} bytes` }, { titulo: "Carga", valor: v => fecha(v.fecha_carga) }], lista, v => boton("Descargar", "descargar", v.id_documento_version), "Aún no se ha subido un archivo.")}`, preparar: modal => {
+            await window.SSALFER_UI.abrirModal({ titulo: `Archivos: ${documento.titulo || api().nombreTipo(documento)}`, contenido: `${puedeCapturar?boton("Subir nueva versión", "subir"):""}${tabla([{ titulo: "Versión", valor: v => v.numero_version }, { titulo: "Archivo", valor: v => v.nombre_original }, { titulo: "Tamaño", valor: v => `${Number(v.tamano_bytes).toLocaleString("es-MX")} bytes` }, { titulo: "Carga", valor: v => fecha(v.fecha_carga) }], lista, v => boton("Descargar", "descargar", v.id_documento_version), "Aún no se ha subido un archivo.")}`, preparar: modal => {
                 modal.addEventListener("click", async event => {
                     const b = event.target.closest("[data-gestion]"); if (!b || b.disabled) return;
                     b.disabled = true;
@@ -87,7 +96,7 @@
                 hijo.addEventListener("change", async () => {
                     const actual = ++origenRevision; doc.replaceChildren(new Option("Selecciona un documento", "")); doc.disabled = true;
                     if (!hijo.value) return;
-                    try { const opciones = await api().listarPorEntidad(padre.value, hijo.value); if (actual !== origenRevision || !form.isConnected) return; opciones.forEach(d => doc.add(new Option(`${d.titulo || d.tipo_documento} · ${d.tipo_documento} · ${fecha(d.fecha_documento)}`, d.id_documento))); doc.disabled = !opciones.length; if (!opciones.length) doc.replaceChildren(new Option("Este registro no tiene documentos", "")); }
+                    try { const opciones = await api().listarPorEntidad(padre.value, hijo.value); if (actual !== origenRevision || !form.isConnected) return; opciones.forEach(d => doc.add(new Option(`${d.titulo || api().nombreTipo(d)} · ${api().nombreTipo(d)} · ${fecha(d.fecha_documento)}`, d.id_documento))); doc.disabled = !opciones.length; if (!opciones.length) doc.replaceChildren(new Option("Este registro no tiene documentos", "")); }
                     catch (error) { if (actual === origenRevision) window.ClienteAPI.mostrarErrorAPI(error); }
                 });
             }, validar: datos => !datos.documento ? "Selecciona un documento disponible." : null, guardar: datos => api().vincularAEntidad(datos.documento, destino.tipo, destino.id) });
@@ -95,7 +104,7 @@
         }
         async function fuentes(destino) {
             const lista = await api().listarTrazabilidad(destino.tipo, destino.id);
-            const accion = await window.SSALFER_UI.abrirModal({ titulo: `Procedencia: ${destino.nombre}`, contenido: tabla([{ titulo: "Archivo de origen", valor: r => r.archivo }, { titulo: "Hoja", valor: r => r.hoja }, { titulo: "Fila", valor: r => r.fila }, { titulo: "Columna", valor: r => r.columna }, { titulo: "Valor original", valor: r => r.valor_original }, { titulo: "Valor interpretado", valor: r => r.valor_normalizado }, { titulo: "Tratamiento", valor: r => r.tratamiento }, { titulo: "Fecha", valor: r => fecha(r.registrado_en) }], lista), acciones: [{ valor: false, texto: "Cerrar" }, { valor: true, texto: "Registrar procedencia", principal: true }] });
+            const accion = await window.SSALFER_UI.abrirModal({ titulo: `Procedencia: ${destino.nombre}`, contenido: tabla([{ titulo: "Archivo de origen", valor: r => r.archivo }, { titulo: "Hoja", valor: r => r.hoja }, { titulo: "Fila", valor: r => r.fila }, { titulo: "Columna", valor: r => r.columna }, { titulo: "Valor original", valor: r => r.valor_original }, { titulo: "Valor interpretado", valor: r => r.valor_normalizado }, { titulo: "Tratamiento", valor: r => r.tratamiento }, { titulo: "Fecha", valor: r => fecha(r.registrado_en) }], lista), acciones: [{ valor: false, texto: "Cerrar" }, ...(puedeCapturar?[{ valor: true, texto: "Registrar procedencia", principal: true }]:[])] });
             if (!accion) return;
             const resultado = await formulario({ titulo: "Registrar procedencia", campos: [campo("archivo", "Archivo de origen", { requerido: true, maximo: 255 }), campo("hoja", "Hoja", { maximo: 255 }), campo("fila", "Fila", { numerico: true, tipo: "number", min: 1, paso: "1" }), campo("columna", "Columna", { maximo: 120 }), campo("valor_original", "Valor original", { tipo: "textarea" }), campo("valor_normalizado", "Valor interpretado", { tipo: "textarea" }), campo("tratamiento", "Tratamiento", { requerido: true, opciones: opciones([["PERSISTIR", "Conservar"], ["DERIVAR", "Derivar"], ["REFERENCIA", "Usar como referencia"], ["DOCUMENTAR", "Documentar"], ["REVISAR", "Revisar"], ["NO IMPLEMENTAR", "No implementar"]]) })], guardar: datos => api().registrarTrazabilidad(destino.tipo, destino.id, datos) });
             if (resultado) await fuentes(destino);
@@ -103,6 +112,7 @@
         tipo.addEventListener("change", () => seleccionarTipo()); registro.addEventListener("change", cargar);
         raiz.addEventListener("click", async event => {
             const b = event.target.closest("[data-gestion]"); if (!b || ocupado) return;
+            if(!puedeCapturar && ["crear","editar","vincular","subir"].includes(b.dataset.gestion))return;
             ocupado = true; tipo.disabled = registro.disabled = true;
             try {
                 const destino = objetivo(), documento = documentos.find(d => d.id_documento === Number(b.dataset.registro));
@@ -127,7 +137,7 @@
         if (!Number.isSafeInteger(id) || id <= 0 || document.getElementById("documentosContenido") || document.querySelector("[data-abrir-documentos]")) return;
         const destino = document.querySelector(".acciones-header") || document.querySelector(".pagina-header");
         if (!destino) return;
-        const b = document.createElement("button"); b.type = "button"; b.className = "btn-secundario"; b.dataset.abrirDocumentos = ""; b.textContent = "Gestionar documentos";
+        const b = document.createElement("button"); b.type = "button"; b.className = "btn-secundario"; b.dataset.abrirDocumentos = ""; b.textContent = "Documentos de este núcleo"; b.title = "Registrar, subir y consultar los documentos de este núcleo";
         b.addEventListener("click", () => abrir(id)); destino.appendChild(b);
     }
     window.addEventListener("ssalfer:contexto-documentos", event => acceso(event.detail.idProyectoNucleo));

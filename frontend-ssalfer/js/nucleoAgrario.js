@@ -337,6 +337,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             );
     }
 
+    if (elementos.residencia) elementos.residencia.closest(".dato").hidden = !nucleo.residencia_nombre && !nucleo.residencia_codigo;
+    if (elementos.referencia) elementos.referencia.closest(".dato").hidden = !nucleo.referencia_principal;
     if (elementos.referencia) {
         elementos.referencia.textContent =
             texto(

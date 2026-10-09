@@ -8,9 +8,21 @@
 
     const { get, post, patch, del } = window.ClienteAPI;
 
-    function listar(params = {}) {
-        const query = new URLSearchParams(params).toString();
-        return get(`/proyectos${query ? `?${query}` : ""}`);
+    function ordenar(items) {
+        return [...items].sort((a,b) => {
+            const fa=Date.parse(a.creado_en), fb=Date.parse(b.creado_en);
+            return ((Number.isFinite(fb)?fb:0)-(Number.isFinite(fa)?fa:0)) || Number(b.id_proyecto)-Number(a.id_proyecto);
+        });
+    }
+    async function listar(params = {}) {
+        if (params.skip !== undefined || params.limit !== undefined) {
+            return get(`/proyectos?${new URLSearchParams(params)}`);
+        }
+        const todos=[];
+        for(let skip=0;;skip+=200){
+            const lote=await get(`/proyectos?${new URLSearchParams({...params,skip,limit:200})}`);
+            todos.push(...lote); if(lote.length<200)return ordenar(todos);
+        }
     }
 
     function obtener(idProyecto) {
@@ -25,8 +37,8 @@
         return patch(`/proyectos/${idProyecto}`, payload);
     }
 
-    function eliminar(idProyecto) {
-        return del(`/proyectos/${idProyecto}`);
+    function eliminar(idProyecto, motivo) {
+        return del(`/proyectos/${idProyecto}`, { motivo });
     }
 
     function listarUsuarios(idProyecto) {
@@ -47,7 +59,7 @@
 
     window.ProyectosAPI = {
         revocarUsuario: (idProyecto, idUsuario, motivo) => del(`/proyectos/${idProyecto}/usuarios/${idUsuario}`, { motivo }),
-        listar,
+        listar, ordenar,
         obtener,
         crear,
         actualizar,

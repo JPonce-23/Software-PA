@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    if (window.SSALFER_MARCO) return;
     if (!document.body.classList.contains("ssalfer-gestion-pagina")) return;
     const aside = document.querySelector(".aside"), boton = document.querySelector(".btn-menu");
     if (!aside || !boton) return;

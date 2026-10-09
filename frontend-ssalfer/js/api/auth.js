@@ -23,10 +23,9 @@
     }
 
 
+    let sesionActual;
     async function obtenerSesionActual() {
-
-        return get("/auth/sesion", { silencioso: true });
-
+        return sesionActual ||= get("/auth/sesion", { silencioso: true }).catch(error=>{sesionActual=null;throw error;});
     }
 
 
@@ -79,12 +78,14 @@
 
             if (error instanceof ErrorAPI && (error.status === 401 || error.status === 403)) {
 
-                window.location.href = "/Index.html";
+                if(window.SSALFER_PROTECCION) window.SSALFER_PROTECCION.iniciarSesion();
+                else window.location.href = "/Index.html";
 
                 return null;
 
             }
 
+            if(window.SSALFER_PROTECCION){window.SSALFER_PROTECCION.fallo();return null;}
             throw error;
 
         }
@@ -182,9 +183,7 @@
                 );
 
 
-                alert(
-                    "No se pudo cerrar la sesión. Intenta nuevamente."
-                );
+                window.ClienteAPI.mostrarErrorAPI(new Error("No se pudo cerrar la sesión. Intenta nuevamente."));
 
             }
 
@@ -192,6 +191,12 @@
     );
 
 
+
+    if(window.SSALFER_PROTECCION) obtenerSesionActual().then(s=>{
+        if(s?.user)window.SSALFER_PROTECCION.permitir(s);else window.SSALFER_PROTECCION.iniciarSesion();
+    }).catch(error=>{
+        if([401,403].includes(error.status))window.SSALFER_PROTECCION.iniciarSesion();else window.SSALFER_PROTECCION.fallo();
+    });
 
     window.AuthAPI = {
         login,

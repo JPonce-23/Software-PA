@@ -634,6 +634,7 @@ document.addEventListener(
                             </td>
 
                             <td>
+                                <button type="button" class="btn-tabla" data-documentos-actividad="${actividad.id_actividad}">Documentos</button>
                                 ${
                                     puedeCapturar
                                         ? `
@@ -660,6 +661,8 @@ document.addEventListener(
                     }
                 );
         }
+
+        elementos.actividadesTabla.addEventListener("click",event=>{const b=event.target.closest('[data-documentos-actividad]');if(b)window.SSALFER_GESTOR_DOCUMENTOS.abrir(idProyectoNucleo,{tipo:"actividad_campo",id:Number(b.dataset.documentosActividad)}).catch(window.ClienteAPI.mostrarErrorAPI);});
 
         async function cargarActividades() {
             try {

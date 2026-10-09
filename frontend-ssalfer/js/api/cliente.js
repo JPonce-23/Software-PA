@@ -155,6 +155,7 @@ function formatearDetalle(detail) {
  * @param {Element|string} [opciones.carga] - Bloque estable para indicador compacto.
  * @param {AbortSignal} [opciones.signal] - Cancelación opcional de la petición.
  * @param {"json"|"blob"} [opciones.tipoRespuesta="json"] - Blob para descargas.
+ * @param {boolean} [opciones.conMetadatos=false] Devuelve {data,status,headers}; no cambia el formato por defecto.
  * @returns {Promise<any>} El cuerpo ya parseado (JSON), o null si la
  *          respuesta no trae cuerpo (204, o 200 vacío).
  * @throws {ErrorAPI} Si la respuesta no es 2xx.
@@ -168,10 +169,15 @@ async function request(
         silencioso = false,
         carga,
         signal,
-        tipoRespuesta = "json"
+        tipoRespuesta = "json",
+        conMetadatos = false
     } = {}
 ) {
 
+    if(window.SSALFER_SESION_LISTA && !ruta.startsWith('/auth/')) {
+        const sesion=await window.SSALFER_SESION_LISTA;
+        if(!sesion)throw new ErrorAPI(401,null,'Inicia sesión para acceder al sistema.');
+    }
     const finalizarCarga = window.SSALFER_UI?.cargando.iniciar({ silencioso, carga, metodo });
     try {
         const metodosConCSRF = ["POST", "PATCH", "DELETE", "PUT"];
@@ -254,9 +260,11 @@ async function request(
 
         }
 
-        if (respuesta.status === 204) return null;
+        const devolver=data=>conMetadatos ? {data,status:respuesta.status,headers:Object.fromEntries(respuesta.headers.entries())} : data;
+        if (respuesta.status === 401 && window.SSALFER_PROTECCION && !ruta.startsWith('/auth/')) window.SSALFER_PROTECCION.iniciarSesion();
+        if (respuesta.status === 204) return devolver(null);
 
-        if (respuesta.ok && tipoRespuesta === "blob") return await respuesta.blob();
+        if (respuesta.ok && tipoRespuesta === "blob") return devolver(await respuesta.blob());
 
         const tipoContenido = respuesta.headers.get("content-type") || "";
 
@@ -277,7 +285,7 @@ async function request(
 
         }
 
-        return cuerpoRespuesta;
+        return devolver(cuerpoRespuesta);
 
     } finally {
         finalizarCarga?.();

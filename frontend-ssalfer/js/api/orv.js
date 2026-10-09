@@ -61,7 +61,8 @@
 
     function listarIntegrantes(
         idOrv,
-        incluirHistorico = true
+        incluirHistorico = true,
+        incluirBajas = false
     ) {
 
         return get(
@@ -71,7 +72,7 @@
                 incluirHistorico
                     ? "true"
                     : "false"
-            }`
+            }&incluir_bajas=${incluirBajas ? "true" : "false"}`
         );
 
     }

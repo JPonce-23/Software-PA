@@ -92,7 +92,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     let puedeCapturar = false;
     let esAdministrador = false;
-    const bajasEstaSesion = new Map();
+    let revisionIntegrantes=0;
+    const filtrosIntegrantes=document.createElement("div");filtrosIntegrantes.className="ssalfer-gestion-barra";
+    filtrosIntegrantes.innerHTML='<label><input type="checkbox" data-orv-historico> Incluir participaciones finalizadas</label><label><input type="checkbox" data-orv-bajas> Incluir bajas administrativas</label>';
+    elementos.integrantesLista.before(filtrosIntegrantes);
+    const verHistorico=filtrosIntegrantes.querySelector('[data-orv-historico]'),verBajas=filtrosIntegrantes.querySelector('[data-orv-bajas]');
+    verHistorico.checked=parametros.get('historico')==='true';verBajas.checked=parametros.get('bajas')==='true';
+    for(const control of [verHistorico,verBajas])control.onchange=()=>{const url=new URL(location.href);url.searchParams.set('historico',verHistorico.checked);url.searchParams.set('bajas',verBajas.checked);history.replaceState(history.state,'',url);cargarIntegrantes();};
 
     let estadosRegistrales = [];
     let organos = [];
@@ -997,6 +1003,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ====================================================== */
 
     async function cargarIntegrantes() {
+        const revision=++revisionIntegrantes;
         if (!idOrvSeleccionado) {
             integrantes = [];
             mostrarIntegrantes();
@@ -1007,7 +1014,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const idSolicitado = idOrvSeleccionado;
             const respuesta =
                 await window.OrvAPI.listarIntegrantes(
-                    idSolicitado
+                    idSolicitado, verHistorico.checked, verBajas.checked
                 );
 
             const registros = Array.isArray(respuesta) ? respuesta : [];
@@ -1015,7 +1022,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             await Promise.allSettled([...new Set(registros.filter(item => !item.nombre).map(item => item.id_persona))].map(async id => {
                 personas.set(Number(id), await window.PersonasAPI.obtener(id));
             }));
-            if (idSolicitado !== idOrvSeleccionado) return;
+            if (idSolicitado !== idOrvSeleccionado || revision!==revisionIntegrantes) return;
 
             integrantes =
                 registros.map(item => {
@@ -1045,12 +1052,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         elementos.sinIntegrantes.hidden =
             integrantes.length > 0;
 
-        [...integrantes, ...[...bajasEstaSesion.values()].filter(i => Number(i.id_orv) === Number(idOrvSeleccionado))].forEach(integrante => {
+        integrantes.forEach(integrante => {
 
             const estaFinalizado =
-                Boolean(
-                    integrante.fecha_fin
-                );
+                !integrante.vigente;
 
 
             const fila =
@@ -1096,16 +1101,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                     <small>
                         Vigencia:
                         ${escaparHTML(
-                            integrante.fecha_inicio || "—"
+                            window.SSALFER_FORMAT.formatearFecha(integrante.fecha_inicio) || "—"
                         )}
                         a
                         ${escaparHTML(
-                            integrante.fecha_fin ||
-                            "Vigente"
+                            integrante.fecha_fin ? window.SSALFER_FORMAT.formatearFecha(integrante.fecha_fin) : "Sin fecha de término"
                         )}
                     </small>
 
 
+                    ${integrante.activo===false?`<p>Baja administrativa: ${escaparHTML(window.SSALFER_FORMAT.formatearFecha(integrante.fecha_baja))}. Motivo: ${escaparHTML(integrante.motivo_baja || "Sin motivo disponible")}</p>`:""}
                     <span>
                         Estado:
                         <strong>
@@ -1783,9 +1788,9 @@ elementos
                     const id = Number(ciclo.dataset.bajaIntegrante || ciclo.dataset.reactivarIntegrante);
                     if (ciclo.dataset.bajaIntegrante) {
                         const integrante = integrantes.find(i => Number(i.id_orv_integrante) === id);
-                        if (await window.SSALFER_GESTION.baja(`el registro de ${nombrePersona(integrante)}. Esto es una baja administrativa y no finaliza su vigencia de participación`, motivo => window.OrvAPI.eliminarIntegrante(id, motivo))) bajasEstaSesion.set(id, { ...integrante, activo: false });
+                        await window.SSALFER_GESTION.baja(`el registro de ${nombrePersona(integrante)}. Esto es una baja administrativa y no finaliza su vigencia de participación`, motivo => window.OrvAPI.eliminarIntegrante(id, motivo));
                     } else if (await window.SSALFER_UI.confirmar("Se restaurará el registro conservando sus fechas de participación.", "Reactivar integrante")) {
-                        await window.OrvAPI.reactivarIntegrante(id); bajasEstaSesion.delete(id); window.SSALFER_UI.toast("Registro reactivado.");
+                        await window.OrvAPI.reactivarIntegrante(id); window.SSALFER_UI.toast("Registro reactivado.");
                     }
                     await cargarIntegrantes();
                 } catch (error) { window.ClienteAPI.mostrarErrorAPI(error); }

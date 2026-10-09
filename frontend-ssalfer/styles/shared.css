@@ -210,6 +210,19 @@
 .reportes-accesos > a > span { color: #526257; font-size: .9rem; }
 .reportes-accesos > a:hover { background: #eff6f1; border-color: #2f6846; }
 .reportes-accesos > a:focus-visible, .ssalfer-volver:focus-visible { outline: 3px solid #2f6846; outline-offset: 3px; }
+.tarjeta-reportes .reportes-accesos { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.tarjeta-reportes .reportes-accesos > a { padding:10px; gap:4px; font-size:.95rem; }
+.tarjeta-reportes .reportes-accesos > a > i { font-size:1.2rem; }
+#nucleoAltaExcepcional { width:auto; margin-right:10px; }
+label:has(#nucleoAltaExcepcional) { display:block; grid-column:1/-1; padding:16px; margin:12px 0; border:1px solid #aabcad; border-radius:8px; background:#f3f7f4; font-weight:bold; }
+#gestionNucleo { border:2px solid #9cb9a6; background:#f4f8f5; }
+.persona-datos { min-width:0; display:grid; gap:8px; }
+.persona-estado { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:10px; min-width:0; }
+.persona-estado > span { padding:6px 10px; border-radius:20px; background:#edf4ef; }
+.persona-estado > button { margin:0; }
+.persona-acciones { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; flex-basis:100%; margin-top:8px; }
+@media(max-width:650px) { .persona-acciones { flex-direction:column; align-items:stretch; } }
+@media(max-width:650px) { .persona-estado { flex-direction:column; align-items:stretch; width:100%; margin-top:16px; } .tarjeta-reportes .reportes-accesos { grid-template-columns:1fr; } }
 .ssalfer-volver { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #cfd8d2; border-radius: 8px; background: white; color: #284737; cursor: pointer; font: inherit; white-space: nowrap; }
 .ssalfer-volver:hover { background: #eff6f1; }
 .ssalfer-modal__campo { display: grid; gap: 10px; }
@@ -247,3 +260,14 @@
     .ssalfer-cargando *, .ssalfer-cargando *::before, .ssalfer-cargando *::after { animation: none !important; }
     html { scroll-behavior: auto !important; }
 }
+.dashboard-kpi-ejecutivo:has(.dashboard-cop-tres) { display:block; padding:10px; }
+.dashboard-kpi-ejecutivo:has(.dashboard-cop-tres) .dashboard-kpi-icono { display:none; }
+.dashboard-cop-tres { display:grid; grid-template-columns:1fr; gap:5px; margin-top:8px; }
+.dashboard-cop-tres span { font-size:.7rem; display:flex; justify-content:space-between; align-items:baseline; gap:5px; white-space:nowrap; }
+.dashboard-cop-tres strong { font-size:.95rem; }
+.gis-aviso-temporal { padding:12px; border:2px dashed #bd7618; background:#fff8e9; color:#634214; }
+
+.colectivo-texto-corto { display:inline-block; max-width:26ch; vertical-align:middle; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.reporte-aviso-fecha { border-left:4px solid #b98324; padding:12px; background:#fff6de; font-weight:600; }
+.auditoria-cambio-linea { overflow-wrap:anywhere; padding:8px; border-bottom:1px solid #ddd; }
+.gis-diagnostico { padding:16px; background:#fff6de; }

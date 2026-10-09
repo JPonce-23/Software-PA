@@ -612,6 +612,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     let revisionBusquedaRan = 0;
     const catalogoRan = document.getElementById("nucleoCatalogoRan");
+    document.getElementById("buscarNucleoRan").addEventListener("input", e => { const pos=e.target.selectionStart; e.target.value=e.target.value.toLocaleUpperCase("es-MX"); e.target.setSelectionRange(pos,pos); });
     const altaExcepcional = document.getElementById("nucleoAltaExcepcional");
     function mostrarAltaExcepcional() {
         const excepcional = altaExcepcional.checked;
@@ -626,7 +627,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("btnBuscarNucleoRan").addEventListener("click", async () => {
         const actual = ++revisionBusquedaRan;
         const params = { limit: 100 };
-        const q = document.getElementById("buscarNucleoRan").value.trim(); if (q) params.q = q;
+        const q = document.getElementById("buscarNucleoRan").value.trim(); if (q) params.q = q.replace(/\s+/g," ");
         if (elementos.nucleoEntidad.value) params.id_entidad = elementos.nucleoEntidad.value;
         if (elementos.nucleoMunicipio.value) params.id_municipio = elementos.nucleoMunicipio.value;
         catalogoRan.disabled = true; catalogoRan.replaceChildren(new Option("Buscando…", ""));

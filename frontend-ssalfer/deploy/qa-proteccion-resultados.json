@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-08T23:07:56.527Z",
+  "tests": [
+    "Sin datos ante fallo de red en sesión",
+    "403 de sesión redirige",
+    "Retorno local autenticado",
+    "URL externa rechazada",
+    "401 de negocio redirige"
+  ]
+}

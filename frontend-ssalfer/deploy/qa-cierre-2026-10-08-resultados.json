@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-08T23:06:50.335Z",
+  "mode": "Archivos locales + API QA de lectura + fixtures interceptados; sin escrituras de negocio",
+  "results": [
+    {
+      "name": "Protección de URL anónima y cero solicitudes de negocio",
+      "screens": 35
+    },
+    {
+      "name": "Consolidado: un documento, todas las procedencias, clasificación inactiva y sin consultas por versión/destino"
+    },
+    {
+      "name": "Catálogo documental: OTRO obligatorio, creación por FK y edición preserva clasificación"
+    },
+    {
+      "name": "Personas: criterio único, acentos/literales, CURP parcial, paginación y vacío autorizado"
+    },
+    {
+      "name": "X-Total-Count importaciones: primera/intermedia/última, vacío, exacto y tamaño+1"
+    },
+    {
+      "name": "ClienteAPI: JSON habitual/metadatos, 204 y blob"
+    },
+    {
+      "name": "Cero errores JavaScript en escenarios autenticados",
+      "escriturasInterceptadas": 2
+    }
+  ]
+}

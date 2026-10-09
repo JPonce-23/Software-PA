@@ -463,6 +463,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 `;
 
 
+                const acciones = document.createElement("div"); acciones.className="persona-acciones";
+                article.querySelectorAll('.persona-estado button').forEach(b=>acciones.appendChild(b));
+                article.querySelector('.persona-estado').appendChild(acciones);
                 elementos
                     .personasContainer
                     .appendChild(

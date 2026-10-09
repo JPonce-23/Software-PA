@@ -58,9 +58,13 @@
         const items = await window.CatalogosAPI.obtenerOperativo(tipo);
         return items.filter(i => i.activo !== false).map(i => ({ valor: i.id_catalogo_opcion, texto: i.nombre || i.descripcion || etiqueta(i.codigo) }));
     }
-    function tabla(columnas, filas, acciones = () => "", vacio = "Aún no hay registros.") {
+    function textoTabla(valor) {
+        const texto=String(valor??'—');
+        return location.pathname.endsWith('/derechosColectivos.html') && texto.length>100 ? `<span class="colectivo-texto-corto">${e(texto)}</span> <button type="button" class="btn-secundario" data-texto-completo="${e(texto)}">Ver</button>` : e(texto);
+    }
+    function tabla(columnas, filas, acciones = null, vacio = "Aún no hay registros.") {
         if (!filas.length) return `<p class="ssalfer-gestion-ayuda">${e(vacio)}</p>`;
-        return `<div class="ssalfer-gestion-tabla"><table><thead><tr>${columnas.map(c => `<th scope="col">${e(c.titulo)}</th>`).join("")}<th scope="col">Acciones</th></tr></thead><tbody>${filas.length ? filas.map(fila => `<tr>${columnas.map(c => `<td>${e(c.valor(fila) ?? "—")}</td>`).join("")}<td class="ssalfer-gestion-acciones">${acciones(fila)}</td></tr>`).join("") : `<tr><td colspan="${columnas.length + 1}">${e(vacio)}</td></tr>`}</tbody></table></div>`;
+        return `<div class="ssalfer-gestion-tabla"><table><thead><tr>${columnas.map(c => `<th scope="col">${e(c.titulo)}</th>`).join("")}${acciones ? '<th scope="col">Acciones</th>' : ""}</tr></thead><tbody>${filas.length ? filas.map(fila => `<tr>${columnas.map(c => `<td data-csv="${e((c.csv || c.valor)(fila) ?? "")}"${c.numerico ? ' data-numerico="true"' : ""}>${c.html ? c.html(fila) : textoTabla(c.valor(fila))}</td>`).join("")}${acciones ? `<td class="ssalfer-gestion-acciones">${acciones(fila)}</td>` : ""}</tr>`).join("") : `<tr><td colspan="${columnas.length + 1}">${e(vacio)}</td></tr>`}</tbody></table></div>`;
     }
     const boton = (texto, accion, id = "") => `<button type="button" class="ssalfer-modal__button" data-gestion="${e(accion)}" data-registro="${e(id)}">${e(texto)}</button>`;
     async function descargar(ruta, nombre) {

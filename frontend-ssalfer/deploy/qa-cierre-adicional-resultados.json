@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-08T23:06:31.630Z",
+  "live": [
+    {
+      "url": "/api/catalogos/tipos-documento",
+      "status": 200,
+      "total": null,
+      "items": 27
+    },
+    {
+      "url": "/api/proyecto-nucleo/150/documentos",
+      "status": 200,
+      "total": null,
+      "items": 0
+    },
+    {
+      "url": "/api/proyectos/4/mapa",
+      "status": 200,
+      "total": null,
+      "tipos": []
+    },
+    {
+      "url": "/api/proyectos/4/importaciones?limit=25&skip=0",
+      "status": 200,
+      "total": "2",
+      "items": 2
+    },
+    {
+      "url": "/api/proyectos/4/geoespacial/revisiones?limit=25&skip=0",
+      "status": 200,
+      "total": "0",
+      "items": 0
+    },
+    {
+      "url": "/api/personas?q=QA%20NO%20COINCIDENCIA%209876543210&limit=20&skip=0",
+      "status": 200,
+      "total": null,
+      "items": 0
+    },
+    {
+      "url": "/api/catalogos/nucleos?q=%C3%81LAMO&limit=100",
+      "status": 200,
+      "total": null,
+      "items": 0
+    }
+  ],
+  "tests": [
+    "Actividad documentos CRUD interceptado",
+    "Legacy y clasificación explícita",
+    "Roles operador, visualizador, geografo simulados",
+    "403/404",
+    "Catálogo RAN"
+  ],
+  "escriturasInterceptadas": 4,
+  "errors": []
+}

@@ -65,6 +65,8 @@
 
 
     window.DocumentosAPI = {
+        listarConsolidados: id => get(`/proyecto-nucleo/${encodeURIComponent(id)}/documentos`),
+        nombreTipo: d => d?.clasificacion?.nombre || d?.tipo_documento || 'Sin clasificación',
         listarPorEntidad,
         crearParaEntidad,
         actualizar,

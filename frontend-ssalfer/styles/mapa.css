@@ -707,3 +707,7 @@
         translateY(-50%)
         scale(1);
 }
+/* El estado vacío se oculta al seleccionar una geometría. */
+#mapaDetalleVacio[hidden], #mapaDetalleContenido[hidden] { display: none !important; }
+.mapa-opcion-ddv input:checked + span { border-color: #286c91; background: #edf6fb; }
+.mapa-opcion-ddv input:checked + span i { color: #286c91; }

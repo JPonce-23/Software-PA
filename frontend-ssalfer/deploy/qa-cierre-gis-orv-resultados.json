@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-08T23:10:20.050Z",
+  "tests": [
+    "GIS read models sin N+1",
+    "Total filtrado",
+    "DDV independiente",
+    "ORV cuatro filtros, F5 y reactivación"
+  ],
+  "writesIntercepted": [
+    "/api/orv-integrantes/980013/reactivar"
+  ],
+  "errors": []
+}

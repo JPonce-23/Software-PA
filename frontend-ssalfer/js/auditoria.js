@@ -1,10 +1,17 @@
 document.addEventListener("DOMContentLoaded", async () => {
     "use strict";
 
+    const etiquetas = window.SSALFER_AUDITORIA;
+    const usuariosPorId = new Map();
+    const tiposDocumentoPorId=new Map();
+    const valorCambio=(valor,campo)=>campo==="id_tipo_documento"&&tiposDocumentoPorId.has(Number(valor))?tiposDocumentoPorId.get(Number(valor)):etiquetas.valor(valor,campo,id=>usuariosPorId.get(id));
     const proyectosPorId = new Map();
     const nucleosPorId = new Map();
     const contextosPorId = new Map();
 
+    const tecnicoFiltro=document.createElement('details');tecnicoFiltro.innerHTML='<summary>Filtros técnicos avanzados</summary>';
+    const filtroId=document.getElementById('cambiosEntidadId')?.closest('.auditoria-campo');
+    if(filtroId){filtroId.before(tecnicoFiltro);tecnicoFiltro.append(filtroId);}
     async function cargarFiltrosHumanos() {
         function convertir(id, etiqueta, opciones, vacio = "Todos") {
             const previo = document.getElementById(id);
@@ -29,6 +36,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             })(),
             window.ProyectosAPI.listar(), window.NucleosAPI.listar()
         ]);
+        try{(await window.CatalogosAPI.tiposDocumento(true)).forEach(t=>tiposDocumentoPorId.set(t.id_tipo_documento,t.nombre));}catch{ /* El detalle técnico permanece disponible. */ }
+        usuarios.forEach(u=>usuariosPorId.set(Number(u.id_usuario),nombreUsuario(u)));
+        convertir("cambiosEntidadTipo","Tipo de entidad",Object.entries(etiquetas.entidades));
+        convertir("cambiosAccion","Acción",[["insert","Alta"],["update","Modificación (incluye bajas lógicas)"],["delete","Baja definitiva"]]);
         const opcionesUsuario = usuarios.map(item => [item.id_usuario, nombreUsuario(item)]);
         convertir("cambiosUsuario", "Usuario", opcionesUsuario);
         convertir("accesosUsuario", "Usuario afectado", opcionesUsuario);
@@ -208,32 +219,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         return (
             nombre ||
             usuario.correo ||
-            `Usuario ${usuario.id_usuario}`
+            "Usuario sin nombre disponible"
         );
     }
 
 
-    function formatearFecha(valor) {
-        if (!valor) {
-            return "—";
-        }
-
-        const fecha =
-            new Date(valor);
-
-        if (
-            Number.isNaN(
-                fecha.getTime()
-            )
-        ) {
-            return String(valor);
-        }
-
-        const fechaLocal = [fecha.getFullYear(), String(fecha.getMonth() + 1).padStart(2, "0"),
-            String(fecha.getDate()).padStart(2, "0")].join("-");
-        return `${window.SSALFER_FORMAT.formatearFecha(fechaLocal)} ${fecha.toLocaleTimeString("es-MX")}`;
-    }
-
+    const formatearFecha = etiquetas.fecha;
 
     function fechaParaAPI(valor) {
         if (!valor) {
@@ -647,7 +638,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             tr.appendChild(
                 celda(
-                    item.id_proyecto ? proyectosPorId.get(Number(item.id_proyecto)) || "Proyecto no disponible" : "—"
+                    nombreProyectoCambio(item)
                 )
             );
 
@@ -659,24 +650,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                 document.createElement("strong");
 
             entidad.textContent =
-                item.entidad_tipo || "—";
+                etiquetas.entidad(item.entidad_tipo);
 
             tdEntidad.appendChild(
                 entidad
             );
 
-
-            const entidadId =
-                document.createElement("small");
-
-            entidadId.textContent =
-                item.entidad_id
-                    ? `ID ${item.entidad_id}`
-                    : "Sin ID de entidad";
-
-            tdEntidad.appendChild(
-                entidadId
-            );
 
             tr.appendChild(
                 tdEntidad
@@ -688,8 +667,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             tdAccion.appendChild(
                 badge(
-                    item.accion_descripcion ||
-                    item.accion,
+                    accionCambio(item),
 
                     varianteAccion(
                         item.accion_descripcion ||
@@ -807,7 +785,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             tdEvento.appendChild(
                 badge(
-                    item.tipo_evento,
+                    etiquetas.accion(item.tipo_evento),
                     "info"
                 )
             );
@@ -819,8 +797,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             tr.appendChild(
                 celda(
-                    item.motivo_codigo ||
-                    "—"
+                    etiquetas.humanizar(item.motivo_codigo)
                 )
             );
 
@@ -836,8 +813,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             tr.appendChild(
                 celda(
-                    item.id_sesion ??
-                    "—"
+                    item.id_sesion ? "Sesión registrada" : "—"
                 )
             );
 
@@ -1213,362 +1189,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
 
-    function abrirDetalleCambio(item) {
-        el.modalTitulo.textContent =
-            `Cambio #${item.id_bitacora}`;
-
-        el.modalSubtitulo.textContent =
-            `${formatearFecha(item.fecha_hora)} · ${item.accion_descripcion || item.accion}`;
-
+    function accionCambio(item) {
+        if(item.cambios?.some(c=>c.campo==='activo'&&c.anterior===true&&c.nuevo===false))return 'Baja';
+        return etiquetas.accion(item.accion_descripcion || item.accion);
+    }
+    function nombreProyectoCambio(item) {
+        const id=item.id_proyecto || (item.entidad_tipo==='proyecto'?item.entidad_id:null);
+        if(!id)return '—';
+        const cambio=item.cambios?.find(c=>c.campo==='nombre_proyecto');
+        return proyectosPorId.get(Number(id)) || cambio?.nuevo || cambio?.anterior || (accionCambio(item)==='Baja' ? 'Proyecto dado de baja' : 'Proyecto sin nombre disponible');
+    }
+    function detalleTecnico(item) {
+        const d=document.createElement('details'),resumen=document.createElement('summary'),pre=document.createElement('pre');
+        resumen.textContent='Detalle técnico';pre.textContent=JSON.stringify(item,null,2);d.append(resumen,pre);el.modalContenido.append(d);
+    }
+    async function abrirDetalleCambio(item) {
+        el.modalTitulo.textContent='Detalle del cambio';
+        el.modalSubtitulo.textContent=`${formatearFecha(item.fecha_hora)} · ${accionCambio(item)}`;
         el.modalContenido.replaceChildren();
-
-
-        const resumen =
-            document.createElement("div");
-
-        resumen.className =
-            "auditoria-detalle-grid";
-
-
-        resumen.append(
-            bloqueDato(
-                "Usuario",
-                nombreUsuario(
-                    item.usuario
-                )
-            ),
-
-            bloqueDato(
-                "Correo",
-                item.usuario?.correo ||
-                "—"
-            ),
-
-            bloqueDato(
-                "Proyecto",
-                item.id_proyecto ? proyectosPorId.get(Number(item.id_proyecto)) || "Proyecto no disponible" : "—"
-            ),
-
-            bloqueDato(
-                "Proyecto-núcleo",
-                item.id_proyecto_nucleo ? contextosPorId.get(Number(item.id_proyecto_nucleo)) || "Referencia no disponible" : "—"
-            ),
-
-            bloqueDato(
-                "Núcleo",
-                item.id_nucleo ? nucleosPorId.get(Number(item.id_nucleo)) || "Núcleo no disponible" : "—"
-            ),
-
-            bloqueDato(
-                "Entidad",
-                item.entidad_tipo ||
-                "—"
-            ),
-
-            bloqueDato(
-                "ID entidad",
-                item.entidad_id ??
-                "—"
-            ),
-
-            bloqueDato(
-                "Acción técnica",
-                item.accion ||
-                "—"
-            )
-        );
-
-
-        el.modalContenido.appendChild(
-            resumen
-        );
-
-
-        const tituloCambios =
-            document.createElement("h3");
-
-        tituloCambios.textContent =
-            "Campos modificados";
-
-        el.modalContenido.appendChild(
-            tituloCambios
-        );
-
-
-        const cambios =
-            Array.isArray(
-                item.cambios
-            )
-                ? item.cambios
-                : [];
-
-
-        if (
-            cambios.length === 0
-        ) {
-            const vacio =
-                document.createElement("p");
-
-            vacio.className =
-                "auditoria-detalle-vacio";
-
-            vacio.textContent =
-                "Este registro no contiene diferencias de campos visibles.";
-
-            el.modalContenido.appendChild(
-                vacio
-            );
-
-        } else {
-            const lista =
-                document.createElement("div");
-
-            lista.className =
-                "auditoria-cambios-lista";
-
-
-            for (
-                const cambio
-                of cambios
-            ) {
-                const tarjeta =
-                    document.createElement("article");
-
-                tarjeta.className =
-                    "auditoria-cambio-item";
-
-
-                const campo =
-                    document.createElement("h4");
-
-                campo.textContent =
-                    cambio.campo ||
-                    "Campo";
-
-
-                const comparacion =
-                    document.createElement("div");
-
-                comparacion.className =
-                    "auditoria-cambio-comparacion";
-
-
-                const anterior =
-                    document.createElement("div");
-
-                const anteriorLabel =
-                    document.createElement("span");
-
-                anteriorLabel.textContent =
-                    "Anterior";
-
-                const anteriorValor =
-                    document.createElement("pre");
-
-                anteriorValor.textContent =
-                    textoValor(
-                        cambio.anterior
-                    );
-
-                anterior.append(
-                    anteriorLabel,
-                    anteriorValor
-                );
-
-
-                const nuevo =
-                    document.createElement("div");
-
-                const nuevoLabel =
-                    document.createElement("span");
-
-                nuevoLabel.textContent =
-                    "Nuevo";
-
-                const nuevoValor =
-                    document.createElement("pre");
-
-                nuevoValor.textContent =
-                    textoValor(
-                        cambio.nuevo
-                    );
-
-                nuevo.append(
-                    nuevoLabel,
-                    nuevoValor
-                );
-
-
-                comparacion.append(
-                    anterior,
-                    nuevo
-                );
-
-                tarjeta.append(
-                    campo,
-                    comparacion
-                );
-
-                lista.appendChild(
-                    tarjeta
-                );
-            }
-
-            el.modalContenido.appendChild(
-                lista
-            );
+        const pid=item.id_proyecto || (item.entidad_tipo==='proyecto'?item.entidad_id:null);
+        if(pid&&!proyectosPorId.has(Number(pid))) {
+            try {const proyecto=await window.ProyectosAPI.obtener(pid);proyectosPorId.set(Number(pid),proyecto.nombre_proyecto);}catch {/* La API puede excluir proyectos dados de baja. */}
         }
-
-
-        abrirModal();
+        const titulo=nombreProyectoCambio(item),accion=accionCambio(item);
+        const verbos={'Alta':'registró','Baja':'dio de baja','Modificación':'modificó','Reactivación':'reactivó'};
+        const motivo=item.cambios?.find(c=>c.campo==='motivo_baja')?.nuevo;
+        const frase=document.createElement('p');frase.className='auditoria-resumen-frase';
+        frase.textContent=`${nombreUsuario(item.usuario)} ${verbos[accion]||'registró un cambio en'} ${item.entidad_tipo==='proyecto'?'el ':''}${etiquetas.entidad(item.entidad_tipo).toLowerCase()}${titulo!=='—'?(item.entidad_tipo==='proyecto'?` «${titulo}»`:` del proyecto «${titulo}»`):''} el ${formatearFecha(item.fecha_hora)}.${motivo?` Motivo: ${motivo}`:''}`;
+        const resumen=document.createElement('div');resumen.className='auditoria-detalle-grid';
+        resumen.append(bloqueDato('Usuario',nombreUsuario(item.usuario)),bloqueDato('Correo',item.usuario?.correo),bloqueDato('Proyecto',titulo),bloqueDato('Entidad',etiquetas.entidad(item.entidad_tipo)),bloqueDato('Acción',accion));
+        if(item.id_proyecto_nucleo)resumen.append(bloqueDato('Núcleo del proyecto',contextosPorId.get(Number(item.id_proyecto_nucleo))||'Nombre no disponible'));
+        if(item.id_nucleo)resumen.append(bloqueDato('Núcleo',nucleosPorId.get(Number(item.id_nucleo))||'Nombre no disponible'));
+        el.modalContenido.append(frase,resumen);
+        const h=document.createElement('h3');h.textContent='Campos modificados';el.modalContenido.append(h);
+        for(const c of item.cambios||[]){const linea=document.createElement('p');linea.className='auditoria-cambio-linea';linea.textContent=`${etiquetas.campo(item.entidad_tipo,c.campo)}: ${valorCambio(c.anterior,c.campo)} → ${valorCambio(c.nuevo,c.campo)}`;el.modalContenido.append(linea);}
+        if(!item.cambios?.length)el.modalContenido.append(bloqueDato('Cambios','Sin diferencias de campos visibles.'));
+        detalleTecnico(item);abrirModal();
     }
-
-
     function abrirDetalleAcceso(item) {
-        el.modalTitulo.textContent =
-            `Evento de acceso #${item.id_evento}`;
-
-        el.modalSubtitulo.textContent =
-            `${formatearFecha(item.fecha_hora)} · ${item.tipo_evento}`;
-
-        el.modalContenido.replaceChildren();
-
-
-        const resumen =
-            document.createElement("div");
-
-        resumen.className =
-            "auditoria-detalle-grid";
-
-
-        resumen.append(
-            bloqueDato(
-                "Usuario",
-                nombreUsuario(
-                    item.usuario
-                )
-            ),
-
-            bloqueDato(
-                "ID usuario",
-                item.usuario?.id_usuario ??
-                "—"
-            ),
-
-            bloqueDato(
-                "Actor",
-                nombreUsuario(
-                    item.usuario_actor
-                )
-            ),
-
-            bloqueDato(
-                "ID actor",
-                item.usuario_actor?.id_usuario ??
-                "—"
-            ),
-
-            bloqueDato(
-                "Tipo de evento",
-                item.tipo_evento ||
-                "—"
-            ),
-
-            bloqueDato(
-                "Código de motivo",
-                item.motivo_codigo ||
-                "—"
-            ),
-
-            bloqueDato(
-                "Sesión",
-                item.id_sesion ??
-                "—"
-            ),
-
-            bloqueDato(
-                "IP de origen",
-                item.ip_origen ||
-                "—",
-                "auditoria-mono"
-            )
-        );
-
-
-        el.modalContenido.appendChild(
-            resumen
-        );
-
-
-        const detalle =
-            document.createElement("section");
-
-        detalle.className =
-            "auditoria-detalle-seccion";
-
-
-        const tituloDetalle =
-            document.createElement("h3");
-
-        tituloDetalle.textContent =
-            "Detalle";
-
-
-        const detalleTexto =
-            document.createElement("pre");
-
-        detalleTexto.textContent =
-            item.detalle ||
-            "—";
-
-
-        detalle.append(
-            tituloDetalle,
-            detalleTexto
-        );
-
-        el.modalContenido.appendChild(
-            detalle
-        );
-
-
-        const agente =
-            document.createElement("section");
-
-        agente.className =
-            "auditoria-detalle-seccion";
-
-
-        const tituloAgente =
-            document.createElement("h3");
-
-        tituloAgente.textContent =
-            "User-Agent";
-
-
-        const agenteTexto =
-            document.createElement("pre");
-
-        agenteTexto.textContent =
-            item.user_agent ||
-            "—";
-
-
-        agente.append(
-            tituloAgente,
-            agenteTexto
-        );
-
-        el.modalContenido.appendChild(
-            agente
-        );
-
-
-        abrirModal();
+        el.modalTitulo.textContent='Evento de acceso';el.modalSubtitulo.textContent=`${formatearFecha(item.fecha_hora)} · ${etiquetas.accion(item.tipo_evento)}`;el.modalContenido.replaceChildren();
+        el.modalContenido.append(bloqueDato('Usuario',nombreUsuario(item.usuario)),bloqueDato('Actor',nombreUsuario(item.usuario_actor)),bloqueDato('Evento',etiquetas.accion(item.tipo_evento)),bloqueDato('Motivo',etiquetas.humanizar(item.motivo_codigo)),bloqueDato('Detalle',item.detalle),bloqueDato('IP de origen',item.ip_origen));detalleTecnico(item);abrirModal();
     }
 
-
+    let focoDetalle;
     function abrirModal() {
+        focoDetalle=document.activeElement;
+        requestAnimationFrame(()=>el.modal.querySelector("[data-cerrar-auditoria-modal]")?.focus());
         el.modal.hidden =
             false;
 
@@ -1579,6 +1245,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
     function cerrarModal() {
+        focoDetalle?.focus();
         el.modal.hidden =
             true;
 

@@ -1,0 +1,12 @@
+.gis-resumen { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+.gis-resumen > div { padding:12px; background:#eef6f0; border-radius:8px; }
+.gis-resumen dd { margin:8px 0 0; font-size:1.4rem; font-weight:bold; }
+.gis-minimapa { height:300px; width:100%; margin:12px 0; z-index:0; }
+.gis-conciliacion select { max-width:100%; padding:10px; margin:8px; }
+.gis-conciliacion dl:not(.gis-resumen) { display:grid; grid-template-columns:minmax(100px,1fr) 2fr; gap:8px; overflow-wrap:anywhere; }
+.gis-conciliacion dd { margin:0; }
+.gis-conciliacion h3 { margin:20px 0 12px; }
+.gis-conciliacion button { margin:4px; }
+.gis-paso-activo { outline:2px solid #2f6846; border-radius:8px; }
+@media(max-width:650px) { .geoespacial-layout { display:block!important; } .gis-minimapa { height:240px; } }
+@media(max-width:650px) { .geoespacial-flujo { display:grid!important; grid-template-columns:1fr 1fr; overflow:visible!important; gap:12px; } .geoespacial-flujo > i { display:none; } .geoespacial-paso { min-width:0!important; } }

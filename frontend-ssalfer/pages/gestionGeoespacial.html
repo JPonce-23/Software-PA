@@ -2,6 +2,7 @@
 <html lang="es">
 
 <head>
+    <script src="/js/utils/proteccion.js"></script>
 
     <meta charset="UTF-8">
 
@@ -33,7 +34,7 @@
 
     <link
         rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+        href="/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css"
     >
 
 
@@ -47,6 +48,10 @@
     >
 
 <link rel="stylesheet" href="/styles/shared.css">
+<link rel="stylesheet" href="/styles/marco.css">
+<link rel="stylesheet" href="/styles/gestion.css">
+<link rel="stylesheet" href="/js/vendor/leaflet-1.9.4/leaflet.css">
+<link rel="stylesheet" href="/styles/conciliacionGeoespacial.css">
 </head>
 
 
@@ -59,15 +64,7 @@
 
     <aside class="aside">
 
-        <button
-            class="btn-menu"
-            type="button"
-            aria-label="Contraer menú"
-        >
 
-            <i class="bi bi-list"></i>
-
-        </button>
 
 
         <div class="logo-aside">
@@ -319,6 +316,15 @@
     ====================================================== -->
 
     <main class="contenedor geoespacial-pagina">
+<details class="ssalfer-gestion-seccion gis-guia"><summary>¿Cómo cargo los archivos?</summary>
+<ol><li>Comprueba el sistema de coordenadas del proyecto.</li><li>Carga el derecho de vía (DDV).</li><li>Vincula los núcleos al proyecto antes de cargar su archivo.</li><li>Carga y concilia los núcleos.</li><li>Carga las parcelas y revisa sus coincidencias.</li><li>Finaliza cuando hayas resuelto o ignorado los pendientes.</li></ol>
+<p><strong>Coordenadas transformadas al sistema de visualización:</strong> el archivo venía en otro sistema, como UTM, y se convirtió. Es informativo, no un error.</p>
+<p><strong>Se conservaron sólo las coordenadas del plano (XY):</strong> el archivo traía altura u otro valor y se descartó. Es informativo.</p>
+<p><strong>No hay coincidencias:</strong> sólo se comparan los núcleos vinculados a este proyecto. Si el archivo trae clave oficial, el núcleo debe haberse vinculado desde el catálogo oficial con la misma clave. Si no trae clave, debe coincidir el nombre, sin importar mayúsculas ni acentos, y también el municipio, la entidad y el tipo de núcleo cuando el archivo los incluya. Vincula a este proyecto los núcleos del archivo y pulsa Nueva conciliación.</p>
+<p><strong>Entrega completa:</strong> representa todos los núcleos o parcelas del proyecto; al finalizar, los registros existentes que falten generan una revisión pendiente. <strong>Entrega parcial:</strong> representa sólo una parte y no genera revisiones por ausencia. El mismo archivo con otro alcance se rechaza.</p>
+<p>El mismo archivo con la misma configuración se reconoce como ya procesado. Para compararlo de nuevo usa <strong>Nueva conciliación</strong>, sin volver a subirlo.</p>
+</details>
+
 
 
         <!-- =================================================
@@ -491,9 +497,7 @@
 
                 <div>
 
-                    <strong>
-                        Previsualizar
-                    </strong>
+                    <strong>Sistema de coordenadas</strong>
 
                     <span>
                         Revisa la validación
@@ -515,12 +519,10 @@
 
                 <div>
 
-                    <strong>
-                        Confirmar
-                    </strong>
+                    <strong>Cargar</strong>
 
                     <span>
-                        Incorpora a PostGIS
+                        Revisa los destinos
                     </span>
 
                 </div>
@@ -539,12 +541,10 @@
 
                 <div>
 
-                    <strong>
-                        Consultar
-                    </strong>
+                    <strong>Conciliar</strong>
 
                     <span>
-                        Visualiza en el mapa
+                        Confirma los resultados
                     </span>
 
                 </div>
@@ -585,7 +585,7 @@
                     <button id="btnCerrarImportacion" class="btn-icono" type="button" title="Cerrar" aria-label="Cerrar formulario de importación">
 
                         <i class="bi bi-x-lg"></i>
-                    
+
                     </button>
 
                 </div>
@@ -616,15 +616,12 @@
                                 Trazo del proyecto
                             </option>
 
-                            <option value="nucleo_agrario">
-                                Núcleo agrario
-                            </option>
-
-                            <option value="parcela">
-                                Parcela
-                            </option>
+                            <option value="ddv">Derecho de vía (DDV)</option>
+<option value="nucleos">Núcleos agrarios</option>
+<option value="parcelas">Parcelas</option>
 
                         </select>
+<label class="ssalfer-gestion-campo" hidden>Alcance de la entrega<select id="alcanceEntregaGis"><option value="parcial">Parcial: contiene una parte de los registros</option><option value="completa">Completa: contiene todos los registros de esta entrega</option></select></label>
 
 
                         <small>
@@ -813,8 +810,8 @@
                             El archivo no modifica inmediatamente
                             la cartografía vigente. Primero será
                             procesado y enviado a previsualización.
-                            La información sólo se incorporará a
-                            PostGIS después de una confirmación
+                            La información sólo se incorporará al
+                            registro geográfico después de una confirmación
                             explícita.
                         </p>
 
@@ -1262,6 +1259,7 @@
 
 
     </main>
+<footer class="footer"><p>© 2026 Procuraduría Agraria. Todos los derechos reservados.</p></footer>
 
 
 
@@ -1303,12 +1301,18 @@
 
     <script src="/js/utils/ui.js"></script>
 <script src="/js/utils/experiencia.js"></script>
+<script src="/js/utils/marco.js"></script>
 <script src="/js/dashboard.js"></script>
 
 
     <!-- LÓGICA DEL MÓDULO -->
 
-    <script src="/js/gestionGeoespacial.js"></script>
+    <script src="/js/api/geoespacial.js"></script>
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/gestion.js"></script>
+<script src="/js/vendor/leaflet-1.9.4/leaflet.js"></script>
+<script src="/js/conciliacionGeoespacial.js"></script>
+<script src="/js/gestionGeoespacial.js"></script>
 
 </body>
 

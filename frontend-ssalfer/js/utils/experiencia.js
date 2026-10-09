@@ -26,6 +26,11 @@
         abrir(".colectivo-detalle summary", () => document.activeElement?.closest("details"));
         reglas.push({ evento: "submit", selector: "#reporteColectivo form", destino: "[data-resultados]" });
         break;
+    case "gestionGeoespacial":
+        abrir('[data-gestion="elemento"]', "[data-gis-elemento]");
+        abrir('[data-gestion="revision"]', "[data-revision-detalle]");
+        abrir("#btnCrearImportacion", "#seccionNuevaImportacion");
+        break;
     case "documentos":
         dependiente("[data-doc-tipo]", campo("[data-doc-registro]"));
         dependiente("[data-doc-registro]", "[data-doc-contenido]");

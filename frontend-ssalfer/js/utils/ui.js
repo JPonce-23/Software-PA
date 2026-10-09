@@ -248,7 +248,7 @@
     }
 
     function iniciarCarga({ silencioso = false, carga, metodo = "GET" } = {}) {
-        if (silencioso || /(?:gestionGeoespacial|mapa)\.html$/i.test(location.pathname)) return () => {};
+        if (silencioso || (!carga && /(?:gestionGeoespacial|mapa)\.html$/i.test(location.pathname))) return () => {};
         peticiones++;
         const solicitado = resolverElemento(carga ?? (metodo.toUpperCase() === "GET" ? accionUsuario?.carga : null));
         const destino = visible(solicitado) ? solicitado : document.body;

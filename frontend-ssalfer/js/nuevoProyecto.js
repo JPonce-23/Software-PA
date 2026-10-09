@@ -287,6 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     ENVÍO DEL FORMULARIO
     ====================================================== */
 
+    let proyectoCreado = null, pendientesUsuarios = null;
     formulario.addEventListener(
         "submit",
         async (event) => {
@@ -296,7 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const btnGuardar = formulario.querySelector("[type='submit']");
             if (btnGuardar?.disabled) return;
 
-            if (!validarFormulario()) {
+            if (!proyectoCreado && !validarFormulario()) {
 
                 return;
 
@@ -326,7 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (btnGuardar) btnGuardar.disabled = true;
             const confirmar =
                 await window.SSALFER_UI.confirmar(
-                    "¿Deseas registrar este proyecto?"
+                    proyectoCreado ? "El proyecto ya existe. ¿Deseas reintentar las asignaciones pendientes?" : "¿Deseas registrar este proyecto?"
                 );
 
 
@@ -339,7 +340,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
 
-                await window.ProyectosAPI.crear(proyecto);
+                if (!proyectoCreado) proyectoCreado = await window.ProyectosAPI.crear(proyecto);
+                const seleccion = document.getElementById("usuariosNuevoProyecto");
+                if (pendientesUsuarios === null) pendientesUsuarios = [...(seleccion?.selectedOptions || [])].map(o => Number(o.value));
+                formulario.querySelectorAll("input,textarea,select").forEach(c=>c.disabled=true);
+                if (btnGuardar) btnGuardar.textContent="Reintentar asignaciones";
+                let salida = document.getElementById("resultadoAsignaciones");
+                if (!salida) { salida=document.createElement("section"); salida.id="resultadoAsignaciones"; salida.className="ssalfer-gestion-seccion"; formulario.after(salida); }
+                pendientesUsuarios = await window.SSALFER_USUARIOS_PROYECTO.asignarPendientes(proyectoCreado.id_proyecto, pendientesUsuarios, salida);
+                if (pendientesUsuarios.length) {
+                    salida.insertAdjacentHTML("afterbegin", '<p>El proyecto ya está creado. Algunas asignaciones no se completaron; pulsa Reintentar asignaciones para intentar sólo las pendientes.</p>');
+                    formulario.querySelectorAll('input,textarea,select').forEach(c => c.disabled=true);
+                    window.SSALFER_UI.desplazarA(salida); return;
+                }
 
                 await window.SSALFER_UI.verDatos("Registro guardado", { "Mensaje": "El proyecto se registró correctamente." });
 

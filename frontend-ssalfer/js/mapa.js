@@ -75,6 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("mapa"),
 
 
+        capaDdv: document.getElementById("capaDdv"),
         capaTrazos:
             document.getElementById("capaTrazos"),
 
@@ -190,6 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
      */
 
     const ESTILOS = {
+        derecho_via_proyecto:{color:"#286c91",weight:3,fillColor:"#68b1d6",fillOpacity:.22},
 
         trazo_proyecto: {
 
@@ -239,6 +241,7 @@ document.addEventListener("DOMContentLoaded", () => {
      */
 
     const ESTILOS_SELECCION = {
+        derecho_via_proyecto:{color:"#143d60",weight:5,fillColor:"#68b1d6",fillOpacity:.4},
 
         trazo_proyecto: {
 
@@ -288,6 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ====================================================== */
 
     let mapaLeaflet = null;
+    let capaTemporal = null;
 
     let proyectos = [];
 
@@ -324,6 +328,7 @@ document.addEventListener("DOMContentLoaded", () => {
      */
 
     const grupos = {
+        derecho_via_proyecto:null,
 
         trazo_proyecto:
             null,
@@ -346,6 +351,7 @@ document.addEventListener("DOMContentLoaded", () => {
      */
 
     const capasPorTipoId = {
+        derecho_via_proyecto:new Map(),
 
         trazo_proyecto:
             new Map(),
@@ -542,6 +548,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function textoTipoParcela(valor) {
 
         const textos = {
+            derecho_via_proyecto:"Derecho de vía vigente",
 
             individual:
                 "Individual",
@@ -570,6 +577,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function tipoLegible(tipo) {
 
         const textos = {
+            derecho_via_proyecto:"Derecho de vía vigente",
 
             trazo_proyecto:
                 "Trazo del proyecto",
@@ -1486,6 +1494,7 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
 
+        grupos.derecho_via_proyecto = window.L.featureGroup().addTo(mapaLeaflet);
         grupos.trazo_proyecto =
             window.L
                 .featureGroup()
@@ -1543,6 +1552,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     function limpiarGeometrias() {
+        if (capaTemporal) { mapaLeaflet.removeLayer(capaTemporal); capaTemporal=null; }
+        document.getElementById("avisoPrevisualizacionGis")?.remove();
 
         Object
             .values(
@@ -1567,6 +1578,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function capaVisible(tipo) {
 
         const controles = {
+            derecho_via_proyecto:elementos.capaDdv,
 
             trazo_proyecto:
                 elementos.capaTrazos,
@@ -1638,6 +1650,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function enlazarControlesCapas() {
 
         const controles = [
+            ["derecho_via_proyecto",elementos.capaDdv],
 
             [
                 "trazo_proyecto",
@@ -2165,10 +2178,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         const capasConBounds =
-            Object
-                .values(
-                    grupos
-                )
+            [...Object.values(grupos), capaTemporal]
                 .filter(Boolean)
                 .filter(
                     grupo =>
@@ -2728,6 +2738,16 @@ document.addEventListener("DOMContentLoaded", () => {
         /* =================================================
            TRAZO
         ================================================== */
+
+        if(tipo==='derecho_via_proyecto'){
+            restaurarEstilosGeometrias();
+            aplicarEstiloACapas(capasPorTipoId.derecho_via_proyecto.get(Number(props.id)),ESTILOS_SELECCION.derecho_via_proyecto);
+            prepararDetalle('Derecho de vía vigente',props.nombre||nombreProyecto(proyecto));
+            agregarDatoDetalle('Proyecto',nombreProyecto(proyecto));
+            agregarDatoDetalle('Estado','Geometría vigente confirmada');
+            agregarDatoDetalle('Superficie administrativa','La geometría no modifica las superficies registradas.');
+            configurarEnlaceDetalle(`/pages/gestionGeoespacial.html?id_proyecto=${idProyecto}`,'Consultar cartografía');return;
+        }
 
         if (
             tipo ===
@@ -3301,6 +3321,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         limpiarMensajes();
+        elementos.selectorProyecto?.classList.add("mapa-elegir-proyecto");
+        mostrarInformativo("Elige un proyecto para ver su mapa.");
 
         limpiarGeometrias();
 
@@ -3326,7 +3348,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ) {
 
             elementos.descripcion.textContent =
-                "Selecciona un proyecto para consultar su trazo vigente, núcleos agrarios, parcelas e información administrativa relacionada.";
+                "Elige un proyecto para ver su mapa.";
 
         }
 
@@ -3654,8 +3676,24 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
-        const errores =
-            [];
+        const errores = [];
+        elementos.selectorProyecto?.classList.remove("mapa-elegir-proyecto");
+        const vista = new URLSearchParams(location.search), imp = Number(vista.get('id_importacion')), fid = Number(vista.get('id_feature'));
+        if (imp > 0 && fid > 0) {
+            try {
+                const importacion = await window.GeoespacialAPI.obtener(imp);
+                if (cargaActual !== tokenCarga) return;
+                if (Number(importacion.id_proyecto) === Number(proyecto.id_proyecto)) {
+                    const geo = await window.GeoespacialAPI.geometria(imp, fid);
+                    if (cargaActual !== tokenCarga) return;
+                    if (geo.geometry) {
+                        capaTemporal=window.L.geoJSON(geo,{style:{color:'#bd7618',dashArray:'7 5',fillOpacity:.15}}).addTo(mapaLeaflet);
+                        const etiqueta=document.createElement('p');etiqueta.id='avisoPrevisualizacionGis';etiqueta.textContent='Previsualización, aún no confirmada · capa temporal';etiqueta.className='gis-aviso-temporal';document.querySelector('main').prepend(etiqueta);
+                        capaTemporal.bindTooltip('Previsualización, aún no confirmada · capa temporal');if(capaTemporal.getBounds().isValid()) mapaLeaflet.fitBounds(capaTemporal.getBounds());
+                    } else { errores.push('Este elemento no tiene geometría disponible para previsualizar. Revisa sus observaciones en la conciliación.'); }
+                } else { errores.push('La previsualización pertenece a otro proyecto. Ábrela desde su conciliación.'); }
+            } catch(error) { if(cargaActual!==tokenCarga)return; errores.push(error.status===403 ? 'Tu cuenta no tiene permiso para ver esta previsualización.' : error.status===404 ? 'La previsualización ya no está disponible. Vuelve a la conciliación.' : 'No se pudo consultar la previsualización. Comprueba la conexión y vuelve a intentarlo.'); }
+        }
 
 
         /*
@@ -3709,7 +3747,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ) {
 
                 mostrarInformativo(
-                    "Este proyecto todavía no tiene geometrías vigentes registradas en el mapa."
+                    capaTemporal ? "Mostrando solo la previsualización, aún no confirmada." : "Este proyecto todavía no tiene geometrías vigentes registradas en el mapa."
                 );
 
             }
@@ -3727,10 +3765,7 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
 
-            mapaLeaflet?.setView(
-                VISTA_INICIAL.centro,
-                VISTA_INICIAL.zoom
-            );
+            ajustarMapaAGeometrias();
 
         }
 
@@ -3877,7 +3912,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         proyectos =
-            todos;
+            window.ProyectosAPI.ordenar(todos);
 
 
         proyectoPorId.clear();

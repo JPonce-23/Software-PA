@@ -32,7 +32,13 @@
 
     }
 
+    let tiposActivos;
+    function tiposDocumento(incluirInactivos=false){
+        if(incluirInactivos)return get('/catalogos/tipos-documento?incluir_inactivos=true');
+        return tiposActivos ||= get('/catalogos/tipos-documento').catch(e=>{tiposActivos=null;throw e;});
+    }
     window.CatalogosAPI = {
+        tiposDocumento,
         buscarNucleos: (params = {}) => get(`/catalogos/nucleos?${new URLSearchParams(params)}`),
         obtenerOperativo,
         obtenerEntidades,

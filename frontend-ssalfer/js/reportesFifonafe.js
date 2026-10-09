@@ -1565,23 +1565,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     ===================================================== */
 
     function escaparCsv(valor) {
-
-        const texto =
-            valor === null ||
-            valor === undefined
-
-                ? ""
-
-                : String(valor);
-
-
-        return `"${texto.replaceAll(
-            '"',
-            '""'
-        )}"`;
-
+        let texto=String(valor??'');if(typeof valor!=='number'&&/^[\s]*[=+@-]/.test(texto))texto="'"+texto;
+        return '"'+texto.replaceAll('"','""')+'"';
     }
-
+    function valorCsv(fila,campo,tipo){
+        if(['entero','decimal','porcentaje'].includes(tipo) && !campo.startsWith('id_'))return fila[campo]==null||fila[campo]===''?'':Number(fila[campo]);
+        return valorVisual(fila,campo,tipo);
+    }
 
     function exportarCsv() {
 
@@ -1612,13 +1602,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             config.columnas
                 .map(
-                    ([
-                        ,
-                        titulo
-                    ]) =>
-                        escaparCsv(
-                            titulo
-                        )
+                    ([campo, titulo]) =>
+                        escaparCsv(/monto|importe/.test(campo) && !/MXN/.test(titulo) ? `${titulo} (MXN)` : /superficie/.test(campo) && !/ha/.test(titulo) ? `${titulo} (ha)` : titulo)
                 )
                 .join(",")
 
@@ -1638,7 +1623,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 tipo
                             ]) =>
                                 escaparCsv(
-                                    valorVisual(
+                                    valorCsv(
                                         fila,
                                         campo,
                                         tipo

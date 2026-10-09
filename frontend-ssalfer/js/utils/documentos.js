@@ -27,7 +27,7 @@
     function nombre(documentos, id) {
         if (!id) return "Sin documento asociado";
         const documento = documentos.get(Number(id));
-        return documento?.titulo || documento?.tipo_documento || "Documento asociado no disponible en el listado";
+        return documento?.titulo || window.DocumentosAPI.nombreTipo(documento) || "Documento asociado no disponible en el listado";
     }
 
     function opciones(documentos, actual = null) {

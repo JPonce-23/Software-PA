@@ -1319,7 +1319,7 @@ async function cargarCatalogos() {
                     opcion.textContent =
                         documento.nombre
                         || documento.titulo
-                        || documento.tipo_documento || "Documento";
+                        || window.DocumentosAPI.nombreTipo(documento) || "Documento";
 
                     selectDocumento.appendChild(opcion);
 

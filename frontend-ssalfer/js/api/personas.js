@@ -11,9 +11,7 @@
  * DELETE /personas/{id_persona}
  * POST   /personas/{id_persona}/reactivar
  *
- * Importante:
- * actualmente no existe un endpoint para listar o buscar
- * personas de un proyecto por nombre, CURP, etc.
+ * GET /personas: búsqueda autorizada por un único criterio.
  */
 
 (function () {
@@ -39,7 +37,7 @@
                 idProyecto
             )}/personas`,
             payload
-        );
+        ).catch(error=>{if(error.status===409)error.message="Ya existe una persona con esta identidad. Búscala por CURP o RFC antes de intentar registrarla nuevamente. Si no aparece, solicita revisión de acceso al administrador.";throw error;});
 
     }
 
@@ -102,7 +100,15 @@
     }
 
 
+    function buscar(params={},opciones={}) {
+        const criterios=['q','curp','rfc'].filter(k=>String(params[k]??'').trim());
+        if(criterios.length!==1)throw Error('Elige sólo un criterio de búsqueda.');
+        const k=criterios[0],v=String(params[k]).trim().replace(/\s+/g,' '),max={q:300,curp:18,rfc:13}[k];
+        if(v.length>(max)||k==='q'&&v.length<2)throw Error(k==='q'?'Escribe entre 2 y 300 caracteres del nombre.':'Revisa la longitud del criterio.');
+        return get(`/personas?${new URLSearchParams({[k]:v,limit:Math.min(100,Math.max(1,Number(params.limit)||20)),skip:Math.max(0,Number(params.skip)||0)})}`,opciones);
+    }
     window.PersonasAPI = {
+        buscar,
 
         crear,
 
