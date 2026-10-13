@@ -349,3 +349,21 @@ explícitos elegibles registran V1. Features confirmadas no se reabren.
 `registros_administrativos` conserva su contrato y no se añaden umbrales de
 completitud. Véanse [API §12](API.md#12-diagnósticos-de-conciliación-gis-entrega-1-esquema-029)
 y [catálogo e integración SSALFER](CONTRATO_DIAGNOSTICOS_GIS_SSALFER.md).
+
+### Cancelación y universos administrativos GIS (entregas 2 y 3)
+
+La cancelación usa los campos de auditoría del padre, preserva hijos y versiones,
+y comprueba referencias reales de geometrías, entregas y revisiones. Las
+escrituras comparten orden de bloqueo proyecto/importación y releen la actividad
+tras el bloqueo. Lecturas históricas requieren opt-in y acceso al proyecto.
+Pipelines con procedencia no demostrable se rechazan conservadoramente.
+
+`gis_universe.py` construye contextos informativos sin intervenir en matching.
+Staging/reconciliación reutilizan los universos cargados y calculan el resumen
+una sola vez. El resumen obtiene versiones vigentes en una consulta por lote,
+sin búsquedas geométricas por destino. Cada ciclo nuevo registra conteos en su
+JSONB `resumen`; las lecturas históricas proyectan el snapshot sin consultas
+administrativas actuales por ciclo. Snapshots antiguos solo permiten inferir
+sus propios destinos y conteos compatibles; la información restante se marca
+no disponible. No se consulta información de otros proyectos ni se definen
+umbrales de incompletitud. Se mantiene el esquema canónico hasta 029.

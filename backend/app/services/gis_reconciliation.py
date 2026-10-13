@@ -178,22 +178,31 @@ def build_candidates(db, record, feature, properties, universe, user, *, direct_
     db.flush()
 
 
-def reconciliation_summary(db, record):
-    universe = administrative_universe(db, record.id_proyecto, parcels=record.tipo_objetivo in PARCEL_TARGETS)
+def reconciliation_summary(db, record, *, universe=None, administrative_context=None, cycle=None):
+    from .gis_universe import current_context, historical_context
+    if universe is None:
+        nuclei = administrative_universe(db, record.id_proyecto)
+        universe = administrative_universe(db, record.id_proyecto, parcels=True, nuclei=nuclei) if record.tipo_objetivo in PARCEL_TARGETS else nuclei
+        administrative_context = current_context(db, record, universe=universe, nuclei=nuclei)
     keys = {(pn.id_proyecto_nucleo, p.id_parcela if p else None) for pn,n,p in universe}
-    confirmed_keys = set()
-    for pn_id, parcel_id in keys:
-        if geometry_query(db,pn_id,parcel_id).filter(geometry_model(parcel_id).es_vigente.is_(True)).first():
-            confirmed_keys.add((pn_id,parcel_id))
+    model = models.ProyectoParcelaGeometria if record.tipo_objetivo in PARCEL_TARGETS else models.ProyectoNucleoGeometria
+    columns = [model.id_proyecto_nucleo, model.id_parcela] if record.tipo_objetivo in PARCEL_TARGETS else [model.id_proyecto_nucleo]
+    rows = db.query(*columns).filter(model.id_proyecto_nucleo.in_({k[0] for k in keys}), model.es_vigente.is_(True)).all() if keys else []
+    confirmed_keys = keys & {(row[0],row[1] if len(row)>1 else None) for row in rows}
     feature_states = dict(db.query(models.ImportacionFeature.estado_conciliacion,func.count()).filter(
         models.ImportacionFeature.id_importacion==record.id_importacion).group_by(models.ImportacionFeature.estado_conciliacion).all())
+    if cycle is None:
+        cycle = db.query(models.ImportacionConciliacionCiclo).filter_by(id_importacion=record.id_importacion).order_by(
+            models.ImportacionConciliacionCiclo.numero_ciclo.desc()).first()
     return {'registros_administrativos':len(keys), 'features_archivo':record.total_features,
             'confirmados':feature_states.get('confirmado',0), 'ambiguos':feature_states.get('ambiguo',0),
             'candidatos':feature_states.get('candidato',0)+feature_states.get('coincidencia_exacta',0),
             'registros_sin_geometria':len(keys-confirmed_keys),
             'features_sin_destino':feature_states.get('sin_coincidencia',0),
             'features_no_utilizadas':record.total_features-feature_states.get('confirmado',0),
-            'ignoradas':feature_states.get('ignorado',0), 'rechazadas':feature_states.get('rechazado',0)}
+            'ignoradas':feature_states.get('ignorado',0), 'rechazadas':feature_states.get('rechazado',0),
+            'universo_administrativo_actual':administrative_context,
+            'universo_administrativo_utilizado':historical_context(cycle,record.tipo_objetivo)}
 
 
 async def stage(db, project_id, source, source_date, upload, user, *, target, mapping=None, strict=True, scope="parcial"):
@@ -248,6 +257,11 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
         nucleus_universe=administrative_universe(db,project_id) if target in RECONCILIATION_TARGETS else []
         universe=administrative_universe(db,project_id,parcels=True,nuclei=nucleus_universe) if target in PARCEL_TARGETS else nucleus_universe
         cycle = history.create_cycle(db,record,universe,user,reason='Conciliación inicial') if target in RECONCILIATION_TARGETS else None
+        administrative_context = None
+        if cycle is not None:
+            from .gis_universe import current_context, register_context
+            administrative_context = current_context(db,record,universe=universe,nuclei=nucleus_universe)
+            register_context(cycle,administrative_context)
         by_layer={l.name:l for l in dataset.layers}
         for index,(layer_name,item) in enumerate(iter_features(dataset_path,dataset,preserve_source_geometry=True)):
             layer=by_layer[layer_name]; raw=item.get('properties') or {}; geometry=item.get('geometry')
@@ -314,9 +328,11 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
             'validos':record.validos,'advertencias':record.advertencias,'errores':record.errores,
             'crs_original':dataset.crs_description,'crs_destino':'EPSG:4326','srid_trabajo':srid,
             'archivo_original_retenido':False}
-        if target in RECONCILIATION_TARGETS: record.reporte={**record.reporte,**reconciliation_summary(db,record)}
+        if target in RECONCILIATION_TARGETS:
+            summary=reconciliation_summary(db,record,universe=universe,administrative_context=administrative_context,cycle=cycle)
+            record.reporte={**record.reporte,**summary}
         if cycle is not None:
-            cycle.resumen = reconciliation_summary(db,record)
+            cycle.resumen = {**cycle.resumen,**{k:v for k,v in summary.items() if not k.startswith('universo_administrativo_')}}
             history.appearances(db,record,user)
         db.commit(); db.refresh(record)
         return record

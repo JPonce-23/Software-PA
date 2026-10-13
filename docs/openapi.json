@@ -11457,6 +11457,29 @@
         ],
         "title": "AdminPasswordResetRequest"
       },
+      "AdvertenciaUniversoGisResponse": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "enum": [
+              "SIN_NUCLEOS_VINCULADOS",
+              "SIN_PARCELAS_ELEGIBLES",
+              "SIN_DESTINOS_APLICABLES"
+            ],
+            "title": "Codigo"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "mensaje"
+        ],
+        "title": "AdvertenciaUniversoGisResponse"
+      },
       "AfectacionCreate": {
         "properties": {
           "observaciones": {
@@ -14361,6 +14384,16 @@
               }
             ],
             "title": "Usuario Nombre"
+          },
+          "universo_administrativo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniversoAdministrativoGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -16892,6 +16925,16 @@
               }
             ],
             "title": "Usuario Nombre"
+          },
+          "universo_administrativo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniversoAdministrativoGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "features": {
             "items": {
@@ -28684,6 +28727,116 @@
         },
         "type": "object",
         "title": "UnidadAgrariaUpdate"
+      },
+      "UniversoAdministrativoGisResponse": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "1",
+            "title": "Version",
+            "default": "1"
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "actual",
+              "ciclo"
+            ],
+            "title": "Origen"
+          },
+          "disponibilidad": {
+            "type": "string",
+            "enum": [
+              "disponible",
+              "parcial",
+              "no_disponible"
+            ],
+            "title": "Disponibilidad"
+          },
+          "tipo_objetivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Objetivo"
+          },
+          "id_ciclo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Ciclo"
+          },
+          "fecha_evaluacion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Evaluacion"
+          },
+          "nucleos_vinculados_activos": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nucleos Vinculados Activos"
+          },
+          "parcelas_elegibles_vinculadas": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parcelas Elegibles Vinculadas"
+          },
+          "destinos_aplicables": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destinos Aplicables"
+          },
+          "advertencias": {
+            "items": {
+              "$ref": "#/components/schemas/AdvertenciaUniversoGisResponse"
+            },
+            "type": "array",
+            "title": "Advertencias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "origen",
+          "disponibilidad"
+        ],
+        "title": "UniversoAdministrativoGisResponse"
       },
       "UserEmailChangeRequest": {
         "properties": {

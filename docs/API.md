@@ -628,3 +628,21 @@ escrituras. El listado conserva paginación y `X-Total-Count`.
 
 Contrato y limitaciones de pipelines históricos:
 [Importaciones GIS, entregas 2 y 3](CONTRATO_IMPORTACIONES_GIS_ENTREGAS_2_3.md).
+
+### Contextos del universo administrativo GIS (entrega 3)
+
+El resumen y `reporte` de núcleos/parcelas añaden
+`universo_administrativo_actual` y `universo_administrativo_utilizado`.
+`registros_administrativos` conserva su definición y valor. Las respuestas de
+ciclos añaden el campo opcional tipado `universo_administrativo`; el snapshot se
+conserva en `resumen.universo_administrativo`. Los conteos se obtienen de vínculos
+activos y la vista parcelaria canónica, con los mismos destinos del matching.
+
+SSALFER distingue ausencia de núcleos, de parcelas elegibles y de destinos
+aplicables mediante códigos `SIN_NUCLEOS_VINCULADOS`, `SIN_PARCELAS_ELEGIBLES`
+y `SIN_DESTINOS_APLICABLES`. Un conteo histórico nulo indica desconocimiento,
+no ausencia. `disponibilidad` describe datos disponibles, no completitud del
+universo. El resumen persistido refleja su última operación; el endpoint de
+resumen recalcula el actual. Para una feature se consulta su propio ciclo,
+incluso si la reconciliación más reciente fue parcial. Ejemplos y contrato:
+[Entregas 2 y 3](CONTRATO_IMPORTACIONES_GIS_ENTREGAS_2_3.md).

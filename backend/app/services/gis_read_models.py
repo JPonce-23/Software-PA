@@ -35,6 +35,18 @@ def with_actor(db, records, schema, id_field="creado_por", name_field="creado_po
                        id_field, name_field)
 
 
+def cycle_previews(db, cycles, tipo_objetivo=None):
+    from .gis_universe import historical_context
+    if cycles and tipo_objetivo is None and any(c.resumen.get('universo_administrativo') is None for c in cycles):
+        # An idempotent POST can return a cycle created before this extension.
+        # Resolve the already-authorized parent's type once, not once per row.
+        tipo_objetivo = db.query(models.ImportacionArchivo.tipo_objetivo).filter_by(
+            id_importacion=cycles[0].id_importacion).scalar()
+    rows = with_actor(db,cycles,schemas.CicloGisResponse,"id_usuario","usuario_nombre")
+    return [{**row,"universo_administrativo":historical_context(cycle,tipo_objetivo)}
+            for row,cycle in zip(rows,cycles)]
+
+
 def revisions(db, rows):
     rows = actor_names(db, rows, "creado_por", "creado_por_nombre")
     keys = {(row["id_proyecto_nucleo"], row["id_parcela"]) for row in rows
@@ -124,7 +136,7 @@ def cycle_detail(db, record, cycle_id):
                       "estado_matching": result.estado_matching, "estado_resultado": state,
                       "diagnostico": result.diagnostico if result.diagnostico is not None else unavailable_diagnostic(),
                       "candidatos": cs, "decisiones": ds})
-    return {**with_actor(db, [cycle], schemas.CicloGisResponse, "id_usuario", "usuario_nombre")[0],
+    return {**cycle_previews(db,[cycle],record.tipo_objetivo)[0],
             "features": items}
 
 

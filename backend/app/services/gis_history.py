@@ -106,17 +106,21 @@ def reconcile(db, import_id, data, user):
         close_cycles(db, record)
         cycle = create_cycle(db, record, universe, user, reason=data.motivo,
                              kind="reconciliacion", request_key=data.clave_solicitud)
+        from .gis_universe import current_context, register_context
+        administrative_context = current_context(db,record,universe=universe,nuclei=nucleus_universe)
+        register_context(cycle,administrative_context)
         for feature in features:
             direct_id = feature.atributos_normalizados.get("id_destino") if record.mapeo.get("id_destino") else None
             matching.build_candidates(db, record, feature, feature.atributos_originales, universe, user,
                                       direct_id=direct_id, cycle=cycle, nucleus_universe=nucleus_universe)
         results = dict(db.query(models.ImportacionConciliacionResultado.estado_matching,func.count()).filter_by(
             id_ciclo=cycle.id_ciclo).group_by(models.ImportacionConciliacionResultado.estado_matching).all())
-        cycle.resumen = {"features":len(features),"resultados":results,"parametros":parameters}
+        cycle.resumen = {**cycle.resumen,"features":len(features),"resultados":results,"parametros":parameters}
         record.estado = "previsualizado"
         record.actualizado_por = user.id_usuario
         record.actualizado_en = datetime.now(timezone.utc)
-        record.reporte = {**record.reporte,**matching.reconciliation_summary(db, record)}
+        record.reporte = {**record.reporte,**matching.reconciliation_summary(
+            db,record,universe=universe,administrative_context=administrative_context,cycle=cycle)}
         db.commit()
         db.refresh(cycle)
         return cycle

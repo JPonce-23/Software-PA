@@ -277,18 +277,18 @@ def get_feature_geometry(id_importacion: int,id_feature: int,incluir_inactivas: 
 def reconcile_import(id_importacion: int, data: schemas.ReconciliarGisRequest,
                      db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
     cycle = history.reconcile(db,id_importacion,data,user)
-    return reads.with_actor(db, [cycle], schemas.CicloGisResponse, "id_usuario", "usuario_nombre")[0]
+    return reads.cycle_previews(db,[cycle])[0]
 
 
 @router.get('/importaciones/{id_importacion}/conciliaciones', response_model=list[schemas.CicloGisResponse], responses=reads.TOTAL_COUNT_RESPONSE)
 def list_cycles(id_importacion: int, response: Response, skip: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200),
                 incluir_inactivas: bool = Query(False),
     db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
-    service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
+    record = service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     query = db.query(models.ImportacionConciliacionCiclo).filter_by(id_importacion=id_importacion)
     response.headers["X-Total-Count"] = str(query.count())
     records = query.order_by(models.ImportacionConciliacionCiclo.numero_ciclo).offset(skip).limit(limit).all()
-    return reads.with_actor(db, records, schemas.CicloGisResponse, "id_usuario", "usuario_nombre")
+    return reads.cycle_previews(db,records,record.tipo_objetivo)
 
 
 @router.get('/importaciones/{id_importacion}/conciliaciones/{id_ciclo}',response_model=schemas.DetalleCicloGisResponse)

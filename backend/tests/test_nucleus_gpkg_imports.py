@@ -175,7 +175,7 @@ def test_three_administrative_nuclei_six_features_partial_reconciliation(transac
     finished=confirm(api,staged['id_importacion']).json()
     assert finished['importados']==2
     summary=api('GET',f"/api/importaciones/{staged['id_importacion']}/resumen").json()
-    assert summary==dict(registros_administrativos=3,features_archivo=6,confirmados=2,ambiguos=0,candidatos=0,
+    assert {k:v for k,v in summary.items() if not k.startswith("universo_administrativo_")}==dict(registros_administrativos=3,features_archivo=6,confirmados=2,ambiguos=0,candidatos=0,
                         registros_sin_geometria=1,features_sin_destino=3,features_no_utilizadas=4,ignoradas=1,rechazadas=0)
     assert before=={t:con.execute(text(f'SELECT count(*) FROM {t}')).scalar_one() for t in tables}
     assert con.execute(text('SELECT count(*) FROM proyecto_nucleo_geometria g JOIN proyecto_nucleo pn USING(id_proyecto_nucleo) WHERE es_vigente AND pn.id_proyecto='+str(project_id))).scalar_one()==2

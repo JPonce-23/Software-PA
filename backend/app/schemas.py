@@ -1920,6 +1920,24 @@ class ReconciliarGisRequest(SolicitudGisRequest):
     reabrir_rechazados: bool = False
 
 
+class AdvertenciaUniversoGisResponse(BaseModel):
+    codigo: Literal["SIN_NUCLEOS_VINCULADOS", "SIN_PARCELAS_ELEGIBLES", "SIN_DESTINOS_APLICABLES"]
+    mensaje: str
+
+
+class UniversoAdministrativoGisResponse(BaseModel):
+    version: Literal["1"] = "1"
+    origen: Literal["actual", "ciclo"]
+    disponibilidad: Literal["disponible", "parcial", "no_disponible"]
+    tipo_objetivo: str | None = None
+    id_ciclo: int | None = None
+    fecha_evaluacion: datetime | None = None
+    nucleos_vinculados_activos: int | None = Field(default=None, ge=0)
+    parcelas_elegibles_vinculadas: int | None = Field(default=None, ge=0)
+    destinos_aplicables: int | None = Field(default=None, ge=0)
+    advertencias: list[AdvertenciaUniversoGisResponse] = Field(default_factory=list)
+
+
 class CicloGisResponse(ORMModel):
     id_ciclo: int
     id_importacion: int
@@ -1934,6 +1952,7 @@ class CicloGisResponse(ORMModel):
     universo_destinos: list[dict[str, Any]]
     resumen: dict[str, Any]
     usuario_nombre: str | None = None
+    universo_administrativo: UniversoAdministrativoGisResponse | None = None
 
 
 class RevisionGisDecisionRequest(SolicitudGisRequest):

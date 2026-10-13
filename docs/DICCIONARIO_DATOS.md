@@ -603,3 +603,21 @@ validación de procedencia/dependencias reales. El estado se conserva. La baja
 no cambia features, candidatos, resultados/diagnósticos, decisiones ni
 versiones geométricas; solo cierra ciclos abiertos. El motivo de una baja ya
 registrada no puede reemplazarse mediante el endpoint. No hay cambio de esquema.
+
+### Contexto administrativo de ciclos GIS (entrega 3)
+
+`importacion_conciliacion_ciclo.resumen.universo_administrativo` almacena el
+contexto informativo versión 1 (`origen=ciclo`, identificador/fecha de ciclo,
+conteos de núcleos vinculados activos, parcelas elegibles y destinos aplicables,
+advertencias estructuradas). Se registra solo en ciclos nuevos, junto con sus
+resultados, sin alterar `universo_destinos` ni el esquema SQL. Su inmutabilidad
+al cerrar el ciclo usa el trigger vigente de 026.
+
+Las respuestas proyectan ese contexto en `universo_administrativo`; los ciclos
+anteriores solo ofrecen conteos demostrables por sus snapshots. Un campo nulo
+significa no disponible. Los backfills declarados no reconstruibles de 026 no
+se rellenan desde el universo actual. `importacion_archivo.reporte` añade
+contextos `universo_administrativo_actual` y `universo_administrativo_utilizado`
+como cálculo persistido; el endpoint de resumen recalcula el contexto actual.
+No hay nuevas columnas ni migraciones. El contrato de normalización parcelaria
+permanece igual: diagnósticos 029 orientan revisión, sin equivalencia automática.
