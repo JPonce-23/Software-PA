@@ -1,5 +1,7 @@
 # Auditoría de historia GIS y conciliación tardía — 2026-10-05
 
+> **Alcance histórico (aclaración documental, 2026-10-08):** Informe histórico de la auditoría que precedió a la estabilización del linaje y a 026. La detención y las funcionalidades pendientes descritas abajo corresponden a esa fase; no describen el backend actual. El linaje canónico ya incluye 026 (ciclos y revisiones) y termina en 028; el pipeline actual es `conciliacion-v3-historia`. Véanse [MIGRACIONES.md](MIGRACIONES.md) y [API.md](API.md). Se conserva la evidencia del bloqueo y el diseño original.
+
 ## Resultado y límite de esta entrega
 
 La fase de implementación de ciclos y revisiones queda detenida por la colisión

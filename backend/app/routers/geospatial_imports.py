@@ -31,14 +31,16 @@ def list_imports(
     response: Response,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
+    incluir_inactivas: bool = Query(False),
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
     require_project_access(db, user, id_proyecto)
     query = db.query(models.ImportacionArchivo).filter(
         models.ImportacionArchivo.id_proyecto == id_proyecto,
-        models.ImportacionArchivo.activo.is_(True),
     )
+    if not incluir_inactivas:
+        query = query.filter(models.ImportacionArchivo.activo.is_(True))
     response.headers["X-Total-Count"] = str(query.count())
     return query.order_by(models.ImportacionArchivo.fecha_carga.desc()).offset(skip).limit(limit).all()
 
@@ -168,10 +170,11 @@ async def stage_import(
 )
 def get_import(
     id_importacion: int,
+    incluir_inactivas: bool = Query(False),
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    return service.require_import_access(db, id_importacion, user)
+    return service.require_import_access(db, id_importacion, user, incluir_inactivas=incluir_inactivas)
 
 
 @router.get(
@@ -185,17 +188,25 @@ def preview_features(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     estado_conciliacion: str | None = Query(default=None),
+    incluir_inactivas: bool = Query(False),
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    service.require_import_access(db, id_importacion, user)
+    service.require_import_access(db, id_importacion, user, incluir_inactivas=incluir_inactivas)
     query = db.query(models.ImportacionFeature).filter(
         models.ImportacionFeature.id_importacion == id_importacion
     )
     if estado_conciliacion is not None:
         query = query.filter(models.ImportacionFeature.estado_conciliacion == estado_conciliacion)
     response.headers["X-Total-Count"] = str(query.count())
-    return query.order_by(models.ImportacionFeature.indice_feature).offset(skip).limit(limit).all()
+    records = query.order_by(models.ImportacionFeature.indice_feature).offset(skip).limit(limit).all()
+    return reads.feature_previews(db, records)
+
+
+@router.post("/importaciones/{id_importacion}/baja", response_model=schemas.ImportacionArchivoResponse)
+def baja_import(id_importacion: int, data: schemas.BajaRequest,
+                db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+    return service.baja_import(db, id_importacion, data, user)
 
 
 @router.post(
@@ -223,16 +234,16 @@ def configure_gis(id_proyecto: int, data: schemas.ConfiguracionGisRequest, db: S
 
 
 @router.get("/importaciones/{id_importacion}/resumen")
-def get_reconciliation_summary(id_importacion: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
-    record=service.require_import_access(db,id_importacion,user)
+def get_reconciliation_summary(id_importacion: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    record=service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     if record.tipo_objetivo not in reconciliation.RECONCILIATION_TARGETS:
         return record.reporte
     return reconciliation.reconciliation_summary(db,record)
 
 
 @router.get("/importaciones/{id_importacion}/features/{id_feature}/candidatos", response_model=list[schemas.CandidatoGisResponse])
-def get_feature_candidates(id_importacion: int, id_feature: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
-    service.require_import_access(db,id_importacion,user)
+def get_feature_candidates(id_importacion: int, id_feature: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     records = db.query(models.ImportacionFeatureCandidato).filter_by(id_importacion=id_importacion,id_importacion_feature=id_feature).order_by(models.ImportacionFeatureCandidato.id_candidato).all()
     return reads.with_actor(db, records, schemas.CandidatoGisResponse, "id_usuario_revision", "usuario_revision_nombre")
 
@@ -243,8 +254,8 @@ def decide_feature(id_importacion: int, id_feature: int, data: schemas.DecisionG
 
 
 @router.get("/importaciones/{id_importacion}/features/{id_feature}/decisiones", response_model=list[schemas.DecisionGisResponse])
-def get_feature_decisions(id_importacion: int, id_feature: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
-    service.require_import_access(db,id_importacion,user)
+def get_feature_decisions(id_importacion: int, id_feature: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     feature=db.query(models.ImportacionFeature).filter_by(id_importacion=id_importacion,id_importacion_feature=id_feature).first()
     if feature is None: raise HTTPException(404,"Feature no encontrada")
     records = db.query(models.ImportacionFeatureDecision).filter_by(id_importacion_feature=id_feature).order_by(models.ImportacionFeatureDecision.id_decision).all()
@@ -252,9 +263,9 @@ def get_feature_decisions(id_importacion: int, id_feature: int, db: Session=Depe
 
 
 @router.get('/importaciones/{id_importacion}/features/{id_feature}/geometria')
-def get_feature_geometry(id_importacion: int,id_feature: int,db: Session=Depends(get_db),user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+def get_feature_geometry(id_importacion: int,id_feature: int,incluir_inactivas: bool=Query(False), db: Session=Depends(get_db),user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
     from sqlalchemy import func
-    service.require_import_access(db,id_importacion,user)
+    service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     row=db.query(models.ImportacionFeature.id_importacion_feature,
         func.ST_AsGeoJSON(models.ImportacionFeature.geometria_normalizada,15)).filter_by(
             id_importacion=id_importacion,id_importacion_feature=id_feature).one_or_none()
@@ -266,23 +277,24 @@ def get_feature_geometry(id_importacion: int,id_feature: int,db: Session=Depends
 def reconcile_import(id_importacion: int, data: schemas.ReconciliarGisRequest,
                      db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
     cycle = history.reconcile(db,id_importacion,data,user)
-    return reads.with_actor(db, [cycle], schemas.CicloGisResponse, "id_usuario", "usuario_nombre")[0]
+    return reads.cycle_previews(db,[cycle])[0]
 
 
 @router.get('/importaciones/{id_importacion}/conciliaciones', response_model=list[schemas.CicloGisResponse], responses=reads.TOTAL_COUNT_RESPONSE)
 def list_cycles(id_importacion: int, response: Response, skip: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200),
-                db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
-    service.require_import_access(db,id_importacion,user)
+                incluir_inactivas: bool = Query(False),
+    db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    record = service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     query = db.query(models.ImportacionConciliacionCiclo).filter_by(id_importacion=id_importacion)
     response.headers["X-Total-Count"] = str(query.count())
     records = query.order_by(models.ImportacionConciliacionCiclo.numero_ciclo).offset(skip).limit(limit).all()
-    return reads.with_actor(db, records, schemas.CicloGisResponse, "id_usuario", "usuario_nombre")
+    return reads.cycle_previews(db,records,record.tipo_objetivo)
 
 
 @router.get('/importaciones/{id_importacion}/conciliaciones/{id_ciclo}',response_model=schemas.DetalleCicloGisResponse)
-def get_cycle(id_importacion: int, id_ciclo: int, db: Session=Depends(get_db),
+def get_cycle(id_importacion: int, id_ciclo: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db),
               user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
-    return reads.cycle_detail(db,service.require_import_access(db,id_importacion,user),id_ciclo)
+    return reads.cycle_detail(db,service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas),id_ciclo)
 
 
 @router.get('/proyectos/{id_proyecto}/geoespacial/revisiones',response_model=list[schemas.RevisionGisResponse], responses=reads.TOTAL_COUNT_RESPONSE)

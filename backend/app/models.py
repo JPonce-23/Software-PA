@@ -1,4 +1,4 @@
-"""SQLAlchemy mappings for the ProyectoNucleo target model (migrations 031-033)."""
+"""SQLAlchemy mappings for the ProyectoNucleo target model (canonical schema 001–029)."""
 
 from datetime import date as date_type
 
@@ -109,7 +109,7 @@ class CatalogoOperativoAlias(Base, AuditableMixin):
 
 
 class Usuario(Base):
-    """Existing authentication principal retained by migration 031."""
+    """Existing authentication principal retained by the canonical baseline 001."""
 
     __tablename__ = "usuario"
 
@@ -387,9 +387,9 @@ class OrvIntegrante(Base, AuditableMixin):
     id_orv_integrante = Column(Integer, primary_key=True)
     id_orv = Column(Integer, ForeignKey("orv.id_orv"), nullable=False)
     id_persona = Column(Integer, ForeignKey("persona.id_persona"), nullable=False)
-    id_organo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
-    id_cargo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
-    id_calidad = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"))
+    id_organo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False)
+    id_cargo = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False)
+    id_calidad = Column(BigInteger, ForeignKey("catalogo_operativo.id_catalogo_opcion"), nullable=False)
     fecha_inicio = Column(Date)
     fecha_fin = Column(Date)
     id_tipo_fin = Column(
@@ -1640,6 +1640,7 @@ class ImportacionConciliacionResultado(Base):
     id_ciclo = Column(BigInteger, ForeignKey("importacion_conciliacion_ciclo.id_ciclo"), primary_key=True)
     id_importacion_feature = Column(BigInteger, ForeignKey("importacion_feature.id_importacion_feature"), primary_key=True)
     estado_matching = Column(String(30), nullable=False)
+    diagnostico = Column(JSONB(none_as_null=True), nullable=True)
     creado_en = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 

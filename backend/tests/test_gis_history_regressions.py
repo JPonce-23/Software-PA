@@ -1,4 +1,4 @@
-"""Regresiones ejecutables sobre 024; no requieren ampliar el esquema GIS."""
+"""Regresiones GIS del linaje canónico 025–026, sin ampliar el esquema."""
 
 import pytest
 from sqlalchemy import text

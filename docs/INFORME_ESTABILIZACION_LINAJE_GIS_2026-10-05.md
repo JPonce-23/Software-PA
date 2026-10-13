@@ -1,5 +1,7 @@
 # Estabilización excepcional del linaje GIS — 2026-10-05
 
+> **Alcance histórico (aclaración documental, 2026-10-08):** Informe histórico del corte de estabilización 001–025. Las versiones, checksums, conteos y pruebas siguientes documentan aquella ejecución; el inventario canónico actual llega a 028 e incluye la historia GIS de 026. Véase [MIGRACIONES.md](MIGRACIONES.md). No se actualizan retrospectivamente sus resultados.
+
 **CADENA 001–025 ESTABILIZADA.** Todos los criterios A–M cumplidos. Sin commit ni push.
 
 ## 1. HEAD inicial/final

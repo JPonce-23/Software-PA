@@ -5,3 +5,12 @@ __pycache__/
 .pytest_cache/
 uploads/
 fuentes_locales/
+
+# Fuentes históricas y auxiliares locales
+/seed_data/
+/check_schema.py
+/extract.py
+/excel.xlsx
+/excel_info.json
+/schema_dump.txt
+/schema_info.json

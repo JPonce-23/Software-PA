@@ -70,13 +70,10 @@ def close_cycles(db, record):
 
 
 def reconcile(db, import_id, data, user):
-    from .geospatial_imports import require_import_access
+    from .geospatial_imports import lock_import
     from . import gis_reconciliation as matching
     try:
-        record = require_import_access(db, import_id, user, mode="gis")
-        db.query(models.Proyecto).filter_by(id_proyecto=record.id_proyecto).with_for_update().one()
-        require_project_access(db,user,record.id_proyecto,mode="gis")
-        record = db.query(models.ImportacionArchivo).filter_by(id_importacion=import_id).populate_existing().with_for_update().one()
+        record = lock_import(db, import_id, user)
         if record.tipo_objetivo not in matching.RECONCILIATION_TARGETS or record.version_pipeline == "legacy-v1":
             raise HTTPException(409, "Esta importación no conserva staging conciliable por proyecto")
         if record.estado not in {"previsualizado", "completo"}:
@@ -102,23 +99,28 @@ def reconcile(db, import_id, data, user):
             raise HTTPException(409, "No hay features elegibles")
         if any(f.geometria_normalizada is None or f.geometria_trabajo is None or f.errores for f in features):
             raise HTTPException(409, "Staging incompleto o inválido; no puede reconciliarse")
-        universe = matching.administrative_universe(db, record.id_proyecto, parcels=record.tipo_objetivo in matching.PARCEL_TARGETS)
+        nucleus_universe = matching.administrative_universe(db, record.id_proyecto)
+        universe = matching.administrative_universe(db, record.id_proyecto, parcels=True, nuclei=nucleus_universe) if record.tipo_objetivo in matching.PARCEL_TARGETS else nucleus_universe
         set_audit_context(db, user.id_usuario)
         # Close the preceding attempt without changing its results or decisions.
         close_cycles(db, record)
         cycle = create_cycle(db, record, universe, user, reason=data.motivo,
                              kind="reconciliacion", request_key=data.clave_solicitud)
+        from .gis_universe import current_context, register_context
+        administrative_context = current_context(db,record,universe=universe,nuclei=nucleus_universe)
+        register_context(cycle,administrative_context)
         for feature in features:
             direct_id = feature.atributos_normalizados.get("id_destino") if record.mapeo.get("id_destino") else None
             matching.build_candidates(db, record, feature, feature.atributos_originales, universe, user,
-                                      direct_id=direct_id, cycle=cycle)
+                                      direct_id=direct_id, cycle=cycle, nucleus_universe=nucleus_universe)
         results = dict(db.query(models.ImportacionConciliacionResultado.estado_matching,func.count()).filter_by(
             id_ciclo=cycle.id_ciclo).group_by(models.ImportacionConciliacionResultado.estado_matching).all())
-        cycle.resumen = {"features":len(features),"resultados":results,"parametros":parameters}
+        cycle.resumen = {**cycle.resumen,"features":len(features),"resultados":results,"parametros":parameters}
         record.estado = "previsualizado"
         record.actualizado_por = user.id_usuario
         record.actualizado_en = datetime.now(timezone.utc)
-        record.reporte = {**record.reporte,**matching.reconciliation_summary(db, record)}
+        record.reporte = {**record.reporte,**matching.reconciliation_summary(
+            db,record,universe=universe,administrative_context=administrative_context,cycle=cycle)}
         db.commit()
         db.refresh(cycle)
         return cycle

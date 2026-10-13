@@ -1,13 +1,13 @@
 # Índice de Documentación Canónica — SOFTWARE-PA
 
 > **Árbol documental consolidado de SOFTWARE-PA.**  
-> Este repositorio cuenta con una documentación pequeña, clara, verificable y estrictamente alineada con el código fuente y la base de datos real (esquema **015**).
+> La referencia técnica vigente es el backend actual y el linaje canónico **001–028**. El esquema aplicado en cada base se consulta mediante `/health`.
 
 ---
 
 ## 1. Documentos Canónicos del Repositorio
 
-El árbol de documentación técnica y funcional vigente se compone exclusivamente de los siguientes documentos en `docs/`:
+Los documentos canónicos de referencia son los siguientes. Los informes fechados y documentos QA adicionales conservan evidencia histórica y no sustituyen estos contratos:
 
 1. **[MODELO_FUNCIONAL.md](MODELO_FUNCIONAL.md):**  
    **Documento canónico del modelo funcional.** Define el propósito del sistema, el alcance sobre propiedad social, el principio *Excel-first*, la estructura jerárquica (`Proyecto → ProyectoNucleo → Núcleo Agrario`), la bifurcación estricta entre derechos colectivos y derechos individuales, los procedimientos ante RAN y FIFONAFE, la cadena financiera de pagos, los eventos de seguimiento, las reglas geoespaciales y las decisiones funcionales pendientes.
@@ -22,7 +22,7 @@ El árbol de documentación técnica y funcional vigente se compone exclusivamen
    **Diccionario de datos físico y lógico.** Especifica de forma exhaustiva las tablas de dominio, campos, tipos de datos PostgreSQL, nulabilidad, llaves foráneas, restricciones, catálogos operativos y vistas de reporting (read-models), verificado contra `backend/app/models.py` y las migraciones vigentes.
 
 5. **[MIGRACIONES.md](MIGRACIONES.md):**  
-   **Gestión del esquema de base de datos.** Detalla el historial inmutable de las migraciones `001` a `015`, sus hashes criptográficos SHA-256 verificados, el esquema activo (**015**), el procedimiento oficial de ejecución mediante `run_migrations.sh` y la política forward-only (siguiente migración: `016`).
+   **Gestión del esquema de base de datos.** Detalla el historial inmutable de las migraciones `001` a `028`, sus hashes SHA-256, el esquema canónico (**028**), el procedimiento de ejecución mediante `run_migrations.sh` y la política forward-only. Las proyecciones de API posteriores no requieren migración.
 
 6. **[API.md](API.md):**  
    **Contrato de integración backend/frontend.** Define la interacción cliente-servidor, endpoints de autenticación y sesiones, reglas no expresadas directamente en OpenAPI (catálogos dinámicos, semántica de hitos RAN, no aditividad de montos multidestino, precisión de 7 decimales), administración de usuarios y estados de salud del servicio.
@@ -43,7 +43,7 @@ En caso de divergencia conceptual o técnica entre artefactos, rige la siguiente
 2. docs/FUENTES_Y_COBERTURA_EXCEL.md
    └── Demuestra la trazabilidad y tratamiento de cada dato de fuente.
        │
-3. Código ejecutable backend + migraciones 001–015
+3. Código ejecutable backend + migraciones 001–028
    └── Define la realidad técnica en ejecución.
        │
 4. docs/ARQUITECTURA.md + docs/DICCIONARIO_DATOS.md
@@ -52,3 +52,9 @@ En caso de divergencia conceptual o técnica entre artefactos, rige la siguiente
 5. docs/API.md + docs/openapi.json
    └── Gobiernan la integración y consumo entre interfaces.
 ```
+
+La conciliación GIS vigente utiliza `conciliacion-v3-historia`; las referencias
+a `conciliacion-v2` describen el contrato histórico de 025. Para B-07 y las
+proyecciones de lectura (actores, destinos, documentos y totales), consultar
+[API.md](API.md). La auditoría documental del 8 de octubre de 2026 se registra
+en [AUDITORIA_DOCUMENTAL_2026-10-08.md](AUDITORIA_DOCUMENTAL_2026-10-08.md).

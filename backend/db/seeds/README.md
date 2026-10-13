@@ -1,6 +1,6 @@
 # Dominio demo objetivo
 
-`backend/db/seed.sql` exige Baseline V1 (`schema_migrations=001`), catálogo territorial `32/2478`, un
+`backend/db/seed.sql` exige Baseline V1 registrado como `001` en `schema_migrations` (no exige que sea la única migración aplicada), catálogo territorial `32/2478`, un
 administrador creado con `scripts/create_admin.py` y dominio funcional vacío.
 No crea cuentas ni contiene secretos.
 

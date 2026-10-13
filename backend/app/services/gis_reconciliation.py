@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from geoalchemy2.elements import WKBElement, WKTElement
 from sqlalchemy import func, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .. import models
 from .access import require_project_access
@@ -73,11 +73,17 @@ def configure_project(db, project_id, srid, user):
         raise HTTPException(422, 'No fue posible configurar el CRS de trabajo') from exc
 
 
-def administrative_universe(db, project_id, *, parcels=False):
-    nuclei = db.query(models.ProyectoNucleo, models.NucleoAgrario).join(
-        models.NucleoAgrario, models.ProyectoNucleo.id_nucleo == models.NucleoAgrario.id_nucleo
-    ).filter(models.ProyectoNucleo.id_proyecto == project_id,
-             models.ProyectoNucleo.activo.is_(True), models.NucleoAgrario.activo.is_(True)).all()
+def administrative_universe(db, project_id, *, parcels=False, nuclei=None):
+    if nuclei is None:
+        nuclei = db.query(models.ProyectoNucleo, models.NucleoAgrario).join(
+            models.NucleoAgrario, models.ProyectoNucleo.id_nucleo == models.NucleoAgrario.id_nucleo
+        ).options(
+            joinedload(models.NucleoAgrario.municipio).joinedload(models.Municipio.entidad),
+            joinedload(models.NucleoAgrario.tipo_tenencia),
+        ).filter(models.ProyectoNucleo.id_proyecto == project_id,
+                 models.ProyectoNucleo.activo.is_(True), models.NucleoAgrario.activo.is_(True)).all()
+    else:
+        nuclei = [(pn, n) for pn, n, _ in nuclei]
     if not parcels:
         return [(pn, nucleus, None) for pn, nucleus in nuclei]
     links = db.execute(text('SELECT id_proyecto_nucleo,id_parcela FROM vw_gis_parcela_proyecto WHERE id_proyecto=:p'), {'p':project_id}).all()
@@ -128,7 +134,7 @@ def geometry_hash(db, pn_id, parcel_id=None):
     return query.scalar()
 
 
-def build_candidates(db, record, feature, properties, universe, user, *, direct_id=None, cycle):
+def build_candidates(db, record, feature, properties, universe, user, *, direct_id=None, cycle, nucleus_universe=None):
     from .geospatial_imports import normalize_parcel_number
     is_parcel = record.tipo_objetivo in PARCEL_TARGETS
     candidates = []
@@ -160,29 +166,43 @@ def build_candidates(db, record, feature, properties, universe, user, *, direct_
         ))
     feature.estado_conciliacion = ('sin_coincidencia' if not candidates else 'ambiguo' if len(candidates)>1
         else 'coincidencia_exacta' if candidates[0].clasificacion=='exacta' else 'candidato')
+    from .gis_diagnostics import matching_diagnostic
+    diagnostic = matching_diagnostic(properties, universe,
+        nucleus_universe if nucleus_universe is not None else universe, candidates,
+        parcel=is_parcel, direct_id=direct_id, direct_id_field=record.mapeo.get('id_destino'))
     db.add(models.ImportacionConciliacionResultado(id_ciclo=cycle.id_ciclo,
-        id_importacion_feature=feature.id_importacion_feature,estado_matching=feature.estado_conciliacion))
+        id_importacion_feature=feature.id_importacion_feature,estado_matching=feature.estado_conciliacion,
+        diagnostico=diagnostic))
     db.flush()
     db.add_all(candidates)
     db.flush()
 
 
-def reconciliation_summary(db, record):
-    universe = administrative_universe(db, record.id_proyecto, parcels=record.tipo_objetivo in PARCEL_TARGETS)
+def reconciliation_summary(db, record, *, universe=None, administrative_context=None, cycle=None):
+    from .gis_universe import current_context, historical_context
+    if universe is None:
+        nuclei = administrative_universe(db, record.id_proyecto)
+        universe = administrative_universe(db, record.id_proyecto, parcels=True, nuclei=nuclei) if record.tipo_objetivo in PARCEL_TARGETS else nuclei
+        administrative_context = current_context(db, record, universe=universe, nuclei=nuclei)
     keys = {(pn.id_proyecto_nucleo, p.id_parcela if p else None) for pn,n,p in universe}
-    confirmed_keys = set()
-    for pn_id, parcel_id in keys:
-        if geometry_query(db,pn_id,parcel_id).filter(geometry_model(parcel_id).es_vigente.is_(True)).first():
-            confirmed_keys.add((pn_id,parcel_id))
+    model = models.ProyectoParcelaGeometria if record.tipo_objetivo in PARCEL_TARGETS else models.ProyectoNucleoGeometria
+    columns = [model.id_proyecto_nucleo, model.id_parcela] if record.tipo_objetivo in PARCEL_TARGETS else [model.id_proyecto_nucleo]
+    rows = db.query(*columns).filter(model.id_proyecto_nucleo.in_({k[0] for k in keys}), model.es_vigente.is_(True)).all() if keys else []
+    confirmed_keys = keys & {(row[0],row[1] if len(row)>1 else None) for row in rows}
     feature_states = dict(db.query(models.ImportacionFeature.estado_conciliacion,func.count()).filter(
         models.ImportacionFeature.id_importacion==record.id_importacion).group_by(models.ImportacionFeature.estado_conciliacion).all())
+    if cycle is None:
+        cycle = db.query(models.ImportacionConciliacionCiclo).filter_by(id_importacion=record.id_importacion).order_by(
+            models.ImportacionConciliacionCiclo.numero_ciclo.desc()).first()
     return {'registros_administrativos':len(keys), 'features_archivo':record.total_features,
             'confirmados':feature_states.get('confirmado',0), 'ambiguos':feature_states.get('ambiguo',0),
             'candidatos':feature_states.get('candidato',0)+feature_states.get('coincidencia_exacta',0),
             'registros_sin_geometria':len(keys-confirmed_keys),
             'features_sin_destino':feature_states.get('sin_coincidencia',0),
             'features_no_utilizadas':record.total_features-feature_states.get('confirmado',0),
-            'ignoradas':feature_states.get('ignorado',0), 'rechazadas':feature_states.get('rechazado',0)}
+            'ignoradas':feature_states.get('ignorado',0), 'rechazadas':feature_states.get('rechazado',0),
+            'universo_administrativo_actual':administrative_context,
+            'universo_administrativo_utilizado':historical_context(cycle,record.tipo_objetivo)}
 
 
 async def stage(db, project_id, source, source_date, upload, user, *, target, mapping=None, strict=True, scope="parcial"):
@@ -234,8 +254,14 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
             mapeo=mapping,opciones_mapeo={},estado='procesando',total_features=dataset.total_features,
             id_usuario_carga=user.id_usuario,creado_por=user.id_usuario,fecha_procesamiento_inicio=datetime.now(timezone.utc))
         db.add(record); db.flush()
-        universe=administrative_universe(db,project_id,parcels=target in PARCEL_TARGETS) if target in RECONCILIATION_TARGETS else []
+        nucleus_universe=administrative_universe(db,project_id) if target in RECONCILIATION_TARGETS else []
+        universe=administrative_universe(db,project_id,parcels=True,nuclei=nucleus_universe) if target in PARCEL_TARGETS else nucleus_universe
         cycle = history.create_cycle(db,record,universe,user,reason='Conciliación inicial') if target in RECONCILIATION_TARGETS else None
+        administrative_context = None
+        if cycle is not None:
+            from .gis_universe import current_context, register_context
+            administrative_context = current_context(db,record,universe=universe,nuclei=nucleus_universe)
+            register_context(cycle,administrative_context)
         by_layer={l.name:l for l in dataset.layers}
         for index,(layer_name,item) in enumerate(iter_features(dataset_path,dataset,preserve_source_geometry=True)):
             layer=by_layer[layer_name]; raw=item.get('properties') or {}; geometry=item.get('geometry')
@@ -292,7 +318,7 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
                     try: direct_id=int(raw[mapping['id_destino']])
                     except (ValueError,TypeError,KeyError): direct_id=-1
                 if direct_id is not None: feature.atributos_normalizados={'id_destino':direct_id}
-                build_candidates(db,record,feature,attrs,universe,user,direct_id=direct_id,cycle=cycle)
+                build_candidates(db,record,feature,attrs,universe,user,direct_id=direct_id,cycle=cycle,nucleus_universe=nucleus_universe)
         counts=dict(db.query(models.ImportacionFeature.estado,func.count()).filter_by(id_importacion=record.id_importacion).group_by(models.ImportacionFeature.estado).all())
         record.validos=counts.get('valido',0); record.advertencias=counts.get('advertencia',0); record.errores=counts.get('error',0)
         record.features_procesados=sum(counts.values())
@@ -302,9 +328,11 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
             'validos':record.validos,'advertencias':record.advertencias,'errores':record.errores,
             'crs_original':dataset.crs_description,'crs_destino':'EPSG:4326','srid_trabajo':srid,
             'archivo_original_retenido':False}
-        if target in RECONCILIATION_TARGETS: record.reporte={**record.reporte,**reconciliation_summary(db,record)}
+        if target in RECONCILIATION_TARGETS:
+            summary=reconciliation_summary(db,record,universe=universe,administrative_context=administrative_context,cycle=cycle)
+            record.reporte={**record.reporte,**summary}
         if cycle is not None:
-            cycle.resumen = reconciliation_summary(db,record)
+            cycle.resumen = {**cycle.resumen,**{k:v for k,v in summary.items() if not k.startswith('universo_administrativo_')}}
             history.appearances(db,record,user)
         db.commit(); db.refresh(record)
         return record
@@ -322,15 +350,15 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
             shutil.rmtree(path.with_suffix(''))
 
 
-def _locked_context(db,import_id,user):
-    from .geospatial_imports import require_import_access
-    record=require_import_access(db,import_id,user,mode='gis')
-    db.query(models.Proyecto).filter_by(id_proyecto=record.id_proyecto).with_for_update().one()
-    require_project_access(db,user,record.id_proyecto,mode='gis')
-    record=db.query(models.ImportacionArchivo).filter_by(id_importacion=import_id).populate_existing().with_for_update().one()
+def _locked_context(db,import_id,user, *, permitir_completa=False):
+    from .geospatial_imports import lock_import
+    record=lock_import(db,import_id,user)
+    if permitir_completa and record.estado=='completo':
+        return record
     if record.version_pipeline=='legacy-v1' or record.tipo_objetivo not in RECONCILIATION_TARGETS:
         raise HTTPException(409,'Esta importación no usa conciliación por proyecto')
-    if record.estado!='previsualizado': raise HTTPException(409,'La importación no está previsualizada')
+    if record.estado!='previsualizado':
+        raise HTTPException(409,'La importación no está previsualizada')
     if working_srid(db,record.id_proyecto)!=record.srid_trabajo: raise HTTPException(409,'La configuración CRS cambió; vuelva a procesar la fuente')
     return record
 
@@ -455,9 +483,9 @@ def decide(db,import_id,feature_id,data,user):
 
 def finalize(db,record,data,user):
     try:
+        record=_locked_context(db,record.id_importacion,user,permitir_completa=True)
         if record.estado=='completo':
             db.commit(); return record
-        record=_locked_context(db,record.id_importacion,user)
         if not data.confirmacion_explicita: raise HTTPException(422,'Se requiere confirmación explícita')
         # Unmatched features are valid residuals. Proposed/ambiguous features
         # require a decision, so completion never silently throws them away.

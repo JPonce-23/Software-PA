@@ -5,13 +5,12 @@ de derechos de vía.
 
 ## Arquitectura
 
-El entorno se ejecuta con Docker Compose y contiene cinco servicios:
+El entorno base se ejecuta con Docker Compose y contiene cuatro servicios:
 
 | Servicio | Función | Puerto local predeterminado |
 | --- | --- | --- |
 | `frontend` | React 19 y Vite; Nginx en modo producción | `5173` |
 | `backend` | API FastAPI y SQLAlchemy | `8000` |
-| `alertas_scheduler` | Generación periódica de alertas ORV | No publica puerto |
 | `db` | PostgreSQL 15 con PostGIS 3.3 | `5433` |
 | `pgadmin` | Administración web de PostgreSQL | `5050` |
 
@@ -324,9 +323,9 @@ docker compose ps
 docker compose logs -f
 docker compose logs -f backend
 
-# Reconstruir únicamente backend y scheduler, que comparten imagen
-docker compose build backend alertas_scheduler
-docker compose up -d backend alertas_scheduler
+# Reconstruir únicamente backend
+docker compose build backend
+docker compose up -d backend
 
 # Reconstruir únicamente frontend
 docker compose up -d --build frontend
@@ -349,7 +348,7 @@ docker compose down -v
 
 ```bash
 docker compose ps
-docker compose logs --tail=100 db backend alertas_scheduler frontend pgadmin
+docker compose logs --tail=100 db backend frontend pgadmin
 curl --fail http://localhost:8000/
 curl --fail http://localhost:5173/
 docker compose exec db sh -lc \

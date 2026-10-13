@@ -1555,6 +1555,62 @@ class ImportacionArchivoResponse(AuditRead):
     reporte: dict[str, Any]
 
 
+CodigoDiagnosticoGis = Literal[
+    "UNIVERSO_DESTINOS_VACIO", "IDENTIDAD_NUCLEO_INSUFICIENTE",
+    "CLAVE_SIN_COINCIDENCIA_EN_UNIVERSO", "NOMBRE_SIN_COINCIDENCIA_EN_UNIVERSO",
+    "MUNICIPIO_INCOMPATIBLE", "ENTIDAD_INCOMPATIBLE", "TIPO_NUCLEO_INCOMPATIBLE",
+    "NUMERO_PARCELA_AUSENTE", "PARCELA_SIN_COINCIDENCIA_EN_UNIVERSO",
+    "VARIANTE_FORMATO_PENDIENTE_REVISION", "MULTIPLES_DESTINOS_COMPATIBLES",
+    "ID_ADMINISTRATIVO_SIN_COINCIDENCIA_EN_UNIVERSO",
+    "DIAGNOSTICO_HISTORICO_NO_DISPONIBLE",
+]
+
+
+class DescartesTerritorialesGis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    municipio: int = Field(default=0, ge=0)
+    entidad: int = Field(default=0, ge=0)
+    tipo_nucleo: int = Field(default=0, ge=0)
+
+
+class VarianteFormatoGis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    campo: Literal["PARCELA", "Num_parcela", "no_parcela"]
+    regla: Literal["DIFERENCIA_CEROS_INICIALES_SEGMENTO_NUMERICO"]
+    destinos_observados: int = Field(gt=0)
+
+
+class EvidenciaDiagnosticoGis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    destinos_evaluados: int | None = Field(default=None, ge=0)
+    nucleos_evaluados: int | None = Field(default=None, ge=0)
+    nucleos_compatibles: int | None = Field(default=None, ge=0)
+    parcelas_evaluadas: int | None = Field(default=None, ge=0)
+    candidatos: int | None = Field(default=None, ge=0)
+    descartes_territoriales: DescartesTerritorialesGis | None = None
+    variantes_formato: list[VarianteFormatoGis] = Field(default_factory=list)
+
+
+class DiagnosticoConciliacionGisResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: Literal["1"] = "1"
+    origen: Literal["registrado", "no_disponible"]
+    codigos: list[CodigoDiagnosticoGis]
+    mensaje: str
+    campos_evaluados: list[str]
+    evidencia: EvidenciaDiagnosticoGis
+
+    @model_validator(mode="after")
+    def validar_disponibilidad(self):
+        unavailable = "DIAGNOSTICO_HISTORICO_NO_DISPONIBLE"
+        if self.origen == "no_disponible":
+            if self.codigos != [unavailable] or self.campos_evaluados or self.evidencia != EvidenciaDiagnosticoGis():
+                raise ValueError("Un diagnóstico no disponible no contiene causas ni evidencia inferida")
+        elif unavailable in self.codigos:
+            raise ValueError("Un diagnóstico registrado no es histórico no disponible")
+        return self
+
+
 class ImportacionFeatureResponse(ORMModel):
     id_importacion_feature: int
     id_importacion: int
@@ -1573,6 +1629,8 @@ class ImportacionFeatureResponse(ORMModel):
     estado_conciliacion: str = "pendiente"
     crs_fuente: str | None = None
     dimension_fuente: str | None = None
+    id_ciclo_conciliacion: int | None = None
+    diagnostico: DiagnosticoConciliacionGisResponse | None = None
 
     @field_validator("atributos_originales", "atributos_normalizados")
     @classmethod
@@ -1862,6 +1920,24 @@ class ReconciliarGisRequest(SolicitudGisRequest):
     reabrir_rechazados: bool = False
 
 
+class AdvertenciaUniversoGisResponse(BaseModel):
+    codigo: Literal["SIN_NUCLEOS_VINCULADOS", "SIN_PARCELAS_ELEGIBLES", "SIN_DESTINOS_APLICABLES"]
+    mensaje: str
+
+
+class UniversoAdministrativoGisResponse(BaseModel):
+    version: Literal["1"] = "1"
+    origen: Literal["actual", "ciclo"]
+    disponibilidad: Literal["disponible", "parcial", "no_disponible"]
+    tipo_objetivo: str | None = None
+    id_ciclo: int | None = None
+    fecha_evaluacion: datetime | None = None
+    nucleos_vinculados_activos: int | None = Field(default=None, ge=0)
+    parcelas_elegibles_vinculadas: int | None = Field(default=None, ge=0)
+    destinos_aplicables: int | None = Field(default=None, ge=0)
+    advertencias: list[AdvertenciaUniversoGisResponse] = Field(default_factory=list)
+
+
 class CicloGisResponse(ORMModel):
     id_ciclo: int
     id_importacion: int
@@ -1876,6 +1952,7 @@ class CicloGisResponse(ORMModel):
     universo_destinos: list[dict[str, Any]]
     resumen: dict[str, Any]
     usuario_nombre: str | None = None
+    universo_administrativo: UniversoAdministrativoGisResponse | None = None
 
 
 class RevisionGisDecisionRequest(SolicitudGisRequest):
@@ -1900,6 +1977,7 @@ class ResultadoCicloGisResponse(BaseModel):
     estado_resultado: str
     candidatos: list[CandidatoGisResponse]
     decisiones: list[DecisionGisResponse]
+    diagnostico: DiagnosticoConciliacionGisResponse | None = None
 
 
 class DetalleCicloGisResponse(CicloGisResponse):

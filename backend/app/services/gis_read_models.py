@@ -35,6 +35,18 @@ def with_actor(db, records, schema, id_field="creado_por", name_field="creado_po
                        id_field, name_field)
 
 
+def cycle_previews(db, cycles, tipo_objetivo=None):
+    from .gis_universe import historical_context
+    if cycles and tipo_objetivo is None and any(c.resumen.get('universo_administrativo') is None for c in cycles):
+        # An idempotent POST can return a cycle created before this extension.
+        # Resolve the already-authorized parent's type once, not once per row.
+        tipo_objetivo = db.query(models.ImportacionArchivo.tipo_objetivo).filter_by(
+            id_importacion=cycles[0].id_importacion).scalar()
+    rows = with_actor(db,cycles,schemas.CicloGisResponse,"id_usuario","usuario_nombre")
+    return [{**row,"universo_administrativo":historical_context(cycle,tipo_objetivo)}
+            for row,cycle in zip(rows,cycles)]
+
+
 def revisions(db, rows):
     rows = actor_names(db, rows, "creado_por", "creado_por_nombre")
     keys = {(row["id_proyecto_nucleo"], row["id_parcela"]) for row in rows
@@ -66,7 +78,32 @@ def revisions(db, rows):
             for row in rows]
 
 
+def feature_previews(db, features):
+    """One result query per page, selecting the latest cycle of EACH feature."""
+    from .gis_diagnostics import unavailable_diagnostic
+    ids = [feature.id_importacion_feature for feature in features]
+    latest = {}
+    if ids:
+        result, cycle = models.ImportacionConciliacionResultado, models.ImportacionConciliacionCiclo
+        records = db.query(result).join(cycle, cycle.id_ciclo == result.id_ciclo).filter(
+            result.id_importacion_feature.in_(ids),
+        ).distinct(result.id_importacion_feature).order_by(
+            result.id_importacion_feature, cycle.numero_ciclo.desc(),
+        ).all()
+        latest = {row.id_importacion_feature: row for row in records}
+    rows = []
+    for feature in features:
+        row = schemas.ImportacionFeatureResponse.model_validate(feature).model_dump()
+        result = latest.get(feature.id_importacion_feature)
+        if result is not None:
+            row.update(id_ciclo_conciliacion=result.id_ciclo,
+                       diagnostico=result.diagnostico if result.diagnostico is not None else unavailable_diagnostic())
+        rows.append(row)
+    return rows
+
+
 def cycle_detail(db, record, cycle_id):
+    from .gis_diagnostics import unavailable_diagnostic
     cycle = db.query(models.ImportacionConciliacionCiclo).filter_by(
         id_importacion=record.id_importacion, id_ciclo=cycle_id).first()
     if cycle is None:
@@ -97,8 +134,9 @@ def cycle_detail(db, record, cycle_id):
                 state = "rechazado" if not remaining else "ambiguo" if len(remaining) > 1 else "candidato"
         items.append({"id_importacion_feature": result.id_importacion_feature,
                       "estado_matching": result.estado_matching, "estado_resultado": state,
+                      "diagnostico": result.diagnostico if result.diagnostico is not None else unavailable_diagnostic(),
                       "candidatos": cs, "decisiones": ds})
-    return {**with_actor(db, [cycle], schemas.CicloGisResponse, "id_usuario", "usuario_nombre")[0],
+    return {**cycle_previews(db,[cycle],record.tipo_objetivo)[0],
             "features": items}
 
 

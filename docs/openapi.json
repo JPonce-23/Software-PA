@@ -7352,6 +7352,53 @@
         }
       }
     },
+    "/api/proyecto-nucleo/{id_proyecto_nucleo}/documentos": {
+      "get": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "List Consolidated Documents",
+        "description": "Soporte documental consolidado de sólo lectura por procedencia. Incluye vínculos activos y referencias de requisitos con vínculo autorizado dentro del alcance; versión vigente = mayor numero_version existente.",
+        "operationId": "list_consolidated_documents_api_proyecto_nucleo__id_proyecto_nucleo__documentos_get",
+        "parameters": [
+          {
+            "name": "id_proyecto_nucleo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Proyecto Nucleo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentoConsolidadoResponse"
+                  },
+                  "title": "Response List Consolidated Documents Api Proyecto Nucleo  Id Proyecto Nucleo  Documentos Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/catalogos/tipos-documento": {
       "get": {
         "tags": [
@@ -7967,6 +8014,16 @@
               "default": 100,
               "title": "Limit"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -7980,6 +8037,15 @@
                     "$ref": "#/components/schemas/ImportacionArchivoResponse"
                   },
                   "title": "Response List Imports Api Proyectos  Id Proyecto  Importaciones Get"
+                }
+              }
+            },
+            "headers": {
+              "X-Total-Count": {
+                "description": "Total de registros autorizados con los mismos filtros, antes de skip/limit.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             }
@@ -8219,6 +8285,16 @@
               "type": "integer",
               "title": "Id Importacion"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8300,6 +8376,16 @@
               ],
               "title": "Estado Conciliacion"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8313,6 +8399,67 @@
                     "$ref": "#/components/schemas/ImportacionFeatureResponse"
                   },
                   "title": "Response Preview Features Api Importaciones  Id Importacion  Features Get"
+                }
+              }
+            },
+            "headers": {
+              "X-Total-Count": {
+                "description": "Total de registros autorizados con los mismos filtros, antes de skip/limit.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/importaciones/{id_importacion}/baja": {
+      "post": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Baja Import",
+        "operationId": "baja_import_api_importaciones__id_importacion__baja_post",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportacionArchivoResponse"
                 }
               }
             }
@@ -8490,6 +8637,16 @@
               "type": "integer",
               "title": "Id Importacion"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8538,6 +8695,16 @@
             "schema": {
               "type": "integer",
               "title": "Id Feature"
+            }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
             }
           }
         ],
@@ -8653,6 +8820,16 @@
               "type": "integer",
               "title": "Id Feature"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8707,6 +8884,16 @@
             "schema": {
               "type": "integer",
               "title": "Id Feature"
+            }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
             }
           }
         ],
@@ -8823,6 +9010,16 @@
               "default": 100,
               "title": "Limit"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8836,6 +9033,15 @@
                     "$ref": "#/components/schemas/CicloGisResponse"
                   },
                   "title": "Response List Cycles Api Importaciones  Id Importacion  Conciliaciones Get"
+                }
+              }
+            },
+            "headers": {
+              "X-Total-Count": {
+                "description": "Total de registros autorizados con los mismos filtros, antes de skip/limit.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             }
@@ -8877,6 +9083,16 @@
             "schema": {
               "type": "integer",
               "title": "Id Ciclo"
+            }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
             }
           }
         ],
@@ -9065,6 +9281,15 @@
                     "$ref": "#/components/schemas/RevisionGisResponse"
                   },
                   "title": "Response List Revisions Api Proyectos  Id Proyecto  Geoespacial Revisiones Get"
+                }
+              }
+            },
+            "headers": {
+              "X-Total-Count": {
+                "description": "Total de registros autorizados con los mismos filtros, antes de skip/limit.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             }
@@ -11231,6 +11456,29 @@
           "contrasena_nueva"
         ],
         "title": "AdminPasswordResetRequest"
+      },
+      "AdvertenciaUniversoGisResponse": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "enum": [
+              "SIN_NUCLEOS_VINCULADOS",
+              "SIN_PARCELAS_ELEGIBLES",
+              "SIN_DESTINOS_APLICABLES"
+            ],
+            "title": "Codigo"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "mensaje"
+        ],
+        "title": "AdvertenciaUniversoGisResponse"
       },
       "AfectacionCreate": {
         "properties": {
@@ -13634,6 +13882,17 @@
               }
             ],
             "title": "Fecha Revision"
+          },
+          "usuario_revision_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Revision Nombre"
           }
         },
         "type": "object",
@@ -14114,6 +14373,27 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Resumen"
+          },
+          "usuario_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Nombre"
+          },
+          "universo_administrativo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniversoAdministrativoGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -16472,6 +16752,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Creado En"
+          },
+          "creado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado Por Nombre"
           }
         },
         "type": "object",
@@ -16484,6 +16775,81 @@
           "creado_en"
         ],
         "title": "DecisionGisResponse"
+      },
+      "DescartesTerritorialesGis": {
+        "properties": {
+          "municipio": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Municipio",
+            "default": 0
+          },
+          "entidad": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Entidad",
+            "default": 0
+          },
+          "tipo_nucleo": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Tipo Nucleo",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DescartesTerritorialesGis"
+      },
+      "DestinoGisResponse": {
+        "properties": {
+          "nombre_nucleo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre Nucleo"
+          },
+          "municipio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Municipio"
+          },
+          "entidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entidad"
+          },
+          "numero_parcela": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Parcela"
+          }
+        },
+        "type": "object",
+        "title": "DestinoGisResponse"
       },
       "DetalleCicloGisResponse": {
         "properties": {
@@ -16548,6 +16914,27 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Resumen"
+          },
+          "usuario_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Nombre"
+          },
+          "universo_administrativo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniversoAdministrativoGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "features": {
             "items": {
@@ -16801,6 +17188,27 @@
             "type": "integer",
             "title": "Creado Por"
           },
+          "creado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado Por Nombre"
+          },
+          "destino": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DestinoGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "decisiones": {
             "items": {
               "$ref": "#/components/schemas/RevisionGisDecisionResponse"
@@ -16823,6 +17231,70 @@
           "decisiones"
         ],
         "title": "DetalleRevisionGisResponse"
+      },
+      "DiagnosticoConciliacionGisResponse": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "1",
+            "title": "Version",
+            "default": "1"
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "registrado",
+              "no_disponible"
+            ],
+            "title": "Origen"
+          },
+          "codigos": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "UNIVERSO_DESTINOS_VACIO",
+                "IDENTIDAD_NUCLEO_INSUFICIENTE",
+                "CLAVE_SIN_COINCIDENCIA_EN_UNIVERSO",
+                "NOMBRE_SIN_COINCIDENCIA_EN_UNIVERSO",
+                "MUNICIPIO_INCOMPATIBLE",
+                "ENTIDAD_INCOMPATIBLE",
+                "TIPO_NUCLEO_INCOMPATIBLE",
+                "NUMERO_PARCELA_AUSENTE",
+                "PARCELA_SIN_COINCIDENCIA_EN_UNIVERSO",
+                "VARIANTE_FORMATO_PENDIENTE_REVISION",
+                "MULTIPLES_DESTINOS_COMPATIBLES",
+                "ID_ADMINISTRATIVO_SIN_COINCIDENCIA_EN_UNIVERSO",
+                "DIAGNOSTICO_HISTORICO_NO_DISPONIBLE"
+              ]
+            },
+            "type": "array",
+            "title": "Codigos"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          },
+          "campos_evaluados": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Campos Evaluados"
+          },
+          "evidencia": {
+            "$ref": "#/components/schemas/EvidenciaDiagnosticoGis"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "origen",
+          "codigos",
+          "mensaje",
+          "campos_evaluados",
+          "evidencia"
+        ],
+        "title": "DiagnosticoConciliacionGisResponse"
       },
       "DocumentoClasificacionResponse": {
         "properties": {
@@ -16851,6 +17323,74 @@
           "activo"
         ],
         "title": "DocumentoClasificacionResponse"
+      },
+      "DocumentoConsolidadoResponse": {
+        "properties": {
+          "entidad_tipo": {
+            "type": "string",
+            "title": "Entidad Tipo"
+          },
+          "entidad_id": {
+            "type": "integer",
+            "title": "Entidad Id"
+          },
+          "origen": {
+            "type": "string",
+            "title": "Origen"
+          },
+          "fuente_relacion": {
+            "type": "string",
+            "enum": [
+              "vinculo",
+              "expediente_requisito"
+            ],
+            "title": "Fuente Relacion"
+          },
+          "id_documento_vinculo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Documento Vinculo"
+          },
+          "id_expediente_requisito": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Expediente Requisito"
+          },
+          "documento": {
+            "$ref": "#/components/schemas/DocumentoResponse"
+          },
+          "version_vigente": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentoVersionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "entidad_tipo",
+          "entidad_id",
+          "origen",
+          "fuente_relacion",
+          "documento"
+        ],
+        "title": "DocumentoConsolidadoResponse"
       },
       "DocumentoCreate": {
         "oneOf": [
@@ -17444,6 +17984,90 @@
           "activo"
         ],
         "title": "EntidadFederativaResponse"
+      },
+      "EvidenciaDiagnosticoGis": {
+        "properties": {
+          "destinos_evaluados": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destinos Evaluados"
+          },
+          "nucleos_evaluados": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nucleos Evaluados"
+          },
+          "nucleos_compatibles": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nucleos Compatibles"
+          },
+          "parcelas_evaluadas": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parcelas Evaluadas"
+          },
+          "candidatos": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidatos"
+          },
+          "descartes_territoriales": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DescartesTerritorialesGis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variantes_formato": {
+            "items": {
+              "$ref": "#/components/schemas/VarianteFormatoGis"
+            },
+            "type": "array",
+            "title": "Variantes Formato"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EvidenciaDiagnosticoGis"
       },
       "ExpedienteRequisitoCreate": {
         "properties": {
@@ -18305,6 +18929,27 @@
               }
             ],
             "title": "Dimension Fuente"
+          },
+          "id_ciclo_conciliacion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Ciclo Conciliacion"
+          },
+          "diagnostico": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiagnosticoConciliacionGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -24018,6 +24663,16 @@
             },
             "type": "array",
             "title": "Decisiones"
+          },
+          "diagnostico": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiagnosticoConciliacionGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -24110,6 +24765,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Creado En"
+          },
+          "creado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado Por Nombre"
           }
         },
         "type": "object",
@@ -24349,6 +25015,27 @@
           "creado_por": {
             "type": "integer",
             "title": "Creado Por"
+          },
+          "creado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado Por Nombre"
+          },
+          "destino": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DestinoGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -28041,6 +28728,116 @@
         "type": "object",
         "title": "UnidadAgrariaUpdate"
       },
+      "UniversoAdministrativoGisResponse": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "1",
+            "title": "Version",
+            "default": "1"
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "actual",
+              "ciclo"
+            ],
+            "title": "Origen"
+          },
+          "disponibilidad": {
+            "type": "string",
+            "enum": [
+              "disponible",
+              "parcial",
+              "no_disponible"
+            ],
+            "title": "Disponibilidad"
+          },
+          "tipo_objetivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Objetivo"
+          },
+          "id_ciclo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Ciclo"
+          },
+          "fecha_evaluacion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Evaluacion"
+          },
+          "nucleos_vinculados_activos": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nucleos Vinculados Activos"
+          },
+          "parcelas_elegibles_vinculadas": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parcelas Elegibles Vinculadas"
+          },
+          "destinos_aplicables": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destinos Aplicables"
+          },
+          "advertencias": {
+            "items": {
+              "$ref": "#/components/schemas/AdvertenciaUniversoGisResponse"
+            },
+            "type": "array",
+            "title": "Advertencias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "origen",
+          "disponibilidad"
+        ],
+        "title": "UniversoAdministrativoGisResponse"
+      },
       "UserEmailChangeRequest": {
         "properties": {
           "motivo": {
@@ -28521,6 +29318,37 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VarianteFormatoGis": {
+        "properties": {
+          "campo": {
+            "type": "string",
+            "enum": [
+              "PARCELA",
+              "Num_parcela",
+              "no_parcela"
+            ],
+            "title": "Campo"
+          },
+          "regla": {
+            "type": "string",
+            "const": "DIFERENCIA_CEROS_INICIALES_SEGMENTO_NUMERICO",
+            "title": "Regla"
+          },
+          "destinos_observados": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Destinos Observados"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "campo",
+          "regla",
+          "destinos_observados"
+        ],
+        "title": "VarianteFormatoGis"
       }
     }
   }
