@@ -8014,6 +8014,16 @@
               "default": 100,
               "title": "Limit"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8275,6 +8285,16 @@
               "type": "integer",
               "title": "Id Importacion"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8356,6 +8376,16 @@
               ],
               "title": "Estado Conciliacion"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8378,6 +8408,58 @@
                 "schema": {
                   "type": "integer",
                   "minimum": 0
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/importaciones/{id_importacion}/baja": {
+      "post": {
+        "tags": [
+          "Importaciones geoespaciales"
+        ],
+        "summary": "Baja Import",
+        "operationId": "baja_import_api_importaciones__id_importacion__baja_post",
+        "parameters": [
+          {
+            "name": "id_importacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Importacion"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportacionArchivoResponse"
                 }
               }
             }
@@ -8555,6 +8637,16 @@
               "type": "integer",
               "title": "Id Importacion"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8603,6 +8695,16 @@
             "schema": {
               "type": "integer",
               "title": "Id Feature"
+            }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
             }
           }
         ],
@@ -8718,6 +8820,16 @@
               "type": "integer",
               "title": "Id Feature"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8772,6 +8884,16 @@
             "schema": {
               "type": "integer",
               "title": "Id Feature"
+            }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
             }
           }
         ],
@@ -8888,6 +9010,16 @@
               "default": 100,
               "title": "Limit"
             }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
+            }
           }
         ],
         "responses": {
@@ -8951,6 +9083,16 @@
             "schema": {
               "type": "integer",
               "title": "Id Ciclo"
+            }
+          },
+          {
+            "name": "incluir_inactivas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Inactivas"
             }
           }
         ],

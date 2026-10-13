@@ -594,3 +594,12 @@ geometrías, normalización ni decisiones. Catálogo, ejemplos e integración:
 La versión documental vigente de la proyección es el máximo `numero_version`
 de DocumentoVersion. Los vínculos y referencias de ExpedienteRequisito mantienen
 su identidad, procedencia y autorizaciones actuales. No se añade migración 029.
+
+### Baja lógica de importación GIS (entrega 2)
+
+`importacion_archivo.activo`, `fecha_baja`, `id_usuario_baja` y `motivo_baja`
+registran cancelación de staging sin confirmar, mediante `BajaRequest` y
+validación de procedencia/dependencias reales. El estado se conserva. La baja
+no cambia features, candidatos, resultados/diagnósticos, decisiones ni
+versiones geométricas; solo cierra ciclos abiertos. El motivo de una baja ya
+registrada no puede reemplazarse mediante el endpoint. No hay cambio de esquema.

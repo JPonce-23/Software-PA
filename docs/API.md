@@ -615,3 +615,16 @@ no un snapshot inmutable de staging. El universo usado por un ciclo está en
 ciclos posteriores resumen las features reevaluadas y sus parámetros. El
 backfill 025 indica `universo_historico_no_reconstruible=true`: su array vacío
 no demuestra un universo histórico vacío.
+
+### Baja e historial de importaciones GIS (entrega 2)
+
+`POST /api/importaciones/{id_importacion}/baja` recibe `BajaRequest` con
+`motivo` obligatorio. Admin/geógrafo con acceso al proyecto pueden cancelar
+importaciones fallidas o previsualizadas sin confirmaciones ni dependencias
+protegidas; los demás casos devuelven 409. Una repetición idéntica conserva la
+auditoría original. `GET` de listados y recursos de una importación admite
+`incluir_inactivas=true` para lectura histórica explícita, sin habilitar
+escrituras. El listado conserva paginación y `X-Total-Count`.
+
+Contrato y limitaciones de pipelines históricos:
+[Importaciones GIS, entregas 2 y 3](CONTRATO_IMPORTACIONES_GIS_ENTREGAS_2_3.md).

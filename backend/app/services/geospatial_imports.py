@@ -470,15 +470,101 @@ def require_import_access(
     user: models.Usuario,
     *,
     mode: str = "read",
+    incluir_inactivas: bool = False,
 ) -> models.ImportacionArchivo:
-    record = db.query(models.ImportacionArchivo).filter(
+    query = db.query(models.ImportacionArchivo).filter(
         models.ImportacionArchivo.id_importacion == import_id,
-        models.ImportacionArchivo.activo.is_(True),
-    ).first()
+    )
+    if not incluir_inactivas or mode != "read":
+        query = query.filter(models.ImportacionArchivo.activo.is_(True))
+    record = query.first()
     if record is None:
         raise HTTPException(status_code=404, detail="Importación no encontrada")
     require_project_access(db, user, record.id_proyecto, mode=mode)
     return record
+
+
+def lock_import(db, import_id, user, *, incluir_inactivas=False):
+    """Serialize GIS writes: project first, then a fresh import row."""
+    record = require_import_access(db, import_id, user, incluir_inactivas=incluir_inactivas)
+    db.query(models.Proyecto).filter_by(id_proyecto=record.id_proyecto).with_for_update().one()
+    require_project_access(db, user, record.id_proyecto, mode="gis")
+    record = db.query(models.ImportacionArchivo).filter_by(
+        id_importacion=import_id).populate_existing().with_for_update().one()
+    if not incluir_inactivas and not record.activo:
+        raise HTTPException(404, "Importación no encontrada")
+    return record
+
+
+def baja_import(db, import_id, data, user):
+    """Cancel unconfirmed staging, retaining every historical child row."""
+    try:
+        record = lock_import(db, import_id, user, incluir_inactivas=True)
+        if not record.activo:
+            if record.motivo_baja != data.motivo:
+                raise HTTPException(409, "La importación ya tiene otro motivo de baja")
+            db.commit()
+            return record
+        if record.estado not in {"error", "previsualizado"}:
+            raise HTTPException(409, "Solo se permite baja de importaciones fallidas o previsualizadas")
+        if record.tipo_objetivo not in {
+            "nucleo_agrario", "parcela", STRICT_NUCLEUS_TARGET, STRICT_PARCEL_TARGET,
+            "derecho_via_proyecto", "trazo_proyecto",
+        }:
+            raise HTTPException(409, "No puede demostrarse la seguridad de este pipeline")
+        if record.version_pipeline not in {"legacy-v1", "conciliacion-v2", "conciliacion-v3-historia"} or (
+            record.version_pipeline == "legacy-v1" and record.tipo_objetivo != "trazo_proyecto"
+        ):
+            # Pre-project nucleus/parcel geometries lack reliable import FKs.
+            raise HTTPException(409, "La procedencia de este pipeline no permite una baja segura")
+        # Flags are a supplementary guard; real references are checked regardless
+        # of counters, activity and version currency.
+        protected = db.execute(text("""
+            SELECT EXISTS (
+                SELECT 1 FROM importacion_feature f WHERE f.id_importacion=:i
+                  AND (f.estado='confirmado' OR f.estado_conciliacion='confirmado'
+                       OR f.registro_destino_id IS NOT NULL OR f.fecha_importacion IS NOT NULL)
+                UNION ALL
+                SELECT 1 FROM proyecto_nucleo_geometria g JOIN importacion_feature f
+                  USING(id_importacion_feature) WHERE f.id_importacion=:i
+                UNION ALL
+                SELECT 1 FROM proyecto_parcela_geometria g JOIN importacion_feature f
+                  USING(id_importacion_feature) WHERE f.id_importacion=:i
+                UNION ALL
+                SELECT 1 FROM derecho_via_proyecto WHERE id_importacion=:i
+                UNION ALL
+                SELECT 1 FROM importacion_archivo WHERE id_importacion_anterior=:i
+                UNION ALL
+                SELECT 1 FROM revision_cambio_gis r WHERE r.id_importacion_anterior=:i
+                  OR r.id_importacion_nueva=:i OR r.id_feature_nueva IN
+                     (SELECT id_importacion_feature FROM importacion_feature WHERE id_importacion=:i)
+                UNION ALL
+                SELECT 1 FROM trazo_proyecto WHERE id_proyecto=:p
+                  AND observaciones=:trace_source
+            )
+        """), {"i":import_id,"p":record.id_proyecto,
+               "trace_source":f"Generado por importación {import_id}"}).scalar_one()
+        if protected or record.confirmacion_explicita or record.fecha_confirmacion or record.importados:
+            raise HTTPException(409, "La importación tiene confirmaciones o dependencias protegidas")
+        set_audit_context(db, user.id_usuario)
+        from .gis_history import close_cycles
+        close_cycles(db, record)
+        now = datetime.now(timezone.utc)
+        record.activo = False
+        record.fecha_baja = now
+        record.id_usuario_baja = user.id_usuario
+        record.motivo_baja = data.motivo
+        record.actualizado_en = now
+        record.actualizado_por = user.id_usuario
+        db.commit()
+        db.refresh(record)
+        return record
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(409, "La baja se revirtió completamente") from exc
 
 
 def _confirm_ddv_import(
@@ -654,6 +740,7 @@ def confirm_import(
     if record.tipo_objetivo in {STRICT_NUCLEUS_TARGET, STRICT_PARCEL_TARGET, "nucleo_agrario", "parcela"}:
         from .gis_reconciliation import finalize
         return finalize(db,record,data,user)
+    record = lock_import(db, import_id, user)
     if record.estado != "previsualizado":
         raise HTTPException(status_code=409, detail="La importación no está previsualizada")
     if record.errores:

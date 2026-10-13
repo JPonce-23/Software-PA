@@ -334,15 +334,15 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
             shutil.rmtree(path.with_suffix(''))
 
 
-def _locked_context(db,import_id,user):
-    from .geospatial_imports import require_import_access
-    record=require_import_access(db,import_id,user,mode='gis')
-    db.query(models.Proyecto).filter_by(id_proyecto=record.id_proyecto).with_for_update().one()
-    require_project_access(db,user,record.id_proyecto,mode='gis')
-    record=db.query(models.ImportacionArchivo).filter_by(id_importacion=import_id).populate_existing().with_for_update().one()
+def _locked_context(db,import_id,user, *, permitir_completa=False):
+    from .geospatial_imports import lock_import
+    record=lock_import(db,import_id,user)
+    if permitir_completa and record.estado=='completo':
+        return record
     if record.version_pipeline=='legacy-v1' or record.tipo_objetivo not in RECONCILIATION_TARGETS:
         raise HTTPException(409,'Esta importación no usa conciliación por proyecto')
-    if record.estado!='previsualizado': raise HTTPException(409,'La importación no está previsualizada')
+    if record.estado!='previsualizado':
+        raise HTTPException(409,'La importación no está previsualizada')
     if working_srid(db,record.id_proyecto)!=record.srid_trabajo: raise HTTPException(409,'La configuración CRS cambió; vuelva a procesar la fuente')
     return record
 
@@ -467,9 +467,9 @@ def decide(db,import_id,feature_id,data,user):
 
 def finalize(db,record,data,user):
     try:
+        record=_locked_context(db,record.id_importacion,user,permitir_completa=True)
         if record.estado=='completo':
             db.commit(); return record
-        record=_locked_context(db,record.id_importacion,user)
         if not data.confirmacion_explicita: raise HTTPException(422,'Se requiere confirmación explícita')
         # Unmatched features are valid residuals. Proposed/ambiguous features
         # require a decision, so completion never silently throws them away.

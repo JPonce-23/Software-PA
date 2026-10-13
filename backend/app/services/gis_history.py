@@ -70,13 +70,10 @@ def close_cycles(db, record):
 
 
 def reconcile(db, import_id, data, user):
-    from .geospatial_imports import require_import_access
+    from .geospatial_imports import lock_import
     from . import gis_reconciliation as matching
     try:
-        record = require_import_access(db, import_id, user, mode="gis")
-        db.query(models.Proyecto).filter_by(id_proyecto=record.id_proyecto).with_for_update().one()
-        require_project_access(db,user,record.id_proyecto,mode="gis")
-        record = db.query(models.ImportacionArchivo).filter_by(id_importacion=import_id).populate_existing().with_for_update().one()
+        record = lock_import(db, import_id, user)
         if record.tipo_objetivo not in matching.RECONCILIATION_TARGETS or record.version_pipeline == "legacy-v1":
             raise HTTPException(409, "Esta importación no conserva staging conciliable por proyecto")
         if record.estado not in {"previsualizado", "completo"}:
