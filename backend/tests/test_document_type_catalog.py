@@ -307,8 +307,8 @@ def test_foreign_target_not_visible(docs, role):
         expected=403, json={"titulo": "Ajeno"})
 
 
-def test_health_028(docs):
-    assert docs.api("GET", "/health").json() == {"status": "ok", "schema": 28}
+def test_health_029(docs):
+    assert docs.api("GET", "/health").json() == {"status": "ok", "schema": 29}
 
 
 def test_existing_document_version_regression_isolated(docs):

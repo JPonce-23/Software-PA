@@ -1,8 +1,8 @@
 # Contrato y Especificación de la API — SOFTWARE-PA
 
 > **Autoridad:** Especificación técnica del contrato de integración HTTP entre el cliente web (frontend) y el servidor de aplicaciones (backend).  
-> **Alineación:** Referencia de backend y OpenAPI en `docs/openapi.json`; B-04 incorpora la migración `027` y B-03 la `028` al esquema canónico `001–028`.
-> **Esquema de base de datos vigente:** **028** (`GET /health` responde `{"status": "ok", "schema": 28}` cuando la base consultada tiene 028 aplicada).
+> **Alineación:** Referencia de backend y OpenAPI en `docs/openapi.json`; esquema canónico `001–029`. La 029 incorpora diagnósticos históricos informativos de conciliación GIS.
+> **Esquema ejecutable:** **029** (`GET /health` responde `{"status": "ok", "schema": 29}` cuando la base consultada tiene 029 aplicada; no implica que se haya desplegado en todos los entornos).
 
 ---
 
@@ -367,7 +367,7 @@ superficie oficial ni sustituyen `superficie_afectada_ha` o `superficie_ha`.
 
 La conciliación vigente utiliza `conciliacion-v3-historia`, identificada en
 `gis_history.ALGORITHM`. `conciliacion-v2` corresponde al contrato histórico de
-025; el linaje canónico actual termina en 028.
+025; el linaje canónico actual termina en 029.
 
 ---
 
@@ -528,3 +528,90 @@ y añaden el header `X-Total-Count` antes de aplicar `skip/limit`:
 El total reutiliza exactamente los filtros del listado autorizado, incluso cuando
 la página es vacía. CORS expone `X-Total-Count` a los orígenes ya permitidos.
 OpenAPI documenta el header; no se añade paginación donde no existía.
+
+## 12. Diagnósticos de conciliación GIS (entrega 1, esquema 029)
+
+Contrato y catálogo definitivo: [integración SSALFER](CONTRATO_DIAGNOSTICOS_GIS_SSALFER.md).
+El diagnóstico explica el resultado inicial de matching; es informativo y no
+selecciona destinos, cambia criterios, confirma geometrías ni crea errores.
+
+`GET /api/importaciones/{id_importacion}/features` conserva su array, filtros,
+orden, paginación y `X-Total-Count`. Añade dos campos opcionales:
+
+- `id_ciclo_conciliacion`: último ciclo en el que participó **esa feature**.
+- `diagnostico`: objeto V1 del resultado de ese ciclo. Su `origen` es
+  `registrado` o `no_disponible`. Si no hay resultado de conciliación, ambos
+  campos son `null` (por ejemplo, trazo legado o DDV).
+
+En mapeo técnico, `diagnostico.campos_evaluados` utiliza el nombre de la columna
+de origen configurada: `record_id`, `id_destino`, `id_parcela` o `id_nucleo`.
+No lo sustituye por el nombre de la clave interna `id_destino`. La corrección
+se registra únicamente en resultados nuevos; no altera diagnósticos previos.
+
+`GET /api/importaciones/{id_importacion}/conciliaciones/{id_ciclo}` añade
+`features[].diagnostico` del ciclo solicitado. Conserva `estado_matching`,
+`estado_resultado`, candidatos y decisiones. Una confirmación posterior cambia
+el resultado derivado, pero no el diagnóstico del matching original.
+
+Antes, una feature podía exponer únicamente:
+
+```json
+{"id_importacion_feature": 37, "estado_conciliacion": "sin_coincidencia"}
+```
+
+Después, con los demás campos anteriores conservados (fragmento):
+
+```json
+{
+  "id_importacion_feature": 37,
+  "estado_conciliacion": "sin_coincidencia",
+  "id_ciclo_conciliacion": 12,
+  "diagnostico": {
+    "version": "1",
+    "origen": "registrado",
+    "codigos": ["PARCELA_SIN_COINCIDENCIA_EN_UNIVERSO", "VARIANTE_FORMATO_PENDIENTE_REVISION"],
+    "mensaje": "Se identificó el núcleo, pero no una parcela compatible en el universo del proyecto. Se observó una diferencia de ceros iniciales en un segmento numérico; no establece equivalencia ni genera candidatos.",
+    "campos_evaluados": ["cve_unica_nucleo", "no_parcela"],
+    "evidencia": {
+      "destinos_evaluados": 4,
+      "nucleos_evaluados": 1,
+      "nucleos_compatibles": 1,
+      "parcelas_evaluadas": 4,
+      "candidatos": 0,
+      "descartes_territoriales": {"municipio": 0, "entidad": 0, "tipo_nucleo": 0},
+      "variantes_formato": [{"campo": "no_parcela", "regla": "DIFERENCIA_CEROS_INICIALES_SEGMENTO_NUMERICO", "destinos_observados": 1}]
+    }
+  }
+}
+```
+
+Los históricos anteriores conservan SQL NULL y se proyectan con
+`origen=no_disponible`, código `DIAGNOSTICO_HISTORICO_NO_DISPONIBLE`, campos
+evaluados vacíos y contadores `null`. No se reconstruyen con el catálogo actual.
+Las respuestas de decisiones conservan su contrato ORM: los campos opcionales
+pueden ser `null`; consultar el GET de features para la proyección diagnóstica.
+
+### 12.1 Conteo administrativo existente
+
+El staging de núcleos/parcelas sigue incluyendo
+`ImportacionArchivoResponse.reporte.registros_administrativos`:
+
+- Núcleos: total de vínculos `ProyectoNucleo` activos con núcleo activo.
+- Parcelas: total de destinos distintos `(id_proyecto_nucleo, id_parcela)`
+  elegibles por relaciones activas de afectación y unidad agraria. No cuenta
+  todas las parcelas del catálogo ni el número de núcleos.
+- Cero: ausencia de destinos elegibles **del tipo importado**. Un proyecto con
+  núcleos y ninguna parcela elegible puede devolver cero para parcelas.
+
+SSALFER puede mostrar una advertencia cuando este valor es cero. No hace falta
+un endpoint nuevo ni inferir un universo incompleto a partir de porcentajes.
+
+`GET /api/importaciones/{id}/resumen` recalcula el universo administrativo y la
+cobertura geométrica actuales; combina esos conteos con los estados persistidos
+de features, sin repetir matching. `reporte` es el resumen almacenado en la
+última operación que lo actualizó (staging, decisión, reconciliación o cierre),
+no un snapshot inmutable de staging. El universo usado por un ciclo está en
+`universo_destinos`; el resumen del ciclo inicial corresponde a staging. Los
+ciclos posteriores resumen las features reevaluadas y sus parámetros. El
+backfill 025 indica `universo_historico_no_reconstruible=true`: su array vacío
+no demuestra un universo histórico vacío.

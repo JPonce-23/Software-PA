@@ -1,4 +1,4 @@
-"""SQLAlchemy mappings for the ProyectoNucleo target model (canonical schema 001–028)."""
+"""SQLAlchemy mappings for the ProyectoNucleo target model (canonical schema 001–029)."""
 
 from datetime import date as date_type
 
@@ -1640,6 +1640,7 @@ class ImportacionConciliacionResultado(Base):
     id_ciclo = Column(BigInteger, ForeignKey("importacion_conciliacion_ciclo.id_ciclo"), primary_key=True)
     id_importacion_feature = Column(BigInteger, ForeignKey("importacion_feature.id_importacion_feature"), primary_key=True)
     estado_matching = Column(String(30), nullable=False)
+    diagnostico = Column(JSONB(none_as_null=True), nullable=True)
     creado_en = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 

@@ -1,7 +1,7 @@
 # Gestión de Migraciones de Base de Datos — SOFTWARE-PA
 
 > **Autoridad:** Documentación canónica del versionado del esquema de base de datos en PostgreSQL 15 / PostGIS.  
-> **Esquema ejecutable vigente:** **028** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base).
+> **Esquema ejecutable vigente:** **029** (`GET /health` reporta el máximo registrado en `schema_migrations` de cada base; su disponibilidad en el repositorio no significa despliegue).
 > **B-04:** La 027 permite `actividad_campo` como objetivo documental directo.
 > **B-03:** La 028 incorpora clasificación documental controlada y conserva el texto legado sin backfill.
 
@@ -16,11 +16,11 @@
 3. **Evolución Forward-Only:**  
    Cualquier corrección, ajuste o extensión debe implementarse exclusivamente a través de una **nueva migración incremental hacia adelante** posterior a la versión aplicada. No se modifican los archivos históricos `001` a `028`. La 025 conserva el contenido funcional del antiguo 024 GIS; su adopción excepcional se documenta abajo y se aplicó únicamente en `software_pa_test`.
 4. **Instalación limpia:**  
-   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `028_catalogo_tipo_documento.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
+   En una base de datos vacía, la ejecución de las migraciones inicia directamente en `001_baseline_v1.sql` y avanza secuencialmente hasta `029_diagnosticos_conciliacion_gis.sql`. Los archivos preliminares anteriores a baseline v1 no se reproducen ni forman parte del árbol de migraciones.
 
 ---
 
-## 2. Inventario Canónico de Migraciones Vigentes (001–028)
+## 2. Inventario Canónico de Migraciones Vigentes (001–029)
 
 | Versión | Archivo SQL | Checksum SHA-256 Verificado | Propósito y Contenido Principal |
 |---|---|---|---|
@@ -52,6 +52,7 @@
 | **026** | `026_historia_cambios_gis.sql` | `6615a137655abbb2a6ea2620d7c8b5013f07d6fcdd81aae4270a4551904ea3fd` | Ciclos históricos, reconciliación tardía, alcance de entregas, revisiones técnicas y decisiones append-only; sin efectos administrativos automáticos. |
 | **027** | `027_actividad_campo_objetivo_documental.sql` | `d5371660b3d0f6a257bcdffe453feb72984b225d24804991e6b4cf7c1ce68665` | Añade únicamente `actividad_campo` a `chk_documento_vinculo_tipo`, preservando sus 22 tipos anteriores. No modifica datos ni el contrato de `ExpedienteRequisito`. |
 | **028** | `028_catalogo_tipo_documento.sql` | `1395d96c59af2fe2192598af13bd5e4f88ca675d4d35e9ba4f19d25cfc7bc845` | Catálogo documental V1 de 27 opciones y FK nullable en Documento; conserva texto legado y todos los históricos sin backfill. Protege OTRO, tipos inactivos, inmutabilidad de código y baja lógica. |
+| **029** | `029_diagnosticos_conciliacion_gis.sql` | `284f8a26fc5d1215f21055657a5171431d1df4ee8d0151dc58071e38731e9716` | JSONB nullable informativo por resultado GIS, sin backfill; check del sobre V1 e índice de lectura por feature. Conserva matching, permisos y triggers inmutables. |
 
 ---
 
@@ -59,12 +60,13 @@
 
 ### Catálogo RAN: sincronización de datos después del esquema
 
-Las migraciones hasta 028 instalan estructura y catálogos estructurales, pero no
+Las migraciones hasta 029 instalan estructura y catálogos estructurales, pero no
 cargan el dataset nacional RAN. B-06 distribuye el CSV aprobado, su manifiesto y
-crosswalk bajo `backend/db/fixtures/`; no añade migración 029 ni cambia 001–028.
+crosswalk bajo `backend/db/fixtures/`; B-06 no añade migraciones ni cambia 001–028.
+La 029 corresponde exclusivamente a diagnósticos de conciliación GIS.
 
 Orden de una instalación limpia: provisionar PostgreSQL/runtime, ejecutar el
-runner canónico, verificar ledger/schema 028, crear administrador con el bootstrap
+runner canónico, verificar ledger/schema 029, crear administrador con el bootstrap
 owner, cargar el fixture territorial y sincronizar RAN. El fixture territorial
 requiere que el administrador exista. En una base existente comprobar esos
 prerrequisitos; el init de PostgreSQL no sustituye la ejecución del runner.
@@ -93,7 +95,7 @@ La carga es idempotente y transaccional, conserva IDs y no elimina ausentes ni
 reactiva bajas. Es independiente del ledger de migraciones: el manifiesto es la
 fuente de integridad del dataset. Ver [fixtures](../backend/db/fixtures/README.md)
 para actualización y prueba aislada. Tras sincronizar, iniciar/reiniciar backend,
-verificar `/health` (schema 28) y `GET /api/catalogos/nucleos` autenticado.
+verificar `/health` (schema 29) y `GET /api/catalogos/nucleos` autenticado.
 
 ### Expansión documental 028 y despliegue
 
@@ -420,10 +422,63 @@ Los nombres mínimos de actores GIS, las etiquetas derivadas de revisiones,
 el soporte documental consolidado por ProyectoNucleo y `X-Total-Count` se
 resuelven exclusivamente mediante consultas/proyecciones. No alteran tablas,
 columnas, vistas SQL, funciones, permisos ni archivos de migración. El linaje
-canónico permanece en 001–028. El pipeline actual sigue siendo
+canónico de esas proyecciones era 001–028; la expansión diagnóstica posterior
+es 029 y se describe a continuación. El pipeline actual sigue siendo
 `conciliacion-v3-historia`; `legacy-v1` y `conciliacion-v2` identifican contratos
 históricos y no se reescriben sus registros.
 Sus contratos de lectura y la publicación B-07 se describen en [API.md](API.md).
 Las áreas calculadas por GIS/ST_Area son auxiliares/cartográficas; no son
 superficie oficial ni modifican las superficies administrativas provenientes
 de Excel/documentos.
+
+## Diagnósticos GIS 029 — aplicación y reversión segura
+
+Archivo: `029_diagnosticos_conciliacion_gis.sql`. Dependencia: 028 canónica
+exacta. Añade `importacion_conciliacion_resultado.diagnostico JSONB NULL`, sin
+default ni backfill, check del sobre V1 e índice `(id_importacion_feature,
+id_ciclo)`. No realiza UPDATE/DELETE/INSERT de datos de dominio. Las filas
+previas conservan SQL NULL. El trigger append-only ya instalado cubre la
+columna nueva, sin cambios de funciones, permisos, candidatos o geometrías.
+
+Antes de aplicar en cualquier entorno autorizado: comprobar base y ledger,
+disponer de respaldo verificable y revisar la expansión. Ejecutar primero en
+pruebas. ALTER TABLE y la creación del índice necesitan bloqueo transaccional;
+programar una ventana adecuada al volumen de resultados. No usar creación de
+índice CONCURRENTLY dentro del runner de transacción única.
+
+En esta entrega sólo se aplicó a `software_pa_test`. Como el checkout de
+desarrollo permanece intacto, se copiaron los archivos del worktree al
+contenedor y se utilizó el runner oficial:
+
+```bash
+docker compose cp /tmp/software-pa-gis-diagnosticos-20261013/backend/db/migrations \
+  db:/tmp/software-pa-diagnosticos-migrations
+docker compose exec -T db sh -lc \
+  'POSTGRES_DB=software_pa_test MIGRATIONS_DIR=/tmp/software-pa-diagnosticos-migrations /opt/software-pa/scripts/run_migrations.sh'
+```
+
+El runner verifica SHA-256 de 001–028 y aplica 029 con `--single-transaction`,
+registrando versión, nombre y checksum en la misma transacción. Un reintento
+verifica el checksum y omite una migración ya aplicada. No ejecutar el SQL
+manualmente sin el registro atómico del runner.
+
+Validación del nuevo contrato en la base aislada:
+
+```bash
+docker compose exec -T db sh -lc \
+  'psql -U "$POSTGRES_USER" -d software_pa_test -X -v ON_ERROR_STOP=1' \
+  < /tmp/software-pa-gis-diagnosticos-20261013/backend/db/tests/029_diagnosticos_conciliacion_gis_contract.sql
+```
+
+Si la transacción de migración falla, PostgreSQL revierte DDL y registro juntos.
+Después de una aplicación exitosa, la reversión operativa preferida es volver
+al backend anterior **manteniendo 029 y todos los diagnósticos**: la columna es
+nullable y ese backend no la consulta ni la escribe. No eliminar la columna,
+diagnósticos o fila del ledger, ni modificar 029. Una retirada física requeriría
+autorización explícita, respaldo y nueva migración forward-only, por la pérdida
+de historia que implicaría. No se ejecutó ninguna reversión destructiva.
+
+Los históricos sin diagnóstico se exponen como `origen=no_disponible`;
+reutilizar un SHA anterior no fuerza un reprocesamiento. Un ciclo explícito
+registra diagnóstico sólo para features elegibles, manteniendo intactas las
+confirmadas y sus versiones. Véase [contrato SSALFER](CONTRATO_DIAGNOSTICOS_GIS_SSALFER.md).

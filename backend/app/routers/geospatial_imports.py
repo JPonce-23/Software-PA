@@ -195,7 +195,8 @@ def preview_features(
     if estado_conciliacion is not None:
         query = query.filter(models.ImportacionFeature.estado_conciliacion == estado_conciliacion)
     response.headers["X-Total-Count"] = str(query.count())
-    return query.order_by(models.ImportacionFeature.indice_feature).offset(skip).limit(limit).all()
+    records = query.order_by(models.ImportacionFeature.indice_feature).offset(skip).limit(limit).all()
+    return reads.feature_previews(db, records)
 
 
 @router.post(

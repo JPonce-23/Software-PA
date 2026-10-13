@@ -102,7 +102,8 @@ def reconcile(db, import_id, data, user):
             raise HTTPException(409, "No hay features elegibles")
         if any(f.geometria_normalizada is None or f.geometria_trabajo is None or f.errores for f in features):
             raise HTTPException(409, "Staging incompleto o inválido; no puede reconciliarse")
-        universe = matching.administrative_universe(db, record.id_proyecto, parcels=record.tipo_objetivo in matching.PARCEL_TARGETS)
+        nucleus_universe = matching.administrative_universe(db, record.id_proyecto)
+        universe = matching.administrative_universe(db, record.id_proyecto, parcels=True, nuclei=nucleus_universe) if record.tipo_objetivo in matching.PARCEL_TARGETS else nucleus_universe
         set_audit_context(db, user.id_usuario)
         # Close the preceding attempt without changing its results or decisions.
         close_cycles(db, record)
@@ -111,7 +112,7 @@ def reconcile(db, import_id, data, user):
         for feature in features:
             direct_id = feature.atributos_normalizados.get("id_destino") if record.mapeo.get("id_destino") else None
             matching.build_candidates(db, record, feature, feature.atributos_originales, universe, user,
-                                      direct_id=direct_id, cycle=cycle)
+                                      direct_id=direct_id, cycle=cycle, nucleus_universe=nucleus_universe)
         results = dict(db.query(models.ImportacionConciliacionResultado.estado_matching,func.count()).filter_by(
             id_ciclo=cycle.id_ciclo).group_by(models.ImportacionConciliacionResultado.estado_matching).all())
         cycle.resumen = {"features":len(features),"resultados":results,"parametros":parameters}

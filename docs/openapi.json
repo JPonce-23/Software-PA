@@ -16601,6 +16601,31 @@
         ],
         "title": "DecisionGisResponse"
       },
+      "DescartesTerritorialesGis": {
+        "properties": {
+          "municipio": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Municipio",
+            "default": 0
+          },
+          "entidad": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Entidad",
+            "default": 0
+          },
+          "tipo_nucleo": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Tipo Nucleo",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DescartesTerritorialesGis"
+      },
       "DestinoGisResponse": {
         "properties": {
           "nombre_nucleo": {
@@ -17021,6 +17046,70 @@
           "decisiones"
         ],
         "title": "DetalleRevisionGisResponse"
+      },
+      "DiagnosticoConciliacionGisResponse": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "1",
+            "title": "Version",
+            "default": "1"
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "registrado",
+              "no_disponible"
+            ],
+            "title": "Origen"
+          },
+          "codigos": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "UNIVERSO_DESTINOS_VACIO",
+                "IDENTIDAD_NUCLEO_INSUFICIENTE",
+                "CLAVE_SIN_COINCIDENCIA_EN_UNIVERSO",
+                "NOMBRE_SIN_COINCIDENCIA_EN_UNIVERSO",
+                "MUNICIPIO_INCOMPATIBLE",
+                "ENTIDAD_INCOMPATIBLE",
+                "TIPO_NUCLEO_INCOMPATIBLE",
+                "NUMERO_PARCELA_AUSENTE",
+                "PARCELA_SIN_COINCIDENCIA_EN_UNIVERSO",
+                "VARIANTE_FORMATO_PENDIENTE_REVISION",
+                "MULTIPLES_DESTINOS_COMPATIBLES",
+                "ID_ADMINISTRATIVO_SIN_COINCIDENCIA_EN_UNIVERSO",
+                "DIAGNOSTICO_HISTORICO_NO_DISPONIBLE"
+              ]
+            },
+            "type": "array",
+            "title": "Codigos"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          },
+          "campos_evaluados": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Campos Evaluados"
+          },
+          "evidencia": {
+            "$ref": "#/components/schemas/EvidenciaDiagnosticoGis"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "origen",
+          "codigos",
+          "mensaje",
+          "campos_evaluados",
+          "evidencia"
+        ],
+        "title": "DiagnosticoConciliacionGisResponse"
       },
       "DocumentoClasificacionResponse": {
         "properties": {
@@ -17710,6 +17799,90 @@
           "activo"
         ],
         "title": "EntidadFederativaResponse"
+      },
+      "EvidenciaDiagnosticoGis": {
+        "properties": {
+          "destinos_evaluados": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destinos Evaluados"
+          },
+          "nucleos_evaluados": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nucleos Evaluados"
+          },
+          "nucleos_compatibles": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nucleos Compatibles"
+          },
+          "parcelas_evaluadas": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parcelas Evaluadas"
+          },
+          "candidatos": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidatos"
+          },
+          "descartes_territoriales": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DescartesTerritorialesGis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variantes_formato": {
+            "items": {
+              "$ref": "#/components/schemas/VarianteFormatoGis"
+            },
+            "type": "array",
+            "title": "Variantes Formato"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EvidenciaDiagnosticoGis"
       },
       "ExpedienteRequisitoCreate": {
         "properties": {
@@ -18571,6 +18744,27 @@
               }
             ],
             "title": "Dimension Fuente"
+          },
+          "id_ciclo_conciliacion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Ciclo Conciliacion"
+          },
+          "diagnostico": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiagnosticoConciliacionGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -24284,6 +24478,16 @@
             },
             "type": "array",
             "title": "Decisiones"
+          },
+          "diagnostico": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiagnosticoConciliacionGisResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -28819,6 +29023,37 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VarianteFormatoGis": {
+        "properties": {
+          "campo": {
+            "type": "string",
+            "enum": [
+              "PARCELA",
+              "Num_parcela",
+              "no_parcela"
+            ],
+            "title": "Campo"
+          },
+          "regla": {
+            "type": "string",
+            "const": "DIFERENCIA_CEROS_INICIALES_SEGMENTO_NUMERICO",
+            "title": "Regla"
+          },
+          "destinos_observados": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Destinos Observados"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "campo",
+          "regla",
+          "destinos_observados"
+        ],
+        "title": "VarianteFormatoGis"
       }
     }
   }

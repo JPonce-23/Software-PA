@@ -1,0 +1,126 @@
+{
+  "methodology": "CPU synthetic; median; no SQL/GDAL; one warm-up; before=Entrega 1 snapshot",
+  "repetitions": 3,
+  "scenarios": [
+    {
+      "features": 200,
+      "destinations": 1000,
+      "nuclei": 40,
+      "identity": "official",
+      "sql_queries": 0,
+      "matching_and_diagnostics_equal": true,
+      "diagnostic_before": {
+        "median_seconds": 0.06172155700005533,
+        "samples_seconds": [
+          0.06095735100007005,
+          0.06172155700005533,
+          0.0634468320004089
+        ]
+      },
+      "diagnostic_after": {
+        "median_seconds": 0.039138694999564905,
+        "samples_seconds": [
+          0.039138694999564905,
+          0.039756593999300094,
+          0.03910565500063967
+        ]
+      },
+      "processing_before": {
+        "median_seconds": 0.21541892200002621,
+        "samples_seconds": [
+          0.21188974899996538,
+          0.219611595999595,
+          0.21541892200002621
+        ]
+      },
+      "processing_after": {
+        "median_seconds": 0.19636394500048482,
+        "samples_seconds": [
+          0.1950857880001422,
+          0.19636394500048482,
+          0.1984378569995897
+        ]
+      }
+    },
+    {
+      "features": 200,
+      "destinations": 1000,
+      "nuclei": 40,
+      "identity": "textual_homonyms",
+      "sql_queries": 0,
+      "matching_and_diagnostics_equal": true,
+      "diagnostic_before": {
+        "median_seconds": 1.2768897920004747,
+        "samples_seconds": [
+          1.2754616680003892,
+          1.2768897920004747,
+          1.3389445669999986
+        ]
+      },
+      "diagnostic_after": {
+        "median_seconds": 0.5073101199996017,
+        "samples_seconds": [
+          0.47322054599953844,
+          0.517468246000135,
+          0.5073101199996017
+        ]
+      },
+      "processing_before": {
+        "median_seconds": 4.1847259320002195,
+        "samples_seconds": [
+          4.1847259320002195,
+          4.2961072489997605,
+          3.980738764999842
+        ]
+      },
+      "processing_after": {
+        "median_seconds": 3.3345469349997074,
+        "samples_seconds": [
+          3.3395095759997275,
+          3.3345469349997074,
+          3.2232461940002395
+        ]
+      }
+    },
+    {
+      "features": 500,
+      "destinations": 2000,
+      "nuclei": 80,
+      "identity": "textual_homonyms",
+      "sql_queries": 0,
+      "matching_and_diagnostics_equal": true,
+      "diagnostic_before": {
+        "median_seconds": 6.476891977999912,
+        "samples_seconds": [
+          6.861460757000714,
+          6.476891977999912,
+          6.387398406000102
+        ]
+      },
+      "diagnostic_after": {
+        "median_seconds": 3.220902546000616,
+        "samples_seconds": [
+          2.9822074380008416,
+          3.220902546000616,
+          3.3274655619998157
+        ]
+      },
+      "processing_before": {
+        "median_seconds": 20.06572330400013,
+        "samples_seconds": [
+          20.06539534700005,
+          20.142113097999754,
+          20.06572330400013
+        ]
+      },
+      "processing_after": {
+        "median_seconds": 17.19946377799988,
+        "samples_seconds": [
+          17.18733318700015,
+          17.19946377799988,
+          18.809130692000508
+        ]
+      }
+    }
+  ]
+}

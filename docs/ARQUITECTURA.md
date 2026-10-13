@@ -28,7 +28,7 @@ SOFTWARE-PA está implementado como una aplicación web modular desacoplada, ori
 ┌───────────────────────────▼────────────────────────────┐
 │                 Base de Datos Persistente              │
 │               PostgreSQL 15 + PostGIS 3.3              │
-│  - Schema Canónico (Migraciones 001–028)               │
+│  - Schema Canónico (Migraciones 001–029)               │
 │  - Constraints de Dominio y Triggers de Integridad     │
 │  - Bitácora Append-Only (SECURITY DEFINER)             │
 │  - Read-Models mediante Vistas SQL                    │
@@ -45,7 +45,7 @@ SOFTWARE-PA está implementado como una aplicación web modular desacoplada, ori
 - **Base de datos:**
   - **Motor:** PostgreSQL 15.
   - **Extensión Espacial:** PostGIS 3.3.
-  - **Versionado de Esquema:** Motor de migraciones SQL secuenciales y verificadas por SHA-256 (`backend/scripts/run_migrations.sh`). Linaje canónico vigente: **001–028**.
+  - **Versionado de Esquema:** Motor de migraciones SQL secuenciales y verificadas por SHA-256 (`backend/scripts/run_migrations.sh`). Linaje canónico vigente: **001–029**.
 - **Frontend:**
   - **Librería de Interfaz:** React 19.
   - **Herramienta de Construcción:** Vite.
@@ -318,3 +318,34 @@ entidades existentes, sin persistencia ni reglas nuevas. Los candidatos reutiliz
 las etiquetas del snapshot `universo_destinos`; no se duplican por fila.
 Usuario y Responsable operativo permanecen separados. `Proyecto.activo`
 representa baja lógica; no existe un ciclo de proyecto activo/completado/reabierto.
+
+### Diagnóstico informativo de conciliación (029)
+
+`gis_diagnostics.py` observa el resultado generado por `build_candidates()` y
+los predicados existentes; no produce ni modifica candidatos. Se registran
+estado y diagnóstico en `ImportacionConciliacionResultado` dentro de la misma
+transacción. La protección append-only existente alcanza el nuevo JSONB.
+
+Staging y reconciliación cargan una vez los núcleos autorizados y reutilizan
+esa carga al obtener parcelas elegibles. Las relaciones territoriales se cargan
+en bloque. El contexto nuclear permite distinguir un núcleo vinculado sin
+parcelas elegibles; permanece separado del universo de destinos del ciclo.
+No se consulta el catálogo global ni otros proyectos para explicar ausencias.
+
+La clave oficial conserva precedencia, sin fallback textual o evaluación
+territorial en esa rama. Se observan únicamente diferencias de ceros en números
+ASCII puros o en el segmento numérico de `P-<dígitos>`, tras la normalización
+existente. Esta observación no declara equivalencia, altera clasificaciones ni
+interviene en `feature_identity()`. Sufijos y otros separadores permanecen distintos.
+
+Preview obtiene en una consulta el último resultado propio de las features
+paginadas. El detalle de ciclo utiliza exclusivamente sus diagnósticos
+persistidos. Un resultado sin diagnóstico se presenta como no disponible,
+con evidencia desconocida, nunca recalculada. No hay backfill ni cambio de
+versión del pipeline: reutilizar un SHA procesado anteriormente puede devolver
+una importación sin diagnósticos; sólo nuevos resultados de staging o ciclos
+explícitos elegibles registran V1. Features confirmadas no se reabren.
+
+`registros_administrativos` conserva su contrato y no se añaden umbrales de
+completitud. Véanse [API §12](API.md#12-diagnósticos-de-conciliación-gis-entrega-1-esquema-029)
+y [catálogo e integración SSALFER](CONTRATO_DIAGNOSTICOS_GIS_SSALFER.md).

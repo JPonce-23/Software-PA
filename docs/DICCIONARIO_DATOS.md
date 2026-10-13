@@ -1,7 +1,7 @@
 # Diccionario de Datos — SOFTWARE-PA
 
 > **Autoridad:** Especificación canónica del modelo físico y lógico de datos de SOFTWARE-PA.  
-> **Validación:** Verificado contra `backend/app/models.py`, migraciones canónicas `001–028` y read-models de base de datos en PostgreSQL 15 / PostGIS.
+> **Validación:** Modelo y esquema canónico `001–029`, PostgreSQL 15 / PostGIS; la 029 se verifica en base aislada antes de integración.
 
 ---
 
@@ -259,7 +259,7 @@ paginación inválida producen 422; siguen aplicándose autenticación y roles.
 `uq_persona_curp` conserva su definición: único sobre `upper(curp)` para
 Personas activas con CURP no nulo, sin `btrim`. Por ello la búsqueda normalizada
 puede devolver varias coincidencias visibles. No se introduce unicidad de RFC,
-normalización de escrituras ni cambios de esquema; el esquema vigente es 028.
+normalización de escrituras ni cambios de esquema para esta búsqueda; el esquema ejecutable vigente es 029.
 La selección no crea relaciones y no amplía permisos de captura o edición.
 
 ## 5. Afectaciones y Unidades Agrarias
@@ -563,6 +563,34 @@ listado documental por procedencia y totales de paginación por header.
 No son columnas, tablas ni relaciones nuevas. Usuario permanece intacto;
 los nombres se consultan en bloque y las etiquetas de candidatos se obtienen
 del snapshot existente `importacion_conciliacion_ciclo.universo_destinos`.
+
+### Diagnóstico histórico de matching (029)
+
+| Tabla / campo | Tipo / nulabilidad | Significado |
+|---|---|---|
+| `importacion_conciliacion_resultado.diagnostico` | JSONB nullable, sin default | Objeto V1 registrado junto al estado de matching por feature/ciclo. NULL identifica ausencia de diagnóstico registrado; sin backfill. |
+
+La PK `(id_ciclo, id_importacion_feature)` y las FKs se conservan.
+`idx_resultado_gis_feature_ciclo` permite buscar resultados de las features de
+una página. `chk_resultado_gis_diagnostico` valida el sobre JSON de la versión
+1 y origen registrado; Pydantic valida códigos, evidencia tipada y ausencia de
+campos extra. El trigger existente `trg_gis_resultado_inmutable` impide UPDATE
+y DELETE de toda la fila, incluido el diagnóstico; runtime conserva sólo
+SELECT/INSERT. No se amplían privilegios ni se suspenden guardas.
+
+La evidencia contiene exclusivamente contadores, campos técnicos y reglas de
+observación. No contiene nombres de titulares, identificadores personales ni
+vínculos de otros proyectos. `nucleos_evaluados` incluye el contexto de núcleos
+vinculados cargado para explicar parcelas sin destinos elegibles. No amplía el
+universo de candidatos. En mapeo técnico legado no se evalúa identidad nuclear
+y el contador es cero. `descartes_territoriales` contabiliza el primer criterio
+fallido por núcleo; no atribuye campos posteriores no evaluados.
+
+Las respuestas añaden `diagnostico` opcional; preview añade también
+`id_ciclo_conciliacion`. Son proyecciones del resultado, no columnas nuevas en
+`importacion_feature`. No se cambia `errores`, `advertencias`, estados,
+geometrías, normalización ni decisiones. Catálogo, ejemplos e integración:
+[contrato SSALFER](CONTRATO_DIAGNOSTICOS_GIS_SSALFER.md) y [API §12](API.md#12-diagnósticos-de-conciliación-gis-entrega-1-esquema-029).
 La versión documental vigente de la proyección es el máximo `numero_version`
 de DocumentoVersion. Los vínculos y referencias de ExpedienteRequisito mantienen
 su identidad, procedencia y autorizaciones actuales. No se añade migración 029.
