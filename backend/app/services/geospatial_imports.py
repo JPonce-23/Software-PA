@@ -525,6 +525,11 @@ def baja_import(db, import_id, data, user):
                   AND (f.estado='confirmado' OR f.estado_conciliacion='confirmado'
                        OR f.registro_destino_id IS NOT NULL OR f.fecha_importacion IS NOT NULL)
                 UNION ALL
+                SELECT 1 FROM importacion_feature_decision d JOIN importacion_feature f
+                  USING(id_importacion_feature) WHERE f.id_importacion=:i AND d.accion='confirmar'
+                UNION ALL
+                SELECT 1 FROM importacion_feature_candidato WHERE id_importacion=:i AND estado='confirmado'
+                UNION ALL
                 SELECT 1 FROM proyecto_nucleo_geometria g JOIN importacion_feature f
                   USING(id_importacion_feature) WHERE f.id_importacion=:i
                 UNION ALL

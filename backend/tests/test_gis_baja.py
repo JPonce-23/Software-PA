@@ -236,3 +236,24 @@ def test_unknown_or_untraceable_pipeline_is_rejected(transactional_api,tmp_path,
     api=transactional_api['request'];_,record,_=staged(transactional_api,tmp_path)
     iid=record['id_importacion'];change_import(transactional_api,iid,version_pipeline=pipeline)
     baja(api,iid,expected=409)
+
+
+@pytest.mark.parametrize('evidence',['decision','candidato'])
+def test_confirmation_history_protects_import_even_without_geometry(transactional_api,tmp_path,evidence):
+    api=transactional_api['request'];_,record,_=staged(transactional_api,tmp_path)
+    iid=record['id_importacion'];f=preview(api,iid)[0];c=candidates(api,iid,f)[0]
+    with transactional_api['session_factory']() as db:
+        actor=app.dependency_overrides[auth.get_current_user]().id_usuario
+        set_audit_context(db,actor)
+        if evidence=='decision':
+            db.add(models.ImportacionFeatureDecision(id_ciclo=c['id_ciclo'],
+                id_importacion_feature=f['id_importacion_feature'],id_candidato=c['id_candidato'],
+                accion='confirmar',motivo='Histórico sintético sin versión',creado_por=actor))
+        else:
+            row=db.get(models.ImportacionFeatureCandidato,c['id_candidato'])
+            row.estado='confirmado';row.actualizado_por=actor
+        db.commit()
+    # Protect even inconsistent legacy metadata; never trust counters alone.
+    assert preview(api,iid)[0]['estado_conciliacion']=='coincidencia_exacta'
+    baja(api,iid,expected=409)
+    assert api('GET',f'/api/importaciones/{iid}').json()['activo'] is True
