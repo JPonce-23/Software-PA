@@ -1,5 +1,10 @@
 # Contrato y Especificación de la API — SOFTWARE-PA
 
+El [reporte general de convenios V1](CONTRATO_REPORTE_GENERAL_CONVENIOS.md)
+añade consultas paginada, completa y de entidades bajo
+`/api/proyectos/{id_proyecto}/reportes/convenios/general`. Incluye ejemplos JSON,
+procedencia RAN y reglas de superficies; conserva los endpoints anteriores.
+
 > **Autoridad:** Especificación técnica del contrato de integración HTTP entre el cliente web (frontend) y el servidor de aplicaciones (backend).  
 > **Alineación:** Referencia de backend y OpenAPI en `docs/openapi.json`; esquema canónico `001–029`. La 029 incorpora diagnósticos históricos informativos de conciliación GIS.
 > **Esquema ejecutable:** **029** (`GET /health` responde `{"status": "ok", "schema": 29}` cuando la base consultada tiene 029 aplicada; no implica que se haya desplegado en todos los entornos).

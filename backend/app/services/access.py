@@ -4,7 +4,7 @@ from typing import Literal
 
 from fastapi import HTTPException
 from sqlalchemy import and_, exists, false, func, or_, select, text, union
-from sqlalchemy.orm import Query, Session
+from sqlalchemy.orm import Query, Session, raiseload
 from sqlalchemy.sql import ColumnElement, Select
 
 from .. import models
@@ -186,6 +186,7 @@ def require_project_access(
     *,
     mode: AccessMode = "read",
     lock: bool = False,
+    load_details: bool = True,
 ) -> models.Proyecto:
     if not _role_allows(user, mode):
         raise _forbidden()
@@ -193,6 +194,9 @@ def require_project_access(
         models.Proyecto.id_proyecto == project_id,
         models.Proyecto.activo.is_(True),
     )
+    if not load_details:
+        # Read projections authorize the principal without loading its domain graph.
+        query = query.options(raiseload("*"))
     if user.rol != "admin":
         query = query.filter(
             exists().where(

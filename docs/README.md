@@ -1,5 +1,8 @@
 # Índice de Documentación Canónica — SOFTWARE-PA
 
+- [Contrato backend del reporte general de convenios](CONTRATO_REPORTE_GENERAL_CONVENIOS.md)
+- [Ejemplo JSON sintético validado](examples/reporte_general_convenios.json)
+
 > **Árbol documental consolidado de SOFTWARE-PA.**  
 > La referencia técnica vigente es el backend actual y el linaje canónico **001–028**. El esquema aplicado en cada base se consulta mediante `/health`.
 

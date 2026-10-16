@@ -4,7 +4,7 @@ import csv
 import io
 import json
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Path, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, case, column, exists, func, literal, table
 from sqlalchemy.orm import Session
@@ -12,10 +12,73 @@ from sqlalchemy.orm import Session
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services.access import authorized_project_ids, require_project_access
+from ..services import convenio_reports
 
 
 router = APIRouter(tags=["Dashboard y mapa"])
 READ_ROLES = ["admin", "operador", "visualizador", "geografo"]
+
+
+@router.get(
+    "/proyectos/{id_proyecto}/reportes/convenios/general",
+    response_model=schemas.ReporteGeneralConveniosResponse,
+    tags=["Reporte general de convenios"],
+)
+def reporte_general_convenios(
+    id_proyecto: int = Path(gt=0),
+    id_entidad: int | None = Query(default=None, gt=0),
+    ambito: schemas.Ambito | None = None,
+    naturaleza: schemas.NaturalezaConvenioReporte | None = None,
+    pagina: int = Query(default=1, ge=1, le=1_000_000),
+    tamano_pagina: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(convenio_reports.get_report_db),
+    user: convenio_reports.ReportPrincipal = Depends(convenio_reports.get_report_user),
+):
+    """Una cabecera por convenio; página independiente por ámbito, orden territorial por IDs."""
+    return convenio_reports.general_report(
+        db, user, id_proyecto, id_entidad=id_entidad, ambito=ambito,
+        naturaleza=naturaleza, pagina=pagina, tamano_pagina=tamano_pagina,
+    )
+
+
+@router.get(
+    "/proyectos/{id_proyecto}/reportes/convenios/general/entidades",
+    response_model=schemas.EntidadesConveniosReporteResponse,
+    tags=["Reporte general de convenios"],
+)
+def entidades_reporte_general_convenios(
+    id_proyecto: int = Path(gt=0),
+    ambito: schemas.Ambito | None = None,
+    naturaleza: schemas.NaturalezaConvenioReporte | None = None,
+    db: Session = Depends(convenio_reports.get_report_db),
+    user: convenio_reports.ReportPrincipal = Depends(convenio_reports.get_report_user),
+):
+    """Entidades del universo autorizado completo; admite filtros de ámbito y naturaleza."""
+    return convenio_reports.report_entities(db, user, id_proyecto, ambito=ambito, naturaleza=naturaleza)
+
+
+@router.get(
+    "/proyectos/{id_proyecto}/reportes/convenios/general/completo",
+    response_model=schemas.ReporteGeneralConveniosResponse,
+    tags=["Reporte general de convenios"],
+    responses={413: {
+        "description": "Más de 10,000 cabeceras de convenios; acote filtros. No se devuelven datos parciales.",
+        "model": schemas.LimiteConveniosReporteResponse,
+    }},
+)
+def reporte_general_convenios_completo(
+    id_proyecto: int = Path(gt=0),
+    id_entidad: int | None = Query(default=None, gt=0),
+    ambito: schemas.Ambito | None = None,
+    naturaleza: schemas.NaturalezaConvenioReporte | None = None,
+    db: Session = Depends(convenio_reports.get_report_db),
+    user: convenio_reports.ReportPrincipal = Depends(convenio_reports.get_report_user),
+):
+    """Conjunto JSON completo bajo un snapshot; error explícito si excede el límite."""
+    return convenio_reports.general_report(
+        db, user, id_proyecto, id_entidad=id_entidad,
+        ambito=ambito, naturaleza=naturaleza, completo=True,
+    )
 
 
 def _dashboard_query(
