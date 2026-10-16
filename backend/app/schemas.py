@@ -2,9 +2,9 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema, field_validator, model_validator
 
 from .passwords import is_within_bcrypt_limit
 
@@ -14,6 +14,10 @@ Ambito = Literal["colectivo", "individual"]
 EfectoMonto = Literal["adicion", "sustitucion", "correccion", "sin_cambio", "pendiente"]
 EfectoSuperficie = Literal["adicion", "sustitucion", "correccion", "sin_cambio", "pendiente"]
 EstadoAntecedente = Literal["no_aplica", "vinculado", "referido_sin_soporte", "pendiente_identificar"]
+NaturalezaConvenioReporte = Literal[
+    "cop_original", "modificatorio", "obras_complementarias",
+    "ampliacion", "ampliacion_remanente",
+]
 
 
 class ORMModel(BaseModel):
@@ -1695,6 +1699,186 @@ class FifonafeIndicadorInstitucionalResponse(ORMModel):
     solicitudes_recibidas: int
     solicitudes_resueltas_positivas: int
     porcentaje: Decimal | None = None
+
+
+# These aliases apply only to the new report. Keep Decimal in Python and emit
+# fixed-point strings in JSON; Decimal's default serializer may emit "0E-7".
+DecimalConvenioReporte = Annotated[
+    Decimal,
+    Field(allow_inf_nan=False),
+    PlainSerializer(lambda value: format(value, "f"), return_type=str, when_used="json"),
+    WithJsonSchema({"type": "string", "pattern": r"^-?[0-9]+(?:\.[0-9]+)?$"}, mode="serialization"),
+]
+ImporteConvenioReporte = Annotated[
+    Decimal,
+    Field(decimal_places=2, allow_inf_nan=False),
+    PlainSerializer(lambda value: format(value, ".2f"), return_type=str, when_used="json"),
+    WithJsonSchema({"type": "string", "pattern": r"^-?[0-9]+\.[0-9]{2}$"}, mode="serialization"),
+]
+
+
+class SuperficieConvenioReporte(BaseModel):
+    origen: str
+    superficie_m2: DecimalConvenioReporte | None
+    subtotal_conocido_m2: DecimalConvenioReporte | None
+    registros: int
+    registros_sin_superficie: int
+
+
+class EventoRanConvenioReporte(BaseModel):
+    id_tramite_ran: int
+    id_evento_ran: int
+    ordinal: int
+    tipo_evento: str
+    fecha_evento: date | None
+    id_documento: int | None
+
+
+class TramiteRanConvenioReporte(BaseModel):
+    id_tramite_ran: int
+    eventos: list[EventoRanConvenioReporte]
+
+
+class ResumenRanConvenioReporte(BaseModel):
+    criterio: Literal["primera_fecha_historica_por_tipo"] = "primera_fecha_historica_por_tipo"
+    fecha_ingreso: date | None
+    fecha_inscripcion: date | None
+    ingreso: EventoRanConvenioReporte | None
+    inscripcion: EventoRanConvenioReporte | None
+    tramite_vigente_determinado: Literal[False] = False
+    multiples_tramites: bool
+    fechas_de_distintos_tramites: bool
+    cantidad_reingresos: int
+    eventos_sin_fecha: int
+    tramites: list[TramiteRanConvenioReporte]
+
+
+class UnidadConvenioReporte(BaseModel):
+    id_afectacion_unidad: int
+    id_afectacion: int
+    id_unidad_agraria: int
+    id_parcela: int | None
+    no_parcela: str | None
+    id_destino_superficie: int | None
+    destino_codigo: str | None
+    destino_nombre: str | None
+    superficie_afectada_m2: DecimalConvenioReporte | None
+
+
+class ParcelaConvenioReporte(BaseModel):
+    id_parcela: int
+    no_parcela: str | None
+    ids_afectacion_unidad: list[int]
+
+
+class AfectacionConvenioReporte(BaseModel):
+    id_convenio_afectacion: int
+    id_afectacion: int
+    rol: str
+    tipo_cop_operativo: str | None
+    superficie_afectada_m2: DecimalConvenioReporte | None
+    efecto_superficie: EfectoSuperficie
+    superficie_impacto_m2: DecimalConvenioReporte | None
+
+
+class DestinoConvenioReporte(BaseModel):
+    id_destino_superficie: int | None
+    codigo: str | None
+    nombre: str | None
+    superficie: SuperficieConvenioReporte
+    ids_afectacion_unidad: list[int]
+
+
+class ConvenioGeneralBaseReporte(BaseModel):
+    no: int = Field(description="Ordinal del convenio en su ámbito y filtro, antes de paginar.")
+    id_convenio: int
+    id_proyecto_nucleo: int
+    id_entidad: int
+    estado: str
+    id_municipio: int
+    municipio: str
+    id_nucleo: int
+    nucleo_agrario: str
+    ambito: Ambito
+    tipo_instrumento: Literal["convenio", "otro"]
+    tipo_convenio: NaturalezaConvenioReporte | None
+    modalidad_especial: str | None
+    tipo_cop_operativo: str | None
+    clasificacion_cop_incompleta: bool
+    id_convenio_padre: int | None
+    estado_antecedente: EstadoAntecedente | None
+    efecto_monto: EfectoMonto
+    fecha_firma_cop: date | None = Field(description="Fecha capturada; no acredita firma documental.")
+    monto_total_90: ImporteConvenioReporte | None = Field(description="convenio.monto_90, MXN; no prorrateable.")
+    monto_total_100: ImporteConvenioReporte | None = Field(description="convenio.monto_100, MXN; no prorrateable.")
+    superficie_declarada_m2: DecimalConvenioReporte | None
+    superficie_administrativa_afectada: SuperficieConvenioReporte
+    superficie_unidades: SuperficieConvenioReporte
+    superficie_geometrica_m2: None = Field(default=None, description="No calculada por este reporte.")
+    afectaciones: list[AfectacionConvenioReporte]
+    unidades: list[UnidadConvenioReporte]
+    ran_convenio: ResumenRanConvenioReporte
+    fecha_ingreso_ran_convenio: date | None
+    fecha_inscripcion_ran_convenio: date | None
+    advertencias: list[str]
+
+
+class ConvenioIndividualGeneralReporte(ConvenioGeneralBaseReporte):
+    ambito: Literal["individual"]
+    parcelas: list[ParcelaConvenioReporte]
+    superficie_excel_m2: None = Field(default=None, description="Pendiente elegir entre candidatos; no se infiere.")
+
+
+class ConvenioColectivoGeneralReporte(ConvenioGeneralBaseReporte):
+    ambito: Literal["colectivo"]
+    destinos: list[DestinoConvenioReporte]
+    id_asamblea_autorizacion: int | None
+    id_convocatoria_celebrada: int | None
+    fecha_asamblea_realizada: date | None
+    ran_asamblea: ResumenRanConvenioReporte
+    fecha_ingreso_ran_asamblea: date | None
+    fecha_inscripcion_ran_asamblea: date | None
+
+
+class PaginaConveniosReporte(BaseModel):
+    total: int
+    pagina: int
+    tamano_pagina: int | None
+    hay_mas: bool
+
+
+class ReporteGeneralConveniosResponse(BaseModel):
+    version: Literal["1"] = "1"
+    id_proyecto: int
+    completo: bool
+    orden: Literal["id_entidad,id_municipio,id_nucleo,id_convenio"] = "id_entidad,id_municipio,id_nucleo,id_convenio"
+    individuales: list[ConvenioIndividualGeneralReporte]
+    colectivos: list[ConvenioColectivoGeneralReporte]
+    paginacion_individuales: PaginaConveniosReporte
+    paginacion_colectivos: PaginaConveniosReporte
+
+
+class EntidadConveniosReporte(BaseModel):
+    id_entidad: int
+    estado: str
+    individuales: int
+    colectivos: int
+
+
+class EntidadesConveniosReporteResponse(BaseModel):
+    id_proyecto: int
+    entidades: list[EntidadConveniosReporte]
+
+
+class LimiteConveniosReporteDetalle(BaseModel):
+    codigo: Literal["REPORTE_EXCEDE_LIMITE"] = "REPORTE_EXCEDE_LIMITE"
+    limite_convenios: int = Field(gt=0, description="Límite de cabeceras, no de parcelas o destinos.")
+    total_convenios: int = Field(gt=0)
+    mensaje: str = "Acote los filtros; no se devolvieron datos parciales."
+
+
+class LimiteConveniosReporteResponse(BaseModel):
+    detail: LimiteConveniosReporteDetalle
 
 
 class ConvenioValorDeclaradoResponse(ORMModel):

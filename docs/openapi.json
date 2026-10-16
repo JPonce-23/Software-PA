@@ -10997,6 +10997,338 @@
           }
         }
       }
+    },
+    "/api/proyectos/{id_proyecto}/reportes/convenios/general": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa",
+          "Reporte general de convenios"
+        ],
+        "summary": "Reporte General Convenios",
+        "description": "Una cabecera por convenio; página independiente por ámbito, orden territorial por IDs.",
+        "operationId": "reporte_general_convenios_api_proyectos__id_proyecto__reportes_convenios_general_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Id Proyecto"
+            }
+          },
+          {
+            "name": "id_entidad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id Entidad"
+            }
+          },
+          {
+            "name": "ambito",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "colectivo",
+                    "individual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ambito"
+            }
+          },
+          {
+            "name": "naturaleza",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cop_original",
+                    "modificatorio",
+                    "obras_complementarias",
+                    "ampliacion",
+                    "ampliacion_remanente"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Naturaleza"
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Pagina"
+            }
+          },
+          {
+            "name": "tamano_pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Tamano Pagina"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReporteGeneralConveniosResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{id_proyecto}/reportes/convenios/general/entidades": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa",
+          "Reporte general de convenios"
+        ],
+        "summary": "Entidades Reporte General Convenios",
+        "description": "Entidades del universo autorizado completo; admite filtros de ámbito y naturaleza.",
+        "operationId": "entidades_reporte_general_convenios_api_proyectos__id_proyecto__reportes_convenios_general_entidades_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Id Proyecto"
+            }
+          },
+          {
+            "name": "ambito",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "colectivo",
+                    "individual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ambito"
+            }
+          },
+          {
+            "name": "naturaleza",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cop_original",
+                    "modificatorio",
+                    "obras_complementarias",
+                    "ampliacion",
+                    "ampliacion_remanente"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Naturaleza"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntidadesConveniosReporteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{id_proyecto}/reportes/convenios/general/completo": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa",
+          "Reporte general de convenios"
+        ],
+        "summary": "Reporte General Convenios Completo",
+        "description": "Conjunto JSON completo bajo un snapshot; error explícito si excede el límite.",
+        "operationId": "reporte_general_convenios_completo_api_proyectos__id_proyecto__reportes_convenios_general_completo_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Id Proyecto"
+            }
+          },
+          {
+            "name": "id_entidad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id Entidad"
+            }
+          },
+          {
+            "name": "ambito",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "colectivo",
+                    "individual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ambito"
+            }
+          },
+          {
+            "name": "naturaleza",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cop_original",
+                    "modificatorio",
+                    "obras_complementarias",
+                    "ampliacion",
+                    "ampliacion_remanente"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Naturaleza"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReporteGeneralConveniosResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Más de 10,000 cabeceras de convenios; acote filtros. No se devuelven datos parciales.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimiteConveniosReporteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -29349,6 +29681,1315 @@
           "destinos_observados"
         ],
         "title": "VarianteFormatoGis"
+      },
+      "AfectacionConvenioReporte": {
+        "properties": {
+          "id_convenio_afectacion": {
+            "type": "integer",
+            "title": "Id Convenio Afectacion"
+          },
+          "id_afectacion": {
+            "type": "integer",
+            "title": "Id Afectacion"
+          },
+          "rol": {
+            "type": "string",
+            "title": "Rol"
+          },
+          "tipo_cop_operativo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Cop Operativo"
+          },
+          "superficie_afectada_m2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superficie Afectada M2"
+          },
+          "efecto_superficie": {
+            "type": "string",
+            "enum": [
+              "adicion",
+              "sustitucion",
+              "correccion",
+              "sin_cambio",
+              "pendiente"
+            ],
+            "title": "Efecto Superficie"
+          },
+          "superficie_impacto_m2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superficie Impacto M2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_convenio_afectacion",
+          "id_afectacion",
+          "rol",
+          "tipo_cop_operativo",
+          "superficie_afectada_m2",
+          "efecto_superficie",
+          "superficie_impacto_m2"
+        ],
+        "title": "AfectacionConvenioReporte"
+      },
+      "ConvenioColectivoGeneralReporte": {
+        "properties": {
+          "no": {
+            "type": "integer",
+            "title": "No",
+            "description": "Ordinal del convenio en su ámbito y filtro, antes de paginar."
+          },
+          "id_convenio": {
+            "type": "integer",
+            "title": "Id Convenio"
+          },
+          "id_proyecto_nucleo": {
+            "type": "integer",
+            "title": "Id Proyecto Nucleo"
+          },
+          "id_entidad": {
+            "type": "integer",
+            "title": "Id Entidad"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "id_municipio": {
+            "type": "integer",
+            "title": "Id Municipio"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "id_nucleo": {
+            "type": "integer",
+            "title": "Id Nucleo"
+          },
+          "nucleo_agrario": {
+            "type": "string",
+            "title": "Nucleo Agrario"
+          },
+          "ambito": {
+            "type": "string",
+            "const": "colectivo",
+            "title": "Ambito"
+          },
+          "tipo_instrumento": {
+            "type": "string",
+            "enum": [
+              "convenio",
+              "otro"
+            ],
+            "title": "Tipo Instrumento"
+          },
+          "tipo_convenio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cop_original",
+                  "modificatorio",
+                  "obras_complementarias",
+                  "ampliacion",
+                  "ampliacion_remanente"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Convenio"
+          },
+          "modalidad_especial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidad Especial"
+          },
+          "tipo_cop_operativo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Cop Operativo"
+          },
+          "clasificacion_cop_incompleta": {
+            "type": "boolean",
+            "title": "Clasificacion Cop Incompleta"
+          },
+          "id_convenio_padre": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Convenio Padre"
+          },
+          "estado_antecedente": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "no_aplica",
+                  "vinculado",
+                  "referido_sin_soporte",
+                  "pendiente_identificar"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado Antecedente"
+          },
+          "efecto_monto": {
+            "type": "string",
+            "enum": [
+              "adicion",
+              "sustitucion",
+              "correccion",
+              "sin_cambio",
+              "pendiente"
+            ],
+            "title": "Efecto Monto"
+          },
+          "fecha_firma_cop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Firma Cop",
+            "description": "Fecha capturada; no acredita firma documental."
+          },
+          "monto_total_90": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monto Total 90",
+            "description": "convenio.monto_90, MXN; no prorrateable."
+          },
+          "monto_total_100": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monto Total 100",
+            "description": "convenio.monto_100, MXN; no prorrateable."
+          },
+          "superficie_declarada_m2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superficie Declarada M2"
+          },
+          "superficie_administrativa_afectada": {
+            "$ref": "#/components/schemas/SuperficieConvenioReporte"
+          },
+          "superficie_unidades": {
+            "$ref": "#/components/schemas/SuperficieConvenioReporte"
+          },
+          "superficie_geometrica_m2": {
+            "type": "null",
+            "title": "Superficie Geometrica M2",
+            "description": "No calculada por este reporte."
+          },
+          "afectaciones": {
+            "items": {
+              "$ref": "#/components/schemas/AfectacionConvenioReporte"
+            },
+            "type": "array",
+            "title": "Afectaciones"
+          },
+          "unidades": {
+            "items": {
+              "$ref": "#/components/schemas/UnidadConvenioReporte"
+            },
+            "type": "array",
+            "title": "Unidades"
+          },
+          "ran_convenio": {
+            "$ref": "#/components/schemas/ResumenRanConvenioReporte"
+          },
+          "fecha_ingreso_ran_convenio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Ingreso Ran Convenio"
+          },
+          "fecha_inscripcion_ran_convenio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Inscripcion Ran Convenio"
+          },
+          "advertencias": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Advertencias"
+          },
+          "destinos": {
+            "items": {
+              "$ref": "#/components/schemas/DestinoConvenioReporte"
+            },
+            "type": "array",
+            "title": "Destinos"
+          },
+          "id_asamblea_autorizacion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Asamblea Autorizacion"
+          },
+          "id_convocatoria_celebrada": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Convocatoria Celebrada"
+          },
+          "fecha_asamblea_realizada": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Asamblea Realizada"
+          },
+          "ran_asamblea": {
+            "$ref": "#/components/schemas/ResumenRanConvenioReporte"
+          },
+          "fecha_ingreso_ran_asamblea": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Ingreso Ran Asamblea"
+          },
+          "fecha_inscripcion_ran_asamblea": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Inscripcion Ran Asamblea"
+          }
+        },
+        "type": "object",
+        "required": [
+          "no",
+          "id_convenio",
+          "id_proyecto_nucleo",
+          "id_entidad",
+          "estado",
+          "id_municipio",
+          "municipio",
+          "id_nucleo",
+          "nucleo_agrario",
+          "ambito",
+          "tipo_instrumento",
+          "tipo_convenio",
+          "modalidad_especial",
+          "tipo_cop_operativo",
+          "clasificacion_cop_incompleta",
+          "id_convenio_padre",
+          "estado_antecedente",
+          "efecto_monto",
+          "fecha_firma_cop",
+          "monto_total_90",
+          "monto_total_100",
+          "superficie_declarada_m2",
+          "superficie_administrativa_afectada",
+          "superficie_unidades",
+          "afectaciones",
+          "unidades",
+          "ran_convenio",
+          "fecha_ingreso_ran_convenio",
+          "fecha_inscripcion_ran_convenio",
+          "advertencias",
+          "destinos",
+          "id_asamblea_autorizacion",
+          "id_convocatoria_celebrada",
+          "fecha_asamblea_realizada",
+          "ran_asamblea",
+          "fecha_ingreso_ran_asamblea",
+          "fecha_inscripcion_ran_asamblea"
+        ],
+        "title": "ConvenioColectivoGeneralReporte"
+      },
+      "ConvenioIndividualGeneralReporte": {
+        "properties": {
+          "no": {
+            "type": "integer",
+            "title": "No",
+            "description": "Ordinal del convenio en su ámbito y filtro, antes de paginar."
+          },
+          "id_convenio": {
+            "type": "integer",
+            "title": "Id Convenio"
+          },
+          "id_proyecto_nucleo": {
+            "type": "integer",
+            "title": "Id Proyecto Nucleo"
+          },
+          "id_entidad": {
+            "type": "integer",
+            "title": "Id Entidad"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "id_municipio": {
+            "type": "integer",
+            "title": "Id Municipio"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "id_nucleo": {
+            "type": "integer",
+            "title": "Id Nucleo"
+          },
+          "nucleo_agrario": {
+            "type": "string",
+            "title": "Nucleo Agrario"
+          },
+          "ambito": {
+            "type": "string",
+            "const": "individual",
+            "title": "Ambito"
+          },
+          "tipo_instrumento": {
+            "type": "string",
+            "enum": [
+              "convenio",
+              "otro"
+            ],
+            "title": "Tipo Instrumento"
+          },
+          "tipo_convenio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cop_original",
+                  "modificatorio",
+                  "obras_complementarias",
+                  "ampliacion",
+                  "ampliacion_remanente"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Convenio"
+          },
+          "modalidad_especial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidad Especial"
+          },
+          "tipo_cop_operativo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Cop Operativo"
+          },
+          "clasificacion_cop_incompleta": {
+            "type": "boolean",
+            "title": "Clasificacion Cop Incompleta"
+          },
+          "id_convenio_padre": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Convenio Padre"
+          },
+          "estado_antecedente": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "no_aplica",
+                  "vinculado",
+                  "referido_sin_soporte",
+                  "pendiente_identificar"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado Antecedente"
+          },
+          "efecto_monto": {
+            "type": "string",
+            "enum": [
+              "adicion",
+              "sustitucion",
+              "correccion",
+              "sin_cambio",
+              "pendiente"
+            ],
+            "title": "Efecto Monto"
+          },
+          "fecha_firma_cop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Firma Cop",
+            "description": "Fecha capturada; no acredita firma documental."
+          },
+          "monto_total_90": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monto Total 90",
+            "description": "convenio.monto_90, MXN; no prorrateable."
+          },
+          "monto_total_100": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monto Total 100",
+            "description": "convenio.monto_100, MXN; no prorrateable."
+          },
+          "superficie_declarada_m2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superficie Declarada M2"
+          },
+          "superficie_administrativa_afectada": {
+            "$ref": "#/components/schemas/SuperficieConvenioReporte"
+          },
+          "superficie_unidades": {
+            "$ref": "#/components/schemas/SuperficieConvenioReporte"
+          },
+          "superficie_geometrica_m2": {
+            "type": "null",
+            "title": "Superficie Geometrica M2",
+            "description": "No calculada por este reporte."
+          },
+          "afectaciones": {
+            "items": {
+              "$ref": "#/components/schemas/AfectacionConvenioReporte"
+            },
+            "type": "array",
+            "title": "Afectaciones"
+          },
+          "unidades": {
+            "items": {
+              "$ref": "#/components/schemas/UnidadConvenioReporte"
+            },
+            "type": "array",
+            "title": "Unidades"
+          },
+          "ran_convenio": {
+            "$ref": "#/components/schemas/ResumenRanConvenioReporte"
+          },
+          "fecha_ingreso_ran_convenio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Ingreso Ran Convenio"
+          },
+          "fecha_inscripcion_ran_convenio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Inscripcion Ran Convenio"
+          },
+          "advertencias": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Advertencias"
+          },
+          "parcelas": {
+            "items": {
+              "$ref": "#/components/schemas/ParcelaConvenioReporte"
+            },
+            "type": "array",
+            "title": "Parcelas"
+          },
+          "superficie_excel_m2": {
+            "type": "null",
+            "title": "Superficie Excel M2",
+            "description": "Pendiente elegir entre candidatos; no se infiere."
+          }
+        },
+        "type": "object",
+        "required": [
+          "no",
+          "id_convenio",
+          "id_proyecto_nucleo",
+          "id_entidad",
+          "estado",
+          "id_municipio",
+          "municipio",
+          "id_nucleo",
+          "nucleo_agrario",
+          "ambito",
+          "tipo_instrumento",
+          "tipo_convenio",
+          "modalidad_especial",
+          "tipo_cop_operativo",
+          "clasificacion_cop_incompleta",
+          "id_convenio_padre",
+          "estado_antecedente",
+          "efecto_monto",
+          "fecha_firma_cop",
+          "monto_total_90",
+          "monto_total_100",
+          "superficie_declarada_m2",
+          "superficie_administrativa_afectada",
+          "superficie_unidades",
+          "afectaciones",
+          "unidades",
+          "ran_convenio",
+          "fecha_ingreso_ran_convenio",
+          "fecha_inscripcion_ran_convenio",
+          "advertencias",
+          "parcelas"
+        ],
+        "title": "ConvenioIndividualGeneralReporte"
+      },
+      "DestinoConvenioReporte": {
+        "properties": {
+          "id_destino_superficie": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Destino Superficie"
+          },
+          "codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "superficie": {
+            "$ref": "#/components/schemas/SuperficieConvenioReporte"
+          },
+          "ids_afectacion_unidad": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ids Afectacion Unidad"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_destino_superficie",
+          "codigo",
+          "nombre",
+          "superficie",
+          "ids_afectacion_unidad"
+        ],
+        "title": "DestinoConvenioReporte"
+      },
+      "EntidadConveniosReporte": {
+        "properties": {
+          "id_entidad": {
+            "type": "integer",
+            "title": "Id Entidad"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "individuales": {
+            "type": "integer",
+            "title": "Individuales"
+          },
+          "colectivos": {
+            "type": "integer",
+            "title": "Colectivos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_entidad",
+          "estado",
+          "individuales",
+          "colectivos"
+        ],
+        "title": "EntidadConveniosReporte"
+      },
+      "EntidadesConveniosReporteResponse": {
+        "properties": {
+          "id_proyecto": {
+            "type": "integer",
+            "title": "Id Proyecto"
+          },
+          "entidades": {
+            "items": {
+              "$ref": "#/components/schemas/EntidadConveniosReporte"
+            },
+            "type": "array",
+            "title": "Entidades"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_proyecto",
+          "entidades"
+        ],
+        "title": "EntidadesConveniosReporteResponse"
+      },
+      "EventoRanConvenioReporte": {
+        "properties": {
+          "id_tramite_ran": {
+            "type": "integer",
+            "title": "Id Tramite Ran"
+          },
+          "id_evento_ran": {
+            "type": "integer",
+            "title": "Id Evento Ran"
+          },
+          "ordinal": {
+            "type": "integer",
+            "title": "Ordinal"
+          },
+          "tipo_evento": {
+            "type": "string",
+            "title": "Tipo Evento"
+          },
+          "fecha_evento": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Evento"
+          },
+          "id_documento": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Documento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_tramite_ran",
+          "id_evento_ran",
+          "ordinal",
+          "tipo_evento",
+          "fecha_evento",
+          "id_documento"
+        ],
+        "title": "EventoRanConvenioReporte"
+      },
+      "PaginaConveniosReporte": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamano_pagina": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tamano Pagina"
+          },
+          "hay_mas": {
+            "type": "boolean",
+            "title": "Hay Mas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "pagina",
+          "tamano_pagina",
+          "hay_mas"
+        ],
+        "title": "PaginaConveniosReporte"
+      },
+      "ParcelaConvenioReporte": {
+        "properties": {
+          "id_parcela": {
+            "type": "integer",
+            "title": "Id Parcela"
+          },
+          "no_parcela": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Parcela"
+          },
+          "ids_afectacion_unidad": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ids Afectacion Unidad"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_parcela",
+          "no_parcela",
+          "ids_afectacion_unidad"
+        ],
+        "title": "ParcelaConvenioReporte"
+      },
+      "ReporteGeneralConveniosResponse": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "1",
+            "title": "Version",
+            "default": "1"
+          },
+          "id_proyecto": {
+            "type": "integer",
+            "title": "Id Proyecto"
+          },
+          "completo": {
+            "type": "boolean",
+            "title": "Completo"
+          },
+          "orden": {
+            "type": "string",
+            "const": "id_entidad,id_municipio,id_nucleo,id_convenio",
+            "title": "Orden",
+            "default": "id_entidad,id_municipio,id_nucleo,id_convenio"
+          },
+          "individuales": {
+            "items": {
+              "$ref": "#/components/schemas/ConvenioIndividualGeneralReporte"
+            },
+            "type": "array",
+            "title": "Individuales"
+          },
+          "colectivos": {
+            "items": {
+              "$ref": "#/components/schemas/ConvenioColectivoGeneralReporte"
+            },
+            "type": "array",
+            "title": "Colectivos"
+          },
+          "paginacion_individuales": {
+            "$ref": "#/components/schemas/PaginaConveniosReporte"
+          },
+          "paginacion_colectivos": {
+            "$ref": "#/components/schemas/PaginaConveniosReporte"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_proyecto",
+          "completo",
+          "individuales",
+          "colectivos",
+          "paginacion_individuales",
+          "paginacion_colectivos"
+        ],
+        "title": "ReporteGeneralConveniosResponse"
+      },
+      "ResumenRanConvenioReporte": {
+        "properties": {
+          "criterio": {
+            "type": "string",
+            "const": "primera_fecha_historica_por_tipo",
+            "title": "Criterio",
+            "default": "primera_fecha_historica_por_tipo"
+          },
+          "fecha_ingreso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Ingreso"
+          },
+          "fecha_inscripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Inscripcion"
+          },
+          "ingreso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventoRanConvenioReporte"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inscripcion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventoRanConvenioReporte"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tramite_vigente_determinado": {
+            "type": "boolean",
+            "const": false,
+            "title": "Tramite Vigente Determinado",
+            "default": false
+          },
+          "multiples_tramites": {
+            "type": "boolean",
+            "title": "Multiples Tramites"
+          },
+          "fechas_de_distintos_tramites": {
+            "type": "boolean",
+            "title": "Fechas De Distintos Tramites"
+          },
+          "cantidad_reingresos": {
+            "type": "integer",
+            "title": "Cantidad Reingresos"
+          },
+          "eventos_sin_fecha": {
+            "type": "integer",
+            "title": "Eventos Sin Fecha"
+          },
+          "tramites": {
+            "items": {
+              "$ref": "#/components/schemas/TramiteRanConvenioReporte"
+            },
+            "type": "array",
+            "title": "Tramites"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha_ingreso",
+          "fecha_inscripcion",
+          "ingreso",
+          "inscripcion",
+          "multiples_tramites",
+          "fechas_de_distintos_tramites",
+          "cantidad_reingresos",
+          "eventos_sin_fecha",
+          "tramites"
+        ],
+        "title": "ResumenRanConvenioReporte"
+      },
+      "SuperficieConvenioReporte": {
+        "properties": {
+          "origen": {
+            "type": "string",
+            "title": "Origen"
+          },
+          "superficie_m2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superficie M2"
+          },
+          "subtotal_conocido_m2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtotal Conocido M2"
+          },
+          "registros": {
+            "type": "integer",
+            "title": "Registros"
+          },
+          "registros_sin_superficie": {
+            "type": "integer",
+            "title": "Registros Sin Superficie"
+          }
+        },
+        "type": "object",
+        "required": [
+          "origen",
+          "superficie_m2",
+          "subtotal_conocido_m2",
+          "registros",
+          "registros_sin_superficie"
+        ],
+        "title": "SuperficieConvenioReporte"
+      },
+      "TramiteRanConvenioReporte": {
+        "properties": {
+          "id_tramite_ran": {
+            "type": "integer",
+            "title": "Id Tramite Ran"
+          },
+          "eventos": {
+            "items": {
+              "$ref": "#/components/schemas/EventoRanConvenioReporte"
+            },
+            "type": "array",
+            "title": "Eventos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_tramite_ran",
+          "eventos"
+        ],
+        "title": "TramiteRanConvenioReporte"
+      },
+      "UnidadConvenioReporte": {
+        "properties": {
+          "id_afectacion_unidad": {
+            "type": "integer",
+            "title": "Id Afectacion Unidad"
+          },
+          "id_afectacion": {
+            "type": "integer",
+            "title": "Id Afectacion"
+          },
+          "id_unidad_agraria": {
+            "type": "integer",
+            "title": "Id Unidad Agraria"
+          },
+          "id_parcela": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Parcela"
+          },
+          "no_parcela": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Parcela"
+          },
+          "id_destino_superficie": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Destino Superficie"
+          },
+          "destino_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino Codigo"
+          },
+          "destino_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino Nombre"
+          },
+          "superficie_afectada_m2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superficie Afectada M2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_afectacion_unidad",
+          "id_afectacion",
+          "id_unidad_agraria",
+          "id_parcela",
+          "no_parcela",
+          "id_destino_superficie",
+          "destino_codigo",
+          "destino_nombre",
+          "superficie_afectada_m2"
+        ],
+        "title": "UnidadConvenioReporte"
+      },
+      "LimiteConveniosReporteDetalle": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "const": "REPORTE_EXCEDE_LIMITE",
+            "title": "Codigo",
+            "default": "REPORTE_EXCEDE_LIMITE"
+          },
+          "limite_convenios": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Limite Convenios",
+            "description": "Límite de cabeceras, no de parcelas o destinos."
+          },
+          "total_convenios": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Total Convenios"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje",
+            "default": "Acote los filtros; no se devolvieron datos parciales."
+          }
+        },
+        "type": "object",
+        "required": [
+          "limite_convenios",
+          "total_convenios"
+        ],
+        "title": "LimiteConveniosReporteDetalle"
+      },
+      "LimiteConveniosReporteResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/LimiteConveniosReporteDetalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "LimiteConveniosReporteResponse"
       }
     }
   }

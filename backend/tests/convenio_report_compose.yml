@@ -1,0 +1,46 @@
+# Dedicated local test project: no host ports, host database, or persistent data.
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    pull_policy: never
+    command: [postgres, -c, cluster_name=convenio-report-disposable]
+    environment:
+      POSTGRES_DB: software_pa_test
+      POSTGRES_USER: report_owner
+      POSTGRES_PASSWORD: report-owner-disposable-only
+      DB_RUNTIME_USER: report_runtime
+      DB_RUNTIME_PASSWORD: report-runtime-disposable-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ../db/init/001_bootstrap_roles.sh:/docker-entrypoint-initdb.d/001_bootstrap_roles.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U report_owner -d software_pa_test']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  worker:
+    image: software-pa-backend
+    pull_policy: never
+    working_dir: /app
+    environment:
+      APP_ENV: test
+      DB_NAME: software_pa_test
+      TEST_ALLOW_DATABASE: software_pa_test
+      DB_HOST: db
+      DB_PORT: '5432'
+      DB_RUNTIME_USER: report_runtime
+      DB_RUNTIME_PASSWORD: report-runtime-disposable-only
+      POSTGRES_ADMIN_USER: report_owner
+      POSTGRES_ADMIN_PASSWORD: report-owner-disposable-only
+      SECRET_KEY: convenios-local-isolated-fixture-key-20261016
+      PYTHONDONTWRITEBYTECODE: '1'
+      TEST_ADMIN_EMAIL: report-qa@local.invalid
+      TEST_ADMIN_PASSWORD: ConveniosLocal2026!QA
+      REPORT_CONTRACT_DOCS: /contract-docs
+    volumes:
+      - ..:/app:ro
+      - ../../docs:/contract-docs:ro
+networks:
+  default:
+    internal: true
