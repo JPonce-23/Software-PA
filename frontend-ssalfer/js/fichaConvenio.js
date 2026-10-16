@@ -351,6 +351,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                     )
             ]);
 
+        window.dispatchEvent(new CustomEvent("ssalfer:contexto-documentos", { detail: { idProyectoNucleo: Number(convenio.id_proyecto_nucleo) } }));
+
         afectacionesConvenio =
             Array.isArray(
                 afectacionesConvenio

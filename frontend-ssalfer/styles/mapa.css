@@ -711,3 +711,50 @@
 #mapaDetalleVacio[hidden], #mapaDetalleContenido[hidden] { display: none !important; }
 .mapa-opcion-ddv input:checked + span { border-color: #286c91; background: #edf6fb; }
 .mapa-opcion-ddv input:checked + span i { color: #286c91; }
+
+.mapa-conciliacion { margin-top:16px; overflow-wrap:anywhere; }
+.mapa-conciliacion details { border-top:1px solid #c8d4cb; padding:10px 0; }
+.mapa-conciliacion summary { cursor:pointer; font-weight:600; }
+.mapa-conciliacion ul { max-height:220px; overflow:auto; padding-left:22px; }
+.mapa-conciliacion .btn-secundario { display:inline-flex; margin:4px 0; text-decoration:none; }
+
+/* El tren conserva la casilla accesible y muestra ambos estados. */
+.mapa-opcion-capa > input + span::after { content:none; }
+.mapa-tren-estado { position:absolute; width:24px; height:24px; right:5px; top:50%; transform:translateY(-50%); color:#737d77; opacity:.55; }
+.mapa-opcion-capa > input:checked + span .mapa-tren-estado { color:#237c37; opacity:1; filter:drop-shadow(0 0 4px #68cc80); }
+
+.mapa-sin-coincidencia { background:#edf5ff; color:#174a78; border-left:4px solid #286aa1; padding:10px; }
+.mapa-error-geometria { background:#fff0f0; color:#8b2020; border-left:4px solid #b83131; padding:10px; }
+
+/* Cabecera centrada en la selección de proyecto. */
+.mapa-encabezado { display:grid; grid-template-columns:1fr; align-items:start; gap:16px; }
+.mapa-selector-contenedor { width:100%; max-width:850px; padding:16px; background:#edf5ef; border-radius:10px; border-left:4px solid #286b30; }
+.mapa-selector-contenedor label { font-size:1rem; }
+.mapa-selector-contenedor select { min-height:50px; font-size:1rem; }
+.mapa-contexto-acciones[hidden] { display:none; }
+.mapa-resumen-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.mapa-resumen-nota { color:#526257; margin:8px 0 16px; }
+#mapaResponsable { margin-top:20px; padding-top:16px; border-top:1px solid #cbd8cf; }
+#mapaResponsable h4 { margin-bottom:12px; }
+#mapaResponsableDatos dt { font-weight:600; margin-top:8px; }
+#mapaResponsableDatos dd { margin:4px 0 0; overflow-wrap:anywhere; }
+.mapa-totales-cartografia { display:grid; gap:10px; }
+.mapa-totales-cartografia div { background:#edf5ef; padding:10px; border-radius:7px; }
+.mapa-totales-cartografia dd { margin:4px 0 0; font-size:1.3rem; font-weight:700; color:#285438; }
+.mapa-ampliar { position:absolute; top:12px; right:12px; z-index:1001; background:white; }
+body.mapa-vista-ampliada { overflow:hidden; }
+.mapa-layout.mapa-ampliado { position:fixed; inset:0; z-index:2000; display:block; background:white; }
+.mapa-ampliado .mapa-visor-contenedor { width:100%; height:100dvh; min-height:0; border-radius:0; }
+.mapa-ampliado .mapa-visor { height:100%; min-height:0; }
+.mapa-ampliado .mapa-panel-capas { position:absolute; top:70px; left:12px; z-index:1000; width:205px; padding:12px; max-height:calc(100dvh - 90px); overflow:auto; }
+.mapa-ampliado .mapa-panel-capas > p, .mapa-ampliado .mapa-leyenda, .mapa-ampliado #mapaDetalleConciliacion { display:none; }
+.mapa-ampliado .mapa-opcion-capa span i, .mapa-ampliado .mapa-tren-estado { display:none; }
+.mapa-ampliado .mapa-opcion-capa > span { padding:10px; }
+.mapa-ampliado .mapa-panel-detalle { position:absolute; top:70px; right:12px; z-index:1000; width:min(320px,calc(100vw - 24px)); max-height:calc(100dvh - 90px); overflow:auto; }
+.mapa-ampliado .detalle-minimizado { width:auto; }
+.mapa-ampliado .detalle-minimizado > :not(h2):not(#btnAlternarDetalleMapa) { display:none!important; }
+#btnLimpiarSeleccionMapa { margin-bottom:12px; }
+.mapa-pagina :focus-visible { outline:3px solid #286b30; outline-offset:3px; }
+@media(max-width:700px) { .mapa-resumen-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .mapa-ampliado .mapa-panel-capas { width:175px; } .mapa-ampliado .mapa-panel-detalle { top:auto; bottom:12px; max-height:55dvh; } }
+
+#btnAlternarDetalleMapa[hidden], #btnLimpiarSeleccionMapa[hidden] { display:none!important; }

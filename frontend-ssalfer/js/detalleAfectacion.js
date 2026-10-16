@@ -229,6 +229,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
     }
 
+    window.dispatchEvent(new CustomEvent("ssalfer:contexto-documentos", { detail: { idProyectoNucleo: Number(afectacion.id_proyecto_nucleo) } }));
+
     const enlaceVolver1 =
         document.getElementById(
             "enlaceVolverAfectaciones"

@@ -301,6 +301,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         tramite =
             tramiteReal;
 
+        window.dispatchEvent(new CustomEvent("ssalfer:contexto-documentos", { detail: { idProyectoNucleo: Number(tramite.id_proyecto_nucleo) } }));
+
         eventos =
             Array.isArray(eventosReales)
                 ? eventosReales

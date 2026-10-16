@@ -609,25 +609,25 @@
                         <select
                             id="tipoObjetivoGeoespacial"
                             name="tipo_objetivo"
+                            aria-describedby="ayudaTipoGeoespacial"
                             required
                         >
 
-                            <option value="trazo_proyecto">
-                                Trazo del proyecto
-                            </option>
+                            <option value="" selected>Selecciona el tipo de información</option>
 
                             <option value="ddv">Derecho de vía (DDV)</option>
 <option value="nucleos">Núcleos agrarios</option>
 <option value="parcelas">Parcelas</option>
 
                         </select>
-<label class="ssalfer-gestion-campo" hidden>Alcance de la entrega<select id="alcanceEntregaGis"><option value="parcial">Parcial: contiene una parte de los registros</option><option value="completa">Completa: contiene todos los registros de esta entrega</option></select></label>
+<label class="ssalfer-gestion-campo" hidden>Alcance de la entrega<select id="alcanceEntregaGis" aria-describedby="ayudaAlcanceGis"><option value="" selected>Selecciona el alcance de esta entrega</option><option value="parcial">Parcial: contiene una parte de los registros</option><option value="completa">Completa: contiene todos los registros de esta entrega</option></select></label>
+<details class="gis-ayuda"><summary id="ayudaAlcanceGis">Cómo elegir el alcance</summary><p>Elige el alcance indicado por el responsable de la entrega. Cambiar entre Parcial y Completa no resuelve las coincidencias: si el mismo archivo ya se procesó con otro alcance, consulta su carga en el historial.</p></details>
 
 
-                        <small>
-                            Indica qué tipo de geometría contiene
-                            el archivo.
+                        <small id="ayudaTipoGeoespacial" aria-live="polite">
+                            Selecciona qué vas a cargar: derecho de vía, núcleos o parcelas.
                         </small>
+                        <details class="gis-ayuda"><summary>Ver requisitos del archivo</summary><p id="detalleTipoGeoespacial"></p></details>
 
                     </div>
 
@@ -677,41 +677,6 @@
                         >
 
                     </div>
-
-
-
-                    <!-- MAPEO DE DESTINO -->
-
-                    <div
-                        id="grupoMapeoDestino"
-                        class="campo campo-mapeo"
-                        hidden
-                    >
-
-                        <label for="campoIdDestino">
-                            Campo identificador en el archivo
-                        </label>
-
-
-                        <input
-                            id="campoIdDestino"
-                            type="text"
-                            autocomplete="off"
-                            placeholder="Ej. id_parcela"
-                        >
-
-
-                        <small id="ayudaMapeoDestino">
-                            Para núcleos y parcelas, el archivo
-                            debe contener un campo que permita
-                            relacionar cada geometría con su
-                            registro en SSALFER.
-                        </small>
-
-                    </div>
-
-
-
                     <!-- ARCHIVO -->
 
                     <div class="campo">
@@ -802,20 +767,14 @@
 
                     <!-- AVISO -->
 
-                    <div class="geoespacial-aviso">
-
-                        <i class="bi bi-info-circle"></i>
-
-                        <p>
+                    <details class="gis-ayuda"><summary>El archivo se revisa antes de incorporarlo</summary><p>
                             El archivo no modifica inmediatamente
                             la cartografía vigente. Primero será
                             procesado y enviado a previsualización.
                             La información sólo se incorporará al
                             registro geográfico después de una confirmación
                             explícita.
-                        </p>
-
-                    </div>
+                        </p></details>
 
 
 
@@ -875,6 +834,19 @@
                 </div>
 
 
+
+                <fieldset id="filtrosHistorial" class="gis-filtros-historial">
+                    <legend>Filtrar importaciones</legend>
+                    <label>Estado<select id="filtroHistorialEstado"><option value="">Todos</option><option value="previsualizado">Previsualizado</option><option value="completo">Completo</option><option value="error">Error</option><option value="procesando">Procesando</option><option value="pendiente">Pendiente</option></select></label>
+                    <label>Tipo<select id="filtroHistorialTipo"><option value="">Todos</option><option value="derecho_via_proyecto">Derecho de vía</option><option value="nucleo_agrario_gpkg">Núcleos agrarios</option><option value="parcela_gpkg">Parcelas</option><option value="trazo_proyecto">Trazo (histórico)</option><option value="nucleo_agrario">Núcleos (histórico)</option><option value="parcela">Parcelas (histórico)</option></select></label>
+                    <label>Desde<input id="filtroHistorialDesde" type="date"></label>
+                    <label>Hasta<input id="filtroHistorialHasta" type="date"></label>
+                    <label>Disponibilidad<select id="filtroHistorialDisponibilidad" aria-describedby="ayudaBajaHistorial"><option value="">Sólo activas</option><option value="todas">Activas y dadas de baja</option><option value="inactivas">Sólo dadas de baja</option></select></label>
+                    <button id="limpiarFiltrosHistorial" class="btn-secundario" type="button">Limpiar filtros</button>
+                </fieldset>
+                <details class="gis-ayuda"><summary id="ayudaBajaHistorial">Acerca de las cargas dadas de baja</summary><p>La baja retira del mapa las geometrías de esa carga que todavía estén vigentes. Conserva el archivo, sus resultados y decisiones para consulta histórica; no elimina núcleos ni parcelas administrativos ni reactiva versiones anteriores.</p></details>
+                <p id="estadoFiltrosHistorial" role="status" aria-live="polite"></p>
+                <details class="gis-ayuda"><summary>Ver detalle del historial</summary><p id="detalleFiltrosHistorial">Las fechas usan la hora local del navegador.</p></details>
 
                 <!-- ESTADO VACÍO -->
 

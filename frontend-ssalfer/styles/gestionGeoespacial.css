@@ -836,3 +836,12 @@ button:disabled,
         width: 100%;
     }
 }
+
+/* Ayuda a petición: accesible con teclado y sin añadir pasos al flujo. */
+.gis-ayuda { margin:10px 0; min-width:0; overflow-wrap:anywhere; }
+.gis-ayuda > summary { cursor:pointer; color:#24563b; padding:8px 4px; font-weight:600; line-height:1.5; }
+.gis-ayuda > summary:focus-visible { outline:3px solid #206536; outline-offset:3px; border-radius:4px; }
+.gis-ayuda[open] { padding-bottom:8px; border-bottom:1px solid #cedbd3; }
+.gis-ayuda > p, .gis-ayuda-contenido { margin:8px 4px; line-height:1.6; }
+.gis-ayuda-contenido > p + p { margin-top:12px; }
+.geoespacial-importacion .gis-ayuda { margin:6px 0; }

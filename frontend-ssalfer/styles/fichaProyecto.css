@@ -1,0 +1,21 @@
+/* Vista propia de la ficha: no altera las tarjetas del dashboard. */
+.proyecto-vistas { display:flex; flex-wrap:wrap; gap:.6rem; margin:1rem 0 1.4rem; border-bottom:1px solid #d4e0d8; padding-bottom:.8rem; }
+.proyecto-vistas button { padding:.75rem 1.1rem; border:1px solid #bdd1c4; border-radius:8px; color:#225639; background:#fff; font:inherit; font-weight:600; cursor:pointer; }
+.proyecto-vistas button[aria-selected="true"] { background:#276543; color:white; border-color:#276543; }
+.proyecto-vistas button:focus-visible, .proyecto-busqueda-nucleos :focus-visible, #nucleosAgrarios .tarjeta-nucleo:focus-visible { outline:3px solid #2b6fac; outline-offset:3px; }
+#resumenProyecto[hidden], #nucleosAgrarios[hidden] { display:none !important; }
+.proyecto-busqueda-nucleos { margin:1.2rem 0; }
+.proyecto-busqueda-nucleos label { display:block; margin-bottom:.4rem; font-weight:600; }
+.proyecto-busqueda-nucleos > div { display:flex; gap:.65rem; flex-wrap:wrap; }
+.proyecto-busqueda-nucleos input { flex:1; min-width:180px; padding:.7rem; border:1px solid #b8cabe; border-radius:7px; font:inherit; }
+#resultadoBusquedaNucleos { margin:.6rem 0; color:#425e4d; }
+#nucleosAgrarios .nucleos-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+#nucleosAgrarios .tarjeta-nucleo { grid-template-columns:32px minmax(0,1fr); align-items:start; gap:8px; padding:12px; height:auto; }
+#nucleosAgrarios .nucleo-icono { width:32px; height:32px; font-size:1rem; }
+#nucleosAgrarios .nucleo-info h3 { font-size:.95rem; line-height:1.3; overflow-wrap:anywhere; }
+#nucleosAgrarios .nucleo-info p { line-height:1.35; overflow-wrap:anywhere; }
+#nucleosAgrarios .nucleo-resumen { grid-column:1/-1; display:flex; flex-direction:row; flex-wrap:wrap; text-align:left; gap:.3rem .7rem; }
+#nucleosAgrarios .nucleo-flecha { display:none; }
+#nucleosAgrarios .proyectos-lista-vacia { grid-column:1/-1; }
+@media(max-width:1100px) { #nucleosAgrarios .nucleos-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:600px) { #nucleosAgrarios .nucleos-grid { grid-template-columns:1fr; } }

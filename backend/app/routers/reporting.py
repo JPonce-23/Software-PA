@@ -6,7 +6,7 @@ import json
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, column, func, literal, table
+from sqlalchemy import and_, case, column, exists, func, literal, table
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -543,12 +543,24 @@ def project_map(
         models.DerechoViaProyecto.activo.is_(True),
         models.DerechoViaProyecto.es_vigente.is_(True),
     ).all()
+    # Once a project has versioned a destination, a withdrawal must not bring
+    # its global legacy geometry back through the fallback. Other projects keep
+    # their own fallback and history. Legacy cancellations are scoped likewise.
+    nucleus_history = exists().where(models.ProyectoNucleoGeometria.id_proyecto_nucleo == models.ProyectoNucleo.id_proyecto_nucleo).correlate(models.ProyectoNucleo)
+    retired_nucleus_legacy = exists().where(
+        models.ImportacionFeature.id_importacion == models.ImportacionArchivo.id_importacion,
+        models.ImportacionArchivo.id_proyecto == id_proyecto,
+        models.ImportacionArchivo.activo.is_(False),
+        models.ImportacionArchivo.version_pipeline == 'legacy-v1',
+        models.ImportacionArchivo.tipo_objetivo == 'nucleo_agrario',
+        models.ImportacionFeature.registro_destino_id == models.NucleoAgrario.id_nucleo,
+    ).correlate(models.NucleoAgrario)
     nuclei = db.query(
         models.NucleoAgrario.id_nucleo.label("id"),
         models.NucleoAgrario.nombre_nucleo.label("nombre"),
         func.ST_AsGeoJSON(func.coalesce(
             models.ProyectoNucleoGeometria.geometria_poligono,
-            models.NucleoAgrario.geometria_poligono,
+            case((~nucleus_history & ~retired_nucleus_legacy, models.NucleoAgrario.geometria_poligono), else_=None),
         )).label("geometry"),
     ).join(
         models.ProyectoNucleo,
@@ -571,9 +583,21 @@ def project_map(
         "vw_gis_parcela_proyecto",
         column("id_proyecto"), column("id_proyecto_nucleo"), column("id_parcela"),
     )
+    parcel_history = exists().where(
+        models.ProyectoParcelaGeometria.id_proyecto_nucleo == parcel_universe.c.id_proyecto_nucleo,
+        models.ProyectoParcelaGeometria.id_parcela == models.Parcela.id_parcela,
+    ).correlate(parcel_universe, models.Parcela)
+    retired_parcel_legacy = exists().where(
+        models.ImportacionFeature.id_importacion == models.ImportacionArchivo.id_importacion,
+        models.ImportacionArchivo.id_proyecto == id_proyecto,
+        models.ImportacionArchivo.activo.is_(False),
+        models.ImportacionArchivo.version_pipeline == 'legacy-v1',
+        models.ImportacionArchivo.tipo_objetivo == 'parcela',
+        models.ImportacionFeature.registro_destino_id == models.Parcela.id_parcela,
+    ).correlate(models.Parcela)
     parcel_geometry = func.coalesce(
         models.ProyectoParcelaGeometria.geometria_poligono,
-        models.Parcela.geometria_poligono,
+        case((~parcel_history & ~retired_parcel_legacy, models.Parcela.geometria_poligono), else_=None),
     )
     parcels = db.query(
         models.Parcela.id_parcela.label("id"),

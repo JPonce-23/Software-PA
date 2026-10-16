@@ -78,7 +78,7 @@ def test_cancel_unconfirmed_and_exact_retry_preserves_audit(transactional_api,tm
         params={'incluir_inactivas':True},json={'accion':'ignorar','motivo':'QA'})
 
 
-@pytest.mark.parametrize('state',['completo','procesando','confirmando','subido','mapeado','cancelado'])
+@pytest.mark.parametrize('state',['procesando','confirmando'])
 def test_reject_unsafe_states(transactional_api,tmp_path,state):
     _,record,_=staged(transactional_api,tmp_path)
     change_import(transactional_api,record['id_importacion'],estado=state)
@@ -86,7 +86,7 @@ def test_reject_unsafe_states(transactional_api,tmp_path,state):
 
 
 @pytest.mark.parametrize('kind',['nucleo','parcela','ddv','trazo'])
-def test_real_confirmed_geometry_prevents_cancellation_and_stays_intact(transactional_api,tmp_path,kind):
+def test_published_geometry_is_retired_but_history_survives(transactional_api,tmp_path,kind):
     api=transactional_api['request']; pid,record,_=staged(transactional_api,tmp_path,kind)
     iid=record['id_importacion']; f=preview(api,iid)[0]
     if kind in ['nucleo','parcela']:
@@ -99,12 +99,16 @@ def test_real_confirmed_geometry_prevents_cancellation_and_stays_intact(transact
     # Corrupt counters cannot authorize cancellation; actual references survive.
     change_import(transactional_api,iid,estado='previsualizado',importados=0,
                   confirmacion_explicita=False,fecha_confirmacion=None,id_usuario_confirmacion=None)
-    baja(api,iid,expected=409)
-    assert con.execute(text(f'SELECT to_jsonb(g) FROM {table} g')).all()==before
+    result=baja(api,iid).json()
+    assert result['activo'] is False
+    assert len(con.execute(text(f'SELECT to_jsonb(g) FROM {table} g')).all())==len(before)
+    assert not api('GET',f'/api/proyectos/{pid}/mapa').json()['features']
+    historic=api('GET',f'/api/importaciones/{iid}/features',params={'incluir_inactivas':True}).json()
+    assert historic[0]['estado']=='confirmado'
 
 
 @pytest.mark.parametrize('dependency',['entrega','revision'])
-def test_reject_dependencies_even_without_geometries(transactional_api,tmp_path,dependency):
+def test_withdrawal_preserves_dependencies_without_deleting_them(transactional_api,tmp_path,dependency):
     api=transactional_api['request']; pid,record,_=staged(transactional_api,tmp_path)
     iid=record['id_importacion']
     with transactional_api['session_factory']() as db:
@@ -121,7 +125,7 @@ def test_reject_dependencies_even_without_geometries(transactional_api,tmp_path,
             record_revision(db,user,id_proyecto=pid,objetivo='nucleo',id_importacion_nueva=iid,
                 id_feature_nueva=fid,tipo_cambio='aparece_en_nueva_version')
         db.commit()
-    baja(api,iid,expected=409)
+    assert baja(api,iid).json()['activo'] is False
 
 
 def test_pagination_and_sha_reimport_keep_history(transactional_api,tmp_path):
@@ -232,14 +236,14 @@ def test_stale_read_cannot_write_after_baja(committed_gis,tmp_path,monkeypatch,o
 
 
 @pytest.mark.parametrize('pipeline',['legacy-v1','unknown-future'])
-def test_unknown_or_untraceable_pipeline_is_rejected(transactional_api,tmp_path,pipeline):
+def test_staging_can_be_withdrawn_regardless_of_pipeline(transactional_api,tmp_path,pipeline):
     api=transactional_api['request'];_,record,_=staged(transactional_api,tmp_path)
     iid=record['id_importacion'];change_import(transactional_api,iid,version_pipeline=pipeline)
-    baja(api,iid,expected=409)
+    assert baja(api,iid).json()['activo'] is False
 
 
 @pytest.mark.parametrize('evidence',['decision','candidato'])
-def test_confirmation_history_protects_import_even_without_geometry(transactional_api,tmp_path,evidence):
+def test_confirmation_history_is_preserved_when_import_is_withdrawn(transactional_api,tmp_path,evidence):
     api=transactional_api['request'];_,record,_=staged(transactional_api,tmp_path)
     iid=record['id_importacion'];f=preview(api,iid)[0];c=candidates(api,iid,f)[0]
     with transactional_api['session_factory']() as db:
@@ -255,5 +259,67 @@ def test_confirmation_history_protects_import_even_without_geometry(transactiona
         db.commit()
     # Protect even inconsistent legacy metadata; never trust counters alone.
     assert preview(api,iid)[0]['estado_conciliacion']=='coincidencia_exacta'
+    assert baja(api,iid).json()['activo'] is False
+    assert api('GET',f'/api/importaciones/{iid}',params={'incluir_inactivas':True}).json()['activo'] is False
+
+
+@pytest.mark.parametrize('kind',['nucleo','parcela','ddv'])
+def test_retiring_older_delivery_preserves_newer_map_and_reupload(transactional_api,tmp_path,kind):
+    api=transactional_api['request'];pid,old,content=staged(transactional_api,tmp_path,kind,'old-'+kind)
+    def publish(record):
+        iid=record['id_importacion']
+        if kind!='ddv':
+            f=preview(api,iid)[0];decision(api,iid,f,'confirmar',candidates(api,iid,f)[0],accept=True)
+        confirm(api,iid,accept=True)
+    publish(old)
+    props=preview(api,old['id_importacion'])[0]['atributos_originales']
+    content2=gpkg(tmp_path,'new-'+kind,[('g',[(polygon(2),props)])])
+    upload={'nucleo':stage,'parcela':stage_parcels,'ddv':stage_ddv}[kind]
+    new=upload(api,pid,content2).json();publish(new)
+    before=api('GET',f'/api/proyectos/{pid}/mapa').json()
+    baja(api,old['id_importacion'])
+    assert api('GET',f'/api/proyectos/{pid}/mapa').json()==before
+    baja(api,new['id_importacion'])
+    assert not api('GET',f'/api/proyectos/{pid}/mapa').json()['features']
+    third=upload(api,pid,content2).json();assert third['id_importacion']!=new['id_importacion']
+    publish(third)
+    after=api('GET',f'/api/proyectos/{pid}/mapa').json()['features']
+    assert len(after)==len(before['features'])==1
+    assert after[0]['geometry']==before['features'][0]['geometry']
+
+
+@pytest.mark.parametrize('kind',['nucleo','parcela'])
+def test_withdrawal_does_not_revive_shared_global_geometry(transactional_api,tmp_path,kind):
+    from geoalchemy2.elements import WKTElement
+    api=transactional_api['request'];pid,record,_=staged(transactional_api,tmp_path,kind,'fallback-'+kind)
+    iid=record['id_importacion'];f=preview(api,iid)[0];c=candidates(api,iid,f)[0]
+    other_pid=project(api)
+    with transactional_api['session_factory']() as db:
+        actor=app.dependency_overrides[auth.get_current_user]();set_audit_context(db,actor.id_usuario)
+        pn=db.get(models.ProyectoNucleo,c['id_proyecto_nucleo'])
+        db.add(models.ProyectoNucleo(id_proyecto=other_pid,id_nucleo=pn.id_nucleo,creado_por=actor.id_usuario))
+        model=models.Parcela if kind=='parcela' else models.NucleoAgrario
+        target=db.get(model,c['id_parcela'] if kind=='parcela' else pn.id_nucleo)
+        target.geometria_poligono=WKTElement('MULTIPOLYGON(((10 0,10 1,11 1,11 0,10 0)))',srid=4326)
+        target.fuente_geometria='Referencia histórica QA';db.commit()
+        nid=pn.id_nucleo
+    if kind=='parcela':link_parcel(transactional_api,other_pid,nid,c['id_parcela'])
+    other_before=api('GET',f'/api/proyectos/{other_pid}/mapa').json()
+    assert len(other_before['features'])==1
+    decision(api,iid,f,'confirmar',c);confirm(api,iid)
+    baja(api,iid)
+    assert not api('GET',f'/api/proyectos/{pid}/mapa').json()['features']
+    assert api('GET',f'/api/proyectos/{other_pid}/mapa').json()==other_before
+
+
+def test_failed_withdrawal_rolls_back_published_geometry(transactional_api,tmp_path,monkeypatch):
+    api=transactional_api['request'];pid,record,_=staged(transactional_api,tmp_path,'nucleo','rollback-published')
+    iid=record['id_importacion'];f=preview(api,iid)[0]
+    decision(api,iid,f,'confirmar',candidates(api,iid,f)[0]);confirm(api,iid)
+    before=api('GET',f'/api/proyectos/{pid}/mapa').json()
+    def fail(db,record):
+        db.flush();raise RuntimeError('Failure after retiring geometry')
+    monkeypatch.setattr(gis_history,'close_cycles',fail)
     baja(api,iid,expected=409)
-    assert api('GET',f'/api/importaciones/{iid}').json()['activo'] is True
+    assert api('GET',f'/api/importaciones/{iid}').json()['activo']
+    assert api('GET',f'/api/proyectos/{pid}/mapa').json()==before

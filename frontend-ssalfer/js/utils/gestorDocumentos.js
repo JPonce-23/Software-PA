@@ -32,13 +32,26 @@
         }
         async function cargar() {
             const actual = ++revision, destino = objetivo();
-            contenido.replaceChildren(); documentos = [];
-            if (!destino.id) return;
+            contenido.textContent = "Consultando documentos…"; documentos = [];
+            if (!destino.id) { contenido.replaceChildren(); return; }
             try {
                 const respuesta = await api().listarPorEntidad(destino.tipo, destino.id);
                 if (actual !== revision) return;
                 documentos = respuesta;
-                contenido.innerHTML = `<h2>Documentos de ${e(destino.nombre)}</h2><div class="ssalfer-gestion-barra">${puedeCapturar?boton("Registrar documento", "crear")+boton("Vincular documento existente", "vincular"):""}${boton("Consultar procedencia", "fuentes")}</div>${tabla([{ titulo: "Documento", valor: d => d.titulo || api().nombreTipo(d) }, { titulo: "Tipo", valor: d => api().nombreTipo(d) }, { titulo: "Estado", valor: d => window.SSALFER_FORMAT.etiquetaCodigo(d.estado) }, { titulo: "Fecha", valor: d => fecha(d.fecha_documento) }, { titulo: "Folio", valor: d => d.numero_folio }], documentos, d => (puedeCapturar?boton("Editar", "editar", d.id_documento):"") + boton("Versiones y archivos", "versiones", d.id_documento), "Aún no hay documentos. Puedes registrar uno o vincular uno existente.")}`;
+                const cargas = new Map(), pendientes = [...documentos];
+                // Concurrencia acotada: la lista de documentos no incluye sus versiones.
+                await Promise.all(Array.from({length: Math.min(4, pendientes.length)}, async () => {
+                    while (pendientes.length && actual === revision) {
+                        const doc = pendientes.shift();
+                        try {
+                            const versiones = await api().listarVersiones(doc.id_documento);
+                            const ultima = versiones.reduce((a, v) => !a || Number(v.numero_version) > Number(a.numero_version) ? v : a, null);
+                            cargas.set(doc.id_documento, ultima ? (ultima.fecha_carga ? fecha(ultima.fecha_carga) : "Fecha no disponible") : "Sin archivo");
+                        } catch { cargas.set(doc.id_documento, "Fecha no disponible · consulta Versiones y archivos"); }
+                    }
+                }));
+                if (actual !== revision || !raiz.isConnected) return;
+                contenido.innerHTML = `<h2>Documentos de ${e(destino.nombre)}</h2><div class="ssalfer-gestion-barra">${puedeCapturar?boton("Registrar documento", "crear")+boton("Vincular documento existente", "vincular"):""}${boton("Consultar procedencia", "fuentes")}</div>${tabla([{ titulo: "Documento", valor: d => d.titulo || api().nombreTipo(d) }, { titulo: "Tipo", valor: d => api().nombreTipo(d) }, { titulo: "Estado", valor: d => window.SSALFER_FORMAT.etiquetaCodigo(d.estado) }, { titulo: "Fecha del documento", valor: d => fecha(d.fecha_documento) }, { titulo: "Última carga", valor: d => cargas.get(d.id_documento) }, { titulo: "Folio", valor: d => d.numero_folio }], documentos, d => (puedeCapturar?boton("Editar", "editar", d.id_documento)+boton("Dar de baja", "baja", d.id_documento):"") + boton("Versiones y archivos", "versiones", d.id_documento), "Aún no hay documentos. Puedes registrar uno o vincular uno existente.")}`;
             } catch (error) { if (actual === revision) errorVisible(error, "reintentar"); }
         }
         async function notificar(destino) {
@@ -64,6 +77,16 @@
             }});
             if (resultado) await notificar(destino);
         }
+        async function darDeBaja(destino, documento) {
+            const resultado = await formulario({
+                titulo: "Dar de baja documento",
+                introduccion: `Vas a dar de baja «${documento.titulo || api().nombreTipo(documento)}». La baja queda auditada y retira el documento de todos los registros donde está vinculado. No borra el archivo físico ni su historial.`,
+                campos: [campo("motivo", "Motivo de la baja", {tipo: "textarea", requerido: true, maximo: 500}), campo("confirmar", "Entiendo y confirmo la baja del documento", {tipo: "checkbox", requerido: true})],
+                validar: datos => !datos.motivo || datos.motivo.trim().length < 3 ? "Escribe un motivo de al menos 3 caracteres." : null,
+                guardar: async datos => { await api().eliminar(documento.id_documento, datos.motivo.trim()); return true; }
+            });
+            if (resultado) await notificar(destino);
+        }
         async function versiones(documento) {
             const lista = await api().listarVersiones(documento.id_documento);
             await window.SSALFER_UI.abrirModal({ titulo: `Archivos: ${documento.titulo || api().nombreTipo(documento)}`, contenido: `${puedeCapturar?boton("Subir nueva versión", "subir"):""}${tabla([{ titulo: "Versión", valor: v => v.numero_version }, { titulo: "Archivo", valor: v => v.nombre_original }, { titulo: "Tamaño", valor: v => `${Number(v.tamano_bytes).toLocaleString("es-MX")} bytes` }, { titulo: "Carga", valor: v => fecha(v.fecha_carga) }], lista, v => boton("Descargar", "descargar", v.id_documento_version), "Aún no se ha subido un archivo.")}`, preparar: modal => {
@@ -75,8 +98,8 @@
                             const version = lista.find(v => v.id_documento_version === Number(b.dataset.registro));
                             await g().descargar(`/documentos/versiones/${version.id_documento_version}/descarga`, version.nombre_original);
                         } else if (b.dataset.gestion === "subir") {
-                            const nuevo = await formulario({ titulo: "Subir nueva versión", campos: [campo("archivo", "Archivo", { tipo: "file", requerido: true })], guardar: datos => { const payload = new FormData(); payload.append("archivo", datos.archivo); return api().subirVersion(documento.id_documento, payload); } });
-                            if (nuevo) { modal.querySelector("[data-modal-cerrar]").click(); await versiones(documento); }
+                            const nuevo = await formulario({ titulo: "Subir nueva versión", campos: [campo("archivo", "Archivo", { tipo: "file", requerido: true, ayuda: "PDF, DOCX, XLSX, JPG, JPEG o PNG. Máximo 20 MB." })], preparar: form => { form.elements.archivo.accept = ".pdf,.docx,.xlsx,.jpg,.jpeg,.png"; }, guardar: datos => { const payload = new FormData(); payload.append("archivo", datos.archivo); return api().subirVersion(documento.id_documento, payload); } });
+                            if (nuevo) { await notificar(objetivo()); modal.querySelector("[data-modal-cerrar]").click(); await versiones(documento); }
                         }
                     } catch (error) { window.ClienteAPI.mostrarErrorAPI(error); }
                     finally { b.disabled = false; }
@@ -112,7 +135,7 @@
         tipo.addEventListener("change", () => seleccionarTipo()); registro.addEventListener("change", cargar);
         raiz.addEventListener("click", async event => {
             const b = event.target.closest("[data-gestion]"); if (!b || ocupado) return;
-            if(!puedeCapturar && ["crear","editar","vincular","subir"].includes(b.dataset.gestion))return;
+            if(!puedeCapturar && ["crear","editar","vincular","subir","baja"].includes(b.dataset.gestion))return;
             ocupado = true; tipo.disabled = registro.disabled = true;
             try {
                 const destino = objetivo(), documento = documentos.find(d => d.id_documento === Number(b.dataset.registro));
@@ -120,6 +143,7 @@
                 else if (b.dataset.gestion === "reintentar") await cargar();
                 else if (b.dataset.gestion === "crear") await editar(destino);
                 else if (b.dataset.gestion === "editar") await editar(destino, documento);
+                else if (b.dataset.gestion === "baja") await darDeBaja(destino, documento);
                 else if (b.dataset.gestion === "versiones") await versiones(documento);
                 else if (b.dataset.gestion === "vincular") await vincular(destino);
                 else if (b.dataset.gestion === "fuentes") await fuentes(destino);
@@ -137,9 +161,9 @@
         if (!Number.isSafeInteger(id) || id <= 0 || document.getElementById("documentosContenido") || document.querySelector("[data-abrir-documentos]")) return;
         const destino = document.querySelector(".acciones-header") || document.querySelector(".pagina-header");
         if (!destino) return;
-        const b = document.createElement("button"); b.type = "button"; b.className = "btn-secundario"; b.dataset.abrirDocumentos = ""; b.textContent = "Documentos de este núcleo"; b.title = "Registrar, subir y consultar los documentos de este núcleo";
+        const b = document.createElement("button"); b.type = "button"; b.className = "btn-secundario ssalfer-modal__button"; b.dataset.abrirDocumentos = ""; b.textContent = "Documentos de este núcleo"; b.title = "Registrar, subir y consultar los documentos de este núcleo";
         b.addEventListener("click", () => abrir(id)); destino.appendChild(b);
     }
-    window.addEventListener("ssalfer:contexto-documentos", event => acceso(event.detail.idProyectoNucleo));
+    window.addEventListener("ssalfer:contexto-documentos", event => acceso(Number(event.detail?.idProyectoNucleo)));
     document.addEventListener("DOMContentLoaded", () => acceso(Number(new URLSearchParams(location.search).get("id_proyecto_nucleo"))));
 })();

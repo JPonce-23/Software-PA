@@ -63,16 +63,6 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("fechaFuenteGeoespacial"),
 
 
-        grupoMapeo:
-            document.getElementById("grupoMapeoDestino"),
-
-        campoIdDestino:
-            document.getElementById("campoIdDestino"),
-
-        ayudaMapeo:
-            document.getElementById("ayudaMapeoDestino"),
-
-
         inputArchivo:
             document.getElementById("archivoGeoespacial"),
 
@@ -200,7 +190,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const TIPOS_OBJETIVO = new Set([
         "ddv", "nucleos", "parcelas",
-        "trazo_proyecto",
         "nucleo_agrario",
         "parcela"
     ]);
@@ -929,60 +918,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         const alcance = document.getElementById("alcanceEntregaGis");
+        const ayudaTipo = document.getElementById("ayudaTipoGeoespacial");
+        const explicacionTipo = {
+            trazo_proyecto: "El trazo es la línea del recorrido; el derecho de vía es el polígono de su franja de terreno. Si solo tienes DDV, núcleos y parcelas, no necesitas cargar un trazo. El trazo debe contener líneas.",
+            ddv: "Carga los polígonos del derecho de vía del proyecto en un archivo GPKG.",
+            nucleos: "Primero registra y vincula los núcleos al proyecto. El sistema compara nombre, municipio, entidad y tipo de núcleo, o su clave oficial cuando esté disponible. Una diferencia puede dejar el polígono sin coincidencia; no significa que su geometría sea inválida.",
+            parcelas: "Primero registra las parcelas y su relación con los núcleos del proyecto. Se comparan los datos del núcleo y el número de parcela. Cargar el GPKG no crea automáticamente esos registros; después debes revisar y confirmar sus asociaciones."
+        }[tipo] || "Selecciona qué vas a cargar: derecho de vía, núcleos o parcelas.";
+        if (ayudaTipo) ayudaTipo.textContent = {
+            ddv: "Carga el archivo GPKG del derecho de vía.",
+            nucleos: "Los núcleos deben estar registrados y vinculados al proyecto.",
+            parcelas: "Las parcelas deben estar registradas y relacionadas con los núcleos."
+        }[tipo] || "Selecciona qué vas a cargar: derecho de vía, núcleos o parcelas.";
+        const detalleTipo = document.getElementById("detalleTipoGeoespacial");
+        detalleTipo.textContent = explicacionTipo;
+        detalleTipo.closest("details").open = false;
         alcance.closest("label").hidden = !["nucleos", "parcelas"].includes(tipo);
         alcance.required = ["nucleos", "parcelas"].includes(tipo);
         elementos.inputArchivo.accept = tipo === "trazo_proyecto" ? ".geojson,.json,.kml,.gpkg,.zip" : ".gpkg";
-        const requiereMapeo =
-            tipo === "nucleo_agrario" ||
-            tipo === "parcela";
-
-
-        if (elementos.grupoMapeo) {
-
-            elementos.grupoMapeo.hidden =
-                !requiereMapeo;
-
-        }
-
-
-        if (
-            elementos.campoIdDestino
-        ) {
-
-            elementos.campoIdDestino.required =
-                requiereMapeo;
-
-
-            if (!requiereMapeo) {
-
-                elementos.campoIdDestino.value =
-                    "";
-
-            }
-
-        }
-
-
-        if (
-            elementos.ayudaMapeo &&
-            requiereMapeo
-        ) {
-
-            if (
-                tipo === "nucleo_agrario"
-            ) {
-
-                elementos.ayudaMapeo.textContent =
-                    "Escribe el nombre de la columna del archivo que contiene el id_nucleo correspondiente en SSALFER.";
-
-            } else {
-
-                elementos.ayudaMapeo.textContent =
-                    "Escribe el nombre de la columna del archivo que contiene el id_parcela correspondiente en SSALFER.";
-
-            }
-
-        }
 
     }
 
@@ -1169,20 +1122,13 @@ document.addEventListener("DOMContentLoaded", () => {
        IMPORTACIONES - API
     ====================================================== */
 
-    async function obtenerImportacion(
-        idImportacion
-    ) {
-
-        return window.ClienteAPI.get(
-            `/importaciones/${idImportacion}`
-        );
-
+    async function obtenerImportacion(idImportacion, incluirInactivas=false) {
+        return window.GeoespacialAPI.obtener(idImportacion,{incluir_inactivas:incluirInactivas});
     }
 
-
-    async function obtenerFeatures(idImportacion) {
+    async function obtenerFeatures(idImportacion, incluirInactivas=false) {
         const features=[];
-        for(let skip=0;;skip+=500){const p=await window.GeoespacialAPI.paginaElementos(idImportacion,{skip,limit:500});features.push(...p.items);if(window.GeoespacialAPI.fin(p,skip,500))return features;}
+        for(let skip=0;;skip+=500){const p=await window.GeoespacialAPI.paginaElementos(idImportacion,{skip,limit:500},{incluir_inactivas:incluirInactivas});features.push(...p.items);if(window.GeoespacialAPI.fin(p,skip,500))return features;}
     }
 
     /* =====================================================
@@ -1298,7 +1244,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="geoespacial-importacion-resumen">
 
                 <span>
-                    ${escaparTexto(estado)}
+                    ${escaparTexto(estado)}${["nucleo_agrario_gpkg","parcela_gpkg"].includes(importacion.tipo_objetivo)?` · Entrega ${importacion.alcance_entrega==="completa"?"completa":importacion.alcance_entrega==="parcial"?"parcial":"sin alcance informado"}`:""}<span class="gis-estado-publicacion">${numero(importacion.importados)} confirmados</span>
                 </span>
 
                 <small>
@@ -1307,7 +1253,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     ${numero(importacion.advertencias)}
                     advertencias ·
                     ${numero(importacion.errores)}
-                    errores
+                    errores de geometría o datos
                 </small>
 
             </div>
@@ -1320,134 +1266,121 @@ document.addEventListener("DOMContentLoaded", () => {
                     importacion.id_importacion
                 )}"
             >
-                Ver detalle
+                Consultar carga
             </button>
         `;
 
 
+        const consultar=contenedor.querySelector('.js-ver-importacion');
+        consultar.dataset.inactiva=String(importacion.activo===false);
+        if(importacion.activo===false){
+            contenedor.classList.add('gis-inactiva');
+            const baja=document.createElement('p');baja.className='gis-etiqueta';
+            baja.textContent=`Dada de baja · Sólo lectura. ${formatearFechaHora(importacion.fecha_baja)}. Motivo: ${importacion.motivo_baja || 'No disponible'}`;
+            contenedor.prepend(baja);
+        } else if(window.SSALFER_GIS.puedeEditar()) {
+            const boton=document.createElement('button');boton.type='button';boton.className='btn-secundario js-baja-importacion';boton.textContent='Dar de baja esta importación';
+            boton.addEventListener('click',()=>darDeBaja(importacion));contenedor.append(boton);
+        }
+        const estadoCarga=document.createElement('details');
+        estadoCarga.classList.add('gis-ayuda');
+        const claseEstado=Number(importacion.errores)>0 || importacion.estado==='error' ? 'gis-etiqueta gis-error' : 'gis-etiqueta gis-informacion';
+        const explicacionEstado=Number(importacion.errores)>0 || importacion.estado==='error' ? '✖ Hay errores de carga, geometría o datos: consulta el detalle.' : 'ℹ Sin errores informados. Las coincidencias administrativas se consultan en el detalle.';
+        const rotuloEstado=Number(importacion.errores)>0 || importacion.estado==='error' ? '✖ Con errores' : 'ℹ Acerca de esta carga';
+        estadoCarga.innerHTML=`<summary><span class="${claseEstado}">${rotuloEstado}</span></summary><p>${escaparTexto(explicacionEstado)}</p><p>${numero(importacion.importados)} elementos confirmados en esta carga. Consultar el detalle no activa ni reemplaza una versión del mapa.</p>`;
+        contenedor.querySelector('.geoespacial-importacion-resumen').after(estadoCarga);
         return contenedor;
 
     }
 
 
-    async function cargarHistorial(skip=0) {
-        const revision = ++revisionHistorial;
-        const idProyectoConsulta = proyectoActivo?.id_proyecto;
-
-        if (!proyectoActivo) {
-
-            mostrarHistorialVacio(
-                "Selecciona un proyecto",
-                "Aquí aparecerán sus importaciones geoespaciales."
-            );
-
-            return;
-
-        }
-
-
-        if (
-            elementos.importacionesVacio
-        ) {
-
-            elementos.importacionesVacio.innerHTML = `
-                <i class="bi bi-arrow-repeat"></i>
-
-                <strong>
-                    Consultando importaciones…
-                </strong>
-            `;
-
-            elementos.importacionesVacio.hidden =
-                false;
-
-        }
-
-
-        if (
-            elementos.listaImportaciones
-        ) {
-
-            elementos.listaImportaciones.hidden =
-                true;
-
-        }
-
-
-        const pagina = await window.GeoespacialAPI.paginaImportaciones(idProyectoConsulta,{skip,limit:25});
-        const importaciones = pagina.items;
-
-        if (revision !== revisionHistorial || idProyectoConsulta !== proyectoActivo?.id_proyecto) return;
-        document.getElementById("paginacionImportaciones")?.remove();
-        const controles=document.createElement("div");controles.id="paginacionImportaciones";controles.className="ssalfer-gestion-barra";
-        const anterior=document.createElement("button"),siguiente=document.createElement("button"),total=document.createElement("span");
-        anterior.textContent="Anterior";siguiente.textContent="Siguiente";
-        for(const boton of [anterior,siguiente]){boton.type="button";boton.className="btn-secundario";}
-        anterior.disabled=skip===0;siguiente.disabled=window.GeoespacialAPI.fin(pagina,skip,25);
-        anterior.onclick=()=>cargarHistorial(skip-25).catch(window.ClienteAPI.mostrarErrorAPI);siguiente.onclick=()=>cargarHistorial(skip+25).catch(window.ClienteAPI.mostrarErrorAPI);
-        total.textContent=pagina.total==null?`${importaciones.length} importaciones · total no informado`:`${importaciones.length?skip+1:0}–${skip+importaciones.length} de ${pagina.total} importaciones`;
-        controles.append(anterior,siguiente,total);elementos.listaImportaciones.after(controles);
-
-
-
-        if (
-            importaciones.length === 0
-        ) {
-
-            mostrarHistorialVacio(
-                "Sin importaciones",
-                "Este proyecto todavía no tiene información geoespacial importada."
-            );
-
-            return;
-
-        }
-
-
-        if (
-            elementos.listaImportaciones
-        ) {
-
-            elementos.listaImportaciones.innerHTML =
-                "";
-
-
-            importaciones.forEach(
-                importacion => {
-
-                    elementos.listaImportaciones.appendChild(
-                        crearItemHistorial(
-                            importacion
-                        )
-                    );
-
-                }
-            );
-
-
-            elementos.listaImportaciones.hidden =
-                false;
-
-        }
-
-
-        if (
-            elementos.importacionesVacio
-        ) {
-
-            elementos.importacionesVacio.hidden =
-                true;
-
-        }
-
+    async function darDeBaja(importacion) {
+        if(procesando || window.SSALFER_GIS.ocupado() || !window.SSALFER_GIS.puedeEditar() || importacion.activo===false) return;
+        const contexto=revisionProyecto, id=importacion.id_importacion;
+        await window.SSALFER_GIS.exclusivo(async()=>{
+            ++revisionPreview; // Invalida consultas abiertas antes de iniciar la baja.
+            establecerProcesando(true);
+            try {
+                const resultado=await window.SSALFER_GESTION.formulario({
+                    titulo:'Dar de baja esta importación',
+                    introduccion:`Vas a dar de baja ${importacion.nombre_original}. Atención: los polígonos de esta carga que sigan vigentes dejarán de verse en el mapa. Las geometrías que ya fueron reemplazadas por cargas posteriores no se cambiarán y no se reactivarán versiones antiguas. Si retiras el DDV, el proyecto puede quedar sin derecho de vía visible hasta confirmar otro. Se conserva el archivo y todo su historial; los núcleos y parcelas administrativos no se eliminan.`,
+                    campos:[{nombre:'motivo',etiqueta:'Motivo de la baja',tipo:'textarea',requerido:true,maximo:500,ayuda:'Escribe entre 3 y 500 caracteres.'},{nombre:'aceptar',etiqueta:'Confirmo la baja y el retiro del mapa de sus geometrías vigentes',tipo:'checkbox',requerido:true}],
+                    validar:d=>!d.motivo || d.motivo.length<3?'Escribe un motivo de al menos 3 caracteres.':null,
+                    guardar:async d=>{
+                        if(contexto!==revisionProyecto || importacion.activo===false)throw Error('La carga ya no está disponible para esta acción.');
+                        return window.GeoespacialAPI.baja(id,{motivo:d.motivo});
+                    }
+                });
+                if(!resultado || contexto!==revisionProyecto)return;
+                Object.assign(importacion,resultado);
+                const abierta=importacionActiva?.id_importacion===id;
+                if(abierta)await mostrarPreview(resultado);
+                await cargarHistorial();
+                mostrarExito('La baja quedó registrada y sus geometrías vigentes se retiraron del mapa. Actualiza el mapa si lo tienes abierto. El archivo sigue disponible en Activas y dadas de baja.');
+            } finally {establecerProcesando(false);actualizarConfirmacion();}
+        });
     }
-
+    let cacheHistorial = null;
+    async function cargarHistorial(skip=0, actualizar=true) {
+        const revision=++revisionHistorial, pid=proyectoActivo?.id_proyecto;
+        const region=document.querySelector('.geoespacial-historial');
+        const aviso=document.getElementById('estadoFiltrosHistorial');
+        document.getElementById('detalleFiltrosHistorial').textContent='Las fechas usan la hora local del navegador.';
+        const vigente=()=>revision===revisionHistorial && pid===proyectoActivo?.id_proyecto;
+        document.getElementById('paginacionImportaciones')?.remove();
+        if(!pid){cacheHistorial=null;region.setAttribute('aria-busy','false');aviso.textContent='Selecciona un proyecto para consultar el historial.';mostrarHistorialVacio('Selecciona un proyecto','Aquí aparecerán sus importaciones geoespaciales.');return;}
+        const valor=id=>document.getElementById(id).value;
+        const disponibilidad=valor('filtroHistorialDisponibilidad'),incluirInactivas=!!disponibilidad;
+        const estado=valor('filtroHistorialEstado'),tipo=valor('filtroHistorialTipo'),desde=valor('filtroHistorialDesde'),hasta=valor('filtroHistorialHasta');
+        elementos.listaImportaciones.hidden=true;
+        if(desde && hasta && desde>hasta){region.setAttribute('aria-busy','false');aviso.textContent='La fecha Desde debe ser anterior o igual a Hasta.';mostrarHistorialVacio('Revisa las fechas','Corrige el intervalo para consultar el historial.');return;}
+        region.setAttribute('aria-busy','true');aviso.textContent='Cargando historial…';
+        try {
+            if(actualizar || cacheHistorial?.proyecto!==pid || cacheHistorial.incluirInactivas!==incluirInactivas){
+                const items=[];
+                for(let offset=0;;offset+=200){
+                    const p=await window.GeoespacialAPI.paginaImportaciones(pid,{skip:offset,limit:200},{incluir_inactivas:incluirInactivas});
+                    if(!vigente())return;
+                    items.push(...p.items);
+                    aviso.textContent=`Cargando historial… (${items.length} recibidas)`;
+                    if(window.GeoespacialAPI.fin(p,offset,200))break;
+                }
+                cacheHistorial={proyecto:pid,incluirInactivas,items};
+            }
+            if(!vigente())return;
+            const dia=r=>{const f=new Date(r.fecha_carga || r.creado_en);return Number.isNaN(f.getTime())?'':`${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')}-${String(f.getDate()).padStart(2,'0')}`;};
+            const filtradas=cacheHistorial.items.filter(r=>(disponibilidad==='inactivas'?r.activo===false:incluirInactivas || r.activo!==false) && (!estado || r.estado===estado) && (!tipo || r.tipo_objetivo===tipo) && (!desde || dia(r)>=desde) && (!hasta || (dia(r) && dia(r)<=hasta)));
+            const inicio=Math.min(skip,Math.max(0,Math.floor((filtradas.length-1)/25)*25));
+            const items=filtradas.slice(inicio,inicio+25);
+            elementos.listaImportaciones.replaceChildren(...items.map(crearItemHistorial));
+            elementos.listaImportaciones.hidden=!items.length;
+            elementos.importacionesVacio.hidden=!!items.length;
+            if(!items.length)mostrarHistorialVacio('Sin resultados con estos filtros','Prueba otro estado, tipo o intervalo de fechas.');
+            aviso.textContent=filtradas.length===cacheHistorial.items.length ? 'Historial actualizado' : 'Filtros aplicados';
+            document.getElementById('detalleFiltrosHistorial').textContent=`${filtradas.length} de ${cacheHistorial.items.length} cargas disponibles coinciden. Las fechas usan la hora local del navegador.`;
+            const controles=document.createElement('div');controles.id='paginacionImportaciones';controles.className='ssalfer-gestion-barra';
+            for(const [nombre,offset,disabled] of [['Anterior',-25,inicio===0],['Siguiente',25,inicio+25>=filtradas.length]]){
+                const boton=document.createElement('button');boton.type='button';boton.className='btn-secundario';boton.textContent=nombre;boton.disabled=disabled;
+                boton.setAttribute('aria-label',`${nombre}: página del historial de importaciones`);
+                boton.onclick=async()=>{await cargarHistorial(inicio+offset,false);if(pid===proyectoActivo?.id_proyecto){elementos.listaImportaciones.scrollTop=0;const inicioTabla=region.querySelector('h2')||region;inicioTabla.tabIndex=-1;inicioTabla.focus({preventScroll:true});inicioTabla.scrollIntoView({block:'start',behavior:'smooth'});}};controles.append(boton);
+            }
+            const total=document.createElement('span');total.textContent=`${items.length?inicio+1:0}–${inicio+items.length} de ${filtradas.length} importaciones`;controles.append(total);elementos.listaImportaciones.after(controles);
+        }catch(err){if(vigente()){cacheHistorial=null;aviso.textContent='No se pudo consultar el historial completo. Pulsa Actualizar importaciones para reintentar.';mostrarHistorialVacio('Historial no disponible','Vuelve a consultar las importaciones.');document.getElementById('detalleFiltrosHistorial').textContent='No se muestran resultados parciales como si fueran el historial completo.';manejarError(err);}}
+        finally{if(vigente())region.setAttribute('aria-busy','false');}
+    }
+    document.getElementById('filtrosHistorial').addEventListener('change',()=>cargarHistorial(0,false));
+    document.getElementById('limpiarFiltrosHistorial').addEventListener('click',()=>{
+        document.querySelectorAll('#filtrosHistorial input, #filtrosHistorial select:not([disabled])').forEach(el=>el.value='');
+        cargarHistorial(0,false);
+    });
 
     /* =====================================================
        PREVIEW
     ====================================================== */
 
     function limpiarPreview() {
+        ++revisionPreview;
+        window.SSALFER_GIS?.limpiar();
 
         importacionActiva =
             null;
@@ -1515,9 +1448,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         elementos.previewEstado.textContent =
-            etiquetaEstado(
-                importacion.estado
-            );
+            importacion.activo===false ? "Dada de baja · Sólo lectura" : etiquetaEstado(importacion.estado);
 
 
         elementos.previewEstado.dataset.estado =
@@ -1647,6 +1578,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         errores.forEach(error => {
 
+            const codigo = typeof error === "string" ? error : error?.codigo;
+            if (codigo === "GEOMETRIA_INVALIDA_MULTILINESTRING") {
+                observaciones.push("Esta carga espera líneas de un trazo. Si el archivo contiene polígonos de núcleos o parcelas, crea una carga con el tipo correspondiente. Este elemento no se incorporó al proyecto.");
+                return;
+            }
+
             if (
                 typeof error === "string"
             ) {
@@ -1756,9 +1693,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
 
 
-            const indice =
-                feature.indice_feature ??
-                "—";
+            const indice = Number.isInteger(feature.indice_feature)
+                ? feature.indice_feature + 1 : "—";
 
 
             const capa =
@@ -1787,9 +1723,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 capa,
                 geometria,
                 estado,
-                observaciones
+                [window.SSALFER_GIS?.camposArchivo(feature,importacionActiva?.tipo_objetivo),feature.diagnostico?window.SSALFER_GIS.diagnosticoElemento(feature):'',observaciones].filter(Boolean).join(' · ')
 
-            ].forEach(valor => {
+            ].forEach((valor, columna) => {
 
                 const celda =
                     document.createElement(
@@ -1801,9 +1737,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     String(valor);
 
 
-                fila.appendChild(
-                    celda
-                );
+                if(columna===3){
+                    const marca=document.createElement('span');
+                    marca.className=`gis-etiqueta ${feature.estado==='error'?'gis-error':feature.estado_conciliacion==='sin_coincidencia'?'gis-sin-coincidencia':'gis-informacion'}`;
+                    marca.textContent=window.SSALFER_GIS?.resultadoTexto(feature) || String(valor);
+                    celda.replaceChildren(marca);
+                }
+                fila.appendChild(celda);
 
             });
 
@@ -1818,6 +1758,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     function actualizarConfirmacion() {
+        if(importacionActiva?.activo===false || !window.SSALFER_GIS.puedeEditar()){
+            elementos.bloqueConfirmacion.hidden=true; elementos.btnConfirmar.disabled=true; return;
+        }
+        elementos.bloqueConfirmacion.hidden=false;
 
         if (
             !importacionActiva ||
@@ -1975,6 +1919,8 @@ document.addEventListener("DOMContentLoaded", () => {
         importacion
     ) {
         if (Number(importacion.id_proyecto) !== Number(proyectoActivo?.id_proyecto)) return;
+        limpiarPreview();
+        elementos.seccionNuevaImportacion.hidden = true;
         if (importacion.version_pipeline !== "legacy-v1" && importacion.tipo_objetivo !== "trazo_proyecto") {
             importacionActiva = importacion; elementos.seccionPreview.hidden = true;
             await window.SSALFER_GIS.mostrar(importacion); return;
@@ -2018,7 +1964,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const features =
             await obtenerFeatures(
-                importacion.id_importacion
+                importacion.id_importacion, importacion.activo===false
             );
 
         if (revision !== revisionPreview || contexto !== revisionProyecto) return;
@@ -2042,8 +1988,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     async function abrirImportacion(
-        idImportacion
+        idImportacion, incluirInactivas=false
     ) {
+        if (procesando || window.SSALFER_GIS?.ocupado()) return;
+        limpiarPreview();
+        elementos.seccionNuevaImportacion.hidden = true;
         const contexto = revisionProyecto, revision = ++revisionPreview;
 
         limpiarMensajes();
@@ -2058,7 +2007,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const importacion =
                 await obtenerImportacion(
-                    idImportacion
+                    idImportacion, incluirInactivas
                 );
 
             if (contexto !== revisionProyecto || revision !== revisionPreview) return;
@@ -2160,27 +2109,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (["ddv", "nucleos", "parcelas"].includes(tipo) && obtenerExtension(archivoActivo.name) !== "gpkg") throw new Error("Para esta carga selecciona un archivo GeoPackage (.gpkg).");
 
 
-        if (["nucleo_agrario", "parcela"].includes(tipo)) {
-
-            const campo =
-                elementos.campoIdDestino
-                    ?.value
-                    .trim();
-
-
-            if (!campo) {
-
-                throw new Error(
-                    tipo === "parcela"
-                        ? "Indica el nombre de la columna que contiene el id_parcela."
-                        : "Indica el nombre de la columna que contiene el id_nucleo."
-                );
-
-            }
-
-        }
-
-
         /*
         * Ahora devolvemos explícitamente el proyecto
         * que realmente debe utilizarse.
@@ -2224,31 +2152,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
-        let mapeo = {};
-
-
-        if (["nucleo_agrario", "parcela"].includes(tipo)) {
-
-            mapeo = {
-
-                id_destino:
-                    elementos.campoIdDestino
-                        .value
-                        .trim()
-
-            };
-
-        }
-
-
-        formData.append(
-            "mapeo",
-            JSON.stringify(
-                mapeo
-            )
-        );
-
-
         formData.append(
             "archivo",
             archivoActivo,
@@ -2257,13 +2160,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         if (["ddv", "nucleos", "parcelas"].includes(tipo)) {
-            formData.delete("tipo_objetivo"); formData.delete("mapeo");
+            formData.delete("tipo_objetivo");
             if (tipo !== "ddv") formData.set("alcance_entrega", document.getElementById("alcanceEntregaGis").value);
         }
         return formData;
 
     }
 
+
+    async function explicarConflictoAlcance(contexto) {
+        const vigente = () => contexto.revision === revisionProyecto && contexto.proyecto === obtenerIdProyectoSeleccionado();
+        if (!vigente()) return;
+        mostrarInformativo("Este archivo ya se procesó con otro alcance. Parcial y Completa describen la entrega; no son opciones para corregir coincidencias. Puedes consultar la carga existente sin volver a subirla ni cambiar su alcance.");
+        try {
+            const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await contexto.archivo.arrayBuffer())), b => b.toString(16).padStart(2,"0")).join("");
+            const objetivo = {nucleos:"nucleo_agrario_gpkg",parcelas:"parcela_gpkg"}[contexto.tipo];
+            const encontradas = [];
+            for (let skip=0; vigente(); skip+=200) {
+                const pagina = await window.GeoespacialAPI.paginaImportaciones(contexto.proyecto,{skip,limit:200});
+                encontradas.push(...pagina.items.filter(r=>Number(r.id_proyecto)===contexto.proyecto && r.sha256===hash && r.tipo_objetivo===objetivo && r.activo!==false && r.estado!=="error"));
+                if (window.GeoespacialAPI.fin(pagina,skip,200)) break;
+            }
+            if (!vigente()) return;
+            for (const r of encontradas) {
+                const texto = document.createElement("p");
+                texto.textContent = `${r.nombre_original} · carga ${r.id_importacion} · alcance registrado: ${r.alcance_entrega === "completa" ? "Completa" : "Parcial"}. Abrirla solo consulta sus resultados.`;
+                const boton = document.createElement("button");boton.type="button";boton.className="btn-secundario";
+                boton.textContent=`Consultar carga ${r.id_importacion}`;
+                boton.addEventListener("click",()=>{if(vigente())abrirImportacion(r.id_importacion);});
+                elementos.mensajeInformativo.append(texto,boton);
+            }
+            if (!encontradas.length) elementos.mensajeInformativo.append(document.createTextNode(" No se pudo identificar una carga disponible con el mismo contenido. Revisa el historial del proyecto o solicita ayuda para corregir el alcance."));
+        } catch (_) {
+            if(vigente())elementos.mensajeInformativo.append(document.createTextNode(" No se pudo consultar la carga anterior. Revisa el historial cuando se recupere la consulta."));
+        }
+    }
 
     async function prepararImportacion(
         evento
@@ -2280,6 +2211,7 @@ document.addEventListener("DOMContentLoaded", () => {
         limpiarMensajes();
 
 
+        let contextoCarga;
         try {
 
             const idProyectoSeleccionado =
@@ -2291,6 +2223,20 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
 
+            const archivoCarga = archivoActivo, tipoCarga = elementos.tipoObjetivo.value;
+            const nombreCarga = archivoCarga.name;
+            contextoCarga = {archivo:archivoCarga,tipo:tipoCarga,proyecto:idProyectoSeleccionado,revision:revisionProyecto};
+            const tipoSugerido = /parcel/i.test(nombreCarga) ? "parcelas" : /nucle/i.test(nombreCarga) ? "nucleos" : /ddv/i.test(nombreCarga) ? "ddv" : null;
+            if (tipoSugerido && tipoSugerido !== elementos.tipoObjetivo.value) {
+                const continuar = await window.SSALFER_UI.confirmar(
+                    `El nombre del archivo ${nombreCarga} sugiere ${tipoSugerido}, pero seleccionaste ${elementos.tipoObjetivo.selectedOptions[0].textContent.trim()}. Cancela para revisar el tipo o confirma solo si esa elección es correcta. El nombre es una pista, no una validación del contenido.`,
+                    "Revisa el tipo de información"
+                );
+                if (!continuar) return;
+                if (archivoActivo !== archivoCarga || elementos.tipoObjetivo.value !== tipoCarga || obtenerIdProyectoSeleccionado() !== idProyectoSeleccionado) {
+                    throw new Error("La selección cambió. Revisa el proyecto, el archivo y el tipo antes de volver a preparar la carga.");
+                }
+            }
             const formData =
                 construirFormData();
 
@@ -2316,7 +2262,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             } else if (
                 importacion.estado ===
-                "error"
+                "error" || Number(importacion.errores) > 0
             ) {
 
                 mostrarError(
@@ -2341,10 +2287,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         } catch (error) {
-
-            manejarError(
-                error
-            );
+            if (error.status === 409 && /mismo archivo.*otro alcance/i.test(error.message) && contextoCarga) {
+                await explicarConflictoAlcance(contextoCarga);
+            } else {
+                manejarError(error);
+            }
 
         } finally {
 
@@ -2362,6 +2309,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ====================================================== */
 
     async function confirmarImportacion() {
+        if(importacionActiva?.activo===false || !window.SSALFER_GIS.puedeEditar())return;
 
         if (
             !importacionActiva ||
@@ -2422,7 +2370,7 @@ document.addEventListener("DOMContentLoaded", () => {
             `¿Confirmas incorporar estas geometrías al proyecto ${nombreProyecto(proyectoActivo)}?`,
             "Confirmar importación geoespacial"
         );
-        if (contextoConfirmado !== revisionProyecto || importacionActiva !== importacionConfirmada || procesando) return;
+        if (importacionConfirmada.activo===false || contextoConfirmado !== revisionProyecto || importacionActiva !== importacionConfirmada || procesando) return;
 
 
         if (!continuar) {
@@ -2586,6 +2534,9 @@ document.addEventListener("DOMContentLoaded", () => {
             "click",
             () => {
 
+                if (procesando || window.SSALFER_GIS?.ocupado()) return;
+                limpiarPreview();
+                limpiarMensajes();
                 if (elementos.seccionNuevaImportacion) {
 
                     elementos.seccionNuevaImportacion.hidden =
@@ -2802,7 +2753,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ) {
 
                     abrirImportacion(
-                        id
+                        id, boton.dataset.inactiva==='true'
                     );
 
                 }
@@ -2833,6 +2784,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ====================================================== */
 
     async function iniciar() {
+        await window.AuthAPI.requerirSesion();
 
         limpiarMensajes();
 

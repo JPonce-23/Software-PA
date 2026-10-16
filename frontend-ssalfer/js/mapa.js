@@ -34,6 +34,57 @@ document.addEventListener("DOMContentLoaded", () => {
        ELEMENTOS
     ====================================================== */
 
+    let seleccionMapa=null, revisionDetalle=0;
+    const idsMetricas=['valorAsambleasRealizadas','valorConveniosIndividuales','valorConveniosColectivos','valorConveniosFirmados'];
+    function limpiarSeleccionMapa(){++revisionDetalle;seleccionMapa=null;mapaLeaflet?.eachLayer(capa=>capa.closeTooltip?.());restaurarEstilosGeometrias();restaurarDetalleVacio();}
+    document.getElementById('btnLimpiarSeleccionMapa').onclick=limpiarSeleccionMapa;
+    const layout=document.querySelector('.mapa-layout'),visor=document.querySelector('.mapa-visor-contenedor'),panelCapas=document.querySelector('.mapa-panel-capas'),panelDetalle=document.querySelector('.mapa-panel-detalle');
+    const lugarCapas=document.createComment('capas'),lugarDetalle=document.createComment('detalle');panelCapas.before(lugarCapas);panelDetalle.before(lugarDetalle);
+    const botonAmpliar=document.getElementById('btnAmpliarMapa'),botonDetalle=document.getElementById('btnAlternarDetalleMapa');
+    let ampliado=false,asidePrevio=false;
+    function ampliarMapa(valor){
+        if(valor===ampliado)return;
+        ampliado=valor;const aside=document.querySelector('.aside');
+        if(valor){asidePrevio=aside?.classList.contains('collapsed');aside?.classList.add('collapsed');visor.append(panelCapas,panelDetalle);panelDetalle.classList.add('detalle-minimizado');}
+        else{lugarCapas.after(panelCapas);lugarDetalle.after(panelDetalle);aside?.classList.toggle('collapsed',!!asidePrevio);panelDetalle.classList.remove('detalle-minimizado');}
+        layout.classList.toggle('mapa-ampliado',valor);document.body.classList.toggle('mapa-vista-ampliada',valor);
+        botonDetalle.hidden=!valor;botonDetalle.textContent='Mostrar detalle';botonDetalle.setAttribute('aria-expanded','false');
+        botonAmpliar.textContent=valor?'Reducir mapa':'Ampliar mapa';botonAmpliar.setAttribute('aria-expanded',String(valor));
+        requestAnimationFrame(()=>mapaLeaflet?.invalidateSize());setTimeout(()=>mapaLeaflet?.invalidateSize(),250);botonAmpliar.focus({preventScroll:true});
+    }
+    botonAmpliar.onclick=()=>ampliarMapa(!ampliado);
+    botonDetalle.onclick=()=>{const minimizado=panelDetalle.classList.toggle('detalle-minimizado');botonDetalle.textContent=minimizado?'Mostrar detalle':'Minimizar detalle';botonDetalle.setAttribute('aria-expanded',String(!minimizado));};
+    document.addEventListener('keydown',event=>{
+        if(!ampliado)return;
+        if(event.key==='Escape'){event.preventDefault();ampliarMapa(false);}
+        if(event.key==='Tab'){
+            const nodos=[...layout.querySelectorAll('button, a[href], input, [tabindex="0"]')].filter(el=>!el.disabled && el.getClientRects().length),primero=nodos[0],ultimo=nodos.at(-1);
+            if(event.shiftKey && document.activeElement===primero){event.preventDefault();ultimo?.focus();}
+            else if(!event.shiftKey && document.activeElement===ultimo){event.preventDefault();primero?.focus();}
+        }
+    });
+    async function metricasProyecto(pid,nucleos,vigente){
+        const pintar=(id,v)=>{if(vigente())document.getElementById(id).textContent=String(v);};
+        idsMetricas.forEach(id=>pintar(id,'Consultando…'));
+        const asambleas=async()=>{
+            const catalogo=await window.ClienteAPI.get('/catalogos/operativos/resultado_convocatoria',{silencioso:true});
+            if(!Array.isArray(catalogo))throw Error('Catálogo no disponible');
+            const celebradas=new Set(catalogo.filter(r=>r.codigo==='celebrada').map(r=>Number(r.id_catalogo_opcion)));
+            if(!celebradas.size)throw Error('Resultado de celebración no disponible');
+            const ids=new Set();let cursor=0;
+            await Promise.all(Array.from({length:Math.min(3,nucleos.length)},async()=>{while(vigente()&&cursor<nucleos.length){const n=nucleos[cursor++],rows=await window.ClienteAPI.get(`/proyecto-nucleo/${n.id_proyecto_nucleo}/asambleas`,{silencioso:true});if(!Array.isArray(rows))throw Error('Respuesta no válida');for(const r of rows)if(r.activo!==false && r.convocatorias?.some(c=>c.activo!==false&&c.fecha_realizacion&&celebradas.has(Number(c.id_resultado))))ids.add(r.id_asamblea);}}));
+            pintar('valorAsambleasRealizadas',ids.size);
+        };
+        const convenios=async()=>{
+            const unicos=new Map();let cursor=0;
+            const leer=async ruta=>{const rows=await window.ClienteAPI.get(ruta,{silencioso:true});if(!Array.isArray(rows))throw Error('Respuesta no válida');return rows;};
+            await Promise.all(Array.from({length:Math.min(3,nucleos.length)},async()=>{while(vigente()&&cursor<nucleos.length){const n=nucleos[cursor++];for(const a of await leer(`/proyecto-nucleo/${n.id_proyecto_nucleo}/afectaciones`)){if(!vigente())return;if(a.activo===false)continue;for(const c of await leer(`/afectaciones/${a.id_afectacion}/convenios`))if(c.activo!==false&&c.fecha_firma)unicos.set(c.id_convenio,c);}}}));
+            const rows=[...unicos.values()],individual=rows.filter(c=>c.ambito==='individual').length,colectivo=rows.filter(c=>c.ambito==='colectivo').length;
+            pintar('valorConveniosIndividuales',individual);pintar('valorConveniosColectivos',colectivo);pintar('valorConveniosFirmados',individual+colectivo);
+        };
+        await Promise.all([asambleas().catch(()=>pintar('valorAsambleasRealizadas','No disponible')),convenios().catch(()=>idsMetricas.slice(1).forEach(id=>pintar(id,'No disponible')))]);
+    }
+
     const elementos = {
 
         titulo:
@@ -1108,6 +1159,8 @@ document.addEventListener("DOMContentLoaded", () => {
         tipo,
         nombre
     ) {
+        document.getElementById("mapaResponsable").hidden=true;
+        document.getElementById("btnLimpiarSeleccionMapa").hidden=false;
 
         if (
             elementos.detalleVacio
@@ -1182,6 +1235,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     function restaurarDetalleVacio() {
+        seleccionMapa=null; ++revisionDetalle;
+        elementos.detalleVacio.querySelector("p").textContent="Selecciona una geometría del mapa para consultar su información.";
+        document.getElementById("mapaResponsable").hidden=true;
+        document.getElementById("btnLimpiarSeleccionMapa").hidden=true;
 
         if (
             elementos.detalleVacio
@@ -1554,6 +1611,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function limpiarGeometrias() {
         if (capaTemporal) { mapaLeaflet.removeLayer(capaTemporal); capaTemporal=null; }
         document.getElementById("avisoPrevisualizacionGis")?.remove();
+        const detalleGis=document.getElementById("mapaDetalleConciliacion");if(detalleGis){detalleGis.hidden=true;detalleGis.replaceChildren();}
 
         Object
             .values(
@@ -1576,6 +1634,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     function capaVisible(tipo) {
+        if (tipo === "trazo_proyecto") return false;
 
         const controles = {
             derecho_via_proyecto:elementos.capaDdv,
@@ -2022,6 +2081,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         if (
+            tipo === "trazo_proyecto" ||
             !grupo ||
             !feature?.geometry ||
             !valorPresente(id)
@@ -2102,13 +2162,14 @@ document.addEventListener("DOMContentLoaded", () => {
                                 capa.on(
                                     "click",
                                     () => {
-
+                                        const contextoClick=tokenCarga,revisionClick=revisionDetalle+1;
                                         mostrarDetalleFeature(
                                             featureActual
                                         )
                                             .catch(
                                                 error => {
-
+                                                    if(contextoClick!==tokenCarga || revisionClick!==revisionDetalle)return;
+                                                    limpiarSeleccionMapa();
                                                     console.error(
                                                         "No fue posible cargar el detalle del elemento.",
                                                         error
@@ -2477,7 +2538,7 @@ document.addEventListener("DOMContentLoaded", () => {
             Array.isArray(
                 geojson?.features
             )
-                ? geojson.features
+                ? geojson.features.filter(f => f?.properties?.tipo !== "trazo_proyecto")
                 : [];
 
 
@@ -2509,7 +2570,7 @@ document.addEventListener("DOMContentLoaded", () => {
             total:
                 features.length,
 
-            agregadas
+            agregadas, geojson
 
         };
 
@@ -2521,6 +2582,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ====================================================== */
 
     function ocultarResumenProyecto() {
+        idsMetricas.forEach(id=>document.getElementById(id).textContent="Consultando…");
 
         if (
             elementos.resumenProyecto
@@ -2735,6 +2797,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
+        const clave=`${idProyecto}:${tipo}:${props.id}`;
+        if(seleccionMapa===clave){limpiarSeleccionMapa();return;}
+        seleccionMapa=clave;const consultaDetalle=++revisionDetalle;
+        restaurarEstilosGeometrias();
+        document.getElementById('mapaResponsable').hidden=true;
+        document.getElementById('btnLimpiarSeleccionMapa').hidden=false;
+        elementos.detalleContenido.hidden=true;elementos.detalleVacio.hidden=false;
+        elementos.detalleVacio.querySelector('p').textContent='Consultando selección…';
+
         /* =================================================
            TRAZO
         ================================================== */
@@ -2774,7 +2845,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
             if (
-                idProyectoActivo !==
+                consultaDetalle !== revisionDetalle || idProyectoActivo !==
                 idProyecto
             ) {
 
@@ -2913,7 +2984,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
             if (
-                idProyectoActivo !==
+                consultaDetalle !== revisionDetalle || idProyectoActivo !==
                 idProyecto
             ) {
 
@@ -3034,29 +3105,10 @@ document.addEventListener("DOMContentLoaded", () => {
              * para el proyecto-núcleo.
              */
 
-            agregarDatoDetalle(
-                "Responsable",
-                asociacion
-                    ?.responsable_nombre ||
-                "—"
-            );
-
-
-            agregarDatoDetalle(
-                "Cargo",
-                asociacion
-                    ?.responsable_cargo ||
-                "—"
-            );
-
-
-            agregarDatoDetalle(
-                "Contacto",
-                asociacion
-                    ?.responsable_contacto ||
-                "—"
-            );
-
+            const responsable=document.getElementById('mapaResponsable'),datosResponsable=document.getElementById('mapaResponsableDatos');
+            datosResponsable.replaceChildren();
+            for(const [label,valor] of [['Nombre',asociacion?.responsable_nombre],['Cargo',asociacion?.responsable_cargo],['Contacto',asociacion?.responsable_contacto]]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=valor||'No registrado';datosResponsable.append(dt,dd);}
+            responsable.hidden=false;
 
             agregarDatoDetalle(
                 "Asambleas registradas",
@@ -3133,7 +3185,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
             if (
-                idProyectoActivo !==
+                consultaDetalle !== revisionDetalle || idProyectoActivo !==
                 idProyecto
             ) {
 
@@ -3316,6 +3368,7 @@ document.addEventListener("DOMContentLoaded", () => {
             1;
 
 
+        document.getElementById("etiquetaProyectoMapa").textContent="Selecciona un proyecto";
         idProyectoActivo =
             null;
 
@@ -3455,6 +3508,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function establecerProyectoActivo(
         proyecto
     ) {
+        document.getElementById("etiquetaProyectoMapa").textContent="Proyecto seleccionado";
 
         idProyectoActivo =
             Number(
@@ -3483,7 +3537,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ) {
 
             elementos.descripcion.textContent =
-                "Consulta el trazo vigente, núcleos agrarios, parcelas e información administrativa del proyecto seleccionado.";
+                "Consulta el derecho de vía vigente, núcleos agrarios, parcelas e información administrativa del proyecto seleccionado.";
 
         }
 
@@ -3678,18 +3732,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const errores = [];
         elementos.selectorProyecto?.classList.remove("mapa-elegir-proyecto");
-        const vista = new URLSearchParams(location.search), imp = Number(vista.get('id_importacion')), fid = Number(vista.get('id_feature'));
+        const vista = new URLSearchParams(location.search), lecturaHistorica= vista.get('incluir_inactivas')==='true'?{incluir_inactivas:true}:{}, imp = Number(vista.get('id_importacion')), fid = Number(vista.get('id_feature'));
+        window.SSALFER_MAPA_CONCILIACION?.detalle(proyecto.id_proyecto,()=>cargaActual===tokenCarga,resultadoMapa.status==="fulfilled"?resultadoMapa.value.geojson:null);
+        if (imp > 0 && !fid && vista.get('vista') === 'coincidencias') {
+            try {
+                const vistaGis=await window.SSALFER_MAPA_CONCILIACION.coincidencias(imp,proyecto.id_proyecto,()=>cargaActual===tokenCarga,lecturaHistorica);
+                if(cargaActual!==tokenCarga)return;
+                if(vistaGis){
+                    capaTemporal=window.L.geoJSON(vistaGis.geo,{style:{color:'#bd7618',dashArray:'7 5',fillOpacity:.15},onEachFeature:(f,l)=>{const texto=document.createElement('span');texto.textContent=f.properties.nombre+' · previsualización de coincidencia';l.bindTooltip(texto);}}).addTo(mapaLeaflet);
+                    const aviso=document.createElement('p');aviso.id='avisoPrevisualizacionGis';aviso.className='gis-aviso-temporal';
+                    aviso.textContent=`${vistaGis.inactiva?"Importación dada de baja · Consulta histórica de sólo lectura. ":""}Previsualización de coincidencias: ${vistaGis.geo.features.length} geometrías. Sin coincidencia: ${vistaGis.sin}. Varias coincidencias por decidir: ${vistaGis.ambiguos}. Esta vista no confirma ni reemplaza geometrías vigentes.`;
+                    if(vistaGis.fallidos)aviso.textContent+=` No se pudieron mostrar ${vistaGis.fallidos} geometrías; vuelve a consultar la carga.`;
+                    const quitar=document.createElement('a');quitar.href=`/pages/mapa.html?id_proyecto=${proyecto.id_proyecto}`;quitar.textContent=' Volver al mapa vigente';aviso.append(quitar);document.querySelector('main').prepend(aviso);
+                }
+            }catch(error){if(cargaActual!==tokenCarga)return;errores.push(error.message||'No se pudo consultar la previsualización de coincidencias.');}
+        }
         if (imp > 0 && fid > 0) {
             try {
-                const importacion = await window.GeoespacialAPI.obtener(imp);
+                const importacion = await window.GeoespacialAPI.obtener(imp,lecturaHistorica);
                 if (cargaActual !== tokenCarga) return;
                 if (Number(importacion.id_proyecto) === Number(proyecto.id_proyecto)) {
-                    const geo = await window.GeoespacialAPI.geometria(imp, fid);
+                    const geo = await window.GeoespacialAPI.geometria(imp, fid,lecturaHistorica);
                     if (cargaActual !== tokenCarga) return;
                     if (geo.geometry) {
                         capaTemporal=window.L.geoJSON(geo,{style:{color:'#bd7618',dashArray:'7 5',fillOpacity:.15}}).addTo(mapaLeaflet);
-                        const etiqueta=document.createElement('p');etiqueta.id='avisoPrevisualizacionGis';etiqueta.textContent='Previsualización, aún no confirmada · capa temporal';etiqueta.className='gis-aviso-temporal';document.querySelector('main').prepend(etiqueta);
-                        capaTemporal.bindTooltip('Previsualización, aún no confirmada · capa temporal');if(capaTemporal.getBounds().isValid()) mapaLeaflet.fitBounds(capaTemporal.getBounds());
+                        const etiqueta=document.createElement('p');etiqueta.id='avisoPrevisualizacionGis';etiqueta.textContent=importacion.activo===false?'Importación dada de baja · Geometría histórica de sólo lectura · capa temporal':'Previsualización, aún no confirmada · capa temporal';etiqueta.className='gis-aviso-temporal';document.querySelector('main').prepend(etiqueta);
+                        capaTemporal.bindTooltip(etiqueta.textContent);if(capaTemporal.getBounds().isValid()) mapaLeaflet.fitBounds(capaTemporal.getBounds());
                     } else { errores.push('Este elemento no tiene geometría disponible para previsualizar. Revisa sus observaciones en la conciliación.'); }
                 } else { errores.push('La previsualización pertenece a otro proyecto. Ábrela desde su conciliación.'); }
             } catch(error) { if(cargaActual!==tokenCarga)return; errores.push(error.status===403 ? 'Tu cuenta no tiene permiso para ver esta previsualización.' : error.status===404 ? 'La previsualización ya no está disponible. Vuelve a la conciliación.' : 'No se pudo consultar la previsualización. Comprueba la conexión y vuelve a intentarlo.'); }
@@ -3709,6 +3777,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 proyecto,
                 resultadoNucleos.value
             );
+            metricasProyecto(proyecto.id_proyecto,resultadoNucleos.value,()=>cargaActual===tokenCarga);
 
         } else {
 
@@ -3770,6 +3839,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
+        if (capaTemporal?.getBounds().isValid()) mapaLeaflet.fitBounds(capaTemporal.getBounds());
         ocultarCarga();
 
 

@@ -7,6 +7,77 @@
 .gis-conciliacion dd { margin:0; }
 .gis-conciliacion h3 { margin:20px 0 12px; }
 .gis-conciliacion button { margin:4px; }
-.gis-paso-activo { outline:2px solid #2f6846; border-radius:8px; }
+.geoespacial-paso.gis-paso-activo, .geoespacial-paso.gis-paso-activo strong { color:#206536; font-weight:700; }
 @media(max-width:650px) { .geoespacial-layout { display:block!important; } .gis-minimapa { height:240px; } }
 @media(max-width:650px) { .geoespacial-flujo { display:grid!important; grid-template-columns:1fr 1fr; overflow:visible!important; gap:12px; } .geoespacial-flujo > i { display:none; } .geoespacial-paso { min-width:0!important; } }
+
+.gis-enlace-boton { display:inline-flex; align-items:center; padding:10px 14px; margin:4px; text-decoration:none; border:1px solid #2f6846; border-radius:8px; }
+.gis-estado-publicacion { display:block; max-width:32rem; font-size:.85rem; font-weight:normal; margin-top:6px; }
+
+.geoespacial-layout:has(#seccionNuevaImportacion[hidden]) { grid-template-columns:minmax(0,1fr); }
+.geoespacial-importacion-principal { display:flex; gap:12px; align-items:flex-start; }
+.geoespacial-importacion-info { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline; min-width:0; }
+.geoespacial-importacion-info strong { overflow-wrap:anywhere; }
+.geoespacial-importacion-resumen { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:20px; align-items:start; }
+.geoespacial-importacion-resumen > span { min-width:0; }
+.gis-estado-publicacion { max-width:none; line-height:1.45; }
+.gis-filtros-revisiones { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:20px 0; }
+.gis-filtros-revisiones label { display:flex; flex-direction:column; gap:8px; }
+.gis-filtros-revisiones select { width:100%; padding:10px; }
+@media(max-width:650px) { .gis-filtros-revisiones, .geoespacial-importacion-resumen { grid-template-columns:1fr; } }
+
+.gis-acciones-conjuntas:not(:empty) { margin:20px 0; padding:18px; border:1px solid #2f6846; border-radius:10px; background:#eef6f0; }
+.gis-acciones-conjuntas button { background:#286b30; color:white; }
+.gis-lista-excepciones { max-height:220px; overflow:auto; padding-left:24px; }
+.gis-lista-excepciones li { margin-bottom:8px; }
+
+.gis-etiqueta { display:inline-block; padding:5px 9px; border-radius:6px; font-weight:600; line-height:1.5; }
+.gis-sin-coincidencia, .gis-diagnostico.gis-sin-coincidencia { background:#edf5ff; color:#174a78; border-left:4px solid #286aa1; }
+.gis-error { background:#fff0f0; color:#8b2020; border-left:4px solid #b83131; }
+.gis-informacion { background:#f0f5f1; color:#294d37; }
+.gis-filtros-historial { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; border:1px solid #ccd7cf; border-radius:8px; padding:14px; margin:16px 0; min-width:0; }
+.gis-filtros-historial label { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.gis-filtros-historial select, .gis-filtros-historial input { width:100%; min-width:0; padding:8px; }
+.gis-conciliacion td { overflow-wrap:anywhere; }
+.gis-conciliacion :focus-visible, .geoespacial-historial :focus-visible { outline:3px solid #206536; outline-offset:3px; }
+.gis-leyenda-estados { line-height:2; margin:16px 0; }
+@media(max-width:650px) { .gis-filtros-historial { grid-template-columns:1fr; } }
+
+.gis-modal-listado { width:min(1100px,calc(100vw - 24px)); max-width:1100px; }
+.gis-listado-sin-coincidencia label { display:flex; flex-direction:column; gap:8px; margin:16px 0; }
+.gis-listado-sin-coincidencia input { width:100%; padding:10px; }
+.gis-listado-sin-coincidencia [data-gis-resultados] { overflow:auto; max-height:45vh; }
+.gis-listado-sin-coincidencia table { min-width:650px; }
+.gis-listado-sin-coincidencia td { white-space:normal; overflow-wrap:anywhere; vertical-align:top; }
+.gis-listado-sin-coincidencia :focus-visible { outline:3px solid #206536; outline-offset:2px; }
+.gis-listado-sin-coincidencia h3 { margin-top:16px; }
+
+.gis-listado-sin-coincidencia [data-gis-resultados] .ssalfer-gestion-tabla { overflow:visible; }
+
+/* La disponibilidad histórica es independiente de errores y coincidencias. */
+.gis-universos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:20px 0; }
+.gis-universo { border:1px solid #c6d2cd; border-radius:8px; padding:16px; min-width:0; overflow-wrap:anywhere; }
+.gis-universo h3 { margin-top:0; }
+.gis-universo .gis-resumen { grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); }
+.gis-advertencias-universo { color:#665017; background:#fff8e6; padding:12px 12px 12px 30px; }
+.gis-inactiva { background:#f2f1f6; border-left:4px solid #645478; padding:12px; }
+.gis-diagnostico-detalle { overflow-wrap:anywhere; }
+.gis-diagnostico-detalle details { margin-top:8px; }
+.gis-diagnostico-detalle summary { cursor:pointer; color:#174a78; }
+.gis-diagnostico-detalle :focus-visible { outline:3px solid #206536; outline-offset:2px; }
+@media(max-width:850px) { .gis-universos { grid-template-columns:1fr; } }
+
+.gis-advertencia { background:#fff8e6; color:#665017; border-left:4px solid #8a6815; }
+.gis-indicadores { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.gis-conciliacion [data-gis-cierre] { margin:18px 0; padding:16px 0; border-top:1px solid #cedbd3; }
+.gis-conciliacion .gis-diagnostico { margin:18px 0; padding:16px; }
+.gis-conciliacion td .gis-ayuda, .gis-modal-listado td .gis-ayuda { margin:0; }
+.gis-conciliacion td .gis-ayuda[open], .gis-modal-listado td .gis-ayuda[open] { min-width:180px; }
+
+/* Evita partir las etiquetas y acciones en fragmentos difíciles de leer. */
+.gis-conciliacion [data-gis-lista] table { min-width:1050px; }
+.gis-conciliacion [data-gis-lista] td:nth-child(3) { min-width:150px; overflow-wrap:normal; }
+.gis-conciliacion [data-gis-lista] button { min-width:116px; overflow-wrap:normal; }
+.geoespacial-historial h2, [data-gis-lista], [data-revision-resultados] { scroll-margin-top: 5rem; }
+[data-revision-estado-consulta] { padding:.65rem .9rem; background:#edf5ef; color:#234f35; border-left:4px solid #397c52; border-radius:4px; }
+[data-revision-resultados][aria-busy="true"] { min-height:6rem; padding:1rem; background:#f5f7f5; }

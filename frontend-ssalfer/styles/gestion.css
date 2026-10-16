@@ -1,4 +1,9 @@
 .ssalfer-gestion-form { display: grid; gap: 16px; }
+/* El gestor documental necesita espacio para las dos fechas y sus acciones. */
+.ssalfer-modal:has([data-gestor-documentos]) { width: min(1200px, 100%); }
+[data-doc-contenido] .ssalfer-gestion-acciones { min-width: 180px; }
+[data-doc-contenido] th { white-space: nowrap; }
+[data-abrir-documentos]:focus-visible { outline: 3px solid #2b6fac; outline-offset: 3px; }
 .ssalfer-gestion-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .ssalfer-gestion-campo { display: flex; flex-direction: column; gap: 7px; color: #284737; font-weight: 600; }
 .ssalfer-gestion-campo input:not([type="checkbox"]), .ssalfer-gestion-campo select, .ssalfer-gestion-campo textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 10px; border: 1px solid #bdcec2; border-radius: 7px; background: white; color: #253d2d; font: inherit; font-weight: 400; }

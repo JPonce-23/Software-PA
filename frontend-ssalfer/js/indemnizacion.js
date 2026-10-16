@@ -230,6 +230,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 idAfectacion
             );
 
+        window.dispatchEvent(new CustomEvent("ssalfer:contexto-documentos", { detail: { idProyectoNucleo: Number(afectacion.id_proyecto_nucleo) } }));
+
         contextoPN =
             await window.NucleosAPI
                 .obtenerProyectoNucleo(

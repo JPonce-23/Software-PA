@@ -497,7 +497,7 @@ def lock_import(db, import_id, user, *, incluir_inactivas=False):
 
 
 def baja_import(db, import_id, data, user):
-    """Cancel unconfirmed staging, retaining every historical child row."""
+    """Retire this delivery and its geometries atomically, preserving provenance."""
     try:
         record = lock_import(db, import_id, user, incluir_inactivas=True)
         if not record.activo:
@@ -505,56 +505,53 @@ def baja_import(db, import_id, data, user):
                 raise HTTPException(409, "La importación ya tiene otro motivo de baja")
             db.commit()
             return record
-        if record.estado not in {"error", "previsualizado"}:
-            raise HTTPException(409, "Solo se permite baja de importaciones fallidas o previsualizadas")
-        if record.tipo_objetivo not in {
-            "nucleo_agrario", "parcela", STRICT_NUCLEUS_TARGET, STRICT_PARCEL_TARGET,
-            "derecho_via_proyecto", "trazo_proyecto",
-        }:
-            raise HTTPException(409, "No puede demostrarse la seguridad de este pipeline")
-        if record.version_pipeline not in {"legacy-v1", "conciliacion-v2", "conciliacion-v3-historia"} or (
-            record.version_pipeline == "legacy-v1" and record.tipo_objetivo != "trazo_proyecto"
-        ):
-            # Pre-project nucleus/parcel geometries lack reliable import FKs.
-            raise HTTPException(409, "La procedencia de este pipeline no permite una baja segura")
-        # Flags are a supplementary guard; real references are checked regardless
-        # of counters, activity and version currency.
-        protected = db.execute(text("""
-            SELECT EXISTS (
-                SELECT 1 FROM importacion_feature f WHERE f.id_importacion=:i
-                  AND (f.estado='confirmado' OR f.estado_conciliacion='confirmado'
-                       OR f.registro_destino_id IS NOT NULL OR f.fecha_importacion IS NOT NULL)
-                UNION ALL
-                SELECT 1 FROM importacion_feature_decision d JOIN importacion_feature f
-                  USING(id_importacion_feature) WHERE f.id_importacion=:i AND d.accion='confirmar'
-                UNION ALL
-                SELECT 1 FROM importacion_feature_candidato WHERE id_importacion=:i AND estado='confirmado'
-                UNION ALL
-                SELECT 1 FROM proyecto_nucleo_geometria g JOIN importacion_feature f
-                  USING(id_importacion_feature) WHERE f.id_importacion=:i
-                UNION ALL
-                SELECT 1 FROM proyecto_parcela_geometria g JOIN importacion_feature f
-                  USING(id_importacion_feature) WHERE f.id_importacion=:i
-                UNION ALL
-                SELECT 1 FROM derecho_via_proyecto WHERE id_importacion=:i
-                UNION ALL
-                SELECT 1 FROM importacion_archivo WHERE id_importacion_anterior=:i
-                UNION ALL
-                SELECT 1 FROM revision_cambio_gis r WHERE r.id_importacion_anterior=:i
-                  OR r.id_importacion_nueva=:i OR r.id_feature_nueva IN
-                     (SELECT id_importacion_feature FROM importacion_feature WHERE id_importacion=:i)
-                UNION ALL
-                SELECT 1 FROM trazo_proyecto WHERE id_proyecto=:p
-                  AND observaciones=:trace_source
-            )
-        """), {"i":import_id,"p":record.id_proyecto,
-               "trace_source":f"Generado por importación {import_id}"}).scalar_one()
-        if protected or record.confirmacion_explicita or record.fecha_confirmacion or record.importados:
-            raise HTTPException(409, "La importación tiene confirmaciones o dependencias protegidas")
+        if record.estado in {"procesando", "confirmando"}:
+            raise HTTPException(409, "Espera a que termine el procesamiento antes de dar de baja la importación")
         set_audit_context(db, user.id_usuario)
+        now = datetime.now(timezone.utc)
+        feature_ids = db.query(models.ImportacionFeature.id_importacion_feature).filter_by(id_importacion=import_id)
+        project_links = db.query(models.ProyectoNucleo.id_proyecto_nucleo).filter_by(id_proyecto=record.id_proyecto)
+        # Lock order matches confirmation: project, import, then its published rows.
+        # Retire only this source, never an older/newer delivery's current geometry.
+        retired = {}
+        for model in (models.ProyectoNucleoGeometria, models.ProyectoParcelaGeometria):
+            rows = db.query(model).filter(model.id_importacion_feature.in_(feature_ids),
+                model.id_proyecto_nucleo.in_(project_links), model.activo.is_(True)).with_for_update().all()
+            retired[model.__tablename__] = sum(row.es_vigente for row in rows)
+            for row in rows:
+                row.es_vigente = False
+                row.activo = False
+                row.fecha_baja = now
+                row.id_usuario_baja = user.id_usuario
+                row.motivo_baja = data.motivo
+                row.actualizado_en = now
+                row.actualizado_por = user.id_usuario
+        rights = db.query(models.DerechoViaProyecto).filter_by(id_importacion=import_id,
+            id_proyecto=record.id_proyecto, activo=True).with_for_update().all()
+        retired['derecho_via_proyecto'] = sum(row.es_vigente for row in rights)
+        for row in rights:
+            row.es_vigente = False
+            row.activo = False
+            row.fecha_baja = now
+            row.id_usuario_baja = user.id_usuario
+            row.motivo_baja = data.motivo
+            row.actualizado_en = now
+            row.actualizado_por = user.id_usuario
+        traces = []
+        if record.tipo_objetivo == 'trazo_proyecto':
+            traces = db.query(models.TrazoProyecto).filter_by(id_proyecto=record.id_proyecto,
+                observaciones=f"Generado por importación {import_id}", activo=True).with_for_update().all()
+            for row in traces:
+                row.activo = False
+                row.fecha_baja = now
+                row.id_usuario_baja = user.id_usuario
+                row.motivo_baja = data.motivo
+                row.actualizado_en = now
+                row.actualizado_por = user.id_usuario
+        retired['trazo_proyecto'] = len(traces)
+        record.reporte = {**(record.reporte or {}), 'geometrias_retiradas_por_baja': retired}
         from .gis_history import close_cycles
         close_cycles(db, record)
-        now = datetime.now(timezone.utc)
         record.activo = False
         record.fecha_baja = now
         record.id_usuario_baja = user.id_usuario

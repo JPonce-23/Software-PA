@@ -86,6 +86,34 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     let proyecto = null;
     let nucleos = [];
+    const tabsProyecto = [...document.querySelectorAll('[data-vista-proyecto]')];
+    function mostrarVistaProyecto(id, enfocar=false) {
+        tabsProyecto.forEach(tab => {
+            const activo=tab.dataset.vistaProyecto===id;
+            tab.setAttribute('aria-selected',String(activo));tab.tabIndex=activo?0:-1;
+            document.getElementById(tab.dataset.vistaProyecto).hidden=!activo;
+            if(activo && enfocar)tab.focus();
+        });
+    }
+    tabsProyecto.forEach((tab,i)=>{
+        tab.addEventListener('click',()=>mostrarVistaProyecto(tab.dataset.vistaProyecto));
+        tab.addEventListener('keydown',event=>{
+            const j=event.key==='Home'?0:event.key==='End'?tabsProyecto.length-1:event.key==='ArrowRight'?(i+1)%tabsProyecto.length:event.key==='ArrowLeft'?(i+tabsProyecto.length-1)%tabsProyecto.length:null;
+            if(j!==null){event.preventDefault();mostrarVistaProyecto(tabsProyecto[j].dataset.vistaProyecto,true);}
+        });
+    });
+    const abrirAnclaNucleos=()=>{if(location.hash==='#nucleosAgrarios')mostrarVistaProyecto('nucleosAgrarios');};
+    document.querySelectorAll('a[href="#nucleosAgrarios"]').forEach(a=>a.addEventListener('click',()=>mostrarVistaProyecto('nucleosAgrarios')));
+    window.addEventListener('hashchange',abrirAnclaNucleos);abrirAnclaNucleos();
+    document.getElementById('buscarNucleoProyecto').addEventListener('input',()=>renderNucleos());
+    document.getElementById('limpiarBusquedaNucleos').addEventListener('click',()=>{const campo=document.getElementById('buscarNucleoProyecto');campo.value='';renderNucleos();campo.focus();});
+    async function cargarTodosLosNucleos() {
+        const lista=[];
+        for(let skip=0;;skip+=200){
+            const pagina=await window.ClienteAPI.get(`/proyectos/${idProyecto}/nucleos?skip=${skip}&limit=200`);
+            lista.push(...pagina);if(pagina.length<200)return lista;
+        }
+    }
     let catalogosNucleoCargados = false;
 
     /* =====================================================
@@ -369,7 +397,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         elementos.nucleosGrid.innerHTML = "";
 
-        if (lista.length === 0) {
+        const normalizar=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim();
+        const busqueda=normalizar(document.getElementById('buscarNucleoProyecto').value);
+        const visibles=lista.filter(n=>normalizar([n.nombre_nucleo,n.municipio,n.entidad].filter(Boolean).join(' ')).includes(busqueda));
+        document.getElementById('resultadoBusquedaNucleos').textContent=`${visibles.length} de ${lista.length} núcleos${busqueda?' coinciden con la búsqueda':''}.`;
+        if (visibles.length === 0) {
             const vacio =
                 document.createElement("p");
 
@@ -377,7 +409,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 "proyectos-lista-vacia";
 
             vacio.textContent =
-                "Este proyecto todavía no tiene núcleos agrarios vinculados.";
+                lista.length ? "No hay núcleos con esa búsqueda. Prueba otro nombre, municipio o entidad." : "Este proyecto todavía no tiene núcleos agrarios vinculados.";
 
             elementos.nucleosGrid.appendChild(
                 vacio
@@ -386,7 +418,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        lista.forEach(nucleo => {
+        visibles.forEach(nucleo => {
             elementos.nucleosGrid.appendChild(
                 crearTarjetaNucleo(nucleo)
             );
@@ -406,9 +438,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 window.ProyectosAPI.obtener(
                     idProyecto
                 ),
-                window.NucleosAPI.listarPorProyecto(
-                    idProyecto
-                )
+                cargarTodosLosNucleos()
             ]);
 
             renderProyecto();
@@ -878,7 +908,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     elementos.btnGuardarNucleo.disabled = true;
                     try {
                         await window.NucleosAPI.vincularAProyecto(idProyecto, { id_nucleo: idNucleo });
-                        nucleos = await window.NucleosAPI.listarPorProyecto(idProyecto); renderNucleos();
+                        nucleos = await cargarTodosLosNucleos(); renderNucleos();
                         limpiarFormularioNucleo(); elementos.formNuevoNucleo.hidden = true;
                         window.SSALFER_UI.toast("Núcleo vinculado correctamente al proyecto.");
                     } catch (error) { mostrarMensajeError(elementos.nuevoNucleoError, error.message); }
@@ -984,10 +1014,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     }
 
                     nucleos =
-                        await window.NucleosAPI
-                            .listarPorProyecto(
-                                idProyecto
-                            );
+                        await cargarTodosLosNucleos();
 
                     renderNucleos();
 

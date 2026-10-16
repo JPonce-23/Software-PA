@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "use strict";
 
     let revisionFiltros = 0;
+    let revisionConsulta = 0;
     const referenciasReporte = {
         id_proyecto_nucleo: new Map(), id_convenio: new Map(), id_afectacion: new Map()
     };
@@ -272,6 +273,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     ===================================================== */
 
     const reportes = {
+        general: {
+            titulo: "Reporte general de convenio",
+            descripcion: "Vista preliminar de Convenios individuales. El Excel incluirá también Convenios colectivos.",
+            nota: "Pendiente de datos consolidados. Aún no es posible consultar ni exportar este reporte del proyecto.",
+            bloqueado: true,
+            filtros: ["id_proyecto"],
+            columnas: ["NO.", "ESTADO", "MUNICIPIO", "NÚCLEO AGRARIO", "NO. DE PARCELA", "TIPO DE CONVENIO", "SUPERFICIE (M2)", "FIRMA DE COP (FECHA)", "INGRESO AL RAN (FECHA)", "INSCRITO AL RAN (FECHA)", "Monto total 90%", "Monto total 100%"].map((titulo, i) => [`general_${i}`, titulo, "texto"]),
+            resumen: () => []
+        },
 
         valores: {
 
@@ -1480,6 +1490,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         );
 
+        if (config.bloqueado) {
+            const proyecto = document.getElementById("reporteConvenioFiltro_id_proyecto");
+            proyecto.options[0].textContent = "Selecciona un proyecto";
+            const id = new URLSearchParams(location.search).get("id_proyecto");
+            if (id && estado.proyectos.has(Number(id))) proyecto.value = id;
+            const etiqueta = document.createElement("label");
+            etiqueta.className = "convenios-reportes-campo";
+            etiqueta.innerHTML = '<span>Estado</span><select id="reporteGeneralEstado" disabled aria-describedby="reporteGeneralEstadoAyuda"><option value="">Todos los estados</option></select><small id="reporteGeneralEstadoAyuda">Se habilitará cuando estén disponibles los estados con convenios del proyecto.</small>';
+            el.filtros.appendChild(etiqueta);
+        }
     }
 
 
@@ -2036,7 +2056,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
         el.total.textContent =
-            `${filtradas.length.toLocaleString(
+            config.bloqueado ? "Datos pendientes de integración" : `${filtradas.length.toLocaleString(
                 "es-MX"
             )} registro(s)`;
 
@@ -2090,7 +2110,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
             td.textContent =
-                estado.filas.length === 0
+                config.bloqueado ? "Este reporte aún no está disponible. Se muestran las columnas previstas; no son resultados del proyecto." : estado.filas.length === 0
                     ? "No hay registros para los filtros seleccionados."
                     : "No hay coincidencias con la búsqueda local.";
 
@@ -2307,6 +2327,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     ===================================================== */
 
     async function consultarReporte() {
+        if (reportes[estado.reporte].bloqueado) return;
+        const consulta = revisionConsulta;
 
         if (
             estado.cargando
@@ -2354,6 +2376,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 );
 
 
+            if (consulta !== revisionConsulta) return;
             let filas =
                 Array.isArray(
                     respuesta
@@ -2379,6 +2402,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 filas;
 
             await cargarReferenciasReporte(filas);
+            if (consulta !== revisionConsulta) return;
 
 
             estado.pagina =
@@ -2404,6 +2428,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
         } catch (error) {
+            if (consulta !== revisionConsulta) return;
 
             estado.filas =
                 [];
@@ -2418,6 +2443,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
         } finally {
+            if (consulta !== revisionConsulta) return;
 
             estado.cargando =
                 false;
@@ -2449,6 +2475,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
 
+        ++revisionConsulta;
+        estado.cargando = false;
         estado.reporte =
             nombre;
 
@@ -2509,6 +2537,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
 
+        el.btnConsultar.disabled = Boolean(config.bloqueado);
+        el.btnExportar.innerHTML = config.bloqueado
+            ? '<i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Exportar Excel (.xlsx)'
+            : '<i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Exportar CSV';
+        el.btnExportar.title = config.bloqueado ? "Disponible cuando se conecten los datos consolidados" : "";
+        el.busqueda.disabled = el.porPagina.disabled = Boolean(config.bloqueado);
         renderFiltros();
 
 
@@ -2556,6 +2590,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function exportarCsv() {
+        if (reportes[estado.reporte].bloqueado) return;
 
         const filas =
             filasFiltradas();

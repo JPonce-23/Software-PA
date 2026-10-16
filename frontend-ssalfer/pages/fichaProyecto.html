@@ -30,6 +30,7 @@
 
 <link rel="stylesheet" href="/styles/marco.css">
 <link rel="stylesheet" href="/styles/gestion.css">
+<link rel="stylesheet" href="/styles/fichaProyecto.css">
 </head>
 
 
@@ -360,7 +361,11 @@
 <!-- TARJETAS DEL PROYECTO -->
 
 
-<div class="tarjetas-proyecto">
+<div class="proyecto-vistas" role="tablist" aria-label="Contenido del proyecto">
+    <button id="tabResumenProyecto" type="button" role="tab" aria-selected="true" aria-controls="resumenProyecto" data-vista-proyecto="resumenProyecto">Resumen del proyecto</button>
+    <button id="tabNucleosProyecto" type="button" role="tab" aria-selected="false" aria-controls="nucleosAgrarios" tabindex="-1" data-vista-proyecto="nucleosAgrarios">Núcleos vinculados</button>
+</div>
+<div class="tarjetas-proyecto" id="resumenProyecto" role="tabpanel" aria-labelledby="tabResumenProyecto">
 
 
 
@@ -521,7 +526,7 @@
                 NÚCLEOS AGRARIOS
 ===================================================== -->
 
-<section class="tarjeta seccion-nucleos" id="nucleosAgrarios">
+<section class="tarjeta seccion-nucleos" id="nucleosAgrarios" role="tabpanel" aria-labelledby="tabNucleosProyecto" hidden>
 
 
     <div class="seccion-nucleos-header">
@@ -626,6 +631,11 @@
 
 
 
+    <div class="proyecto-busqueda-nucleos">
+        <label for="buscarNucleoProyecto">Buscar núcleos del proyecto</label>
+        <div><input id="buscarNucleoProyecto" type="search" placeholder="Nombre, municipio o entidad" autocomplete="off" aria-controls="nucleosGrid"><button id="limpiarBusquedaNucleos" class="btn-secundario" type="button">Limpiar búsqueda</button></div>
+        <p id="resultadoBusquedaNucleos" role="status" aria-live="polite"></p>
+    </div>
     <div class="nucleos-grid" id="nucleosGrid">
 
         <p class="proyectos-lista-vacia">

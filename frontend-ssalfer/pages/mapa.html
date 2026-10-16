@@ -264,7 +264,7 @@
     ====================================================== -->
 
     <main class="contenedor mapa-pagina">
-<p class="ssalfer-mapa-leyenda">Capas oficiales publicadas: las disponibles en el mapa del proyecto. La previsualización se distingue en naranja y aún no está confirmada. El mapa publicado muestra la geometría vigente confirmada; el trazo y el derecho de vía son capas independientes.</p>
+
 
 
         <!-- ENCABEZADO DEL MAPA -->
@@ -282,7 +282,7 @@
                 </h1>
 
                 <p id="descripcionMapa">
-                    Selecciona un proyecto para consultar su trazo vigente,
+                    Selecciona un proyecto para consultar su derecho de vía vigente,
                     núcleos agrarios, parcelas e información administrativa
                     relacionada.
                 </p>
@@ -292,8 +292,8 @@
 
             <div class="mapa-selector-contenedor">
 
-                <label for="selectorProyectoMapa">
-                    Proyecto
+                <label id="etiquetaProyectoMapa" for="selectorProyectoMapa">
+                    Selecciona un proyecto
                 </label>
 
                 <select id="selectorProyectoMapa">
@@ -306,49 +306,7 @@
 
             </div>
 
-        </section>
-
-
-        <!-- MENSAJES -->
-
-        <div
-            id="mapaMensajeError"
-            class="mensaje-error"
-            role="alert"
-            hidden
-        ></div>
-
-
-        <div
-            id="mapaMensajeInformativo"
-            class="mapa-mensaje-informativo"
-            role="status"
-            hidden
-        ></div>
-
-
-        <!-- BARRA DE CONTEXTO -->
-
-        <section
-            id="mapaContextoProyecto"
-            class="mapa-contexto-proyecto"
-            hidden
-        >
-
-            <div>
-
-                <span class="mapa-contexto-etiqueta">
-                    PROYECTO SELECCIONADO
-                </span>
-
-                <strong id="mapaContextoNombreProyecto">
-                    —
-                </strong>
-
-            </div>
-
-
-            <div class="mapa-contexto-acciones">
+<div id="mapaContextoProyecto" class="mapa-contexto-acciones" hidden>
 
                 <a
                     id="enlaceFichaProyectoMapa"
@@ -378,13 +336,30 @@
                 </a>
 
             </div>
-
         </section>
+
+
+        <!-- MENSAJES -->
+
+        <div
+            id="mapaMensajeError"
+            class="mensaje-error"
+            role="alert"
+            hidden
+        ></div>
+
+
+        <div
+            id="mapaMensajeInformativo"
+            class="mapa-mensaje-informativo"
+            role="status"
+            hidden
+        ></div>
 
 
         <!-- ÁREA PRINCIPAL DEL VISOR -->
 
-        <div class="mapa-layout">
+        <div id="visorProyectoMapa" class="mapa-layout">
 
 
             <!-- CONTROLES / CAPAS -->
@@ -405,21 +380,8 @@
 
                 <div class="mapa-lista-capas">
 
-                    <label class="mapa-opcion-capa mapa-opcion-ddv"><input type="checkbox" id="capaDdv" checked><span><i class="bi bi-bounding-box"></i>Derecho de vía vigente</span></label>
-                    <label class="mapa-opcion-capa">
+                    <label class="mapa-opcion-capa mapa-opcion-ddv"><input type="checkbox" id="capaDdv" checked><span><i class="bi bi-bounding-box"></i>Derecho de vía vigente<svg class="mapa-tren-estado" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3l3 3h-3l-2-3H9l-2 3H4l3-3a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3Z" fill="currentColor"/><path d="M7 6h10v6H7Z" fill="white"/><circle cx="8" cy="16" r="1.3" fill="white"/><circle cx="16" cy="16" r="1.3" fill="white"/></svg></span></label>
 
-                        <input
-                            id="capaTrazos"
-                            type="checkbox"
-                            checked
-                        >
-
-                        <span>
-                            <i class="bi bi-bezier2"></i>
-                            Trazos del proyecto
-                        </span>
-
-                    </label>
 
 
                     <label class="mapa-opcion-capa">
@@ -433,7 +395,7 @@
                         <span>
                             <i class="bi bi-bounding-box-circles"></i>
                             Núcleos agrarios
-                        </span>
+                        <svg class="mapa-tren-estado" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3l3 3h-3l-2-3H9l-2 3H4l3-3a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3Z" fill="currentColor"/><path d="M7 6h10v6H7Z" fill="white"/><circle cx="8" cy="16" r="1.3" fill="white"/><circle cx="16" cy="16" r="1.3" fill="white"/></svg></span>
 
                     </label>
 
@@ -449,13 +411,14 @@
                         <span>
                             <i class="bi bi-grid-3x3"></i>
                             Parcelas
-                        </span>
+                        <svg class="mapa-tren-estado" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3l3 3h-3l-2-3H9l-2 3H4l3-3a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3Z" fill="currentColor"/><path d="M7 6h10v6H7Z" fill="white"/><circle cx="8" cy="16" r="1.3" fill="white"/><circle cx="16" cy="16" r="1.3" fill="white"/></svg></span>
 
                     </label>
 
                 </div>
 
 
+                <div id="mapaDetalleConciliacion" class="mapa-conciliacion" hidden></div>
                 <div class="mapa-leyenda">
 
                     <h3>
@@ -478,6 +441,7 @@
                 aria-label="Mapa geográfico de proyectos"
             >
 
+                <button id="btnAmpliarMapa" aria-controls="visorProyectoMapa" class="btn-secundario mapa-ampliar" type="button" aria-expanded="false">Ampliar mapa</button>
                 <div
                     id="mapaEstadoCarga"
                     class="mapa-estado-carga"
@@ -523,6 +487,8 @@
                 </h2>
 
 
+                <button id="btnAlternarDetalleMapa" aria-controls="mapaDetalleContenido" class="btn-secundario" type="button" aria-expanded="false" hidden>Mostrar detalle</button>
+                <button id="btnLimpiarSeleccionMapa" class="btn-secundario" type="button" hidden>Quitar selección</button>
                 <div id="mapaDetalleVacio">
 
                     <i class="bi bi-cursor"></i>
@@ -582,6 +548,8 @@
 
                     </div>
 
+                    <section id="mapaResponsable" hidden><h4>Información del responsable</h4><dl id="mapaResponsableDatos"></dl></section>
+
                 </div>
 
             </section>
@@ -616,6 +584,7 @@
             </div>
 
 
+            <p class="mapa-resumen-nota">Totales administrativos del proyecto, de todos los años. Las asambleas cuentan como realizadas según su resultado de celebración; los convenios firmados tienen fecha de firma.</p>
             <div class="mapa-resumen-grid">
 
 
@@ -698,7 +667,7 @@
 
                 </article>
 
-
+<article class="mapa-resumen-tarjeta"><span>Asambleas realizadas</span><strong id="valorAsambleasRealizadas">Consultando…</strong></article><article class="mapa-resumen-tarjeta"><span>Convenios individuales firmados</span><strong id="valorConveniosIndividuales">Consultando…</strong></article><article class="mapa-resumen-tarjeta"><span>Convenios colectivos firmados</span><strong id="valorConveniosColectivos">Consultando…</strong></article><article class="mapa-resumen-tarjeta"><span>Convenios firmados · total</span><strong id="valorConveniosFirmados">Consultando…</strong></article>
             </div>
 
         </section>
@@ -747,6 +716,7 @@
 
     <!-- Se implementará en la siguiente etapa -->
     <script src="/js/api/geoespacial.js"></script>
+<script src="/js/utils/mapaConciliacion.js"></script>
 <script src="/js/mapa.js"></script>
 
 </body>
