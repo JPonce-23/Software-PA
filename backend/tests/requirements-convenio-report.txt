@@ -1,0 +1,2 @@
+# Test-only dependency; never needed by the API runtime.
+jsonschema==4.10.3

@@ -272,12 +272,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 CONFIGURACIÓN DE REPORTES
     ===================================================== */
 
+    const general = window.SSALFER_REPORTE_GENERAL.crear(el);
     const reportes = {
         general: {
             titulo: "Reporte general de convenio",
-            descripcion: "Vista preliminar de Convenios individuales. El Excel incluirá también Convenios colectivos.",
-            nota: "Pendiente de datos consolidados. Aún no es posible consultar ni exportar este reporte del proyecto.",
-            bloqueado: true,
+            descripcion: "Elige Individuales o Colectivos debajo de la tabla para cambiar la vista previa.",
+            nota: "El Excel incluye individuales y colectivos del proyecto y estado seleccionados.",
+            bloqueado: false,
             filtros: ["id_proyecto"],
             columnas: ["NO.", "ESTADO", "MUNICIPIO", "NÚCLEO AGRARIO", "NO. DE PARCELA", "TIPO DE CONVENIO", "SUPERFICIE (M2)", "FIRMA DE COP (FECHA)", "INGRESO AL RAN (FECHA)", "INSCRITO AL RAN (FECHA)", "Monto total 90%", "Monto total 100%"].map((titulo, i) => [`general_${i}`, titulo, "texto"]),
             resumen: () => []
@@ -2005,6 +2006,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ===================================================== */
 
     function renderTabla() {
+        if (estado.reporte === "general") return general.render();
 
         const config =
             reportes[
@@ -2327,6 +2329,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ===================================================== */
 
     async function consultarReporte() {
+        if (estado.reporte === "general") return general.consultar();
         if (reportes[estado.reporte].bloqueado) return;
         const consulta = revisionConsulta;
 
@@ -2475,6 +2478,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
 
+        const proyectoSeleccionado = document.getElementById("generalConvenio_proyecto")?.value || document.getElementById("reporteConvenioFiltro_id_proyecto")?.value || new URLSearchParams(location.search).get("id_proyecto");
+        general.desactivar();
         ++revisionConsulta;
         estado.cargando = false;
         estado.reporte =
@@ -2537,6 +2542,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
 
+        if (nombre === "general") { renderCabecera(); general.activar(estado.proyectos, proyectoSeleccionado); return; }
         el.btnConsultar.disabled = Boolean(config.bloqueado);
         el.btnExportar.innerHTML = config.bloqueado
             ? '<i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Exportar Excel (.xlsx)'
@@ -2562,6 +2568,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ===================================================== */
 
     function limpiarFiltros() {
+        if (estado.reporte === "general") return general.limpiar();
 
         renderFiltros();
 
@@ -2590,6 +2597,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function exportarCsv() {
+        if (estado.reporte === "general") return general.exportar();
         if (reportes[estado.reporte].bloqueado) return;
 
         const filas =
@@ -2853,6 +2861,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el.porPagina.addEventListener(
         "change",
         () => {
+            if (estado.reporte === "general") return general.tamano();
 
             estado.porPagina =
                 Number(
@@ -2874,6 +2883,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el.btnAnterior.addEventListener(
         "click",
         () => {
+            if (estado.reporte === "general") return general.pagina(-1);
 
             if (
                 estado.pagina <= 1
@@ -2895,6 +2905,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el.btnSiguiente.addEventListener(
         "click",
         () => {
+            if (estado.reporte === "general") return general.pagina(1);
 
             const totalPaginas =
                 Math.max(
@@ -2930,6 +2941,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
 
+        document.querySelectorAll("[data-reporte]").forEach(tab => { tab.disabled = true; });
         const sesion =
             await window.AuthAPI
                 .requerirSesion();
@@ -2941,6 +2953,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
         await cargarCatalogosBase();
+        document.querySelectorAll("[data-reporte]").forEach(tab => { tab.disabled = false; });
 
 
         configurarReporte(

@@ -1,3 +1,5 @@
+> Actualización 16/10/2026: bloqueo de endpoints resuelto con 24eb4c7 e integración local probada. Ver QA-REPORTE-GENERAL-CONVENIOS-2026-10-16.md. Sigue pendiente definir la superficie individual. El contenido siguiente es histórico.
+
 # Reporte general de convenio: interfaz preparada y datos pendientes
 
 Fecha: 15 de octubre de 2026.
