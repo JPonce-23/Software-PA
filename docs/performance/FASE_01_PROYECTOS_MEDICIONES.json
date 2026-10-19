@@ -1,0 +1,175 @@
+{
+  "base_commit": "630f7dd66c494a1f2a4b4375184ff49a3a5b540b",
+  "preparation": {
+    "local_host": "Cooper",
+    "worktree": "/tmp/software-pa-ssalfer-optimizacion-fase1",
+    "branch": "perf/ssalfer-optimizacion-fase1",
+    "base": "630f7dd66c494a1f2a4b4375184ff49a3a5b540b",
+    "git_status_before_code": "",
+    "test_project": "ssalfer-f01-20261019",
+    "compose": "backend/tests/convenio_report_compose.yml",
+    "test_db": "software_pa_test",
+    "cluster": "convenio-report-disposable",
+    "test_storage": "tmpfs",
+    "published_ports": [],
+    "source_mount": "readonly",
+    "production_reverification": "/tmp/ssalfer-f01-reverify.txt"
+  },
+  "environment": {
+    "python": "3.11.17",
+    "fastapi": "0.138.2",
+    "sqlalchemy": "2.0.51",
+    "pydantic": "2.13.4",
+    "pytest": "9.1.1",
+    "psycopg2-binary": "2.9.12",
+    "database": {
+      "name": "software_pa_test",
+      "cluster": "convenio-report-disposable",
+      "postgres": "PostgreSQL 15.4 (Debian 15.4-1.pgdg110+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit",
+      "postgis": "3.3.4"
+    }
+  },
+  "method": {
+    "rows_returned": 2,
+    "pairs_per_run": 15,
+    "order": "original/optimized, optimized/original, alternating",
+    "warmup": "one call per variant excluded",
+    "sql": "functional SELECT only; excludes authentication, savepoints and transaction control",
+    "objects": "len(session.identity_map) before serialization; retained objects, not peak memory",
+    "wall_ms": "query + ORM load; excludes JSON serialization, HTTP and authentication",
+    "cache": "existing database caches; no cache flushing",
+    "sessions": "fresh ORM Session for each sample, same isolated connection"
+  },
+  "checks": {
+    "original_query_reference_ast_identical": true,
+    "other_router_functions_ast_identical": true,
+    "models_schemas_auth_access_migrations_unchanged": true
+  },
+  "openapi": {
+    "openapi_identical": true,
+    "sha256": "0270fc8f7edacaed68e287b1c44dce96c85fa49140f46287dd5ec3d6b537f72f",
+    "paths": 140
+  },
+  "runs": [
+    {
+      "original": {
+        "sql_per_sample": [
+          13
+        ],
+        "objects_per_sample": [
+          24
+        ],
+        "serialization_sql_per_sample": [
+          0
+        ],
+        "median_ms": 10.268220000398287,
+        "wall_ms": [
+          10.268220000398287,
+          11.32059300016408,
+          11.42992899985984,
+          10.031883000010566,
+          11.227717999645392,
+          10.490654000022914,
+          8.100209999611252,
+          10.897152999859827,
+          9.561638999912248,
+          9.477888999754214,
+          8.644326999274199,
+          9.131028000410879,
+          11.629267999524018,
+          10.833569999704196,
+          9.974288000194065
+        ]
+      },
+      "optimized": {
+        "sql_per_sample": [
+          1
+        ],
+        "objects_per_sample": [
+          2
+        ],
+        "serialization_sql_per_sample": [
+          0
+        ],
+        "median_ms": 1.2696610001512454,
+        "wall_ms": [
+          1.5099560005182866,
+          1.241179999851738,
+          1.3058229997113813,
+          0.6994940004005912,
+          1.2696610001512454,
+          0.9787460003281012,
+          0.9212739996655728,
+          1.1643560001175501,
+          1.1348340003678459,
+          1.1939030000576167,
+          1.547449000099732,
+          1.3190179997764062,
+          1.3713340003960184,
+          1.3371590002861922,
+          1.586980999491061
+        ]
+      }
+    },
+    {
+      "original": {
+        "sql_per_sample": [
+          13
+        ],
+        "objects_per_sample": [
+          24
+        ],
+        "serialization_sql_per_sample": [
+          0
+        ],
+        "median_ms": 8.327061000272806,
+        "wall_ms": [
+          9.134732999882544,
+          8.283348999611917,
+          8.327061000272806,
+          7.615612999870791,
+          7.65639499968529,
+          8.308987999953388,
+          8.283742999992683,
+          8.58559999960562,
+          8.854552999764564,
+          7.680128999709268,
+          9.3305930004135,
+          8.657561000291025,
+          10.828222999407444,
+          7.759396999972523,
+          9.263490000193997
+        ]
+      },
+      "optimized": {
+        "sql_per_sample": [
+          1
+        ],
+        "objects_per_sample": [
+          2
+        ],
+        "serialization_sql_per_sample": [
+          0
+        ],
+        "median_ms": 0.9006279997265665,
+        "wall_ms": [
+          0.8451400008198107,
+          0.7711280004514265,
+          0.909407000108331,
+          0.7635880001544137,
+          1.1034939998353366,
+          0.6037249995642924,
+          0.9006279997265665,
+          1.0720350001065526,
+          0.745677999475447,
+          1.0725030006142333,
+          1.323692000369192,
+          1.4048189996174187,
+          0.8972390005510533,
+          0.805034000222804,
+          0.9240780000254745
+        ]
+      }
+    }
+  ]
+}

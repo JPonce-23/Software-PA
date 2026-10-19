@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, raiseload
 
 from .. import auth, models, schemas
 from ..database import get_db
@@ -142,7 +142,10 @@ def list_projects(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    query = db.query(models.Proyecto).filter(models.Proyecto.activo.is_(True))
+    # ProyectoResponse uses only columns; avoid the model's selectin graph here.
+    query = db.query(models.Proyecto).options(raiseload("*")).filter(
+        models.Proyecto.activo.is_(True)
+    )
     query = filter_projects_by_user(query, db, user)
     return query.order_by(models.Proyecto.nombre_proyecto).offset(skip).limit(limit).all()
 
