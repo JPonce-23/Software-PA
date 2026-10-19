@@ -58,6 +58,7 @@
         generalConvenios: (id, params = {}, completo = false) => get(`/proyectos/${encodeURIComponent(id)}/reportes/convenios/general${completo ? '/completo' : ''}?${new URLSearchParams(params)}`),
         entidadesConvenios: id => get(`/proyectos/${encodeURIComponent(id)}/reportes/convenios/general/entidades`),
         obtenerColectivosDestino: (params = {}) => get(`/reportes/convenios/colectivos-destino?${new URLSearchParams(params)}`),
+        obtenerResumenConveniosDashboard: idProyecto => get(`/proyectos/${encodeURIComponent(idProyecto)}/dashboard/convenios`),
         obtenerKpiDashboard,
         obtenerAvancePeriodo,
         obtenerResumenActual,
