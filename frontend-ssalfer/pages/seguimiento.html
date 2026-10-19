@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<html data-role="admin operador visualizador" lang="es">
 
 <head>
+    <script src="/js/utils/permisos.js"></script>
     <script src="/js/utils/proteccion.js"></script>
 
     <meta charset="UTF-8">
@@ -257,7 +258,7 @@
             <button
                 type="button"
                 class="btn-principal"
-                id="btnNuevoEvento">
+                id="btnNuevoEvento" data-role="admin operador">
 
                 <i class="bi bi-plus-lg"></i>
 
@@ -510,7 +511,7 @@
 
         <form
             id="formSeguimiento"
-            novalidate>
+            novalidate data-role="admin operador">
 
 
             <div class="form-grid">

@@ -547,7 +547,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 <i class="bi bi-eye"></i>
                             </button>
 
-                            <button
+                            <button data-role="admin operador"
                                 type="button"
                                 class="btn-tabla"
                                 data-editar-evento="${evento.id_evento_fifonafe}"
@@ -555,7 +555,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 <i class="bi bi-pencil"></i>
                             </button>
 
-                            <button
+                            <button data-role="admin operador"
                                 type="button"
                                 class="btn-tabla"
                                 data-eliminar-evento="${evento.id_evento_fifonafe}"

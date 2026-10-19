@@ -72,7 +72,9 @@
 
         try {
 
-            return await obtenerSesionActual();
+            const sesion = await obtenerSesionActual();
+            if(window.SSALFER_PERMISOS && !window.SSALFER_PERMISOS.acceso(location.href,sesion?.user?.rol)) return null;
+            return sesion;
 
         } catch (error) {
 

@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", async () => {
     "use strict";
+    const botonCaptura = (...args) => window.SSALFER_GESTION.boton(...args).replace('<button', '<button data-role="admin operador"');
     const params = new URLSearchParams(location.search), id = Number(params.get("id_fifonafe") || params.get("id")), pn = Number(params.get("id_proyecto_nucleo"));
     if (!id || !pn) return;
     const g = window.SSALFER_GESTION, api = window.FifonafeAPI, f = window.SSALFER_FORMAT;
@@ -9,7 +10,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         lista = await api.listarIntervinientes(id);
         const eventos = await api.listarEventos(id), nombres = new Map();
         for (const r of lista) nombres.set(r.id_persona, window.SSALFER_CONTEXTO.nombrePersona(await window.SSALFER_CONTEXTO.persona(r.id_persona)));
-        seccion.innerHTML = `<h2>Intervinientes del trámite</h2>${g.boton("Agregar interviniente", "agregar")}${g.tabla([{ titulo: "Persona", valor: r => nombres.get(r.id_persona) }, { titulo: "Participación", valor: r => f.etiquetaCodigo(r.rol) }, { titulo: "Evento", valor: r => { const evento = eventos.find(e => e.id_evento_fifonafe === r.id_evento_fifonafe); return evento ? `Evento ${evento.ordinal} · ${f.formatearFecha(evento.fecha_evento || evento.fecha_oficio)}` : "Sin evento asociado"; } }, { titulo: "Representación ORV", valor: r => r.id_orv_integrante ? "Acreditada para el evento" : "Sin vínculo ORV" }], lista, r => g.boton("Dar de baja", "baja", r.id_interviniente_fifonafe), "Aún no hay intervinientes. Puedes agregar una persona del núcleo.")}`;
+        seccion.innerHTML = `<h2>Intervinientes del trámite</h2>${botonCaptura("Agregar interviniente", "agregar")}${g.tabla([{ titulo: "Persona", valor: r => nombres.get(r.id_persona) }, { titulo: "Participación", valor: r => f.etiquetaCodigo(r.rol) }, { titulo: "Evento", valor: r => { const evento = eventos.find(e => e.id_evento_fifonafe === r.id_evento_fifonafe); return evento ? `Evento ${evento.ordinal} · ${f.formatearFecha(evento.fecha_evento || evento.fecha_oficio)}` : "Sin evento asociado"; } }, { titulo: "Representación ORV", valor: r => r.id_orv_integrante ? "Acreditada para el evento" : "Sin vínculo ORV" }], lista, r => botonCaptura("Dar de baja", "baja", r.id_interviniente_fifonafe), "Aún no hay intervinientes. Puedes agregar una persona del núcleo.")}`;
     }
     async function agregar() {
         const [directorio, eventos, orvs, cargos] = await Promise.all([window.SSALFER_DIRECTORIO.listar(pn), api.listarEventos(id), window.OrvAPI.listarPorProyectoNucleo(pn), window.CatalogosAPI.obtenerOperativo("cargo_orv")]);

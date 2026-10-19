@@ -161,7 +161,7 @@
         if (!Number.isSafeInteger(id) || id <= 0 || document.getElementById("documentosContenido") || document.querySelector("[data-abrir-documentos]")) return;
         const destino = document.querySelector(".acciones-header") || document.querySelector(".pagina-header");
         if (!destino) return;
-        const b = document.createElement("button"); b.type = "button"; b.className = "btn-secundario ssalfer-modal__button"; b.dataset.abrirDocumentos = ""; b.textContent = "Documentos de este núcleo"; b.title = "Registrar, subir y consultar los documentos de este núcleo";
+        const b = document.createElement("button"); b.type = "button"; b.className = "btn-secundario ssalfer-modal__button"; b.dataset.abrirDocumentos = ""; b.dataset.role = "admin operador visualizador"; b.textContent = "Documentos de este núcleo"; b.title = "Registrar, subir y consultar los documentos de este núcleo";
         b.addEventListener("click", () => abrir(id)); destino.appendChild(b);
     }
     window.addEventListener("ssalfer:contexto-documentos", event => acceso(Number(event.detail?.idProyectoNucleo)));

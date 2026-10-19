@@ -638,7 +638,7 @@ document.addEventListener(
                                 ${
                                     puedeCapturar
                                         ? `
-                                            <button
+                                            <button data-role="admin operador"
                                                 type="button"
                                                 class="btn-tabla"
                                                 data-editar-actividad="${actividad.id_actividad}"

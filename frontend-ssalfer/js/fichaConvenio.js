@@ -765,7 +765,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         ${
                             puedeCapturar
                                 ? `
-                                    <button
+                                    <button data-role="admin operador"
                                         type="button"
                                         class="btn-tabla"
                                         data-eliminar-compareciente="${item.id_compareciente}"

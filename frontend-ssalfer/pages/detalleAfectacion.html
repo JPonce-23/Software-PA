@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<html data-role="admin operador visualizador" lang="es">
 
 <head>
+    <script src="/js/utils/permisos.js"></script>
     <script src="/js/utils/proteccion.js"></script>
 
     <meta charset="UTF-8">
@@ -265,7 +266,7 @@
                     type="button"
                     class="btn-principal"
                     id="btnEditarAfectacion"
-                >
+                 data-role="admin operador">
 
                     <i class="bi bi-pencil"></i>
 
@@ -289,7 +290,7 @@
                 <h2>Editar información de la afectación</h2>
             </div>
 
-            <form id="formEditarAfectacion" class="datos-grid">
+            <form id="formEditarAfectacion" class="datos-grid" data-role="admin operador">
 
                 <div class="dato">
                     <label for="inputSituacion">Situación</label>
@@ -555,7 +556,7 @@
             </div>
 
 
-            <form id="formAvaluo" class="datos-grid" hidden>
+            <form id="formAvaluo" class="datos-grid" hidden data-role="admin operador">
 
                 <div class="dato">
                     <label for="inputAvaluoMonto">Monto</label>
@@ -596,7 +597,7 @@
                     class="btn-secundario"
                     data-accion="avaluo"
                     id="btnCapturarAvaluo"
-                >
+                 data-role="admin operador">
 
                     <i class="bi bi-pencil"></i>
 
@@ -645,7 +646,7 @@
                     class="btn-secundario"
                     data-accion="nuevo-convenio"
                     id="btnNuevoConvenio"
-                >
+                 data-role="admin operador">
 
                     <i class="bi bi-plus-lg"></i>
 
@@ -936,7 +937,7 @@
                     class="btn-secundario"
                     data-accion="unidad-agraria"
                     id="btnAgregarUnidad"
-                >
+                 data-role="admin operador">
 
                     <i class="bi bi-plus-lg"></i>
 
@@ -1032,7 +1033,7 @@
                 type="button"
                 class="btn-guardar"
                 id="btnGuardarCambios"
-            >
+             data-role="admin operador">
 
                 <i class="bi bi-save"></i>
 

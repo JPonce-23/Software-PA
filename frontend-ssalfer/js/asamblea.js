@@ -1128,7 +1128,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         ${
                             puedeCapturar
                                 ? `
-                                    <button
+                                    <button data-role="admin operador"
                                         type="button"
                                         class="btn-secundario"
                                         data-editar-asamblea="${asamblea.id_asamblea}">

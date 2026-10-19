@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="es">
+<html data-role="admin" lang="es">
 <head>
+    <script src="/js/utils/permisos.js"></script>
     <script src="/js/utils/proteccion.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -118,7 +119,7 @@
                 </p>
             </div>
 
-            <button id="btnNuevoUsuario" class="usuarios-btn usuarios-btn-primario" type="button">
+            <button id="btnNuevoUsuario" class="usuarios-btn usuarios-btn-primario" type="button" data-role="admin">
                 <i class="bi bi-person-plus"></i>
                 Nuevo usuario
             </button>
@@ -216,7 +217,7 @@
 
             <div id="usuarioModalError" class="usuarios-alerta usuarios-alerta-error" hidden></div>
 
-            <form id="formUsuario" class="usuarios-form-grid">
+            <form id="formUsuario" class="usuarios-form-grid" data-role="admin">
                 <input id="usuarioId" type="hidden">
                 <input id="usuarioModo" type="hidden" value="crear">
 
@@ -266,7 +267,7 @@
                     <button class="usuarios-btn usuarios-btn-secundario" type="button" data-cerrar-modal="usuario">
                         Cancelar
                     </button>
-                    <button id="btnGuardarUsuario" class="usuarios-btn usuarios-btn-primario" type="submit">
+                    <button id="btnGuardarUsuario" class="usuarios-btn usuarios-btn-primario" type="submit" data-role="admin">
                         Guardar
                     </button>
                 </div>
@@ -291,7 +292,7 @@
             <p id="modalAccionDescripcion" class="usuarios-modal-descripcion"></p>
             <div id="accionModalError" class="usuarios-alerta usuarios-alerta-error" hidden></div>
 
-            <form id="formAccionUsuario">
+            <form id="formAccionUsuario" data-role="admin">
                 <input id="accionUsuarioId" type="hidden">
                 <input id="accionUsuarioTipo" type="hidden">
 

@@ -1836,7 +1836,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const accionesCaptura =
                 puedeCapturar
                     ? `
-                        <button
+                        <button data-role="admin operador"
                             type="button"
                             class="btn-tabla"
                             title="Editar evento"
@@ -1844,7 +1844,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             <i class="bi bi-pencil"></i>
                         </button>
 
-                        <button
+                        <button data-role="admin operador"
                             type="button"
                             class="btn-tabla"
                             title="Eliminar evento"

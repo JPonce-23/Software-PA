@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<html data-role="admin operador visualizador" lang="es">
 
 <head>
+    <script src="/js/utils/permisos.js"></script>
     <script src="/js/utils/proteccion.js"></script>
 
     <meta charset="UTF-8">
@@ -374,7 +375,7 @@
             <button
                 type="button"
                 class="btn-principal"
-                id="btnCrearIndemnizacion">
+                id="btnCrearIndemnizacion" data-role="admin operador">
 
                 <i class="bi bi-plus-lg"></i>
 
@@ -391,7 +392,7 @@
         <form
             id="formIndemnizacion"
             class="formulario"
-            hidden>
+            hidden data-role="admin operador">
 
 
             <div class="form-grid">
@@ -582,7 +583,7 @@
                 <button
                     type="button"
                     class="btn-secundario"
-                    id="btnEditarIndemnizacion">
+                    id="btnEditarIndemnizacion" data-role="admin operador">
 
                     <i class="bi bi-pencil"></i>
 
@@ -682,7 +683,7 @@
             <button
                 type="button"
                 class="btn-principal"
-                id="btnRegistrarPago">
+                id="btnRegistrarPago" data-role="admin operador">
 
                 <i class="bi bi-plus-lg"></i>
 
@@ -812,7 +813,7 @@
         <form
             id="formPago"
             class="formulario-pago"
-            hidden>
+            hidden data-role="admin operador">
 
 
             <div class="formulario-pago-header">

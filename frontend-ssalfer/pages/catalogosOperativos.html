@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<html data-role="admin" lang="es">
 
 <head>
+    <script src="/js/utils/permisos.js"></script>
     <script src="/js/utils/proteccion.js"></script>
 
     <meta charset="UTF-8">
@@ -313,7 +314,7 @@
             <button
                 id="btnNuevoCatalogo"
                 class="catalogos-btn catalogos-btn-primario"
-                type="button">
+                type="button" data-role="admin">
 
                 <i class="bi bi-plus-lg"></i>
 
@@ -637,7 +638,7 @@
 
         <form
             id="formCatalogo"
-            class="catalogos-formulario">
+            class="catalogos-formulario" data-role="admin">
 
 
             <input
@@ -869,7 +870,7 @@
                 <button
                     id="btnGuardarCatalogo"
                     class="catalogos-btn catalogos-btn-primario"
-                    type="submit">
+                    type="submit" data-role="admin">
 
                     Crear opción
 
@@ -940,7 +941,7 @@
 
         <form
             id="formBajaCatalogo"
-            class="catalogos-formulario">
+            class="catalogos-formulario" data-role="admin">
 
 
             <input

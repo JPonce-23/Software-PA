@@ -153,7 +153,7 @@ def _forbidden() -> HTTPException:
 
 
 def authorized_project_ids(db: Session, user: models.Usuario) -> select:
-    if user.rol == "admin":
+    if user.rol in {"admin", "visualizador", "geografo"}:
         return select(models.Proyecto.id_proyecto).where(models.Proyecto.activo.is_(True))
     return (
         select(models.UsuarioProyecto.id_proyecto)
@@ -197,7 +197,7 @@ def require_project_access(
     if not load_details:
         # Read projections authorize the principal without loading its domain graph.
         query = query.options(raiseload("*"))
-    if user.rol != "admin":
+    if user.rol == "operador":
         query = query.filter(
             exists().where(
                 models.UsuarioProyecto.id_usuario == user.id_usuario,

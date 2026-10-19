@@ -178,6 +178,7 @@ async function request(
         const sesion=await window.SSALFER_SESION_LISTA;
         if(!sesion)throw new ErrorAPI(401,null,'Inicia sesión para acceder al sistema.');
     }
+    if(window.SSALFER_PERMISOS && !ruta.startsWith('/auth/') && !window.SSALFER_PERMISOS.puedeEscribir(ruta,metodo)) throw new ErrorAPI(403,null,'Tu rol no permite realizar esta acción.');
     const finalizarCarga = window.SSALFER_UI?.cargando.iniciar({ silencioso, carga, metodo });
     try {
         const metodosConCSRF = ["POST", "PATCH", "DELETE", "PUT"];

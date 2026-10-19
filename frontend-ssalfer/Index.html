@@ -63,6 +63,7 @@
 <script src="/js/utils/experiencia.js"></script>
 <script src="/js/api/cliente.js"></script>
 <script src="/js/api/auth.js"></script>
+<script src="/js/utils/permisos.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -72,9 +73,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Si ya hay una sesión activa, saltar directo al dashboard.
     window.AuthAPI.obtenerSesionActual()
-        .then(() => { const retorno=new URLSearchParams(location.search).get('return_to');
+        .then(sesion => { const retorno=new URLSearchParams(location.search).get('return_to');
             let destino='/dashboard.html';
-            if(retorno){try{const url=new URL(retorno,location.origin);if(url.origin===location.origin && (url.pathname.startsWith('/pages/')||url.pathname==='/dashboard.html'))destino=url.pathname+url.search;}catch{}}
+            if(retorno){try{const url=new URL(retorno,location.origin);if(url.origin===location.origin && (url.pathname.startsWith('/pages/')||url.pathname==='/dashboard.html') && window.SSALFER_PERMISOS.acceso(url.href, sesion?.user?.rol))destino=url.pathname+url.search;}catch{}}
             window.location.href = destino; })
         .catch(() => { /* sin sesión: se queda en el login, es lo esperado */ });
 
@@ -100,11 +101,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
 
-            await window.AuthAPI.login(usuario, password);
+            const sesion = await window.AuthAPI.login(usuario, password);
 
             const retorno=new URLSearchParams(location.search).get('return_to');
             let destino='/dashboard.html';
-            if(retorno){try{const url=new URL(retorno,location.origin);if(url.origin===location.origin && (url.pathname.startsWith('/pages/')||url.pathname==='/dashboard.html'))destino=url.pathname+url.search;}catch{}}
+            if(retorno){try{const url=new URL(retorno,location.origin);if(url.origin===location.origin && (url.pathname.startsWith('/pages/')||url.pathname==='/dashboard.html') && window.SSALFER_PERMISOS.acceso(url.href, sesion?.user?.rol))destino=url.pathname+url.search;}catch{}}
             window.location.href = destino;
 
         } catch (error) {

@@ -1066,7 +1066,7 @@ configurarAccesoMapa();
 
 
                 vacio.textContent =
-                    "No hay proyectos disponibles todavía. Usa \"Nuevo proyecto\" en el menú para crear el primero.";
+                    document.documentElement.dataset.rolActual === "operador" ? "Aún no tienes proyectos asignados. Pide al administrador que te asigne un proyecto." : document.documentElement.dataset.rolActual === "admin" ? "No hay proyectos disponibles. Crea uno desde Nuevo proyecto." : "No hay proyectos activos disponibles.";
 
 
                 listaProyectos.appendChild(

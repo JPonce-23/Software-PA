@@ -16,7 +16,7 @@
         try{const sesion=await window.AuthAPI.requerirSesion();if(sesion?.user?.rol!=='admin')return;
             if(pagina==='nuevoProyecto.html'){
                 const usuarios=await listar(),form=document.getElementById('formNuevoProyecto'),label=document.createElement('label');label.className='ssalfer-gestion-campo';
-                label.innerHTML=`Usuarios responsables (opcional)<select id="usuariosNuevoProyecto" multiple size="5">${usuarios.filter(u=>u.activo!==false).map(u=>`<option value="${u.id_usuario}">${g.e(nombre(u))} · ${g.e(u.correo)}</option>`).join('')}</select><small>Selecciona uno o varios usuarios. Se asignarán después de crear el proyecto.</small>`;form.insertBefore(label,form.querySelector(".acciones-formulario"));
+                label.innerHTML=`Operadores responsables (opcional)<select id="usuariosNuevoProyecto" multiple size="5">${usuarios.filter(u=>u.rol==="operador" && u.activo!==false).map(u=>`<option value="${u.id_usuario}">${g.e(nombre(u))} · ${g.e(u.correo)}</option>`).join('')}</select><small>Selecciona uno o varios usuarios. Se asignarán después de crear el proyecto.</small>`;form.insertBefore(label,form.querySelector(".acciones-formulario"));
             }else{
                 const id=Number(new URLSearchParams(location.search).get('id'));if(!id)return;
                 const s=document.createElement('section');s.className='ssalfer-gestion-seccion';s.innerHTML=`<h2>Administrar proyecto</h2><p>Completar un proyecto requiere una función que aún no está disponible. La fecha de fin no cambia su estado.</p>${g.boton('Dar de baja proyecto','baja-proyecto')}`;document.querySelector('main').appendChild(s);

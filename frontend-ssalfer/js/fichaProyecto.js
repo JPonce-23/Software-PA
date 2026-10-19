@@ -1064,7 +1064,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             if (elementos.btnAgregarNucleo) {
                 elementos.btnAgregarNucleo.hidden =
-                    true;
+                    rol !== "operador";
             }
         }
 

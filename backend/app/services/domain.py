@@ -1485,6 +1485,8 @@ def assign_user_to_project(
     # the principal was already present in SQLAlchemy's identity map.
     if target is None or not target.activo:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if target.rol != "operador":
+        raise HTTPException(status_code=422, detail="Solo se pueden asignar operadores a un proyecto")
     entity = models.UsuarioProyecto(
         id_usuario=data.id_usuario,
         id_proyecto=project_id,

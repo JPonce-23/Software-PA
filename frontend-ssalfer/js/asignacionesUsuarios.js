@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const actual = ++revision, pid = Number(proyecto.value); salida.replaceChildren(); asignados = []; if (!pid) return;
             try {
                 const respuesta = await window.ProyectosAPI.listarUsuarios(pid); if (actual !== revision) return; asignados = respuesta;
-                salida.innerHTML = `${g.boton("Asignar usuario", "asignar")}${g.tabla([{ titulo: "Usuario", valor: r => nombre(usuarios.find(u => u.id_usuario === r.id_usuario) || {}) || "Usuario sin ficha disponible" }, { titulo: "Correo", valor: r => usuarios.find(u => u.id_usuario === r.id_usuario)?.correo }, { titulo: "Estado de usuario", valor: r => usuarios.find(u => u.id_usuario === r.id_usuario)?.activo === false ? "Inactivo" : "Activo" }], asignados, r => g.boton("Revocar asignación", "revocar", r.id_usuario), "Aún no hay usuarios asignados a este proyecto.")}`;
+                salida.innerHTML = `${g.boton("Asignar operador", "asignar")}${g.tabla([{ titulo: "Usuario", valor: r => nombre(usuarios.find(u => u.id_usuario === r.id_usuario) || {}) || "Usuario sin ficha disponible" }, { titulo: "Correo", valor: r => usuarios.find(u => u.id_usuario === r.id_usuario)?.correo }, { titulo: "Estado de usuario", valor: r => usuarios.find(u => u.id_usuario === r.id_usuario)?.activo === false ? "Inactivo" : "Activo" }], asignados, r => g.boton("Revocar asignación", "revocar", r.id_usuario), "Aún no hay usuarios asignados a este proyecto.")}`;
             } catch(error) { if (actual === revision) salida.innerHTML = `<p role="alert">${g.e(error.message)}</p>${g.boton("Reintentar", "reintentar")}`; }
         }
         if (proyectoFijo) { proyecto.value=String(proyectoFijo); proyecto.closest("label").hidden=true; await cargar(); }
@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const b = event.target.closest("[data-gestion]"); if (!b || ocupado) return; ocupado = true; proyecto.disabled = true;
             try {
                 const pid = Number(proyecto.value); let resultado;
-                if (b.dataset.gestion === "asignar") resultado = await g.formulario({ titulo: `Asignar usuario a ${proyecto.selectedOptions[0].textContent}`, campos: [{ nombre: "id_usuario", etiqueta: "Usuario", requerido: true, numerico: true, opciones: usuarios.filter(u => u.activo !== false && !asignados.some(a => a.id_usuario === u.id_usuario)).map(u => ({ valor: u.id_usuario, texto: `${nombre(u)} · ${u.correo}` })) }], guardar: datos => window.ProyectosAPI.agregarUsuario(pid, datos) });
+                if (b.dataset.gestion === "asignar") resultado = await g.formulario({ titulo: `Asignar operador a ${proyecto.selectedOptions[0].textContent}`, campos: [{ nombre: "id_usuario", etiqueta: "Usuario", requerido: true, numerico: true, opciones: usuarios.filter(u => u.rol === "operador" && u.activo !== false && !asignados.some(a => a.id_usuario === u.id_usuario)).map(u => ({ valor: u.id_usuario, texto: `${nombre(u)} · ${u.correo}` })) }], guardar: datos => window.ProyectosAPI.agregarUsuario(pid, datos) });
                 else if (b.dataset.gestion === "revocar") resultado = await g.baja(`la asignación de ${nombre(usuarios.find(u => u.id_usuario === Number(b.dataset.registro)) || {})} a este proyecto`, motivo => window.ProyectosAPI.revocarUsuario(pid, Number(b.dataset.registro), motivo));
                 if (resultado || b.dataset.gestion === "reintentar") await cargar();
             } catch(error) { window.ClienteAPI.mostrarErrorAPI(error); }

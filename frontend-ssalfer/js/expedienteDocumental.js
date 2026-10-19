@@ -860,7 +860,7 @@ async function cargarCatalogos() {
                             </button>
 
 
-                            <button
+                            <button data-role="admin operador"
                                 type="button"
                                 class="btn-tabla"
                                 title="Editar requisito"

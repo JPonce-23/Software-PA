@@ -493,7 +493,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const accionesEdicion =
                 puedeCapturar
                     ? `
-                        <button
+                        <button data-role="admin operador"
                             type="button"
                             class="btn-tabla"
                             title="Editar padrón"

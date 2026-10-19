@@ -493,7 +493,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     ${
                         puedeCapturar
                             ? `
-                                <button
+                                <button data-role="admin operador"
                                     type="button"
                                     class="btn-secundario"
                                     data-editar-orv="${orv.id_orv}">
@@ -1128,7 +1128,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         ? `
                             <div class="integrante-acciones">
 
-                                <button
+                                <button data-role="admin operador"
                                     type="button"
                                     class="btn-secundario"
                                     data-editar-integrante="${integrante.id_orv_integrante}">
@@ -1139,7 +1139,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 ${
                                     !integrante.fecha_fin
                                         ? `
-                                            <button
+                                            <button data-role="admin operador"
                                                 type="button"
                                                 class="btn-secundario"
                                                 data-finalizar-integrante="${integrante.id_orv_integrante}">
@@ -1150,10 +1150,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                                         : ""
                                 }
 
-                                ${esAdministrador ? `<button type="button" class="btn-secundario" data-baja-integrante="${integrante.id_orv_integrante}">Eliminar registro</button>` : ""}
+                                ${esAdministrador ? `<button data-role="admin" type="button" class="btn-secundario" data-baja-integrante="${integrante.id_orv_integrante}">Eliminar registro</button>` : ""}
                             </div>
                         `
-                        : esAdministrador && integrante.activo === false ? `<button type="button" class="btn-secundario" data-reactivar-integrante="${integrante.id_orv_integrante}">Reactivar registro</button>` : ""
+                        : esAdministrador && integrante.activo === false ? `<button data-role="admin" type="button" class="btn-secundario" data-reactivar-integrante="${integrante.id_orv_integrante}">Reactivar registro</button>` : ""
                 }
             `;
 

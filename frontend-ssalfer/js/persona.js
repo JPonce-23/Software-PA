@@ -399,7 +399,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             activa
 
                                 ? `
-                                    <button
+                                    <button data-role="admin operador"
                                         type="button"
                                         class="btn-secundario"
                                         data-editar-persona="${persona.id_persona}"
@@ -421,7 +421,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             activa
 
                                 ? `
-                                    <button
+                                    <button data-role="admin"
                                         type="button"
                                         class="btn-secundario"
                                         data-baja-persona="${persona.id_persona}"
@@ -443,7 +443,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             !activa
 
                                 ? `
-                                    <button
+                                    <button data-role="admin"
                                         type="button"
                                         class="btn-secundario"
                                         data-reactivar-persona="${persona.id_persona}"
