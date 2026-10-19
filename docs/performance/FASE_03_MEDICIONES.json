@@ -1,0 +1,102 @@
+{
+  "validation": {"baseline": {"tests": 56, "passed": 56, "failed": 0, "errors": 0, "skipped": 0, "junit": "baseline-tests.xml", "junit_sha256": "7121a0bf36625c7bf370bad9ea76cd98c8bf19d89781f25f8ba09124cfb81276"}, "f03": {"tests": 60, "passed": 60, "failed": 0, "errors": 0, "skipped": 0, "junit": "f03-tests.xml", "junit_sha256": "b4cdeea1f475ab64bc1a26868e5ecbdb1f9fe65ed2264623bee91a8674a915ed"}, "f01_f02": {"tests": 211, "passed": 211, "failed": 0, "errors": 0, "skipped": 0, "junit": "f01-f02-tests.xml", "junit_sha256": "504dc33568892b68b588a12b49bbcf9cd18ad361a4a8fbc7966a48f2a8ecafb7"}, "full_suite": {"tests": 1238, "passed": 1208, "failed": 3, "errors": 0, "skipped": 27, "junit": "full-suite.xml", "junit_sha256": "914d906533575c1528ae84db27d4a954701bac99979771a9ab588368cd546cfa"}, "original_facets": {"tests": 1, "passed": 0, "failed": 1, "errors": 0, "skipped": 0, "junit": "original-facets-control.xml", "junit_sha256": "52c79de9c8ddaaf830457d14f463a24581b2857c840fb0b9db9eece915dcc905"}, "original_history": {"tests": 2, "passed": 0, "failed": 2, "errors": 0, "skipped": 0, "junit": "original-history-control.xml", "junit_sha256": "9c1b208f1597f456fdd803d299eacb638b52961a48faae02184b7807690235d5"}},
+  "environment": {"base": "6e622ff", "date": "2026-10-19", "database": "software_pa_test", "compose_project": "ssalfer-f03-20261019", "catalog": {"states": 32, "municipalities": 2478, "public_ran_nuclei": 32278, "synthetic_nuclei": 3}, "method": {"timing_samples_per_variant": 5, "alternating_order": true, "fresh_sessions": true, "warmup_per_variant": 1, "authentication": "excluded", "authorization": "embedded in functional SELECT for scoped nuclei", "timing": "function only; serialization counted separately", "memory": "separate tracemalloc peak sample; includes serialization; not RSS"}},
+  "endpoints": {
+    "list_states": {
+      "original": {
+        "median_ms": 3124.143794999327,
+        "memory_sample": {"ms": 8366.110554999977, "phases": {"functional": {"sql": 341, "objects": 34794}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34794, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840", "peak_python_bytes": 203208116},
+        "samples": [
+          {"ms": 3111.6852089999156, "phases": {"functional": {"sql": 341, "objects": 34794}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34794, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"},
+          {"ms": 3124.143794999327, "phases": {"functional": {"sql": 341, "objects": 34794}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34794, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"},
+          {"ms": 3109.866017000968, "phases": {"functional": {"sql": 341, "objects": 34794}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34794, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"},
+          {"ms": 3167.9589509985817, "phases": {"functional": {"sql": 341, "objects": 34794}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34794, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"},
+          {"ms": 3185.901496999577, "phases": {"functional": {"sql": 341, "objects": 34794}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34794, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"}
+        ]
+      },
+      "optimized": {
+        "median_ms": 1.7124419991887407,
+        "memory_sample": {"ms": 3.8690969995514024, "phases": {"functional": {"sql": 1, "objects": 32}, "serialization": {"sql": 0, "objects": 0}}, "retained": 32, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840", "peak_python_bytes": 77365},
+        "samples": [
+          {"ms": 1.469598999392474, "phases": {"functional": {"sql": 1, "objects": 32}, "serialization": {"sql": 0, "objects": 0}}, "retained": 32, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"},
+          {"ms": 1.7124419991887407, "phases": {"functional": {"sql": 1, "objects": 32}, "serialization": {"sql": 0, "objects": 0}}, "retained": 32, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"},
+          {"ms": 1.676781999776722, "phases": {"functional": {"sql": 1, "objects": 32}, "serialization": {"sql": 0, "objects": 0}}, "retained": 32, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"},
+          {"ms": 2.2171350010466995, "phases": {"functional": {"sql": 1, "objects": 32}, "serialization": {"sql": 0, "objects": 0}}, "retained": 32, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"},
+          {"ms": 1.808535998861771, "phases": {"functional": {"sql": 1, "objects": 32}, "serialization": {"sql": 0, "objects": 0}}, "retained": 32, "rows": 32, "bytes": 2352, "sha256": "4d777040538042c0dcf698057df897384d1c382ae3a7f62fda7eecdfe42bf840"}
+        ]
+      }
+    },
+    "list_municipalities": {
+      "original": {
+        "median_ms": 3068.1072360002872,
+        "memory_sample": {"ms": 8121.21918900084, "phases": {"functional": {"sql": 340, "objects": 34762}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34762, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44", "peak_python_bytes": 203519091},
+        "samples": [
+          {"ms": 3020.5925070004014, "phases": {"functional": {"sql": 340, "objects": 34762}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34762, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"},
+          {"ms": 3084.5556639997085, "phases": {"functional": {"sql": 340, "objects": 34762}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34762, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"},
+          {"ms": 3068.1072360002872, "phases": {"functional": {"sql": 340, "objects": 34762}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34762, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"},
+          {"ms": 3143.480148999515, "phases": {"functional": {"sql": 340, "objects": 34762}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34762, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"},
+          {"ms": 3063.7118280010327, "phases": {"functional": {"sql": 340, "objects": 34762}, "serialization": {"sql": 0, "objects": 0}}, "retained": 34762, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"}
+        ]
+      },
+      "optimized": {
+        "median_ms": 13.681100999747287,
+        "memory_sample": {"ms": 65.01009899875498, "phases": {"functional": {"sql": 1, "objects": 2478}, "serialization": {"sql": 0, "objects": 0}}, "retained": 2478, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44", "peak_python_bytes": 6501614},
+        "samples": [
+          {"ms": 13.681100999747287, "phases": {"functional": {"sql": 1, "objects": 2478}, "serialization": {"sql": 0, "objects": 0}}, "retained": 2478, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"},
+          {"ms": 14.124442999673192, "phases": {"functional": {"sql": 1, "objects": 2478}, "serialization": {"sql": 0, "objects": 0}}, "retained": 2478, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"},
+          {"ms": 14.518792000671965, "phases": {"functional": {"sql": 1, "objects": 2478}, "serialization": {"sql": 0, "objects": 0}}, "retained": 2478, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"},
+          {"ms": 11.502512999868486, "phases": {"functional": {"sql": 1, "objects": 2478}, "serialization": {"sql": 0, "objects": 0}}, "retained": 2478, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"},
+          {"ms": 13.17181000013079, "phases": {"functional": {"sql": 1, "objects": 2478}, "serialization": {"sql": 0, "objects": 0}}, "retained": 2478, "rows": 2478, "bytes": 246251, "sha256": "966f4efeed464f0a19e073a7550604b7314e117499c539f9f06b66c8405a2b44"}
+        ]
+      }
+    },
+    "list_nuclei": {
+      "original": {
+        "median_ms": 20.977500000299187,
+        "memory_sample": {"ms": 37.41173300113587, "phases": {"functional": {"sql": 6, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f", "peak_python_bytes": 1019776},
+        "samples": [
+          {"ms": 22.975760999543127, "phases": {"functional": {"sql": 6, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"},
+          {"ms": 22.220849999939674, "phases": {"functional": {"sql": 6, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"},
+          {"ms": 20.977500000299187, "phases": {"functional": {"sql": 6, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"},
+          {"ms": 18.539931001214427, "phases": {"functional": {"sql": 6, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"},
+          {"ms": 18.8657359994977, "phases": {"functional": {"sql": 6, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"}
+        ]
+      },
+      "optimized": {
+        "median_ms": 14.602945999286021,
+        "memory_sample": {"ms": 18.42632799889543, "phases": {"functional": {"sql": 1, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f", "peak_python_bytes": 549055},
+        "samples": [
+          {"ms": 15.459462001672364, "phases": {"functional": {"sql": 1, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"},
+          {"ms": 12.72488300128316, "phases": {"functional": {"sql": 1, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"},
+          {"ms": 14.744432000952656, "phases": {"functional": {"sql": 1, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"},
+          {"ms": 12.850514000092517, "phases": {"functional": {"sql": 1, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"},
+          {"ms": 14.602945999286021, "phases": {"functional": {"sql": 1, "objects": 100}, "serialization": {"sql": 0, "objects": 0}}, "retained": 100, "rows": 100, "bytes": 50922, "sha256": "8636340c07fdb5530d27e5484d7dc00d55b329cf8272014a4bc4695197c80a3f"}
+        ]
+      }
+    },
+    "list_ran_nuclei_catalog": {
+      "original": {
+        "median_ms": 57.42681199990329,
+        "memory_sample": {"ms": 59.43315600052301, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52", "peak_python_bytes": 77771},
+        "samples": [
+          {"ms": 67.81269900056941, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"},
+          {"ms": 57.42681199990329, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"},
+          {"ms": 65.23479200041038, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"},
+          {"ms": 56.16513299901271, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"},
+          {"ms": 56.5084059999208, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"}
+        ]
+      },
+      "optimized": {
+        "median_ms": 59.021971999754896,
+        "memory_sample": {"ms": 60.59031800032244, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52", "peak_python_bytes": 77830},
+        "samples": [
+          {"ms": 61.976897000931785, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"},
+          {"ms": 56.58167899855471, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"},
+          {"ms": 59.021971999754896, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"},
+          {"ms": 68.40207700042811, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"},
+          {"ms": 56.38886599990656, "phases": {"functional": {"sql": 1, "objects": 0}, "serialization": {"sql": 0, "objects": 0}}, "retained": 0, "rows": 20, "bytes": 5048, "sha256": "db80b9174705fc3d947ac018df3a7efc13453e252dc0783d4bc0759cb9b0fb52"}
+        ]
+      }
+    }
+  }
+}
