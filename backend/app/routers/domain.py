@@ -165,7 +165,7 @@ def get_project(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    return require_project_access(db, user, id_proyecto)
+    return require_project_access(db, user, id_proyecto, load_details=False)
 
 
 @router.patch("/proyectos/{id_proyecto}", response_model=schemas.ProyectoResponse)
@@ -277,7 +277,7 @@ def list_project_nuclei(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_access(db, user, id_proyecto)
+    require_project_access(db, user, id_proyecto, load_details=False)
     query = db.query(models.ProyectoNucleoResumen).filter(
         models.ProyectoNucleoResumen.id_proyecto == id_proyecto,
         models.ProyectoNucleoResumen.activo.is_(True),
@@ -319,7 +319,7 @@ def get_project_nucleus(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, load_details=False)
     record = db.get(models.ProyectoNucleoResumen, id_proyecto_nucleo)
     if record is None:
         raise HTTPException(status_code=404, detail="ProyectoNucleo no encontrado")
@@ -369,7 +369,7 @@ def list_references(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, load_details=False)
     return db.query(models.ProyectoNucleoReferencia).filter(
         models.ProyectoNucleoReferencia.id_proyecto_nucleo
         == id_proyecto_nucleo,
@@ -736,7 +736,7 @@ def list_activities(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, load_details=False)
     query = db.query(models.ActividadCampo).filter(
         models.ActividadCampo.id_proyecto_nucleo == id_proyecto_nucleo,
         models.ActividadCampo.activo.is_(True),
@@ -921,7 +921,7 @@ def list_affectations(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, load_details=False)
     query = db.query(models.Afectacion).filter(
         models.Afectacion.id_proyecto_nucleo == id_proyecto_nucleo,
         models.Afectacion.activo.is_(True),
@@ -1064,7 +1064,7 @@ def list_assemblies(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, load_details=False)
     return db.query(models.Asamblea).filter(
         models.Asamblea.id_proyecto_nucleo == id_proyecto_nucleo,
         models.Asamblea.activo.is_(True),
@@ -1246,7 +1246,7 @@ def list_ran_procedures(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_nucleus_access(db, user, id_proyecto_nucleo, mode="read")
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, mode="read", load_details=False)
     return db.query(models.TramiteRan).filter(
         models.TramiteRan.id_proyecto_nucleo == id_proyecto_nucleo,
         models.TramiteRan.activo.is_(True),
@@ -1311,7 +1311,7 @@ def list_agreements(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_affectation_access(db, user, id_afectacion)
+    require_affectation_access(db, user, id_afectacion, load_details=False)
     return db.query(models.Convenio).join(models.ConvenioAfectacion).filter(
         models.ConvenioAfectacion.id_afectacion == id_afectacion,
         models.ConvenioAfectacion.activo.is_(True),
@@ -1479,7 +1479,7 @@ def list_fifonafe(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_nucleus_access(db, user, id_proyecto_nucleo)
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, load_details=False)
     return db.query(models.TramiteFifonafe).filter(
         models.TramiteFifonafe.id_proyecto_nucleo == id_proyecto_nucleo,
         models.TramiteFifonafe.activo.is_(True),
