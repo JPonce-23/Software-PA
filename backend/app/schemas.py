@@ -1648,6 +1648,22 @@ class ImportacionConfirmarRequest(BaseModel):
     aceptar_advertencias: bool = False
 
 
+class DashboardConvenioDetalle(BaseModel):
+    id_convenio: int
+    ambito: Ambito
+    tipo_convenio: str | None
+    consecutivo: int
+    fecha_firma: date | None
+
+
+class DashboardConveniosResponse(BaseModel):
+    """Active unique agreements reachable from the dashboard's first 100 nuclei."""
+    individuales: int
+    colectivos: int
+    formalizados: int
+    convenios: list[DashboardConvenioDetalle]
+
+
 class DashboardKpiResponse(ORMModel):
     id_proyecto: int
     anio: int
