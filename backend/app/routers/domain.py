@@ -44,7 +44,7 @@ def list_states(
     db: Session = Depends(get_db),
     _: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    return db.query(models.EntidadFederativa).filter(
+    return db.query(models.EntidadFederativa).options(raiseload("*")).filter(
         models.EntidadFederativa.activo.is_(True)
     ).order_by(models.EntidadFederativa.clave_inegi).all()
 
@@ -55,7 +55,7 @@ def list_municipalities(
     db: Session = Depends(get_db),
     _: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    query = db.query(models.Municipio).filter(models.Municipio.activo.is_(True))
+    query = db.query(models.Municipio).options(raiseload("*")).filter(models.Municipio.activo.is_(True))
     if id_entidad is not None:
         query = query.filter(models.Municipio.id_entidad == id_entidad)
     return query.order_by(models.Municipio.clave_inegi).all()
@@ -199,7 +199,7 @@ def list_nuclei(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    query = db.query(models.NucleoAgrario).filter(
+    query = db.query(models.NucleoAgrario).options(raiseload("*")).filter(
         models.NucleoAgrario.activo.is_(True)
     )
     if user.rol != "admin":
