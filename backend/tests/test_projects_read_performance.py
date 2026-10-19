@@ -13,6 +13,7 @@ import uuid
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import event, inspect, text
+from sqlalchemy.orm import raiseload
 
 from app import auth, models, schemas
 from app.config import AUTH_SETTINGS
@@ -57,6 +58,12 @@ def projects_env(transactional_api):
         ), "Use el Compose local desechable; nunca una base persistente"
         actor = db.query(models.Usuario.id_usuario).filter_by(rol="admin", activo=True).first()[0]
         set_audit_context(db, actor)
+        # Other modules may leave active synthetic projects in a shared run.
+        # Hide them only inside this module's outer rollback, keeping the same
+        # 205-project expectations and restoring prior state at fixture teardown.
+        for project in db.query(models.Proyecto).options(raiseload("*")).filter_by(activo=True).all():
+            mark_inactive(project, actor, "Aislamiento transaccional del fixture F01")
+        db.flush()
         password = "Qa1!" + uuid.uuid4().hex
         users = {}
         for role in ROLES:
