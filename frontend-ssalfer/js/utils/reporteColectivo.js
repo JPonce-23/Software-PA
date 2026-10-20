@@ -13,11 +13,37 @@
         const fallo = error => { salida.textContent = error.message || "No fue posible consultar el reporte. Vuelve a consultar para reintentar."; salida.setAttribute("role", "alert"); exportar.disabled = true; };
         async function cargarReferencias(nucleos) {
             const mapa = new Map();
+            if (!nucleos.length) return mapa;
+            const datos = await window.ReportesAPI.obtenerReferenciasContexto(nucleos.map(n => n.id_proyecto_nucleo));
+            if (!['nucleos', 'afectaciones', 'convenios', 'asambleas'].every(tipo => Array.isArray(datos?.[tipo]))) throw Error('Referencias no disponibles');
+            const disponibles = new Set(datos.nucleos.map(n => Number(n.id_proyecto_nucleo)));
+            if (nucleos.some(n => !disponibles.has(Number(n.id_proyecto_nucleo)))) throw Error('Referencias no disponibles');
+            const padres = new Map(datos.afectaciones.map(a => [a.id_afectacion, a]));
+            const agrupar = (filas, id) => {
+                const grupos = new Map();
+                for (const fila of filas) {
+                    const clave = Number(id(fila));
+                    if (!grupos.has(clave)) grupos.set(clave, []);
+                    grupos.get(clave).push(fila);
+                }
+                return grupos;
+            };
+            const conveniosPorNucleo = agrupar(datos.convenios, ref => ref.item.id_proyecto_nucleo);
+            const asambleasPorNucleo = agrupar(datos.asambleas, a => a.id_proyecto_nucleo);
+            const texto = partes => partes.filter(v => v !== null && v !== undefined && v !== '').join(' · ');
+            const fecha = valor => valor ? f.formatearFecha(valor) : '';
             for (const n of nucleos) {
-                const contexto = window.SSALFER_CONTEXTO.crear(n.id_proyecto_nucleo);
-                const [convenios, asambleas] = await Promise.all([contexto.listar("convenio"), contexto.listar("asamblea")]);
-                convenios.filter(c => c.item.ambito === "colectivo" || c.padre?.item.tipo_afectacion === "colectivo").forEach(c => mapa.set(`convenio:${c.id}`, { ...c, etiqueta: `${n.nombre_nucleo} · ${c.etiqueta}` }));
-                asambleas.forEach(a => mapa.set(`asamblea:${a.id}`, { ...a, etiqueta: `${n.nombre_nucleo} · ${a.etiqueta}` }));
+                for (const ref of conveniosPorNucleo.get(Number(n.id_proyecto_nucleo)) || []) {
+                    const c = ref.item, a = padres.get(ref.id_afectacion);
+                    if (!a) throw Error('Referencia de afectación no disponible');
+                    if (c.ambito !== 'colectivo' && a?.tipo_afectacion !== 'colectivo') continue;
+                    const padre = texto([f.etiquetaCodigo(a.tipo_afectacion), a.superficie_afectada_ha == null ? '' : `${Number(a.superficie_afectada_ha).toLocaleString('es-MX')} ha`, a.situacion]);
+                    const etiqueta = texto([padre, texto([f.etiquetaCodigo(c.tipo_convenio), `Consecutivo ${c.consecutivo}`, fecha(c.fecha_firma)])]);
+                    mapa.set(`convenio:${c.id_convenio}`, {id: c.id_convenio, item: c, etiqueta: `${n.nombre_nucleo} · ${etiqueta}`});
+                }
+                for (const a of asambleasPorNucleo.get(Number(n.id_proyecto_nucleo)) || []) {
+                    mapa.set(`asamblea:${a.id_asamblea}`, {id: a.id_asamblea, item: a, etiqueta: `${n.nombre_nucleo} · ${a.proposito || 'Asambleas'}`});
+                }
             }
             return mapa;
         }
@@ -27,6 +53,7 @@
             const pid = campo("id_proyecto").value; if (!pid) { cargandoContexto=false; return; }
             try {
                 const [nucleos, datos] = await Promise.all([window.NucleosAPI.listarPorProyecto(pid), window.ReportesAPI.obtenerColectivosDestino({ id_proyecto: pid })]);
+                if (actual !== revision) return;
                 const refs = await cargarReferencias(nucleos);
                 if (actual !== revision) return;
                 baseReporte = datos; referencias = refs; llenar("id_proyecto_nucleo", nucleos.map(n => [n.id_proyecto_nucleo, n.nombre_nucleo]), nucleo);

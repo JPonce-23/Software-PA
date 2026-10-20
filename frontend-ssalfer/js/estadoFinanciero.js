@@ -164,13 +164,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                     KPIs (dashboard/kpi + valores declarados)
     ====================================================== */
 
+    // Both initial consumers share one snapshot; exports keep their existing URLs.
+    const valoresDeclaradosIniciales = window.ReportesAPI.obtenerConveniosValoresDeclarados({ id_proyecto: idProyecto });
+
     (async () => {
 
         try {
 
             const [kpisTodos, valoresDeclarados] = await Promise.all([
                 window.ReportesAPI.obtenerKpiDashboard(),
-                window.ReportesAPI.obtenerConveniosValoresDeclarados({ id_proyecto: idProyecto })
+                valoresDeclaradosIniciales
             ]);
 
             const kpisProyecto = (Array.isArray(kpisTodos) ? kpisTodos : [])
@@ -284,7 +287,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         try {
 
-            const filas = await window.ReportesAPI.obtenerConveniosValoresDeclarados({ id_proyecto: idProyecto });
+            const filas = await valoresDeclaradosIniciales;
 
             if (!Array.isArray(filas) || filas.length === 0) {
 
@@ -294,11 +297,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
 
             const referencias = new Map();
-            await Promise.allSettled([...new Set(filas.map(fila => fila.id_convenio))].map(async id => {
-                const convenio = await window.ConveniosAPI.obtener(id);
-                referencias.set(Number(id), [window.SSALFER_FORMAT.etiquetaCodigo(convenio.tipo_convenio),
+            const datosReferencias = await window.ReportesAPI.obtenerReferenciasReporte({convenios: filas.map(fila => fila.id_convenio)});
+            for (const convenio of datosReferencias.convenios) {
+                referencias.set(Number(convenio.id_convenio), [window.SSALFER_FORMAT.etiquetaCodigo(convenio.tipo_convenio),
                     `Consecutivo ${convenio.consecutivo}`, window.SSALFER_FORMAT.etiquetaCodigo(convenio.ambito)].join(" · "));
-            }));
+            }
 
             cuerpo.innerHTML = filas.map(fila => `
                 <tr>
