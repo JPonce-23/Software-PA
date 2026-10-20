@@ -1,0 +1,663 @@
+{
+  "backend-comparison": {
+    "small": {
+      "original": {
+        "median_ms": 54.23804399833898,
+        "samples": [
+          {
+            "authorization": 25,
+            "functional": 39,
+            "serialization": 0,
+            "objects": 53,
+            "ms": 55.97134899653611,
+            "bytes": 101
+          },
+          {
+            "authorization": 25,
+            "functional": 39,
+            "serialization": 0,
+            "objects": 53,
+            "ms": 54.23804399833898,
+            "bytes": 101
+          },
+          {
+            "authorization": 25,
+            "functional": 39,
+            "serialization": 0,
+            "objects": 53,
+            "ms": 58.60389300141833,
+            "bytes": 101
+          },
+          {
+            "authorization": 25,
+            "functional": 39,
+            "serialization": 0,
+            "objects": 53,
+            "ms": 54.06101799962926,
+            "bytes": 101
+          },
+          {
+            "authorization": 25,
+            "functional": 39,
+            "serialization": 0,
+            "objects": 53,
+            "ms": 47.30943699905765,
+            "bytes": 101
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 5.558064000069862,
+        "samples": [
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 6.054929999663727,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 5.593535002844874,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 5.188241000723792,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 5.558064000069862,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 4.749894000269705,
+            "bytes": 101
+          }
+        ]
+      }
+    },
+    "over_100": {
+      "original": {
+        "median_ms": 927.967442003137,
+        "samples": [
+          {
+            "authorization": 736,
+            "functional": 744,
+            "serialization": 0,
+            "objects": 852,
+            "ms": 927.967442003137,
+            "bytes": 101
+          },
+          {
+            "authorization": 736,
+            "functional": 744,
+            "serialization": 0,
+            "objects": 852,
+            "ms": 922.1264830011933,
+            "bytes": 101
+          },
+          {
+            "authorization": 736,
+            "functional": 744,
+            "serialization": 0,
+            "objects": 852,
+            "ms": 1000.4051850010001,
+            "bytes": 101
+          },
+          {
+            "authorization": 736,
+            "functional": 744,
+            "serialization": 0,
+            "objects": 852,
+            "ms": 916.1611370000173,
+            "bytes": 101
+          },
+          {
+            "authorization": 736,
+            "functional": 744,
+            "serialization": 0,
+            "objects": 852,
+            "ms": 1197.0959799982666,
+            "bytes": 101
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 4.149811000388581,
+        "samples": [
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 3.9660570000705775,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 4.217192999931285,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 4.149811000388581,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 3.98311100070714,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 7.056693000777159,
+            "bytes": 101
+          }
+        ]
+      }
+    },
+    "empty": {
+      "original": {
+        "median_ms": 9.337284001958324,
+        "samples": [
+          {
+            "authorization": 1,
+            "functional": 3,
+            "serialization": 0,
+            "objects": 6,
+            "ms": 13.27065700024832,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 3,
+            "serialization": 0,
+            "objects": 6,
+            "ms": 7.7232999974512495,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 3,
+            "serialization": 0,
+            "objects": 6,
+            "ms": 9.726407002744963,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 3,
+            "serialization": 0,
+            "objects": 6,
+            "ms": 8.474304999253945,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 3,
+            "serialization": 0,
+            "objects": 6,
+            "ms": 9.337284001958324,
+            "bytes": 101
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 5.7212499996239785,
+        "samples": [
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 5.770925999968313,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 5.709488999855239,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 5.7212499996239785,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 5.621265001536813,
+            "bytes": 101
+          },
+          {
+            "authorization": 1,
+            "functional": 1,
+            "serialization": 0,
+            "objects": 1,
+            "ms": 7.032467001408804,
+            "bytes": 101
+          }
+        ]
+      }
+    }
+  },
+  "http-comparison": {
+    "small": {
+      "original": {
+        "median_ms": 102.5873889993818,
+        "samples": [
+          {
+            "sql": 64,
+            "requests": 12,
+            "objects": 64,
+            "response_bytes": 18155,
+            "ms": 97.15325100114569
+          },
+          {
+            "sql": 64,
+            "requests": 12,
+            "objects": 64,
+            "response_bytes": 18155,
+            "ms": 97.74891400229535
+          },
+          {
+            "sql": 64,
+            "requests": 12,
+            "objects": 64,
+            "response_bytes": 18155,
+            "ms": 103.06836900053895
+          },
+          {
+            "sql": 64,
+            "requests": 12,
+            "objects": 64,
+            "response_bytes": 18155,
+            "ms": 102.5873889993818
+          },
+          {
+            "sql": 64,
+            "requests": 12,
+            "objects": 64,
+            "response_bytes": 18155,
+            "ms": 113.15830499734147
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 19.65627699973993,
+        "samples": [
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 5,
+            "response_bytes": 3390,
+            "ms": 20.19373900111532
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 5,
+            "response_bytes": 3390,
+            "ms": 19.65627699973993
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 5,
+            "response_bytes": 3390,
+            "ms": 19.53523399788537
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 5,
+            "response_bytes": 3390,
+            "ms": 19.04768899839837
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 5,
+            "response_bytes": 3390,
+            "ms": 22.398819997761166
+          }
+        ]
+      }
+    },
+    "over_100": {
+      "original": {
+        "median_ms": 2740.965699998924,
+        "samples": [
+          {
+            "sql": 1480,
+            "requests": 317,
+            "objects": 958,
+            "response_bytes": 185262,
+            "ms": 2675.391288001265
+          },
+          {
+            "sql": 1480,
+            "requests": 317,
+            "objects": 958,
+            "response_bytes": 185262,
+            "ms": 3029.484965998563
+          },
+          {
+            "sql": 1480,
+            "requests": 317,
+            "objects": 958,
+            "response_bytes": 185262,
+            "ms": 2809.9300209978537
+          },
+          {
+            "sql": 1480,
+            "requests": 317,
+            "objects": 958,
+            "response_bytes": 185262,
+            "ms": 2612.2024780015636
+          },
+          {
+            "sql": 1480,
+            "requests": 317,
+            "objects": 958,
+            "response_bytes": 185262,
+            "ms": 2740.965699998924
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 30.88785900035873,
+        "samples": [
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 107,
+            "response_bytes": 115287,
+            "ms": 35.458128000755096
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 107,
+            "response_bytes": 115287,
+            "ms": 30.88785900035873
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 107,
+            "response_bytes": 115287,
+            "ms": 27.671340998494998
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 107,
+            "response_bytes": 115287,
+            "ms": 28.100106999772834
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 107,
+            "response_bytes": 115287,
+            "ms": 36.56594299900462
+          }
+        ]
+      }
+    },
+    "empty": {
+      "original": {
+        "median_ms": 18.929051999293733,
+        "samples": [
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 6,
+            "response_bytes": 2078,
+            "ms": 19.531660997017752
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 6,
+            "response_bytes": 2078,
+            "ms": 18.73737300047651
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 6,
+            "response_bytes": 2078,
+            "ms": 18.77323000007891
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 6,
+            "response_bytes": 2078,
+            "ms": 19.767809000768466
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 6,
+            "response_bytes": 2078,
+            "ms": 18.929051999293733
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 24.185480000596726,
+        "samples": [
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 2,
+            "response_bytes": 103,
+            "ms": 24.084512999252183
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 2,
+            "response_bytes": 103,
+            "ms": 25.358287999551976
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 2,
+            "response_bytes": 103,
+            "ms": 23.89023800060386
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 2,
+            "response_bytes": 103,
+            "ms": 25.06655000252067
+          },
+          {
+            "sql": 4,
+            "requests": 2,
+            "objects": 2,
+            "response_bytes": 103,
+            "ms": 24.185480000596726
+          }
+        ]
+      }
+    }
+  },
+  "frontend-comparison": [
+    {
+      "nuclei": 0,
+      "original_requests": 1,
+      "optimized_requests": 1,
+      "values": [
+        "0",
+        "0",
+        "0",
+        "0"
+      ]
+    },
+    {
+      "nuclei": 74,
+      "original_requests": 241,
+      "optimized_requests": 1,
+      "values": [
+        "37",
+        "0",
+        "1",
+        "1"
+      ]
+    },
+    {
+      "nuclei": 105,
+      "original_requests": 334,
+      "optimized_requests": 1,
+      "values": [
+        "53",
+        "0",
+        "1",
+        "1"
+      ]
+    },
+    {
+      "nuclei": 205,
+      "original_requests": 634,
+      "optimized_requests": 1,
+      "values": [
+        "103",
+        "0",
+        "1",
+        "1"
+      ]
+    }
+  ],
+  "browser-availability": {
+    "chromium": null,
+    "chromium-browser": null,
+    "google-chrome": null,
+    "firefox": null,
+    "node": "/home/alfredo/.nvm/versions/node/v22.23.2/bin/node",
+    "playwright_cached_files": 0
+  },
+  "static-review": {
+    "backend/app/routers/reporting.py": {
+      "existing_definitions_unchanged": 17,
+      "added": [
+        "map_indicators"
+      ]
+    },
+    "backend/app/schemas.py": {
+      "existing_definitions_unchanged": 202,
+      "added": [
+        "MapaIndicadoresResponse"
+      ]
+    },
+    "unchanged_files_sha256": {
+      "backend/app/models.py": "6bfdc5dea8707a5342ba5abb75c93f6c1b55a7fd41d472bd12f2eb12ab3f3a9a",
+      "backend/app/services/access.py": "dcf46e723b9e9dd4006fdd7128963898d33b62ab5f378579d34924a8ee166620",
+      "backend/app/services/dashboard_summary.py": "ad35f682268323b62b35438fe785a8b80241a62461f4700c23afe78e4b1d963c",
+      "frontend-ssalfer/js/dashboard.js": "1a253687cf3fb3bc258de027c2de30b7efb6259e8ca2de69010157c9c8135e6e",
+      "frontend-ssalfer/js/utils/dashboardExcel.js": "92bb53bc4483d93d2027ff58ba00968a33607f6fb41020d415bbadb01a11fcbc",
+      "backend/app/routers/domain.py": "7039d40f0b1bc8d59d4e11895b356ab50f57ab5132e0a0f79b70a7c70029c2ba",
+      "backend/app/services/domain.py": "3dbb6849fb5751b461a4a118285b6a684ec871f5fcd82c71c9e66456077e9245"
+    },
+    "published_openapi": {
+      "existing_paths_unchanged": 141,
+      "added_paths": [
+        "/api/proyectos/{id_proyecto}/mapa/indicadores"
+      ],
+      "added_schemas": [
+        "MapaIndicadoresResponse"
+      ]
+    },
+    "geometry_regressions": {
+      "tests.test_projects_read_performance": 38,
+      "tests.test_access_context_performance": 173,
+      "tests.test_territorial_catalog_performance": 60,
+      "tests.test_dashboard_summary_performance": 56,
+      "tests.test_project_map_gis": 17,
+      "tests.test_gis_history_026": 26
+    }
+  },
+  "methodology": {
+    "api": "TestClient local; sesión sustituida en mediciones; sesiones reales en pruebas separadas",
+    "backend": "5 muestras alternadas tras calentamiento; Session nueva por muestra; misma transacción y datos",
+    "js": "funciones reales de mapa.js en VM Node con dobles DOM/API; referencia Git 0ce1743",
+    "no_browser_har_or_render_times": true,
+    "production_access": false
+  },
+  "validation": {
+    "f05_backend_passed": 80,
+    "f01_f04_and_geometry_passed": 370,
+    "javascript_passed": 18,
+    "full_suite": [
+      {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "3",
+        "skipped": "27",
+        "tests": "1374",
+        "time": "945.848",
+        "timestamp": "2026-10-20T17:01:46.339009+00:00",
+        "hostname": "224eb270fabd"
+      }
+    ],
+    "preexisting_comparison": {
+      "same_failures": true,
+      "same_skips": true,
+      "failures": [
+        "tests.test_convenio_general_report::test_facetas_respetan_naturaleza_sin_depender_de_pagina",
+        "tests.test_schema_018_orv_persona_ciclo_vida::test_018_backfill_specific_record_from_017_transition",
+        "tests.test_sync_catalogo_ran::test_dataset_excludes_actual_additional_ran_identities"
+      ],
+      "skips": {
+        "Backfill DDL requiere instancia desechable aislada": 2,
+        "Ledger-writing checks require the isolated disposable instance": 23,
+        "Definir RAN_REPRO_DATABASE con una DB desechable preparada": 1,
+        "La base aislada tiene más de un administrador activo": 1
+      }
+    },
+    "browser_pending": true,
+    "preexisting_excel_null_type_pending": true
+  }
+}

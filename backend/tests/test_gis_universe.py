@@ -179,14 +179,15 @@ def test_context_schema_is_additive_and_openapi_valid():
     assert 'AdvertenciaUniversoGisResponse' in contract
 
 
-def test_universe_project_permissions_unchanged(transactional_api,tmp_path,monkeypatch):
+@pytest.mark.parametrize('role',['operador','visualizador','geografo'])
+def test_universe_administration_requires_gis_role(transactional_api,tmp_path,monkeypatch,role):
     from types import SimpleNamespace
     api=transactional_api['request'];pid=project(api);iid=stage(api,pid,gpkg(tmp_path,'scope-context',[('g',[(polygon(),{})])])).json()['id_importacion']
-    row=api('POST','/api/usuarios',expected=201,json={'nombre':'QA','apellido_paterno':'Universo','rol':'geografo',
+    row=api('POST','/api/usuarios',expected=201,json={'nombre':'QA','apellido_paterno':'Universo','rol':role,
         'correo':uuid.uuid4().hex+'@example.invalid','contrasena':'Qa1!'+uuid.uuid4().hex+'Z'}).json()
-    monkeypatch.setitem(app.dependency_overrides,auth.get_current_user,lambda:SimpleNamespace(id_usuario=row['id_usuario'],rol='geografo',activo=True))
-    api('GET',f'/api/importaciones/{iid}/resumen',expected=403)
-    api('GET',f'/api/importaciones/{iid}/conciliaciones',expected=403)
+    monkeypatch.setitem(app.dependency_overrides,auth.get_current_user,lambda:SimpleNamespace(id_usuario=row['id_usuario'],rol=role,activo=True))
+    api('GET',f'/api/importaciones/{iid}/resumen',expected=200 if role=='geografo' else 403)
+    api('GET',f'/api/importaciones/{iid}/conciliaciones',expected=200 if role=='geografo' else 403)
 
 
 def test_idempotent_old_reconciliation_returns_correct_snapshot_without_rewriting(transactional_api,tmp_path):

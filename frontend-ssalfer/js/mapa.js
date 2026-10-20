@@ -63,26 +63,23 @@ document.addEventListener("DOMContentLoaded", () => {
             else if(!event.shiftKey && document.activeElement===ultimo){event.preventDefault();primero?.focus();}
         }
     });
-    async function metricasProyecto(pid,nucleos,vigente){
-        const pintar=(id,v)=>{if(vigente())document.getElementById(id).textContent=String(v);};
+    async function metricasProyecto(pid,vigente){
+        const pintar=(id,valor)=>{
+            if(vigente())document.getElementById(id).textContent=String(valor);
+        };
         idsMetricas.forEach(id=>pintar(id,'Consultando…'));
-        const asambleas=async()=>{
-            const catalogo=await window.ClienteAPI.get('/catalogos/operativos/resultado_convocatoria',{silencioso:true});
-            if(!Array.isArray(catalogo))throw Error('Catálogo no disponible');
-            const celebradas=new Set(catalogo.filter(r=>r.codigo==='celebrada').map(r=>Number(r.id_catalogo_opcion)));
-            if(!celebradas.size)throw Error('Resultado de celebración no disponible');
-            const ids=new Set();let cursor=0;
-            await Promise.all(Array.from({length:Math.min(3,nucleos.length)},async()=>{while(vigente()&&cursor<nucleos.length){const n=nucleos[cursor++],rows=await window.ClienteAPI.get(`/proyecto-nucleo/${n.id_proyecto_nucleo}/asambleas`,{silencioso:true});if(!Array.isArray(rows))throw Error('Respuesta no válida');for(const r of rows)if(r.activo!==false && r.convocatorias?.some(c=>c.activo!==false&&c.fecha_realizacion&&celebradas.has(Number(c.id_resultado))))ids.add(r.id_asamblea);}}));
-            pintar('valorAsambleasRealizadas',ids.size);
-        };
-        const convenios=async()=>{
-            const unicos=new Map();let cursor=0;
-            const leer=async ruta=>{const rows=await window.ClienteAPI.get(ruta,{silencioso:true});if(!Array.isArray(rows))throw Error('Respuesta no válida');return rows;};
-            await Promise.all(Array.from({length:Math.min(3,nucleos.length)},async()=>{while(vigente()&&cursor<nucleos.length){const n=nucleos[cursor++];for(const a of await leer(`/proyecto-nucleo/${n.id_proyecto_nucleo}/afectaciones`)){if(!vigente())return;if(a.activo===false)continue;for(const c of await leer(`/afectaciones/${a.id_afectacion}/convenios`))if(c.activo!==false&&c.fecha_firma)unicos.set(c.id_convenio,c);}}}));
-            const rows=[...unicos.values()],individual=rows.filter(c=>c.ambito==='individual').length,colectivo=rows.filter(c=>c.ambito==='colectivo').length;
-            pintar('valorConveniosIndividuales',individual);pintar('valorConveniosColectivos',colectivo);pintar('valorConveniosFirmados',individual+colectivo);
-        };
-        await Promise.all([asambleas().catch(()=>pintar('valorAsambleasRealizadas','No disponible')),convenios().catch(()=>idsMetricas.slice(1).forEach(id=>pintar(id,'No disponible')))]);
+        try {
+            const resumen=await window.ClienteAPI.get(
+                `/proyectos/${pid}/mapa/indicadores`,{silencioso:true}
+            );
+            const valores=[resumen?.asambleas_realizadas,resumen?.convenios_individuales,
+                resumen?.convenios_colectivos,resumen?.convenios_firmados];
+            if(valores.some((valor,i)=>!(i===0&&valor===null)&&
+                (!Number.isSafeInteger(valor)||valor<0)))throw Error('Respuesta no válida');
+            idsMetricas.forEach((id,i)=>pintar(id,valores[i]===null?'No disponible':valores[i]));
+        } catch {
+            idsMetricas.forEach(id=>pintar(id,'No disponible'));
+        }
     }
 
     const elementos = {
@@ -3692,6 +3689,10 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
 
+        // Los indicadores no bloquean las capas ni esperan al GeoJSON o a la
+        // paginación administrativa. El token descarta respuestas de otro proyecto.
+        metricasProyecto(proyecto.id_proyecto,()=>cargaActual===tokenCarga);
+
         /*
          * El mapa y el resumen se consultan en paralelo.
          *
@@ -3733,8 +3734,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const errores = [];
         elementos.selectorProyecto?.classList.remove("mapa-elegir-proyecto");
         const vista = new URLSearchParams(location.search), lecturaHistorica= vista.get('incluir_inactivas')==='true'?{incluir_inactivas:true}:{}, imp = Number(vista.get('id_importacion')), fid = Number(vista.get('id_feature'));
+        // Published layers are available to every project reader. Staging and
+        // historical import previews belong to GIS management, even on this page.
+        const sesionGis = imp > 0 ? await window.SSALFER_SESION_LISTA : null;
+        if (cargaActual !== tokenCarga) return;
+        const puedePrevisualizarGis = imp > 0 && ["admin", "geografo"].includes(sesionGis?.user?.rol);
+        if (imp > 0 && !puedePrevisualizarGis) {
+            errores.push('Tu cuenta no tiene permiso para ver esta previsualización. El mapa vigente sigue disponible.');
+        }
         window.SSALFER_MAPA_CONCILIACION?.detalle(proyecto.id_proyecto,()=>cargaActual===tokenCarga,resultadoMapa.status==="fulfilled"?resultadoMapa.value.geojson:null);
-        if (imp > 0 && !fid && vista.get('vista') === 'coincidencias') {
+        if (puedePrevisualizarGis && !fid && vista.get('vista') === 'coincidencias') {
             try {
                 const vistaGis=await window.SSALFER_MAPA_CONCILIACION.coincidencias(imp,proyecto.id_proyecto,()=>cargaActual===tokenCarga,lecturaHistorica);
                 if(cargaActual!==tokenCarga)return;
@@ -3747,7 +3756,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }catch(error){if(cargaActual!==tokenCarga)return;errores.push(error.message||'No se pudo consultar la previsualización de coincidencias.');}
         }
-        if (imp > 0 && fid > 0) {
+        if (puedePrevisualizarGis && fid > 0) {
             try {
                 const importacion = await window.GeoespacialAPI.obtener(imp,lecturaHistorica);
                 if (cargaActual !== tokenCarga) return;
@@ -3777,7 +3786,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 proyecto,
                 resultadoNucleos.value
             );
-            metricasProyecto(proyecto.id_proyecto,resultadoNucleos.value,()=>cargaActual===tokenCarga);
 
         } else {
 

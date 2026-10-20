@@ -27,13 +27,16 @@ def test_reconciliation_reuses_existing_roles_and_project_access(transactional_a
     else:
         user=api('POST','/api/usuarios',expected=201,json={'nombre':'GIS QA','apellido_paterno':'Sintético',
             'correo':uuid.uuid4().hex+'@example.invalid','rol':role,'contrasena':'Qa1!'+uuid.uuid4().hex+'Z'}).json()
-        api('POST',f'/api/proyectos/{pid}/usuarios',expected=201,json={'id_usuario':user['id_usuario']})
+        api('POST',f'/api/proyectos/{pid}/usuarios',expected=201 if role=='operador' else 422,json={'id_usuario':user['id_usuario']})
         principal=SimpleNamespace(id_usuario=user['id_usuario'],rol=role,activo=True)
     try:
         app.dependency_overrides[auth.get_current_user]=lambda:principal
-        assert candidates(api,staged['id_importacion'],f)
+        if can_write:
+            assert candidates(api,staged['id_importacion'],f)
+        else:
+            api('GET',f"/api/importaciones/{staged['id_importacion']}/features/{f['id_importacion_feature']}/candidatos",expected=403)
         decision(api,staged['id_importacion'],f,'confirmar',c,expected=200 if can_write else 403)
-        api('GET',f'/api/proyectos/{other}/geoespacial/configuracion',expected=200 if role=='admin' else 403)
+        api('GET',f'/api/proyectos/{other}/geoespacial/configuracion',expected=200 if role in ['admin','geografo'] else 403)
     finally: app.dependency_overrides[auth.get_current_user]=original
 
 

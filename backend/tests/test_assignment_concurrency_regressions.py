@@ -14,6 +14,7 @@ from app import models
 from app import schemas
 from app.database import SessionLocal, engine
 from app.services import domain
+from app.services.common import set_audit_context
 from .concurrency import PostgreSQLWorkers, wait_for_blocked_workers, workers_are_blocked
 from .test_project_user_assignments import REASON, _assign, _audit, _project, _snapshot
 from .test_user_administration import _create_user, _login
@@ -166,7 +167,17 @@ def test_cross_admin_unassignments_do_not_deadlock_and_audit_each_actor(api):
     admins = [_create_user(api, role="admin") for _ in range(2)]
     project_id = _project(api)
     ids = [admin["id_usuario"] for admin, _ in admins]
-    assignment_ids = [_assign(api, project_id, user_id).json()["id_usuario_proyecto"] for user_id in ids]
+    # Historical non-operator assignments can still be removed. New API
+    # assignments correctly reject admins under the current operator-only rule.
+    actor = api("GET", "/api/auth/sesion").json()["user"]["id_usuario"]
+    with SessionLocal() as db:
+        set_audit_context(db, actor)
+        historical = [models.UsuarioProyecto(id_usuario=user_id, id_proyecto=project_id,
+                      asignado_por=actor, creado_por=actor) for user_id in ids]
+        db.add_all(historical)
+        db.flush()
+        assignment_ids = [row.id_usuario_proyecto for row in historical]
+        db.commit()
     clients = [_login(admin["correo"], password) for admin, password in admins]
     barrier = threading.Barrier(2)
 

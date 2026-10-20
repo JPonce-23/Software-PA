@@ -1,0 +1,2426 @@
+{
+  "base_commit": "f98586eb4633e07b2481a7a67ee62ee81aa7d938",
+  "preparation": {
+    "host": "Cooper",
+    "worktree": "/home/alfredo/proyectos/Software-PA/.worktrees/ssalfer-optimizacion-fase1",
+    "branch": "perf/ssalfer-optimizacion-fase1",
+    "base": "f98586eb4633e07b2481a7a67ee62ee81aa7d938",
+    "status_before_code": "",
+    "test_project": "ssalfer-f02-20261019",
+    "schema_strategy": "restore local test schema, no migration execution",
+    "scope": ["require_project_access", "require_project_nucleus_access", "require_affectation_access"],
+    "endpoints": ["get_project", "list_project_nuclei", "get_project_nucleus", "list_references", "list_activities", "list_affectations", "list_assemblies", "list_ran_procedures", "list_agreements", "list_fifonafe"]
+  },
+  "environment": {
+    "identity": {
+      "name": "software_pa_test",
+      "cluster": "convenio-report-disposable",
+      "postgres": "PostgreSQL 15.4 (Debian 15.4-1.pgdg110+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit",
+      "postgis": "3.3.4"
+    },
+    "python": "3.11.17",
+    "fastapi": "0.138.2",
+    "sqlalchemy": "2.0.51",
+    "pydantic": "2.13.4",
+    "pytest": "9.1.1"
+  },
+  "static_checks": {
+    "f01_preserved": true,
+    "only_ten_reads_opted_in": true,
+    "write_handlers_ast_identical": true,
+    "access_helpers_changed": ["require_project_nucleus_access", "require_affectation_access"],
+    "reference_functions_ast_match_f98586e": true,
+    "models_schemas_authentication_reporting_migrations_unchanged": true
+  },
+  "openapi": {
+    "identical": true,
+    "paths": 140,
+    "sha256": "0270fc8f7edacaed68e287b1c44dce96c85fa49140f46287dd5ec3d6b537f72f"
+  },
+  "method": {
+    "pairs_per_pattern": 7,
+    "pattern_count": 8,
+    "warmup": "one call per variant, excluded",
+    "order": "alternating original/optimized and optimized/original",
+    "sessions": "fresh Session per sample; same isolated PostgreSQL connection",
+    "sql": "SELECT/WITH counts; transaction control excluded",
+    "authentication": "excluded from timing and SQL; separately checked through real HTTP sessions",
+    "authorization": "instrumented at each helper, excludes functional query",
+    "serialization": "separate phase, excluded from wall_ms",
+    "objects_loaded": "loaded_as_persistent events; distinct from final identity_map objects_retained",
+    "timing": "query, authorization and ORM load; no HTTP, authentication or serialization",
+    "cold_cache": false
+  },
+  "patterns": {
+    "require_project_access": {
+      "original": {
+        "median_ms": 25.99130700036767,
+        "wall_ms": [28.202404999319697, 25.99130700036767, 26.88006100106577, 23.48341799915943, 27.449126000647084, 24.02002300004824, 25.698969000586658],
+        "objects_retained": [22, 22, 22, 22, 22, 22, 22],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [32, 32, 32, 32, 32, 32, 32],
+            "objects_loaded": [22, 22, 22, 22, 22, 22, 22]
+          }
+        }
+      },
+      "optimized": {
+        "median_ms": 1.1011839997081552,
+        "wall_ms": [1.386423000440118, 1.1011839997081552, 1.3750630005233688, 0.9370150000904687, 1.0329300002922537, 0.8267350003734464, 1.3809400006721262],
+        "objects_retained": [1, 1, 1, 1, 1, 1, 1],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          }
+        }
+      }
+    },
+    "require_project_nucleus_access": {
+      "original": {
+        "median_ms": 47.03365700152062,
+        "wall_ms": [40.867956000511185, 47.03365700152062, 43.99656500027049, 45.31277400019462, 50.57916600162571, 50.63283500021498, 48.11981599959836],
+        "objects_retained": [16, 16, 16, 16, 16, 16, 16],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [32, 32, 32, 32, 32, 32, 32],
+            "objects_loaded": [6, 6, 6, 6, 6, 6, 6]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [29, 29, 29, 29, 29, 29, 29],
+            "objects_loaded": [16, 16, 16, 16, 16, 16, 16]
+          }
+        }
+      },
+      "optimized": {
+        "median_ms": 1.7896559984365012,
+        "wall_ms": [1.9040410006709863, 1.4832489996479126, 1.9631750001281034, 1.3165069995011436, 1.7896559984365012, 1.562293000461068, 2.2487610003736336],
+        "objects_retained": [1, 1, 1, 1, 1, 1, 1],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          }
+        }
+      }
+    },
+    "require_affectation_access": {
+      "original": {
+        "median_ms": 53.206044000035035,
+        "wall_ms": [51.44170400126313, 48.05772400140995, 47.850445998847135, 53.48499499996251, 53.206044000035035, 55.68565399880754, 53.22944100043969],
+        "objects_retained": [1, 1, 1, 1, 1, 1, 1],
+        "phases": {
+          "authorization.require_affectation_access": {
+            "sql": [5, 5, 5, 5, 5, 5, 5],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_access": {
+            "sql": [32, 32, 32, 32, 32, 32, 32],
+            "objects_loaded": [6, 6, 6, 6, 6, 6, 6]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [29, 29, 29, 29, 29, 29, 29],
+            "objects_loaded": [15, 15, 15, 15, 15, 15, 15]
+          }
+        }
+      },
+      "optimized": {
+        "median_ms": 2.91925499914214,
+        "wall_ms": [3.060011998968548, 2.4156159997801296, 2.91925499914214, 2.443221999783418, 2.5652479998825584, 3.3187360004376387, 3.1010980001155986],
+        "objects_retained": [1, 1, 1, 1, 1, 1, 1],
+        "phases": {
+          "authorization.require_affectation_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          }
+        }
+      }
+    },
+    "list_agreements": {
+      "original": {
+        "median_ms": 62.63136199959263,
+        "wall_ms": [56.55230500087782, 58.6301920011465, 89.38645099988207, 62.63136199959263, 70.50194399926113, 70.78037599967502, 56.85497100057546],
+        "objects_retained": [0, 0, 0, 0, 0, 0, 0],
+        "phases": {
+          "authorization.require_affectation_access": {
+            "sql": [5, 5, 5, 5, 5, 5, 5],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_access": {
+            "sql": [32, 32, 32, 32, 32, 32, 32],
+            "objects_loaded": [6, 6, 6, 6, 6, 6, 6]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [29, 29, 29, 29, 29, 29, 29],
+            "objects_loaded": [15, 15, 15, 15, 15, 15, 15]
+          },
+          "functional": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      "optimized": {
+        "median_ms": 4.577541001708596,
+        "wall_ms": [4.557470998406643, 4.577541001708596, 5.382743998779915, 3.791972998442361, 8.067468999797711, 5.442040001071291, 3.994004999185563],
+        "objects_retained": [0, 0, 0, 0, 0, 0, 0],
+        "phases": {
+          "authorization.require_affectation_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "functional": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      }
+    },
+    "list_activities": {
+      "original": {
+        "median_ms": 48.11197600065498,
+        "wall_ms": [55.70878700018511, 55.46748300002946, 46.79053899963037, 44.07497600004717, 44.59747900000366, 48.11197600065498, 49.84063600022637],
+        "objects_retained": [3, 3, 3, 3, 3, 3, 3],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [32, 32, 32, 32, 32, 32, 32],
+            "objects_loaded": [6, 6, 6, 6, 6, 6, 6]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [29, 29, 29, 29, 29, 29, 29],
+            "objects_loaded": [16, 16, 16, 16, 16, 16, 16]
+          },
+          "functional": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [3, 3, 3, 3, 3, 3, 3]
+          }
+        }
+      },
+      "optimized": {
+        "median_ms": 2.5191470012941863,
+        "wall_ms": [3.4208010001748335, 2.5228909998986637, 2.5191470012941863, 2.259885000967188, 2.419811999061494, 2.4311510005645687, 3.0733410003449535],
+        "objects_retained": [3, 3, 3, 3, 3, 3, 3],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "functional": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [3, 3, 3, 3, 3, 3, 3]
+          }
+        }
+      }
+    },
+    "list_assemblies": {
+      "original": {
+        "median_ms": 60.069834000387345,
+        "wall_ms": [60.277284999756375, 61.870162999184686, 60.03523000072164, 56.26531399866508, 49.69453099874954, 60.069834000387345, 61.355126001217286],
+        "objects_retained": [6, 6, 6, 6, 6, 6, 6],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [32, 32, 32, 32, 32, 32, 32],
+            "objects_loaded": [6, 6, 6, 6, 6, 6, 6]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [29, 29, 29, 29, 29, 29, 29],
+            "objects_loaded": [16, 16, 16, 16, 16, 16, 16]
+          },
+          "functional": {
+            "sql": [8, 8, 8, 8, 8, 8, 8],
+            "objects_loaded": [6, 6, 6, 6, 6, 6, 6]
+          }
+        }
+      },
+      "optimized": {
+        "median_ms": 9.142851000433438,
+        "wall_ms": [9.531020999929751, 9.43316099983349, 9.644574000049033, 8.620642000096268, 7.7454439997382, 6.021709999913583, 9.142851000433438],
+        "objects_retained": [6, 6, 6, 6, 6, 6, 6],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "functional": {
+            "sql": [8, 8, 8, 8, 8, 8, 8],
+            "objects_loaded": [6, 6, 6, 6, 6, 6, 6]
+          }
+        }
+      }
+    },
+    "list_ran_procedures": {
+      "original": {
+        "median_ms": 56.87746900002821,
+        "wall_ms": [56.87746900002821, 55.036550998920575, 56.93678299940075, 52.24085699956049, 57.561344001442194, 61.83137799962424, 51.659662000020035],
+        "objects_retained": [2, 2, 2, 2, 2, 2, 2],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [32, 32, 32, 32, 32, 32, 32],
+            "objects_loaded": [6, 6, 6, 6, 6, 6, 6]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [29, 29, 29, 29, 29, 29, 29],
+            "objects_loaded": [16, 16, 16, 16, 16, 16, 16]
+          },
+          "functional": {
+            "sql": [2, 2, 2, 2, 2, 2, 2],
+            "objects_loaded": [2, 2, 2, 2, 2, 2, 2]
+          }
+        }
+      },
+      "optimized": {
+        "median_ms": 4.264138000507955,
+        "wall_ms": [4.836604000956868, 4.357126999821048, 3.6728499999298947, 3.1948300002113683, 4.396365000502556, 4.264138000507955, 4.254058998412802],
+        "objects_retained": [2, 2, 2, 2, 2, 2, 2],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "functional": {
+            "sql": [2, 2, 2, 2, 2, 2, 2],
+            "objects_loaded": [2, 2, 2, 2, 2, 2, 2]
+          }
+        }
+      }
+    },
+    "list_fifonafe": {
+      "original": {
+        "median_ms": 54.53471699911461,
+        "wall_ms": [60.11693199980073, 59.306903000106104, 54.70712600072147, 52.44877099903533, 54.53471699911461, 51.622536999275326, 50.041810998664005],
+        "objects_retained": [3, 3, 3, 3, 3, 3, 3],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [32, 32, 32, 32, 32, 32, 32],
+            "objects_loaded": [6, 6, 6, 6, 6, 6, 6]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [29, 29, 29, 29, 29, 29, 29],
+            "objects_loaded": [16, 16, 16, 16, 16, 16, 16]
+          },
+          "functional": {
+            "sql": [5, 5, 5, 5, 5, 5, 5],
+            "objects_loaded": [3, 3, 3, 3, 3, 3, 3]
+          }
+        }
+      },
+      "optimized": {
+        "median_ms": 6.456237000747933,
+        "wall_ms": [7.012817000941141, 6.456237000747933, 6.809054999393993, 6.321439001112594, 4.854250999414944, 6.615197999053635, 6.283551998421899],
+        "objects_retained": [3, 3, 3, 3, 3, 3, 3],
+        "phases": {
+          "authorization.require_project_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "authorization.require_project_nucleus_access": {
+            "sql": [1, 1, 1, 1, 1, 1, 1],
+            "objects_loaded": [1, 1, 1, 1, 1, 1, 1]
+          },
+          "functional": {
+            "sql": [5, 5, 5, 5, 5, 5, 5],
+            "objects_loaded": [3, 3, 3, 3, 3, 3, 3]
+          }
+        }
+      }
+    }
+  },
+  "validation": {
+    "baseline-tests.xml": {
+      "cases": 133,
+      "passed": 133,
+      "failures": [],
+      "skipped": 0,
+      "skipped_by_module": {
+
+      }
+    },
+    "specific-tests.xml": {
+      "cases": 211,
+      "passed": 211,
+      "failures": [],
+      "skipped": 0,
+      "skipped_by_module": {
+
+      }
+    },
+    "full-suite.xml": {
+      "cases": 1178,
+      "passed": 1134,
+      "failures": ["tests/test_catalogo_nucleos_ran_api.py::test_without_filters_is_bounded_stable_and_only_returns_ran", "tests/test_catalogo_nucleos_ran_api.py::test_valid_limit_and_maximum_are_enforced", "tests/test_import_catalogo_nucleos_ran.py::test_apply_is_transactional_and_idempotent", "tests/test_import_catalogo_nucleos_ran.py::test_crosswalk_12_86_preserves_source_and_resolves_to_12085", "tests/test_import_catalogo_nucleos_ran.py::test_normal_flow_uses_direct_concatenation", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[0-1-admin]", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[0-100-admin]", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[0-200-admin]", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[199-200-admin]", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[205-200-admin]", "tests/test_schema_017_contexto_asamblea_adicional.py::test_caso_3_catalogo_contexto_asamblea_superficie_adicional_inactivo", "tests/test_schema_017_contexto_asamblea_adicional.py::test_revision_e_id_usuario_baja_null_sin_actor_hardcodeado", "tests/test_schema_017_contexto_asamblea_adicional.py::test_chk_baja_superficie_adicional_permite_id_usuario_baja_null", "tests/test_schema_017_contexto_asamblea_adicional.py::test_preservacion_observaciones_superficie_adicional", "tests/test_schema_018_orv_persona_ciclo_vida.py::test_018_backfill_specific_record_from_017_transition", "tests/test_sync_catalogo_ran.py::test_dataset_excludes_actual_additional_ran_identities", "tests/test_target_domain.py::test_territorial_fixture_contract"],
+      "skipped": 27,
+      "skipped_by_module": {
+        "tests.test_gis_backfill_026": 2,
+        "tests.test_migration_lineage": 23,
+        "tests.test_sync_catalogo_ran": 1,
+        "tests.test_user_administration": 1
+      }
+    },
+    "f01-control-failures.xml": {
+      "cases": 35,
+      "passed": 18,
+      "failures": ["tests/test_catalogo_nucleos_ran_api.py::test_without_filters_is_bounded_stable_and_only_returns_ran", "tests/test_catalogo_nucleos_ran_api.py::test_valid_limit_and_maximum_are_enforced", "tests/test_import_catalogo_nucleos_ran.py::test_apply_is_transactional_and_idempotent", "tests/test_import_catalogo_nucleos_ran.py::test_crosswalk_12_86_preserves_source_and_resolves_to_12085", "tests/test_import_catalogo_nucleos_ran.py::test_normal_flow_uses_direct_concatenation", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[0-1-admin]", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[0-100-admin]", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[0-200-admin]", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[199-200-admin]", "tests/test_projects_read_performance.py::test_roles_json_order_and_pagination[205-200-admin]", "tests/test_schema_017_contexto_asamblea_adicional.py::test_caso_3_catalogo_contexto_asamblea_superficie_adicional_inactivo", "tests/test_schema_017_contexto_asamblea_adicional.py::test_revision_e_id_usuario_baja_null_sin_actor_hardcodeado", "tests/test_schema_017_contexto_asamblea_adicional.py::test_chk_baja_superficie_adicional_permite_id_usuario_baja_null", "tests/test_schema_017_contexto_asamblea_adicional.py::test_preservacion_observaciones_superficie_adicional", "tests/test_schema_018_orv_persona_ciclo_vida.py::test_018_backfill_specific_record_from_017_transition", "tests/test_sync_catalogo_ran.py::test_dataset_excludes_actual_additional_ran_identities", "tests/test_target_domain.py::test_territorial_fixture_contract"],
+      "skipped": 0,
+      "skipped_by_module": {
+
+      }
+    },
+    "final/regressions.xml": {
+      "cases": 241,
+      "passed": 237,
+      "failures": ["tests/test_catalogo_nucleos_ran_api.py::test_without_filters_is_bounded_stable_and_only_returns_ran", "tests/test_catalogo_nucleos_ran_api.py::test_valid_limit_and_maximum_are_enforced", "tests/test_schema_018_orv_persona_ciclo_vida.py::test_018_backfill_specific_record_from_017_transition", "tests/test_sync_catalogo_ran.py::test_dataset_excludes_actual_additional_ran_identities"],
+      "skipped": 0,
+      "skipped_by_module": {
+
+      }
+    }
+  },
+  "final_reference_data": {
+    "territory": "existing fixture 32 states / 2478 municipalities",
+    "catalog_notes": "preserved",
+    "historical_null_actors": "preserved",
+    "non_null_actor_ids": "mapped to synthetic bootstrap",
+    "migrations_executed": false
+  },
+  "repeat_after_fixture_corrections": {
+    "require_project_access": {
+      "original": {
+        "median_ms": 26.625348000379745,
+        "samples": [
+          {
+            "wall_ms": 28.28132399918104,
+            "objects_retained": 22,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 22
+              }
+            }
+          },
+          {
+            "wall_ms": 28.101892999984557,
+            "objects_retained": 22,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 22
+              }
+            }
+          },
+          {
+            "wall_ms": 26.662984999347827,
+            "objects_retained": 22,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 22
+              }
+            }
+          },
+          {
+            "wall_ms": 26.18855299988354,
+            "objects_retained": 22,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 22
+              }
+            }
+          },
+          {
+            "wall_ms": 26.625348000379745,
+            "objects_retained": 22,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 22
+              }
+            }
+          },
+          {
+            "wall_ms": 25.44332899924484,
+            "objects_retained": 22,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 22
+              }
+            }
+          },
+          {
+            "wall_ms": 26.01311300168163,
+            "objects_retained": 22,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 22
+              }
+            }
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 1.0747159994934918,
+        "samples": [
+          {
+            "wall_ms": 1.3875969998480286,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.047292998919147,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.1577240002225153,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.0388029986643232,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.0747159994934918,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 0.8117559991660528,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.2618910004675854,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    "require_project_nucleus_access": {
+      "original": {
+        "median_ms": 42.05013799946755,
+        "samples": [
+          {
+            "wall_ms": 45.18237399861391,
+            "objects_retained": 16,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 42.05013799946755,
+            "objects_retained": 16,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 41.720687000633916,
+            "objects_retained": 16,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 39.98439199858694,
+            "objects_retained": 16,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 44.40128899841511,
+            "objects_retained": 16,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 41.78587100068398,
+            "objects_retained": 16,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 44.578529999853345,
+            "objects_retained": 16,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 1.7286309994233306,
+        "samples": [
+          {
+            "wall_ms": 1.83665300028224,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.7286309994233306,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.5613569994457066,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.319711998803541,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 2.1084999989398057,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.2816179987567011,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 2.2262549991864944,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    "require_affectation_access": {
+      "original": {
+        "median_ms": 51.12126200037892,
+        "samples": [
+          {
+            "wall_ms": 45.87856900070619,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 50.15319799895224,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 49.34729600063292,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 51.12126200037892,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 54.589928000496,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 55.04007099989394,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 51.84458700023242,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              }
+            }
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 2.735285001108423,
+        "samples": [
+          {
+            "wall_ms": 2.7011769998352975,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 2.4186730006476864,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 2.735285001108423,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 1.8900329996540677,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 2.834323999195476,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 2.9998219997651177,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          },
+          {
+            "wall_ms": 2.964847999464837,
+            "objects_retained": 1,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    "list_agreements": {
+      "original": {
+        "median_ms": 58.031302000017604,
+        "samples": [
+          {
+            "wall_ms": 67.5090269996872,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 58.867615000053775,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 58.031302000017604,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 58.236062999640126,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 52.54220200004056,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 54.12141799934034,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 52.18820099980803,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 5,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 15
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 4.140856000958593,
+        "samples": [
+          {
+            "wall_ms": 4.455713000425021,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 4.315483000027598,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 4.140856000958593,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 4.189949000647175,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 4.134214001169312,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 4.125419000047259,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          },
+          {
+            "wall_ms": 3.7626860012096586,
+            "objects_retained": 0,
+            "phases": {
+              "authorization.require_affectation_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    "list_activities": {
+      "original": {
+        "median_ms": 42.716021998785436,
+        "samples": [
+          {
+            "wall_ms": 42.518934000327135,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 42.716021998785436,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 44.07873600030143,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 44.76333900129248,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 40.11655599970254,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 47.704992999570095,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 39.282068000829895,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 2.7387390000512823,
+        "samples": [
+          {
+            "wall_ms": 2.699753000342753,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 2.6040939992526546,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 2.774996000880492,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 2.844403999915812,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 3.0697869988216553,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 2.0736200003739214,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 2.7387390000512823,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 1,
+                "objects_loaded": 3
+              }
+            }
+          }
+        ]
+      }
+    },
+    "list_assemblies": {
+      "original": {
+        "median_ms": 57.20218399983423,
+        "samples": [
+          {
+            "wall_ms": 60.04927100002533,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 58.489017999818316,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 57.20218399983423,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 60.31629700009944,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 54.724060000808095,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 54.09387100007734,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 56.039716000668705,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 8.435360001385561,
+        "samples": [
+          {
+            "wall_ms": 8.435360001385561,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 8.746102999793948,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 7.676520001041354,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 8.142086000589188,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 9.006570999190444,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 8.169198001269251,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          },
+          {
+            "wall_ms": 8.90676299968618,
+            "objects_retained": 6,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 8,
+                "objects_loaded": 6
+              }
+            }
+          }
+        ]
+      }
+    },
+    "list_ran_procedures": {
+      "original": {
+        "median_ms": 44.98792499907722,
+        "samples": [
+          {
+            "wall_ms": 51.15024300175719,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 44.98792499907722,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 42.903481000394095,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 43.26071899959061,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 44.29974599952402,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 45.07225499946799,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 45.859713000027114,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 3.1159909995039925,
+        "samples": [
+          {
+            "wall_ms": 3.7308690007193945,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 2.5557009994372493,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 3.8724049991287757,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 3.1159909995039925,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 3.00120199972298,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 3.262624999479158,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          },
+          {
+            "wall_ms": 3.0526770005963044,
+            "objects_retained": 2,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 2,
+                "objects_loaded": 2
+              }
+            }
+          }
+        ]
+      }
+    },
+    "list_fifonafe": {
+      "original": {
+        "median_ms": 46.645292999528465,
+        "samples": [
+          {
+            "wall_ms": 45.811494999725255,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 46.649801999592455,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 46.12581000037608,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 46.303954999530106,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 47.97382799915795,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 46.645292999528465,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 47.141980001470074,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 29,
+                "objects_loaded": 16
+              },
+              "authorization.require_project_access": {
+                "sql": 32,
+                "objects_loaded": 6
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 5.001976000130526,
+        "samples": [
+          {
+            "wall_ms": 5.007439998735208,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 6.333211000310257,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 5.202434998864192,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 4.180193000138388,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 4.206165998766664,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 5.001976000130526,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          },
+          {
+            "wall_ms": 4.818437000722042,
+            "objects_retained": 3,
+            "phases": {
+              "authorization.require_project_nucleus_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "authorization.require_project_access": {
+                "sql": 1,
+                "objects_loaded": 1
+              },
+              "functional": {
+                "sql": 5,
+                "objects_loaded": 3
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "closing_checks": {
+    "ledger_rows": 29,
+    "checksum_mismatches": [],
+    "territory": [32, 2478],
+    "openapi_identical": true
+  },
+  "cleanup": "ssalfer-f02-20261019 disposable containers/network removed; source and production unchanged"
+}

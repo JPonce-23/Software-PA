@@ -4,19 +4,79 @@ import csv
 import io
 import json
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.responses import StreamingResponse
+from pydantic import PositiveInt
 from sqlalchemy import and_, case, column, exists, func, literal, table
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
 from ..database import get_db
-from ..services.access import authorized_project_ids, require_project_access
-from ..services import convenio_reports
+from ..services.access import authorized_project_ids, require_project_access, require_project_nucleus_access
+from ..services import convenio_reports, dashboard_summary, map_summary
+from ..services import report_references as report_references_service
 
 
 router = APIRouter(tags=["Dashboard y mapa"])
 READ_ROLES = ["admin", "operador", "visualizador", "geografo"]
+
+
+@router.get(
+    "/reportes/referencias", response_model=schemas.ReporteReferenciasResponse,
+    responses={401: {"description": "Sesión inválida o usuario inactivo"},
+               403: {"description": "Rol no autorizado para lectura"}},
+)
+def report_references(
+    id_proyecto_nucleo: list[PositiveInt] = Query(default=[], max_length=200),
+    id_afectacion: list[PositiveInt] = Query(default=[], max_length=200),
+    id_convenio: list[PositiveInt] = Query(default=[], max_length=200),
+    incluir_afectaciones: bool = False,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """Máximo 200 IDs por lote. Referencias inexistentes/inactivas/ajenas omitidas.
+
+    incluir_afectaciones recupera las afectaciones activas de los núcleos pedidos,
+    como el listado anterior, sin enviar un ID por cada afectación del reporte.
+    """
+    if len(id_proyecto_nucleo) + len(id_afectacion) + len(id_convenio) > 200:
+        raise HTTPException(status_code=422, detail="Máximo 200 referencias por lote")
+    return report_references_service.references(db, user, id_proyecto_nucleo, id_afectacion,
+                                               id_convenio, incluir_afectaciones)
+
+
+@router.get(
+    "/reportes/referencias-contexto", response_model=schemas.ReporteContextoReferenciasResponse,
+    responses={401: {"description": "Sesión inválida o usuario inactivo"},
+               403: {"description": "Rol no autorizado para lectura"}},
+)
+def report_context_references(
+    id_proyecto_nucleo: list[PositiveInt] = Query(min_length=1, max_length=100),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """Contexto mínimo para hasta 100 núcleos legibles; conserva el orden de referencias.
+
+    No pagina ni limita registros hijos. El consumidor decide el universo de núcleos.
+    """
+    return report_references_service.context_references(db, user, id_proyecto_nucleo)
+
+
+@router.get(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/reportes/referencias-convenios",
+    response_model=list[schemas.ReporteConvenioEventoVinculoReferencia],
+    responses={401: {"description": "Sesión inválida o usuario inactivo"},
+               403: {"description": "Proyecto sin acceso"},
+               404: {"description": "ProyectoNucleo inexistente o inactivo"}},
+)
+def report_event_agreement_references(
+    id_proyecto_nucleo: int = Path(gt=0),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """Vínculos activos por afectación y convenio, sin deduplicar etiquetas."""
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, load_details=False)
+    return report_references_service.event_agreement_references(db, id_proyecto_nucleo)
 
 
 @router.get(
@@ -98,6 +158,38 @@ def _dashboard_query(
     if year is not None:
         query = query.filter(models.DashboardKpi.anio == year)
     return query
+
+
+@router.get(
+    "/proyectos/{id_proyecto}/dashboard/convenios",
+    response_model=schemas.DashboardConveniosResponse,
+    responses={401: {"description": "Sesión inválida o usuario inactivo"},
+               403: {"description": "Proyecto inexistente, inactivo o fuera del alcance autorizado"}},
+)
+def dashboard_convenios(
+    id_proyecto: int = Path(gt=0),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """COP and eager Excel detail; preserves the existing 100-nucleus dashboard page."""
+    require_project_access(db, user, id_proyecto, load_details=False)
+    return dashboard_summary.project_agreements(db, id_proyecto)
+
+
+@router.get(
+    "/proyectos/{id_proyecto}/mapa/indicadores",
+    response_model=schemas.MapaIndicadoresResponse,
+    responses={401: {"description": "Sesión inválida o usuario inactivo"},
+               403: {"description": "Proyecto inexistente, inactivo o fuera del alcance autorizado"}},
+)
+def map_indicators(
+    id_proyecto: int = Path(gt=0),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """Todos los núcleos activos; asambleas celebradas y convenios activos firmados únicos."""
+    require_project_access(db, user, id_proyecto, load_details=False)
+    return map_summary.project_indicators(db, id_proyecto)
 
 
 @router.get("/dashboard/kpi", response_model=list[schemas.DashboardKpiResponse])

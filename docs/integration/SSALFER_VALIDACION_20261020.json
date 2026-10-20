@@ -1,0 +1,1141 @@
+{
+  "branch": "integration/ssalfer-mq-f01-f06-20261020",
+  "worktree": "/home/alfredo/proyectos/Software-PA/.worktrees/ssalfer-integracion-mq-f01-f06",
+  "base": "d73615f7d447159ef9512d0ef500d0ae887ee5fd",
+  "merge_head": "813055ca48cc0cd82e79acee58e7ab8f9022cbb8",
+  "original_backend_head": "2183ab20091f977208912f101748d5ff10c3f735",
+  "optimization_commits": [
+    {
+      "sha": "f98586eb4633e07b2481a7a67ee62ee81aa7d938",
+      "subject": "perf: limita la carga ORM de GET /api/proyectos (F01)"
+    },
+    {
+      "sha": "197b3de656ee214cfcb8e853b61cfb2ecb6feaf9",
+      "subject": "perf: habilita contexto minimo optativo para PN y afectaciones (F02)"
+    },
+    {
+      "sha": "75531120f4706f9a1b5b0a7acf7a7fd8f952e079",
+      "subject": "test: aisla el fixture F01 entre modulos sin cambiar expectativas"
+    },
+    {
+      "sha": "ec0cd6238a60d80341b74f0a46517df2ffa1b2e0",
+      "subject": "perf: usa contexto minimo en diez lecturas de dominio (F02)"
+    },
+    {
+      "sha": "6e622ffa2daa63f3184722241968516893493c82",
+      "subject": "docs: registra resultados y limites de F02"
+    },
+    {
+      "sha": "97fc45875c1d7d765d798dd591e920e747f506e3",
+      "subject": "perf: limita carga ORM de catalogos territoriales F03"
+    },
+    {
+      "sha": "cbc78d051629e10c52343bbf861737be0fbd8bfd",
+      "subject": "docs: registra validacion y limites de F03"
+    },
+    {
+      "sha": "b3d992b5cd3ccaf1ae8951de0a0554f2bccb1e8d",
+      "subject": "perf: agrega resumen autorizado de convenios del dashboard F04"
+    },
+    {
+      "sha": "912a9673cec5db23c8c7cc0bccd2b3504ee542a7",
+      "subject": "perf: sustituye fanout del dashboard y comparte carga inicial F04"
+    },
+    {
+      "sha": "0ce1743aa351b3a69348342a8b15906d23f5b2cd",
+      "subject": "test: valida F04 y documenta resultados y limites"
+    },
+    {
+      "sha": "4f505dfc094b416f1a2852381888139096ee7b20",
+      "subject": "perf: agrega indicadores agrupados y autorizados del mapa F05"
+    },
+    {
+      "sha": "b265f21661690dcaf6be0c01e73c83983cdc0b23",
+      "subject": "perf: sustituye recorridos del mapa por resumen paralelo F05"
+    },
+    {
+      "sha": "0d25fb3e6f22c54264477b80dee67f294bdaec89",
+      "subject": "test: verifica equivalencia y rendimiento de indicadores del mapa F05"
+    },
+    {
+      "sha": "41d4b68acc04356b3d5fcfcc10a6998251c32abb",
+      "subject": "docs: registra validacion y limites de F05"
+    },
+    {
+      "sha": "d5b863de20651dfd99b7d533004364adfaa63f0b",
+      "subject": "perf: resuelve referencias autorizadas de reportes por lotes F06"
+    },
+    {
+      "sha": "d3bd66d413d38234eca01717813a398d0cab2dcb",
+      "subject": "perf: agrupa referencias y comparte carga inicial de reportes F06"
+    },
+    {
+      "sha": "3f8fc862697962eb8d6831b1f960b5f278dec122",
+      "subject": "test: verifica referencias, reportes y exportaciones F06"
+    },
+    {
+      "sha": "18d3b663822ce1ab912ddb2b5e6244bcb55f2b87",
+      "subject": "perf: proyecta vinculos de convenios para referencias de seguimiento F06"
+    },
+    {
+      "sha": "087217a9840a6b6269eaf2ed2b41dd7ef22dddd6",
+      "subject": "perf: agrupa etiquetas de seguimiento conservando orden y parada F06"
+    },
+    {
+      "sha": "f16ec94b9ff3d28079e377131fc866251743cf4e",
+      "subject": "test: compara permisos y referencias compartidas de seguimiento F06"
+    },
+    {
+      "sha": "813055ca48cc0cd82e79acee58e7ab8f9022cbb8",
+      "subject": "docs: registra validacion y limites de F06"
+    }
+  ],
+  "merge_committed": false,
+  "push_pr_deploy": false,
+  "backend": {
+    "tests": 1518,
+    "failures": [
+      {
+        "id": "tests.test_convenio_general_report::test_facetas_respetan_naturaleza_sin_depender_de_pagina",
+        "message": "AssertionError: assert [{'id_entidad...lectivos': 0}] == [{'id_entidad...lectivos': 0}]\n  \n  At index 0 diff: {'id_entidad': 1, 'estado': 'Aguascalientes', 'individuales': 1, 'colectivos': 0} != {'id_entidad': 1, 'estado': 'Entidad sintética A', 'individuales': 1, 'colectivos': 0}\n  Use -v to get more diff",
+        "details": "tests/test_convenio_general_report.py:466: in test_facetas_respetan_naturaleza_sin_depender_de_pagina\n    assert data[\"entidades\"] == [{\"id_entidad\": 1, \"estado\": \"Entidad sintética A\", \"individuales\": 1, \"colectivos\": 0}]\nE   AssertionError: assert [{'id_entidad...lectivos': 0}] == [{'id_entidad...lectivos': 0}]\nE     \nE     At index 0 diff: {'id_entidad': 1, 'estado': 'Aguascalientes', 'individuales': 1, 'colectivos': 0} != {'id_entidad': 1, 'estado': 'Entidad sintética A', 'individuales': 1, 'colectivos': 0}\nE     Use -v to get more diff"
+      },
+      {
+        "id": "tests.test_schema_018_orv_persona_ciclo_vida::test_018_backfill_specific_record_from_017_transition",
+        "message": "AssertionError: assert 'termino_periodo' == 'sin_clasificar'\n  \n  - sin_clasificar\n  + termino_periodo",
+        "details": "tests/test_schema_018_orv_persona_ciclo_vida.py:563: in test_018_backfill_specific_record_from_017_transition\n    assert r[\"tipo_fin_codigo\"] == \"sin_clasificar\"\nE   AssertionError: assert 'termino_periodo' == 'sin_clasificar'\nE     \nE     - sin_clasificar\nE     + termino_periodo"
+      },
+      {
+        "id": "tests.test_sync_catalogo_ran::test_dataset_excludes_actual_additional_ran_identities",
+        "message": "AssertionError: assert 19 == 51\n +  where 19 = len({'054f510074b74a2aba51f3a0dc2c46f2', '368dc0f65fe748dfb62b6a14d9f83370', '38993627d0c84cd9847bf6835398e1f9', '469aa9a0d7664b0d86b0c988260a5318', '510af5a6549044dcaf57b3ce34b0e3c9', '5dc341a5ba794e1dbf985f82c0a2437a', ...})",
+        "details": "tests/test_sync_catalogo_ran.py:52: in test_dataset_excludes_actual_additional_ran_identities\n    assert len(extras) == 51\nE   AssertionError: assert 19 == 51\nE    +  where 19 = len({'054f510074b74a2aba51f3a0dc2c46f2', '368dc0f65fe748dfb62b6a14d9f83370', '38993627d0c84cd9847bf6835398e1f9', '469aa9a0d7664b0d86b0c988260a5318', '510af5a6549044dcaf57b3ce34b0e3c9', '5dc341a5ba794e1dbf985f82c0a2437a', ...})"
+      }
+    ],
+    "skipped": [
+      {
+        "id": "tests.test_gis_backfill_026::test_backfill_preserves_ids_dates_users_decisions_and_geometry[False]",
+        "reason": "Backfill DDL requiere instancia desechable aislada"
+      },
+      {
+        "id": "tests.test_gis_backfill_026::test_backfill_preserves_ids_dates_users_decisions_and_geometry[True]",
+        "reason": "Backfill DDL requiere instancia desechable aislada"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_real_database_name_guard",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_read_only_dry_run_without_updates",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_invalid_actual_ledger_aborts[checksum]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_invalid_actual_ledger_aborts[incomplete]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_invalid_actual_ledger_aborts[unexpected]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_invalid_actual_ledger_aborts[heartbeat]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_invalid_actual_ledger_aborts[partial]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_missing_structural_signature_aborts[column]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_missing_structural_signature_aborts[constraint]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_missing_structural_signature_aborts[index]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_missing_structural_signature_aborts[trigger]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_missing_structural_signature_aborts[function]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_apply_descending_dates_and_zero_business_changes",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_every_step_rolls_back_completely[024]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_every_step_rolls_back_completely[023]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_every_step_rolls_back_completely[022]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_every_step_rolls_back_completely[021]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_every_step_rolls_back_completely[020]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_concurrent_advisory_lock_aborts_without_updates",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_uncertain_commit_classifies_without_repair[before-LEGACY_GIS_024]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_uncertain_commit_classifies_without_repair[after-RECONCILED_PENDING_HEARTBEAT]",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_canonical_ledger_reexecution_is_rejected",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_migration_lineage::test_concurrent_ledger_lock_aborts_without_updates",
+        "reason": "Ledger-writing checks require the isolated disposable instance"
+      },
+      {
+        "id": "tests.test_sync_catalogo_ran::test_full_dataset_reproduces_in_explicit_empty_database",
+        "reason": "Definir RAN_REPRO_DATABASE con una DB desechable preparada"
+      },
+      {
+        "id": "tests.test_user_administration::test_cannot_demote_the_last_active_admin",
+        "reason": "La base aislada tiene más de un administrador activo"
+      }
+    ],
+    "errors": 0,
+    "passed": 1488,
+    "elapsed_seconds": 883.413475108995,
+    "skip_reasons": {
+      "Backfill DDL requiere instancia desechable aislada": 2,
+      "Ledger-writing checks require the isolated disposable instance": 23,
+      "Definir RAN_REPRO_DATABASE con una DB desechable preparada": 1,
+      "La base aislada tiene más de un administrador activo": 1
+    },
+    "same_three_known_failures": true,
+    "same_27_skip_ids_and_reasons": true,
+    "new_regressions": [],
+    "modules": {
+      "tests.test_access_context_performance": {
+        "passed": 173,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_affectation_units_039": {
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_agricultural_units_039": {
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_assignment_concurrency_regressions": {
+        "passed": 11,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_audit_api": {
+        "passed": 21,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_auth_rbac": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_catalogo_nucleos_ran_api": {
+        "passed": 10,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_cierre_006_excel_bloque_02": {
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_cierre_006_excel_bloque_03": {
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_cierre_006_excel_bloque_04": {
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_cierre_006_ran_ciclos": {
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_cierre_007_convenios_api": {
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_cierre_007_convenios_patch": {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_cierre_008_fifonafe_api": {
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_cierre_008_fifonafe_pre_migracion": {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_convenio_general_report": {
+        "passed": 54,
+        "failed": 1,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_convenio_report_connections": {
+        "passed": 16,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_convenios_colectivos_destino": {
+        "passed": 12,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_credential_management": {
+        "passed": 14,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_dashboard_summary_performance": {
+        "passed": 56,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_ddv_gpkg_imports": {
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_document_targets_039": {
+        "passed": 25,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_document_type_catalog": {
+        "passed": 67,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_documents_dashboard": {
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_excel_closure_002": {
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_fifonafe_intervinientes": {
+        "passed": 10,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_frontend_read_models": {
+        "passed": 11,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_geospatial_imports": {
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_gis_backfill_026": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 2,
+        "errors": 0
+      },
+      "tests.test_gis_baja": {
+        "passed": 42,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_gis_concurrency_026": {
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_gis_confirmation_024": {
+        "passed": 11,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_gis_diagnostics_029": {
+        "passed": 37,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_gis_history_026": {
+        "passed": 26,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_gis_history_regressions": {
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_gis_management_rbac": {
+        "passed": 35,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_gis_preflight_024": {
+        "passed": 21,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_gis_universe": {
+        "passed": 18,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_import_catalogo_nucleos_ran": {
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_map_indicators_performance": {
+        "passed": 80,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_migration_lineage": {
+        "passed": 15,
+        "failed": 0,
+        "skipped": 23,
+        "errors": 0
+      },
+      "tests.test_nucleus_gpkg_imports": {
+        "passed": 11,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_operational_model_037": {
+        "passed": 12,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_operational_model_038": {
+        "passed": 16,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_operational_model_039": {
+        "passed": 27,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_orv_member_history": {
+        "passed": 35,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_orv_persona_ciclo_vida": {
+        "passed": 10,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_pago_reporting": {
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_parcel_gpkg_imports": {
+        "passed": 16,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_person_project_access": {
+        "passed": 26,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_person_search": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_post_release_schema_008_contract": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_project_map_gis": {
+        "passed": 17,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_project_user_assignments": {
+        "passed": 16,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_projects_read_performance": {
+        "passed": 38,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_ran_programacion": {
+        "passed": 10,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_report_references_performance": {
+        "passed": 61,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_reporting_cierre_005": {
+        "passed": 22,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_reporting_post_auditoria_006": {
+        "passed": 25,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_runtime_postgresql": {
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_schema_015_exclusion_proyectos_inactivos": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_schema_016_normalizacion_superficie_adicional": {
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_schema_017_contexto_asamblea_adicional": {
+        "passed": 17,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_schema_018_orv_persona_ciclo_vida": {
+        "passed": 9,
+        "failed": 1,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_schema_021_derecho_via_proyecto": {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_seguimiento_funcional_004": {
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_snapshot_tuc_triestado": {
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_sync_catalogo_ran": {
+        "passed": 51,
+        "failed": 1,
+        "skipped": 1,
+        "errors": 0
+      },
+      "tests.test_target_domain": {
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_territorial_catalog_performance": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_tracking_report_references": {
+        "passed": 38,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "tests.test_user_administration": {
+        "passed": 4,
+        "failed": 0,
+        "skipped": 1,
+        "errors": 0
+      }
+    }
+  },
+  "targeted_policy_fixtures": {
+    "exit_code": 0,
+    "elapsed_seconds": 100.60453908999625,
+    "suites": [
+      {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "142",
+        "time": "95.707",
+        "timestamp": "2026-10-20T22:22:11.453673+00:00",
+        "hostname": "9944302e780e"
+      }
+    ],
+    "failures": [],
+    "errors": [],
+    "skipped": []
+  },
+  "focused_gis_read_models_f03_before_final_assertion": {
+    "exit_code": 0,
+    "elapsed_seconds": 168.4916992369981,
+    "suites": [
+      {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "103",
+        "time": "164.019",
+        "timestamp": "2026-10-20T22:00:54.192193+00:00",
+        "hostname": "a9fa401c7560"
+      }
+    ],
+    "failures": [],
+    "errors": [],
+    "skipped": []
+  },
+  "javascript": {
+    "tests": 38,
+    "passed": 38,
+    "failed": 0,
+    "skipped": 0,
+    "real_browser_navigation_executed": false,
+    "known_excel_tipo_convenio_null_defect_preserved": true
+  },
+  "preservation_and_contracts": {
+    "unchanged_previous_openapi_paths": 140,
+    "unchanged_previous_openapi_schemas": 193,
+    "added_paths": [
+      "/api/proyecto-nucleo/{id_proyecto_nucleo}/reportes/referencias-convenios",
+      "/api/proyectos/{id_proyecto}/dashboard/convenios",
+      "/api/proyectos/{id_proyecto}/mapa/indicadores",
+      "/api/reportes/referencias",
+      "/api/reportes/referencias-contexto"
+    ],
+    "added_schemas": [
+      "DashboardConvenioDetalle",
+      "DashboardConveniosResponse",
+      "MapaIndicadoresResponse",
+      "ReporteAfectacionReferencia",
+      "ReporteAsambleaReferencia",
+      "ReporteContextoReferenciasResponse",
+      "ReporteConvenioContextoReferencia",
+      "ReporteConvenioEventoReferencia",
+      "ReporteConvenioEventoVinculoReferencia",
+      "ReporteConvenioReferencia",
+      "ReporteNucleoReferencia",
+      "ReporteReferenciasResponse"
+    ],
+    "base_change_files_preserved_exactly": 62,
+    "shared_merge_files": [
+      "backend/app/services/access.py",
+      "frontend-ssalfer/js/dashboard.js",
+      "frontend-ssalfer/js/seguimiento.js"
+    ],
+    "optimization_application_files_exactly_preserved": [
+      "backend/app/routers/domain.py",
+      "backend/app/routers/reporting.py",
+      "backend/app/schemas.py",
+      "backend/app/services/dashboard_summary.py",
+      "backend/app/services/map_summary.py",
+      "backend/app/services/report_references.py",
+      "frontend-ssalfer/js/api/reportes.js",
+      "frontend-ssalfer/js/api/seguimiento.js",
+      "frontend-ssalfer/js/estadoFinanciero.js",
+      "frontend-ssalfer/js/reportesConvenios.js",
+      "frontend-ssalfer/js/utils/dashboardExcel.js",
+      "frontend-ssalfer/js/utils/reporteColectivo.js"
+    ],
+    "project_policy_functions_identical_to_base": true,
+    "assignment_service_identical_to_base": true,
+    "merge_head": "813055ca48cc0cd82e79acee58e7ab8f9022cbb8",
+    "optimization_commits": "21",
+    "historical_migrations_001_029_exactly_preserved": true,
+    "gis_services_models_general_report_exactly_preserved": true,
+    "backend_2183ab2_redundant_with_c0875ff": true
+  },
+  "disposable_database": {
+    "schema_sha256": "d83bc9d3ed0336f33c378570fe3d35b1dbfe03ce3ef252706aaa0a8b030864bb",
+    "ledger": "001-030 from repository checksums",
+    "migration_030_sha256": "aa8f3f568b3abb42751202301b980d9e5dda15db2d7070c661648445e050423d",
+    "catalogs": {
+      "catalogo_operativo": 151,
+      "catalogo_operativo_alias": 14,
+      "catalogo_tipo_documento": 27,
+      "requisito_documental": 34
+    },
+    "ran": {
+      "database": "software_pa_test",
+      "dataset_sha256": "863d31fff0f9b0338a103c7858872d4f531fe2b2593aade514dac2233d2fa6c3",
+      "rows": 32278,
+      "insertions": 32278,
+      "updates": 0,
+      "unchanged": 0,
+      "errors": 0,
+      "error_details": [],
+      "unresolved_crosswalk": 0,
+      "success": true,
+      "mode": "apply"
+    },
+    "isolation": {
+      "project": "ssalfer-integration-20261020",
+      "tmpfs": {
+        "/var/lib/postgresql/data": ""
+      },
+      "ports": {},
+      "mounts": [
+        {
+          "source": "/home/alfredo/proyectos/Software-PA/.worktrees/ssalfer-integracion-mq-f01-f06/backend/db/init/001_bootstrap_roles.sh",
+          "destination": "/docker-entrypoint-initdb.d/001_bootstrap_roles.sh",
+          "rw": false
+        }
+      ]
+    },
+    "source_database_access": false
+  },
+  "initial_run": {
+    "tests": 1518,
+    "passed": 1453,
+    "failed": 38,
+    "skipped": 27,
+    "obsolete_policy_expectations_or_fixture_isolation_fixed": 35
+  },
+  "changed_files_from_base": [
+    "backend/app/routers/domain.py",
+    "backend/app/routers/geospatial_imports.py",
+    "backend/app/routers/reporting.py",
+    "backend/app/schemas.py",
+    "backend/app/services/access.py",
+    "backend/app/services/dashboard_summary.py",
+    "backend/app/services/map_summary.py",
+    "backend/app/services/report_references.py",
+    "backend/db/migrations/030_rbac_gis_revisiones.sql",
+    "backend/tests/benchmark_report_screens.py",
+    "backend/tests/fixtures/f02_baseline.py",
+    "backend/tests/fixtures/f03_baseline.py",
+    "backend/tests/setup_convenio_report_db.py",
+    "backend/tests/test_access_context_performance.py",
+    "backend/tests/test_assignment_concurrency_regressions.py",
+    "backend/tests/test_auth_rbac.py",
+    "backend/tests/test_cierre_007_convenios_api.py",
+    "backend/tests/test_convenio_general_report.py",
+    "backend/tests/test_convenio_report_connections.py",
+    "backend/tests/test_dashboard_summary_performance.py",
+    "backend/tests/test_ddv_gpkg_imports.py",
+    "backend/tests/test_document_type_catalog.py",
+    "backend/tests/test_frontend_read_models.py",
+    "backend/tests/test_gis_baja.py",
+    "backend/tests/test_gis_confirmation_024.py",
+    "backend/tests/test_gis_diagnostics_029.py",
+    "backend/tests/test_gis_history_026.py",
+    "backend/tests/test_gis_management_rbac.py",
+    "backend/tests/test_gis_universe.py",
+    "backend/tests/test_map_indicators_performance.py",
+    "backend/tests/test_operational_model_037.py",
+    "backend/tests/test_operational_model_038.py",
+    "backend/tests/test_orv_member_history.py",
+    "backend/tests/test_person_project_access.py",
+    "backend/tests/test_person_search.py",
+    "backend/tests/test_project_map_gis.py",
+    "backend/tests/test_project_user_assignments.py",
+    "backend/tests/test_projects_read_performance.py",
+    "backend/tests/test_ran_programacion.py",
+    "backend/tests/test_report_references_performance.py",
+    "backend/tests/test_territorial_catalog_performance.py",
+    "backend/tests/test_tracking_report_references.py",
+    "docs/integration/SSALFER_INTEGRACION_20261020.md",
+    "docs/integration/SSALFER_VALIDACION_20261020.json",
+    "docs/openapi.json",
+    "docs/performance/FASE_01_PROYECTOS.md",
+    "docs/performance/FASE_01_PROYECTOS_MEDICIONES.json",
+    "docs/performance/FASE_02_CONTEXTO_ACCESO.md",
+    "docs/performance/FASE_02_CONTEXTO_MEDICIONES.json",
+    "docs/performance/FASE_03_CATALOGOS_TERRITORIALES.md",
+    "docs/performance/FASE_03_MEDICIONES.json",
+    "docs/performance/FASE_04_DASHBOARD.md",
+    "docs/performance/FASE_04_MEDICIONES.json",
+    "docs/performance/FASE_05_MAPA_INDICADORES.md",
+    "docs/performance/FASE_05_MEDICIONES.json",
+    "docs/performance/FASE_06_MEDICIONES.json",
+    "docs/performance/FASE_06_REPORTES.md",
+    "frontend-ssalfer/js/api/reportes.js",
+    "frontend-ssalfer/js/api/seguimiento.js",
+    "frontend-ssalfer/js/dashboard.js",
+    "frontend-ssalfer/js/estadoFinanciero.js",
+    "frontend-ssalfer/js/mapa.js",
+    "frontend-ssalfer/js/reportesConvenios.js",
+    "frontend-ssalfer/js/seguimiento.js",
+    "frontend-ssalfer/js/utils/dashboardExcel.js",
+    "frontend-ssalfer/js/utils/reporteColectivo.js",
+    "tests/frontend-ssalfer/dashboard-performance.cjs",
+    "tests/frontend-ssalfer/map-gis-rbac.cjs",
+    "tests/frontend-ssalfer/map-performance.cjs",
+    "tests/frontend-ssalfer/reports-performance.cjs",
+    "tests/frontend-ssalfer/tracking-references-performance.cjs"
+  ],
+  "tested_source_sha256": {
+    "backend/app/auth.py": "dd102238c8abe35e1a2dbb8eff430019280c765cb5b29bc5ef3aac9776d92fbe",
+    "backend/app/config.py": "2cabbd56c632fb16d62b77d8a698c1ac43d75e22343ce694dc902f7a5498606a",
+    "backend/app/database.py": "7ac1d3f38d2e985229ab5a372c15627e50a8b0d7519689879c92fddb1e9abe3e",
+    "backend/app/jobs/__init__.py": "11e26dcbb67a8dab63417bde218add42c87d5c797c970756a1bb8264ea121edc",
+    "backend/app/main.py": "1e84553a94f454bb9e76e87bafd2935e858884199759d8af42be61684427a0b1",
+    "backend/app/models.py": "6bfdc5dea8707a5342ba5abb75c93f6c1b55a7fd41d472bd12f2eb12ab3f3a9a",
+    "backend/app/passwords.py": "14096bfc05a6ccd1f921130c8215560f48095b9b5914d8061c07df8eb02f3855",
+    "backend/app/routers/__init__.py": "95cd80694d9b801a991a2f934ecdef8b79df7418b55a975c757559c4645b3d3b",
+    "backend/app/routers/audit.py": "e320b455a754c2c30a72f05d5cc4b5fb63e8ed7c590e4a5993ead8fede3003bf",
+    "backend/app/routers/authentication.py": "9f169550cc00af7c3f39b1176d8038c0b3b1920d70abb697e3379e3613902150",
+    "backend/app/routers/documents.py": "4485008f92678a2fd3067903e14bbbb294fedb4e1c14150ecb4d1fc98b3b2c0d",
+    "backend/app/routers/domain.py": "7039d40f0b1bc8d59d4e11895b356ab50f57ab5132e0a0f79b70a7c70029c2ba",
+    "backend/app/routers/geospatial_imports.py": "9acae31982f2b59a417eb368d0174fdb5721c965901af205dded40c2592fe500",
+    "backend/app/routers/reporting.py": "8b9eba30537cccf090df5545e6c45b784023d34e9b515a7d3ff8eb46fd752737",
+    "backend/app/routers/users.py": "4744c2dec51fa4118511b28e65787b4aba930bd56c7cd517f64008a3179c4ef3",
+    "backend/app/schemas.py": "23f574f818253cd830420d7e9d105569375be49e612a2a17d21ef7ba2173fd49",
+    "backend/app/services/__init__.py": "32b6edf147283da7b351bbcbf7349e36641ee3d631aca9eea743b8419103e416",
+    "backend/app/services/access.py": "3d492fbad7792675ff7400e62111765a6153ae5f25daf0a6f60168076bf7e21a",
+    "backend/app/services/audit.py": "31c7c8fccb14eeca0cd1f87c40de7842106a2c249cdff9eb25efbdf5d56d9a46",
+    "backend/app/services/authentication.py": "7ec2cf65ea43a3cc2516edbf6a9bce2c958b07565dd25d57045d8e9f4ecdb361",
+    "backend/app/services/common.py": "d99e27873d3203a4ba436c6e2509da285e04d6b889a6add44b43ffd22ce668be",
+    "backend/app/services/convenio_reports.py": "e14b81304f3c616721a39263ae203c91bf8d2085506cbed0d83fe53c84c65e19",
+    "backend/app/services/dashboard_summary.py": "ad35f682268323b62b35438fe785a8b80241a62461f4700c23afe78e4b1d963c",
+    "backend/app/services/document_read_models.py": "ff6a2f6c56b22f8a74b2cc59e812b133d9f950b884fb0f3734258783a35a2f7b",
+    "backend/app/services/documents.py": "c70da0a7663defb07e07424c376a099dd6fe31920663ba20da9945a13f134cf4",
+    "backend/app/services/domain.py": "cdbcf48e66417bef4f8d10a1ead00ee92168e010474635595b43bb48bb2fb6d6",
+    "backend/app/services/geospatial_imports.py": "9ac1bbe3f26a030f5c77f122d71461d28481ccea1f0493974beeb91f8a4e7a02",
+    "backend/app/services/gis_attributes.py": "f638cec9bb7d97f78302a29e38fc9d5e7279a122d6506946efa7b6d28af32620",
+    "backend/app/services/gis_diagnostics.py": "17a16d06c7e0ee45a4e88ce2cdda2921ddef2f644ba02a133d2ebcaa6cb8ca96",
+    "backend/app/services/gis_history.py": "79fdd82772f0ea438a40405f03083904bfbb0d9010e7c11bc22f609248e0c68e",
+    "backend/app/services/gis_ingestion.py": "ba480d1e1aa914cb01c193f9e2fc4477e73db8345cc7e1b3718f561ca7e47445",
+    "backend/app/services/gis_read_models.py": "8e43c18051f1ebfdfd69bd62946d66f637b898caa88a0cfb016311323dcbc652",
+    "backend/app/services/gis_reconciliation.py": "1ee2759ee5df8cf67a5e5b8ef2aadd3c83d4320c011d6b6c42e276e66ebbc573",
+    "backend/app/services/gis_universe.py": "799a72d109c2f98f80f823df8bda9e540bfdccb2cedd16a7838bef8cc3db922a",
+    "backend/app/services/map_summary.py": "39dfb59fc4c36e3f0aff344f867e0bcace8655507baeecadd107fe6b5d04109e",
+    "backend/app/services/report_references.py": "60073ed311ac1387aa6e48faa35dee5a7ed2940166225d7e29537eb5f67e2191",
+    "backend/db/migrations/001_baseline_v1.sql": "242ffc787beb2886d36b6fb3031c25a8baddd23ce669e78488672e274c4ad7c7",
+    "backend/db/migrations/002_cierre_fuentes_excel.sql": "ef1165711cc6054f26921062fd4e8202ce3dc0f7623ddb8f7eac1daa8639577e",
+    "backend/db/migrations/003_reporting_fuentes_excel.sql": "807279889979c3e7d55e849738f2361483e8e20810614f068515e8f95aa053ba",
+    "backend/db/migrations/004_seguimiento_funcional_excel.sql": "7c1a470e2429b6ec6ff3bc003ae9e3324ce3d552a984904760d0deb57381de12",
+    "backend/db/migrations/005_reporting_cierre_excel.sql": "a35faa802c5f43a3c906aae6c62b5bac4ef842f610e87a178a2e8524ed494c76",
+    "backend/db/migrations/006_ajustes_reporting_post_auditoria.sql": "e1a603fd2015615671c0cd072a0a795f50e92e8c21e838f26d88abec25dddee4",
+    "backend/db/migrations/007_convenios_impactos_precision.sql": "adabd7775fb8165a1db8be04a93e7971fe207e745b410c57eb6fc76cc3a7e4f7",
+    "backend/db/migrations/008_fifonafe_evolucion_forward_only.sql": "95bf328f18112933481488c59763df6a6467d8fd3db354bb7e5465c727c8f012",
+    "backend/db/migrations/009_bitacora_append_only.sql": "ef85729089cc0b5d3905169f87abd343a34473f7cb97717ff98b710b49f991bc",
+    "backend/db/migrations/010_credenciales_auditoria.sql": "5673767c9a24325a17ac323ed8fbfce5241dd205fd41ffccfee644709c6c6668",
+    "backend/db/migrations/011_auditoria_actor_update.sql": "f28b2705694fb8a011f943a81376c687cba380474aa37cbad31cc524e010df5d",
+    "backend/db/migrations/012_correccion_snapshot_tuc_triestado.sql": "c76d2d2af326a23427ae1aaf7358fdbc62faf31d91380758f744e8c8d72a7c01",
+    "backend/db/migrations/013_pagos_en_reporting.sql": "315194e6daa7b8bffd27c8d678b6e86c0486eaf851f58aba3722e90e19a37eef",
+    "backend/db/migrations/014_convenios_colectivos_por_destino.sql": "0ac8df3e32cc5bb7a103a314160fa4b6b392d9e5e041af3aaa74c0cda9aeceab",
+    "backend/db/migrations/015_exclusion_proyectos_inactivos.sql": "4e5d7fa8926f8026923146d3a0695d933bb43e9bb5f8c71ef8f9ecd9bae4b422",
+    "backend/db/migrations/016_normalizacion_convenio_superficie_adicional.sql": "246eb8247d1f3256e40453afa5f5d13d09586d90f0d3e599680ed8865160c810",
+    "backend/db/migrations/017_normalizar_contexto_asamblea_adicional.sql": "7fe91d37c1724291f0bf3fa47ba58d6afff8c062e6c44d527b14ea025fa36282",
+    "backend/db/migrations/018_orv_persona_ciclo_vida.sql": "2fb5676b52d902b636b3941490ea71a8044a791764b2913a18b6a905d9ddfea3",
+    "backend/db/migrations/019_catalogo_nucleos_ran.sql": "6769168eb11b2773b4e8e42f9409ccbbfbe986984f69895a562fe17c29f03b04",
+    "backend/db/migrations/020_auditoria_heartbeat_sesion.sql": "cfa4dadb2e8b5bb9b8cddddf617c34132380ad49a660de9037de43850263f4c8",
+    "backend/db/migrations/021_derecho_via_proyecto.sql": "c759eaab96a7ed88679fd5fa288504b4bdf36724479d82e155044a572da90d4e",
+    "backend/db/migrations/022_importacion_ddv_gpkg.sql": "40e988e06f7f211995ea62456ee7fc64e951fabd2ff14609f155de968171d58f",
+    "backend/db/migrations/023_importacion_nucleos_gpkg.sql": "ede1ea43947cec0f9f9ba433319d69de21847c892985adbd03feed80ef0f051b",
+    "backend/db/migrations/024_importacion_parcelas_gpkg.sql": "15f36ea78a591aeb0f587a84e7e2bddb21f53de455d80daaf8532422796bc2d6",
+    "backend/db/migrations/025_conciliacion_gis_proyecto.sql": "8338aace95845761acf0f9b675064ca25a6b0da2117013178ed060f260ec372a",
+    "backend/db/migrations/026_historia_cambios_gis.sql": "6615a137655abbb2a6ea2620d7c8b5013f07d6fcdd81aae4270a4551904ea3fd",
+    "backend/db/migrations/027_actividad_campo_objetivo_documental.sql": "d5371660b3d0f6a257bcdffe453feb72984b225d24804991e6b4cf7c1ce68665",
+    "backend/db/migrations/028_catalogo_tipo_documento.sql": "1395d96c59af2fe2192598af13bd5e4f88ca675d4d35e9ba4f19d25cfc7bc845",
+    "backend/db/migrations/029_diagnosticos_conciliacion_gis.sql": "284f8a26fc5d1215f21055657a5171431d1df4ee8d0151dc58071e38731e9716",
+    "backend/db/migrations/030_rbac_gis_revisiones.sql": "aa8f3f568b3abb42751202301b980d9e5dda15db2d7070c661648445e050423d",
+    "backend/tests/__init__.py": "aca8a8eb011c0310b17e8bff75df5e1196ac9717106ab2222975fb74d89e407d",
+    "backend/tests/benchmark_report_screens.py": "74cc9e5020958092f69049beb91f035d51385008b1345a39c900f7a297a569a2",
+    "backend/tests/concurrency.py": "668472a787eb8361440f685b1fce7c6de30d19e86004aeb329988298daa810cc",
+    "backend/tests/conftest.py": "897c8a9ea30cac5cdc579ea191d4a425ddf5678f1a85a064b2d0fbe077e300d8",
+    "backend/tests/fixtures/f02_baseline.py": "2e43e6d865fca757f85c70eab5cf214c6b0905f0e54de6f8f26030134f87913c",
+    "backend/tests/fixtures/f03_baseline.py": "be7c46462205c8cddb515a202380b58a9ac2bc834ee5b004cb10993c62f9139f",
+    "backend/tests/setup_convenio_report_db.py": "1137af9202dbb8504cdf4d50d329e63f6963813b5108e8f1f90a7f98a6fa3a7c",
+    "backend/tests/test_access_context_performance.py": "9234df724cf3e628596fb01510a8dc0f737a692f57f94da643f19e593f682709",
+    "backend/tests/test_affectation_units_039.py": "01586bfea7b24ecf6e421c65d47893886b9f1ffce4f92641e5749daa5603724e",
+    "backend/tests/test_agricultural_units_039.py": "9c86eded4b4593978d85a451eb8d1db973f4dd3e90f74c2fb8ee67490cc28dfa",
+    "backend/tests/test_assignment_concurrency_regressions.py": "cb22185cf174bbd69c2976133ce664afa5fccdf9c93f39fe9bee6fbf4b8eae5b",
+    "backend/tests/test_audit_api.py": "5340fe379ff99201fa5f19161e1f2c3b6d244e3c9115dac3ddc5efabe2a4b498",
+    "backend/tests/test_auth_rbac.py": "d985cf72aedd0c232d73cebcb2e6ef8df1abe7f50d5f11db37c48e65beed763b",
+    "backend/tests/test_catalogo_nucleos_ran_api.py": "2030843f6a6b9f7a3d707666e95b4b68501ca1f956d3d022b466e99c0b0acc4a",
+    "backend/tests/test_cierre_006_excel_bloque_02.py": "db1d85f49822df858724f6e12f17a87300ac75253f9d9309de5e4ec2468ca621",
+    "backend/tests/test_cierre_006_excel_bloque_03.py": "517736ecf6f5e78e4d6ef4eac29387b17fcf0903db0c33a1106e097da403d264",
+    "backend/tests/test_cierre_006_excel_bloque_04.py": "b8d1c282a13231e28d3488aa0923e131c227c3abe0f8adb9b41e50f4807c659d",
+    "backend/tests/test_cierre_006_ran_ciclos.py": "125d0b4c1e5a364f4330394f810b742717680bd9cd46f944ca45d56c15b8a240",
+    "backend/tests/test_cierre_007_convenios_api.py": "ea41fcd13ee09dc9781897f734308f412f6e28b53fc3a1134cd9e21d793d09de",
+    "backend/tests/test_cierre_007_convenios_patch.py": "52d1f1c3f039272fedd9a447c3af77755f58616698658d98966a480de1064862",
+    "backend/tests/test_cierre_008_fifonafe_api.py": "2333eb158fb7a3a93aa70a9265e63e5e9b96ce288e12cad9d998b02248514cae",
+    "backend/tests/test_cierre_008_fifonafe_pre_migracion.py": "5ff63725b77366a770db17a7e9a8cfa54b134f49d4605db8a37201447f098108",
+    "backend/tests/test_convenio_general_report.py": "960d347bb0b6a5521a555c67a6ec259712f199fbc81f13a1f00a3c54d886284b",
+    "backend/tests/test_convenio_report_connections.py": "a04219456691ca70b7bea5793e951e80ebca4f4b4151e489c3b37efdaa5ee4ed",
+    "backend/tests/test_convenios_colectivos_destino.py": "7c3b062b8f24676410cbd9077f2a03aff78f25a835d286465047e6a28c62d118",
+    "backend/tests/test_credential_management.py": "d9b40742f0d8f3513e0bdc225e7bb9e4d8e427c96c0c93ec0b217107b2ded096",
+    "backend/tests/test_dashboard_summary_performance.py": "28fba5a493317df884b8278347aeac80f010017b601dc48189151bffcc3334bb",
+    "backend/tests/test_ddv_gpkg_imports.py": "2c02c12309279f8ff694b617dad8656afaeda0b32b9028621feeb5b8226c022d",
+    "backend/tests/test_document_targets_039.py": "17ffc7f2c7751dbf8bf60540b2d0bb5901be9adbd3c3ef0217dd9a2d56378801",
+    "backend/tests/test_document_type_catalog.py": "36184e134556f8440713334d50661eb3dda5ae25c332f2da1df5d2ece6d9e639",
+    "backend/tests/test_documents_dashboard.py": "52d8aaa4f64ceda142ee8fd4714f1618cc7136db1fd5219ad07e26a0a16cf98c",
+    "backend/tests/test_excel_closure_002.py": "b2b25b61aaf8a2a4567de33d04121ada00fa0a5cdc906c6a1f99df0f2a31eb92",
+    "backend/tests/test_fifonafe_intervinientes.py": "0287d9eeb7518a76dbd6929e20f31610a7d3c0c8fea24a2ebff28cf83281ca20",
+    "backend/tests/test_frontend_read_models.py": "6d02face04fdc5aa425f5d6af50bae8332019a7e595fdc315a71508dc301268e",
+    "backend/tests/test_geospatial_imports.py": "5226fe6b6fefd5c3e0c098bda70a29c0e8b70dafae7c00e606aece51bcf58746",
+    "backend/tests/test_gis_backfill_026.py": "b6172e29345d937350708bcd489f5b6adf481ad15321965d66be6f8f4f4c4f5f",
+    "backend/tests/test_gis_baja.py": "b0d2338a1d37291b51f441e1affb0e1aa086400a64992802afa54e92b944ef9d",
+    "backend/tests/test_gis_concurrency_026.py": "ae401030f740306f628050793464e352c2ffba78863a27137e2e0beed26ba847",
+    "backend/tests/test_gis_confirmation_024.py": "b96f28942cdce08036d1b5dd3f92f9314218b3ea67806bacab22718a83ee1767",
+    "backend/tests/test_gis_diagnostics_029.py": "0175647c9a190223f1b1c38edc45fceeedac8d3b425783264f2bd5680595bfb3",
+    "backend/tests/test_gis_history_026.py": "354846b2cf8cb86b21829bb4e08ff63f531bc524ad2e4da7803e1b727ab6afd5",
+    "backend/tests/test_gis_history_regressions.py": "b068039cace389d6ffbf2202719e4ace9f896b211e316dd35d68e2d86d4c33d0",
+    "backend/tests/test_gis_management_rbac.py": "bcc2cdbb1e0382786ff1d0b1128b7af657b5cdab4dfcd0d5d1eebcbb500c5ebd",
+    "backend/tests/test_gis_preflight_024.py": "bb6df5e33f085756bfb0420eb305e3bd700d08320304d2107e421f658ed44e71",
+    "backend/tests/test_gis_universe.py": "9f46cfe94dcc433894b8992bcfaaf2fa5b0b418813a171fd28f289e30d9b2b35",
+    "backend/tests/test_import_catalogo_nucleos_ran.py": "cd4b20be249d6eb41d4ed58499cf864c2e1ce2fccb688036a1fb78733e44050d",
+    "backend/tests/test_map_indicators_performance.py": "90b3c1f800e85c6cc8bb934ecba14ebe4e439c9c338154237f9aea162400608a",
+    "backend/tests/test_migration_lineage.py": "cfefa22895fdf3a8c9b4bb619cec7690bd3651a00ea7be59ff478d8fed1e39dd",
+    "backend/tests/test_nucleus_gpkg_imports.py": "3812e4856022b1c960fe5a0ec88aaa3ab4ad7c90dc2336bd1b8f8be8b01ba745",
+    "backend/tests/test_operational_model_037.py": "87a9ef56b950ed0d6aaea6487b89b77f4e633606d682e7a5ceaa9c9f46fb5e1c",
+    "backend/tests/test_operational_model_038.py": "d635ddf7e3eb9bbc8ed33d030e41064ab43cff5371988e7e16ad47ce315e2dab",
+    "backend/tests/test_operational_model_039.py": "62066e7cb5fde3c98b19cafd52a70025366cfd4ba4f550a66a9bf3f1fcd4077f",
+    "backend/tests/test_orv_member_history.py": "46bc23346fd4b03e190249df534a93157891cce2e137a7e738e648751d013801",
+    "backend/tests/test_orv_persona_ciclo_vida.py": "2bd917bcd93830189842bdd2940f01db15c64b1a1e289f8d72633a080a898f5b",
+    "backend/tests/test_pago_reporting.py": "606c4e0b1bb73ad32fb0056075eb0cff7f806dc09cede769c81d2a6a652b8403",
+    "backend/tests/test_parcel_gpkg_imports.py": "d8d446615afe4baa1f2ce8c8e16fa8c5e74a654a32a566adc3de02deae638712",
+    "backend/tests/test_person_project_access.py": "bc1d0a16162eb6bd5a86e40d6310fd9634c1f423df869e92bb59d2eaad3d2207",
+    "backend/tests/test_person_search.py": "bfd6ff36d5205a5a3a152c68df7eb2113ad5ced7368a81f6387c8a92543bf7f6",
+    "backend/tests/test_post_release_schema_008_contract.py": "ecbe456a230fb2421392e17ac51a5f7e3e74462b51399f871940eda7025e100b",
+    "backend/tests/test_project_map_gis.py": "76ffb0fe2b4cb8f12b56d2ef29568aeffe466ffadd5614bc976938601fa1e6a0",
+    "backend/tests/test_project_user_assignments.py": "5f61862a6928659f96c7ee6fad7d2a0842adfb07502ae3ea9749d1d11e2cddf0",
+    "backend/tests/test_projects_read_performance.py": "a6bd8ed8a0ff434796a7ca84f7853eaa934b9eb2aa3003c9a8c8f00c8cc30668",
+    "backend/tests/test_ran_programacion.py": "f1016f7954929526a3c7df001cb1bffd5eff27dc5364c8ec10869b0771353a97",
+    "backend/tests/test_report_references_performance.py": "c4c3b5780604eb1bdeded95c927f7e9fc2c3e6ef6231a4dd6f0a5a6a4481aa50",
+    "backend/tests/test_reporting_cierre_005.py": "155ffd08fadc6629c3ca52e1b04b4d0e6dad41fd3c5f97443f4f26ba6306f64a",
+    "backend/tests/test_reporting_post_auditoria_006.py": "0543b4116cb76043fb4ed98b2ebf70d4eb8d3a4ab2dd8d0b89374ed2471938f6",
+    "backend/tests/test_runtime_postgresql.py": "50d925f2ed73969a0bdc941050fc32f72bba03fdbaed975171306356c257ad91",
+    "backend/tests/test_schema_015_exclusion_proyectos_inactivos.py": "d9f972ce1fee93c334b59b73ef8e3898662cfc0a5f26e83135eb07f34f150348",
+    "backend/tests/test_schema_016_normalizacion_superficie_adicional.py": "ef052a3330f4b8a6bdc64ffb3ed8f475c5c58809e83bc7a5222028337a0d6547",
+    "backend/tests/test_schema_017_contexto_asamblea_adicional.py": "0d11e2c90ddd93035c5b7de028fa6ea7211a9781530bf9d8c1433e94297e7fec",
+    "backend/tests/test_schema_018_orv_persona_ciclo_vida.py": "a5079deabf410c9fd7b8dd0cf491ce86f1372f2b432d36dce20c037e15fcd46e",
+    "backend/tests/test_schema_021_derecho_via_proyecto.py": "120d3e99e9ea481b358884960bab1085b0c8527bdf92f4b61a0a8d7ec15c177e",
+    "backend/tests/test_seguimiento_funcional_004.py": "ab7cadd0b2c7c4700620add1ecd73ed1dd9658f58cb3e3a3b898121475ee4971",
+    "backend/tests/test_snapshot_tuc_triestado.py": "ade18965d8a045aa44179b30b2edd6d8a8312e0eaa75003017bb96463899d2ea",
+    "backend/tests/test_sync_catalogo_ran.py": "ac561e36cff25d6712b4fa0c2a78be7d07a329f7febbf2262c09ad496359e362",
+    "backend/tests/test_target_domain.py": "6e8e01ea752c7731f49bf96a88cf8efa90c3e303ba33466cb7efa339ae97992b",
+    "backend/tests/test_territorial_catalog_performance.py": "04453fb5d9af39b93145f1c7418f610ec94cd5c1d7accf184119427b3f00544c",
+    "backend/tests/test_tracking_report_references.py": "8bb2b0efdbdbde5d7ac8d5802dd780ec0cb930b011099deb243c8f950f7b5f2b",
+    "backend/tests/test_user_administration.py": "232e636afb420ae0aa5dafd13d39599ca4af4724a95c22dc7954d26056130507",
+    "docs/openapi.json": "97d54be110a68b7073dabd66a18a3d7572719b6ade48bc55346b52600fc6fb86",
+    "frontend-ssalfer/js/actividades.js": "7e2ae2a0d873111249a4cae8397bb7700eb3fe8428cc03441f5db42874b1d3f4",
+    "frontend-ssalfer/js/afectacion.js": "a441e4bca44fb3a339c05099ebe1d8b9874379a35b20b420ad51de9509681d48",
+    "frontend-ssalfer/js/api/actividades.js": "fb304cc2063aa6400ac1a576d103cfc8ef2feb580b77114a90d54313ff988efc",
+    "frontend-ssalfer/js/api/afectaciones.js": "f7933d331e58ebc0f92e0ec2f33904418f5c06bca378a3e7728e55d583c07971",
+    "frontend-ssalfer/js/api/asambleas.js": "933f89d7ab1b8f2980cda4eb5e33b3b7f6637e142f09302e3e4fd08067f5a711",
+    "frontend-ssalfer/js/api/auditoria.js": "7943066b507435263b63369f2552f6d6ab83983420295dc865a29281ad363fe6",
+    "frontend-ssalfer/js/api/auth.js": "b0add72150a019a25185c832a95310db9e0544144fd75441b0276fd5ec78ff12",
+    "frontend-ssalfer/js/api/catalogos.js": "f8a9dc34002b019beb6b1e3d5130b09fbfbe9e9a44304f71978abc4e119e6f5c",
+    "frontend-ssalfer/js/api/catalogosOperativos.js": "ba3989ddf91704d9c4af68d8eac8706635066b0de2d834ec9dde0430895ca5e2",
+    "frontend-ssalfer/js/api/cliente.js": "0475aa9ca3c7b5b9094a0c55fd2827bfce47035ec2439f75c5dc5a4d438b35cb",
+    "frontend-ssalfer/js/api/convenios.js": "c886456870c83455bd6b130fb29286999a224c5358223e4753f0fc8cd76c142d",
+    "frontend-ssalfer/js/api/documentos.js": "5673794ccda434476050eedd2b998f89507db961cfc41705ecae754a5b67db94",
+    "frontend-ssalfer/js/api/fifonafe.js": "851739debde0452a23327adc1cafa8d3c3b4f207d136424e63e4ab2fa32272cd",
+    "frontend-ssalfer/js/api/geoespacial.js": "59457c3cbc3e772b35debc24aacf1b9554766efb9c935f3283df3ffa756bc95f",
+    "frontend-ssalfer/js/api/indemnizacion.js": "98838d9e632ac829e53d23f31d7e6377604ef2bd1cab2d38e9414c012eee0ce8",
+    "frontend-ssalfer/js/api/nucleos.js": "cd200dfd0a3f64a8baaa7cf0edc0e830429e86e636a800a954f5983cb196e7d7",
+    "frontend-ssalfer/js/api/orv.js": "2b6d65471191f1c1916ee4a191745202345d7d50d7dc78c1a29c9bf5df115d43",
+    "frontend-ssalfer/js/api/padrones.js": "4324bcc738758384028d848af85fc42415bdaa8249b1a418300d9726f2061093",
+    "frontend-ssalfer/js/api/parcelas.js": "0cbc11a812d75a9b08a132f478c2ab7565463dd9a15ed5418b2a8630b730cbb5",
+    "frontend-ssalfer/js/api/personas.js": "d4f01013c57c71911a6afcfca05b466d80498f496fa439b3184a6696d095e8d5",
+    "frontend-ssalfer/js/api/proyectos.js": "3922bee09e28332926807a3244715da9aea61a1b9674ea830b5d400482bfd1c6",
+    "frontend-ssalfer/js/api/reportes.js": "43fb01086b18269127af38900ea7bdf35122b31bd07e86d9a62f4aa14c2c8829",
+    "frontend-ssalfer/js/api/seguimiento.js": "fff8728b4b681fdb519018bf0cd606f14efc276d0c13fb9bed354fe78dbb4086",
+    "frontend-ssalfer/js/api/tramitesRan.js": "f55eccbb360cb7db5422ecf526c7d8a039aba59adce97698423322121b78d50b",
+    "frontend-ssalfer/js/api/unidadesAgrarias.js": "335bce71eabf73ec8eb82746db4e055631980218590964abbf9ae343513d1a3b",
+    "frontend-ssalfer/js/api/usuarios.js": "6f67de46d6d4f789fcf649b6566435e47de940e3ed1a39fe822102a9b11c5a8b",
+    "frontend-ssalfer/js/asamblea.js": "ad093598e58bfb613a39224752f40d3601d45f3241c676e3d3e4225a62b4b5dd",
+    "frontend-ssalfer/js/asignacionesUsuarios.js": "092355e7dc119ba42ae3413d05a407f0260961949ccd02d6853ae2158347bf65",
+    "frontend-ssalfer/js/auditoria.js": "d1770d5cf4f629024b4789ba54a11a929afd5d427636baaab9f3db8524f26f22",
+    "frontend-ssalfer/js/cambiarContrasena.js": "226d1db11f72d3437a9ff2fd3a161f12215d1c9740a413fbf31605541bab005d",
+    "frontend-ssalfer/js/catalogosOperativos.js": "699355825962227bf950ca80750801433197213e47430358545c0a3f541eba49",
+    "frontend-ssalfer/js/conciliacionGeoespacial.js": "afa17c4a576a3f72e8684b01045c70350b111e808f7389b610df3e221180f5c0",
+    "frontend-ssalfer/js/config.js": "0de89165fcf24a40ad5eac04770e99359a8eac407057319bb08651124628610c",
+    "frontend-ssalfer/js/dashboard.js": "10eb4649734a9765656332e0e7f04e86dc18ba291a554769061ae43fe125e410",
+    "frontend-ssalfer/js/derechosColectivos.js": "2883087d9554f87b129b5ffe8d984a10671820ae6c464648b77563f072d04dff",
+    "frontend-ssalfer/js/detalleAfectacion.js": "13a55ff8a1e0b90cf0855d408e12e753fb64aa13ab6845c07f46e96fc27178c3",
+    "frontend-ssalfer/js/documentos.js": "fae83b3160693b07892965b2d489acb9dd9a02ac8bb1c50c14df6b3293bcfc86",
+    "frontend-ssalfer/js/env.js": "368b0f497b85a5a919d807f24bbfd6152c68d14d554fa2f83c93ef0a4c17f898",
+    "frontend-ssalfer/js/estadoFinanciero.js": "09ff5635e095740c7a2dbf59dbcf77d2ef9e27b63f65d5cb62105f97ef15bb42",
+    "frontend-ssalfer/js/expedienteDocumental.js": "5ab79375331539327d130f33a2e24a4e1317c76296c457acf78fa8fbba86ada4",
+    "frontend-ssalfer/js/fichaConvenio.js": "88815bdbf82f3883b23a204fa63332fcc01efafb415bc6c96f1909187f5e318a",
+    "frontend-ssalfer/js/fichaFifonafe.js": "9f06607c6cbadf30d327c25cd914f7935aeaf2495b26c5b9e7f2bf2a76b11530",
+    "frontend-ssalfer/js/fichaProyecto.js": "90417f1a31c4796e5c52584e6cbb6fc75ec77e843abc0fba05174ab7dfdd4ab6",
+    "frontend-ssalfer/js/fichaRan.js": "f7658321a9958244837fa9b56eb411f3206d82a548145ad1d280e1d4577bae9c",
+    "frontend-ssalfer/js/fifonafe.js": "f5dbebdf4c75d18aaf43ad92344407561d740200d3cddb537b55b7d6fbbd8b88",
+    "frontend-ssalfer/js/gestionGeoespacial.js": "03544935edb974da48acb077b09a350bc35768ab5fc10c25c0774765f250cc77",
+    "frontend-ssalfer/js/gestionNucleo.js": "d9755f001398b9f72d71a55ea5b2df93d3334f4066738f405b9127b7ffc96d55",
+    "frontend-ssalfer/js/indemnizacion.js": "8cd999790ad4046c28f38266afbb754af8fe236a9e24524b78479204aa0cc30f",
+    "frontend-ssalfer/js/intervinientesFifonafe.js": "70886593f292d3a897ba8585aef7f4362ecdbeb828d3eda948bc9edd7c1b2ed7",
+    "frontend-ssalfer/js/mapa.js": "b0ab5809fd5fe836a57ca3e6af4ebdd0f52172ae6f96d80beadbaaec25752dca",
+    "frontend-ssalfer/js/nucleoAgrario.js": "265e66bcd23a5c8cec894fb66f36429322a97c801735d2d5b18b94ffb8940897",
+    "frontend-ssalfer/js/nuevoConvenio.js": "304492400a0cafc5b0efad9aa5a2c06580ae69aac5383fa4e26d704b33b97b71",
+    "frontend-ssalfer/js/nuevoProyecto.js": "e0faaa226df8f7bdd3d17410d68f89caf0d79c99beaca32d1ffa6078ec605d2d",
+    "frontend-ssalfer/js/orv.js": "a166d9fa83c45cfc56ea30b03fc7b29fbc6bee0ec2aff35a1b2457046fcdfddd",
+    "frontend-ssalfer/js/padrones.js": "97ad740837f41e61fd89749b6bed7b1d8e9f86bc7b1b61645224e019d671f0db",
+    "frontend-ssalfer/js/parcela.js": "a76aef3f99fb5e1664caa11a2e404c5b758f86ef17a1d038e26cb0cc72305d41",
+    "frontend-ssalfer/js/persona.js": "51ce761ebab78d4532d02c4fa6d2f3de122f56c474746c3013088cc46de05c37",
+    "frontend-ssalfer/js/reporteAvancePeriodo.js": "f69ce5d8fe54e3a7315e8278334a70e1c3c95215aed408365b74251022d6dfe8",
+    "frontend-ssalfer/js/reporteGeneralConvenios.js": "730a83a6756d064c98d84065f85e2c0b67ef2d874a312f03008a25cfa4d44124",
+    "frontend-ssalfer/js/reportesColectivos.js": "bf9eb9444880ecde61bfa49494f3ed413781cd85296f303d4a3607107903b5c5",
+    "frontend-ssalfer/js/reportesConvenios.js": "2a2fb7b48a921dcf5000bc65c835eddc3e830f48617c1b5aa533088bc74834bf",
+    "frontend-ssalfer/js/reportesFifonafe.js": "fd1e8d06399e51051a0c8b83385bc19e05aae30c222b53744814a0b3ee455f4b",
+    "frontend-ssalfer/js/seguimiento.js": "4e9950f64abfd3bfec11b9c19e9f27ffd24fbb6b27d689a1985eeed68dd4dc60",
+    "frontend-ssalfer/js/tramiteRan.js": "49d65d89a26bfbe7d72f5a14e819ba4ac8e741ff007e4723a25bb5dee24409a6",
+    "frontend-ssalfer/js/unidadAgraria.js": "45bb9c11a8398dfb1f68c7d1cb9fa4f6e70ccb7f908fc54eb5ff1889d8231423",
+    "frontend-ssalfer/js/usuarios.js": "9f0d6388c84f0b8bb7a88d00099a80532c5db57b6e1527f3564f588cba80fd58",
+    "frontend-ssalfer/js/utils/contexto.js": "dfc9bdbb338431d391b1ed4e670c446b7e63fc4c13b94a81b5f30fbdaaa2fc2a",
+    "frontend-ssalfer/js/utils/dashboardExcel.js": "92bb53bc4483d93d2027ff58ba00968a33607f6fb41020d415bbadb01a11fcbc",
+    "frontend-ssalfer/js/utils/directorioPersonas.js": "a9a23721da928c2d3d69836388f63cdcb280bedce7b113bb67437d9f9e711453",
+    "frontend-ssalfer/js/utils/documentos.js": "2361f0d0a6a42651856dd1eb4fee2144660d09e2aa969189fac2a355eaa78367",
+    "frontend-ssalfer/js/utils/ediciones.js": "c3befe2d241c5993a99ef82d0705be757a1c7a9e05ba486531b37a47f01e3d88",
+    "frontend-ssalfer/js/utils/etiquetasAuditoria.js": "56b9f48e0701877a21967affde1779101a2baf3b65c7b7087cb6422ac6824dd8",
+    "frontend-ssalfer/js/utils/experiencia.js": "daa42905f477009435de7bc9a5481019de4f0a63e833501812ada599ba79b7bb",
+    "frontend-ssalfer/js/utils/formatters.js": "5fd26d5ccfaa1d28953daeb657e0f909b825d2671b93aad89c5a676d945a722b",
+    "frontend-ssalfer/js/utils/gestion.js": "fb99a8e196d58e0d8f1acfab05fadbf8e4e48921e77e53e374f909ba161927a3",
+    "frontend-ssalfer/js/utils/gestorDocumentos.js": "e49b7fde58e1b8da799724419746bfbc3ad1deafb321a8769cc40969a14b7d29",
+    "frontend-ssalfer/js/utils/listadoDocumentos.js": "b1e0f4818dcadecd93ab540fccf2c38a22b6a25efe52d971abb47b36b8ff1a90",
+    "frontend-ssalfer/js/utils/mapaConciliacion.js": "fcc889bdfbca380bc34a3948f95886b0159d08fcb5a08cc1d72ccd7b1cd2f72d",
+    "frontend-ssalfer/js/utils/marco.js": "ad8ac8b8a08a1e254f635e4c83dfabe04817e5bae614fdffb439dc8021d0b155",
+    "frontend-ssalfer/js/utils/navegacion.js": "7f6d237f89a3c7265778e0257ef443f90b4648c980aa849fa4a2ccce976b2a97",
+    "frontend-ssalfer/js/utils/paginaGestion.js": "8b262fd84de2b0536c1d9ec992ad18b0bb45bfcff79dcc7ebd748613effb551a",
+    "frontend-ssalfer/js/utils/periodos.js": "f291f06f5cf8ed011863726720e68608fdaaa949b0d608bb0b780dc3ff2c69a0",
+    "frontend-ssalfer/js/utils/permisos.js": "168d555834ba84faf74d6e35c3188eaf28b34d1595e1aa6699904a466a765103",
+    "frontend-ssalfer/js/utils/proteccion.js": "485781f0556e6b465ebfa6a0b168de8d955533b316a7c90c69033c84e5b2de15",
+    "frontend-ssalfer/js/utils/reporteColectivo.js": "c2ff234a8f5c8d89395200abdd2c868d9d9fa85f2500b46ab680f723e3f5e9b3",
+    "frontend-ssalfer/js/utils/ui.js": "94f02f11e7486f3befbb333ba778e664c164aad05865cc90de7c608fab5cfeac",
+    "frontend-ssalfer/js/utils/usuariosProyecto.js": "21336308bcc71128fdc1273e943b5d8328518db2c4ffcea498eec7defec2afee",
+    "frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js": "7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9",
+    "frontend-ssalfer/js/vendor/html2canvas-1.4.1.min.js": "e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb",
+    "frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.js": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a",
+    "frontend-ssalfer/js/vendor/xlsx-0.20.3.mini.min.js": "0cb353f830d7288385492c83d277b058ddeac664ca51cf1393aa1fd3e2b70939",
+    "tests/frontend-ssalfer/dashboard-performance.cjs": "9e3d7f509651afac0f76d6dc3eeffdcf78ef7e09cb42c7d8798250cebde9b07d",
+    "tests/frontend-ssalfer/map-gis-rbac.cjs": "5fc481c5cccf8c6b0cf1decb9b81d56281ae83a60b7c33691002667205d1a868",
+    "tests/frontend-ssalfer/map-performance.cjs": "28426c1c22bcea23a3d01e377a0ae793ff0e87982cc4b0622b6250526f013402",
+    "tests/frontend-ssalfer/reports-performance.cjs": "631b376c7d12b2325e9fe73603d6609157c4bf0f11fc60c7afa8c68295a56d8c",
+    "tests/frontend-ssalfer/tracking-references-performance.cjs": "02c884f7259b2b5fddb7d01d8b231b03e3a2f49450543622cfe7a4a9e04e7991"
+  },
+  "local_evidence_directory": "/tmp/ssalfer-integration-20261020",
+  "constraints": {
+    "original_worktrees_clean": true,
+    "original_refs_unchanged": true,
+    "production_accessed": false,
+    "real_databases_modified": false,
+    "commit_created": false,
+    "remote_mutations": false
+  }
+}

@@ -59,7 +59,7 @@ def history(transactional_api, transactional_target_domain, history_resources):
         project, pn = _isolated_pn(api, transactional_target_domain)
         catalogs, users = history_resources
         for user in users.values():
-            _assign(api, project["id_proyecto"], user.id_usuario)
+            _assign(api, project["id_proyecto"], user.id_usuario, expected=201 if user.rol == "operador" else 422)
         marker = unique("ORV-B02")
         orv = api("POST", f"/api/proyecto-nucleo/{pn['id_proyecto_nucleo']}/orv",
                   expected=201, json={"numero_orv": marker}).json()
@@ -207,20 +207,25 @@ def test_all_read_roles_see_bajas_but_not_inactive_people(history, population, r
 
 
 @pytest.mark.parametrize("role", ["operador", "visualizador", "geografo"])
-def test_revoked_or_unrelated_project_has_no_historical_access(history, role):
+def test_historical_access_follows_current_project_read_scope(history, role):
     member = _add(history, "hidden", inactive=True)
     user = history.users[role]
     assert _ids(_list(history, user=user, incluir_bajas=True)) == {member["id_orv_integrante"]}
-    _remove(history.api, history.project["id_proyecto"], user.id_usuario)
+    if role == "operador":
+        _remove(history.api, history.project["id_proyecto"], user.id_usuario)
     unrelated = history.api("POST", "/api/proyectos", expected=201,
                             json={"clave_proyecto": unique("B02-OTRO"),
                                   "nombre_proyecto": unique("Proyecto ajeno")}).json()
-    _assign(history.api, unrelated["id_proyecto"], user.id_usuario)
+    _assign(history.api, unrelated["id_proyecto"], user.id_usuario, expected=201 if role == "operador" else 422)
     for include_history, include_deactivated in COMBINATIONS:
         response = _as(history, user, "GET", f"/api/orv/{history.orv['id_orv']}/integrantes",
-                       expected=403, params={"incluir_historico": include_history,
+                       expected=403 if role == "operador" else 200, params={"incluir_historico": include_history,
                                              "incluir_bajas": include_deactivated})
-        assert response.json() == {"detail": "Proyecto fuera del alcance autorizado"}
+        if role == "operador":
+            assert response.json() == {"detail": "Proyecto fuera del alcance autorizado"}
+        else:
+            expected_ids = {member["id_orv_integrante"]} if include_deactivated else set()
+            assert {row["id_orv_integrante"] for row in response.json()} == expected_ids
 
 
 @pytest.mark.parametrize("parent,expected", [("orv", 404), ("nucleus", 404),

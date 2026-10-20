@@ -140,16 +140,16 @@ def test_consolidation_preserves_roles_project_scope_and_missing_target(
 ):
     pn = target_domain["project_nucleus"]["id_proyecto_nucleo"]
     pid = target_domain["project"]["id_proyecto"]
-    admin = app.dependency_overrides[auth.get_current_user]()
-    api("POST", f"/api/proyectos/{pid}/usuarios", expected=201 if role == "operador" else 409,
-        json={"id_usuario": admin.id_usuario})
+    user, _ = _create_user(api, role=role)
+    api("POST", f"/api/proyectos/{pid}/usuarios", expected=201 if role == "operador" else 422,
+        json={"id_usuario": user["id_usuario"]})
     monkeypatch.setitem(app.dependency_overrides, auth.get_current_user,
-                        lambda: SimpleNamespace(id_usuario=admin.id_usuario, rol=role))
+                        lambda: SimpleNamespace(id_usuario=user["id_usuario"], rol=role))
     api("GET", f"/api/proyecto-nucleo/{pn}/documentos")
     api("GET", "/api/proyecto-nucleo/2147483647/documentos", expected=404)
     monkeypatch.setitem(app.dependency_overrides, auth.get_current_user,
                         lambda: SimpleNamespace(id_usuario=-1, rol=role))
-    api("GET", f"/api/proyecto-nucleo/{pn}/documentos", expected=403)
+    api("GET", f"/api/proyecto-nucleo/{pn}/documentos", expected=403 if role == "operador" else 200)
 
 
 @pytest.fixture(scope="module")
@@ -270,7 +270,7 @@ def test_historical_inactive_actor_and_multiple_cycle_totals(transactional_api, 
     api = transactional_api["request"]
     actor, _ = _create_user(api, role="geografo")
     pid = gis_sample["project"]
-    api("POST", f"/api/proyectos/{pid}/usuarios", expected=201, json={"id_usuario": actor["id_usuario"]})
+    api("POST", f"/api/proyectos/{pid}/usuarios", expected=422, json={"id_usuario": actor["id_usuario"]})
     iid = stage_parcels(api, pid, gpkg(tmp_path, "inactive-actor", [("p", [
         (polygon(), attrs(gis_sample["key"], "P-0")),
         (polygon(4), attrs(gis_sample["key"], "INEXISTENTE")),
@@ -297,8 +297,8 @@ def test_historical_inactive_actor_and_multiple_cycle_totals(transactional_api, 
     assert detail["usuario_nombre"] == name and detail["features"][0]["decisiones"] == decisions
 
 
-@pytest.mark.parametrize("role", ["operador", "visualizador", "geografo"])
-def test_gis_read_permissions_and_write_roles_unchanged(transactional_api, gis_sample, monkeypatch, role):
+@pytest.mark.parametrize("role", ["operador", "visualizador"])
+def test_gis_management_denies_read_roles_without_gis_permissions(transactional_api, gis_sample, monkeypatch, role):
     api = transactional_api["request"]
     iid, pid = gis_sample["import"], gis_sample["project"]
     monkeypatch.setitem(app.dependency_overrides, auth.get_current_user,

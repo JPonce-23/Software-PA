@@ -7,28 +7,29 @@ document.addEventListener("DOMContentLoaded", async () => {
         id_proyecto_nucleo: new Map(), id_convenio: new Map(), id_afectacion: new Map()
     };
 
-    async function cargarReferenciasReporte(filas) {
-        const consultas = [];
-        for (const id of new Set(filas.map(item => item.id_proyecto_nucleo).filter(Boolean))) {
-            consultas.push(window.NucleosAPI.obtenerProyectoNucleo(id).then(item => {
-                referenciasReporte.id_proyecto_nucleo.set(Number(id), item.nombre_nucleo);
-            }));
-            if (filas.some(item => item.id_afectacion)) {
-                consultas.push(window.AfectacionesAPI.listarPorProyectoNucleo(id).then(lista => {
-                    lista.forEach(item => referenciasReporte.id_afectacion.set(Number(item.id_afectacion),
-                        [window.SSALFER_FORMAT.etiquetaCodigo(item.tipo_afectacion), item.situacion].filter(Boolean).join(" · ")));
-                }));
-            }
-        }
-        for (const id of new Set(filas.map(item => item.id_convenio).filter(Boolean))) {
-            if (referenciasReporte.id_convenio.has(Number(id))) continue;
-            consultas.push(window.ConveniosAPI.obtener(id).then(item => {
-                referenciasReporte.id_convenio.set(Number(id),
-                    [window.SSALFER_FORMAT.etiquetaCodigo(item.tipo_convenio), `Consecutivo ${item.consecutivo}`, window.SSALFER_FORMAT.etiquetaCodigo(item.ambito), item.descripcion_instrumento].filter(Boolean).join(" · "));
-            }));
-        }
-        const resultados = await Promise.allSettled(consultas);
-        if (resultados.some(item => item.status === "rejected")) {
+    function invalidarConsultaPendiente() {
+        ++revisionConsulta;
+        if (!estado.cargando) return;
+        estado.cargando = false;
+        estado.filas = [];
+        estado.pagina = 1;
+        el.btnConsultar.disabled = false;
+        el.btnExportar.disabled = true;
+        renderTabla();
+    }
+
+    async function cargarReferenciasReporte(filas, vigente = () => true) {
+        const datos = await window.ReportesAPI.obtenerReferenciasReporte({
+            nucleos: filas.map(item => item.id_proyecto_nucleo).filter(Boolean),
+            convenios: filas.map(item => item.id_convenio).filter(id => id && !referenciasReporte.id_convenio.has(Number(id)))
+        }, filas.some(item => item.id_afectacion));
+        if (!vigente()) return;
+        for (const item of datos.nucleos) referenciasReporte.id_proyecto_nucleo.set(Number(item.id_proyecto_nucleo), item.nombre_nucleo);
+        for (const item of datos.afectaciones) referenciasReporte.id_afectacion.set(Number(item.id_afectacion),
+            [window.SSALFER_FORMAT.etiquetaCodigo(item.tipo_afectacion), item.situacion].filter(Boolean).join(" · "));
+        for (const item of datos.convenios) referenciasReporte.id_convenio.set(Number(item.id_convenio),
+            [window.SSALFER_FORMAT.etiquetaCodigo(item.tipo_convenio), `Consecutivo ${item.consecutivo}`, window.SSALFER_FORMAT.etiquetaCodigo(item.ambito), item.descripcion_instrumento].filter(Boolean).join(" · "));
+        if (datos.incompletas) {
             window.SSALFER_UI.toast("Algunas referencias no están disponibles; los valores del reporte se conservan.", { tipo: "error" });
         }
     }
@@ -61,13 +62,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return;
             }
             if (!nucleo.value) return;
-            const afectaciones = await window.AfectacionesAPI.listarPorProyectoNucleo(nucleo.value);
-            const convenios = new Map();
-            for (const afectacion of afectaciones) {
-                const lista = await window.ConveniosAPI.listarPorAfectacion(afectacion.id_afectacion);
-                lista.forEach(item => convenios.set(Number(item.id_convenio), item));
-            }
+            const contexto = await window.ReportesAPI.obtenerReferenciasContexto([nucleo.value]);
             if (revision !== revisionFiltros) return;
+            if (!contexto.nucleos.some(n => Number(n.id_proyecto_nucleo) === Number(nucleo.value))) throw Error('Referencias no disponibles');
+            const afectaciones = contexto.afectaciones;
+            const convenios = new Map(contexto.convenios.map(ref => [Number(ref.item.id_convenio), ref.item]));
             const selectAfectacion = campo("id_afectacion");
             if (selectAfectacion) selectAfectacion.replaceChildren(new Option("Todas las afectaciones del núcleo", ""));
             afectaciones.forEach(item => {
@@ -2401,11 +2400,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
 
 
-            estado.filas =
-                filas;
-
-            await cargarReferenciasReporte(filas);
+            await cargarReferenciasReporte(filas, () => consulta === revisionConsulta);
             if (consulta !== revisionConsulta) return;
+            estado.filas = filas;
 
 
             estado.pagina =
@@ -2796,6 +2793,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ===================================================== */
 
     el.filtros.addEventListener("change", event => {
+        if (estado.reporte !== "general") invalidarConsultaPendiente();
         if (["id_proyecto", "id_proyecto_nucleo"].includes(event.target.dataset.param)) {
             void cargarFiltrosContextuales(event.target.dataset.param);
         }

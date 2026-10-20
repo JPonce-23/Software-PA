@@ -209,11 +209,12 @@ def test_map_preserves_project_authorization(transactional_api):
     api = transactional_api["request"]
     allowed, forbidden = project(api), project(api)
     original = app.dependency_overrides[auth.get_current_user]
-    admin = original()
-    api("POST", f"/api/proyectos/{allowed}/usuarios", expected=201, json={"id_usuario": admin.id_usuario})
+    from tests.test_user_administration import _create_user
+    operator, _ = _create_user(api)
+    api("POST", f"/api/proyectos/{allowed}/usuarios", expected=201, json={"id_usuario": operator['id_usuario']})
     try:
         app.dependency_overrides[auth.get_current_user] = lambda: SimpleNamespace(
-            id_usuario=admin.id_usuario, rol="geografo", activo=True,
+            id_usuario=operator['id_usuario'], rol="operador", activo=True,
         )
         assert api("GET", f"/api/proyectos/{allowed}/mapa").json()["type"] == "FeatureCollection"
         api("GET", f"/api/proyectos/{forbidden}/mapa", expected=403)

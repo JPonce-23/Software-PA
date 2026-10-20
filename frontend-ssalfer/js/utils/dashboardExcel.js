@@ -46,7 +46,7 @@
             ctx.lineWidth=16;ctx.strokeStyle='#e4e7e5';ctx.beginPath();ctx.arc(66,66,58,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#237436';ctx.beginPath();ctx.arc(66,66,58,-Math.PI/2,-Math.PI/2+Math.PI*2*p/100);ctx.stroke();el.style.background='transparent';el.prepend(canvas);
         });
     }
-    window.SSALFER_DASHBOARD_EXCEL={contarConvenios,registrar,listo:()=>{document.getElementById('btnExportarDashboardExcel').disabled=false;}};
+    window.SSALFER_DASHBOARD_EXCEL={contarConvenios,registrar,listo:()=>{proyectosDatos.sort((a,b)=>(a.orden??0)-(b.orden??0));document.getElementById('btnExportarDashboardExcel').disabled=false;}};
     document.addEventListener('DOMContentLoaded',()=>{
         const csv=document.getElementById('btnExportarDashboardCsv');if(!csv)return;
         const b=document.createElement('button');b.type='button';b.className='btn-secundario';b.textContent='Exportar dashboard (Excel)';b.id='btnExportarDashboardExcel';b.disabled=true;csv.before(b);csv.textContent='CSV de respaldo';

@@ -294,7 +294,7 @@ def test_08_rbac_visualizador_read_only(api, target_domain, setup_domain):
     api(
         "POST",
         f"/api/proyectos/{project_id}/usuarios",
-        expected=201,
+        expected=422,  # Visualizador reads active projects without assignment.
         json={"id_usuario": user["id_usuario"]},
     )
 

@@ -361,7 +361,7 @@ def test_diagnostic_reads_preserve_project_access(transactional_api, tmp_path, m
     iid = stage(api, pid, gpkg(tmp_path, "access-diag", [("n", [(polygon(), {})])])).json()["id_importacion"]
     cid = preview(api, iid)[0]["id_ciclo_conciliacion"]
     monkeypatch.setitem(app.dependency_overrides, auth.get_current_user,
-                        lambda: N(id_usuario=-1, rol="geografo", activo=True))
+                        lambda: N(id_usuario=-1, rol="operador", activo=True))
     api("GET", f"/api/importaciones/{iid}/features", expected=403)
     api("GET", f"/api/importaciones/{iid}/conciliaciones/{cid}", expected=403)
 

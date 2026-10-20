@@ -108,6 +108,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ]);
 
     let revisionEntidad = 0;
+    let revisionReferenciasEventos = 0;
     const referenciasEntidad = new Map();
     const consultasEntidad = new Map();
     const dependenciasEntidad = {
@@ -139,10 +140,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function consultarUnaVez(clave, consulta) {
         if (!consultasEntidad.has(clave)) {
-            consultasEntidad.set(clave, Promise.resolve().then(consulta).catch(error => {
-                consultasEntidad.delete(clave);
+            const pendiente = Promise.resolve().then(consulta).catch(error => {
+                if (consultasEntidad.get(clave) === pendiente) consultasEntidad.delete(clave);
                 throw error;
-            }));
+            });
+            consultasEntidad.set(clave, pendiente);
         }
         return consultasEntidad.get(clave);
     }
@@ -1721,12 +1723,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function cargarReferenciasEventos() {
+        const revision = ++revisionReferenciasEventos;
+        const eventosActuales = eventos;
+        const vigente = () => revision === revisionReferenciasEventos;
         referenciasEntidad.clear();
         consultasEntidad.clear();
-        const tipos = [...new Set(eventos.map(evento => evento.entidad_tipo).filter(Boolean))];
+        const tipos = [...new Set(eventosActuales.map(evento => evento.entidad_tipo).filter(Boolean))];
         const resultados = await Promise.allSettled(tipos.map(async tipo => {
             if (tiposEntidadSelectorDirecto.has(tipo)) {
                 const lista = comoLista(await consultarUnaVez(`padres:${tipo}`, () => listarEntidadDirecta(tipo)));
+                if (!vigente()) return;
                 lista.forEach(item => referenciasEntidad.set(`${tipo}:${idEntidadDirecta(tipo, item)}`, etiquetaEntidadDirecta(tipo, item)));
                 return;
             }
@@ -1734,12 +1740,36 @@ document.addEventListener("DOMContentLoaded", async () => {
             const padreTipo = config?.padre || (tipo === "parcela_titular" ? "parcela" : null);
             if (!padreTipo) return;
             const padres = comoLista(await consultarUnaVez(`padres:${padreTipo}`, () => listarEntidadDirecta(padreTipo)));
-            const pendientes = new Set(eventos.filter(evento => evento.entidad_tipo === tipo).map(evento => Number(evento.entidad_id)));
+            if (!vigente()) return;
+            let conveniosPorAfectacion = null;
+            if (tipo === "convenio" && padres.length) {
+                try {
+                    const vinculos = await window.SeguimientoAPI.obtenerReferenciasConvenios(idProyectoNucleo);
+                    if (!Array.isArray(vinculos)) throw new Error("Referencias de convenios inválidas");
+                    conveniosPorAfectacion = new Map();
+                    for (const vinculo of vinculos) {
+                        const id = Number(vinculo.id_afectacion);
+                        if (!conveniosPorAfectacion.has(id)) conveniosPorAfectacion.set(id, []);
+                        conveniosPorAfectacion.get(id).push(vinculo.item);
+                    }
+                } catch {
+                    // Preserve per-affectation failure/retry behavior if the batch is unavailable.
+                }
+                if (!vigente()) return;
+            }
+            const pendientes = new Set(eventosActuales.filter(evento => evento.entidad_tipo === tipo).map(evento => Number(evento.entidad_id)));
             for (const padre of padres) {
+                if (!vigente()) return;
                 if (!pendientes.size) break;
                 const idPadre = idEntidadDirecta(padreTipo, padre);
                 let hijos;
-                if (tipo === "parcela_titular") {
+                if (tipo === "convenio" && conveniosPorAfectacion) {
+                    hijos = await consultarUnaVez(`convenio:${idPadre}`, () => Promise.all(
+                        (conveniosPorAfectacion.get(idPadre) || []).map(async item => ({
+                            id: Number(item.id_convenio), etiqueta: await etiquetaDependiente(tipo, item)
+                        }))
+                    ));
+                } else if (tipo === "parcela_titular") {
                     hijos = comoLista(await window.ParcelasAPI.listarTitulares(idPadre)).map(item => ({
                         id: Number(item.id_parcela_titular), etiqueta: etiquetaTitularParcela(item)
                     }));
@@ -1750,13 +1780,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                 } else {
                     hijos = await listarHijos(tipo, idPadre);
                 }
+                if (!vigente()) return;
                 hijos.forEach(hijo => {
                     referenciasEntidad.set(`${tipo}:${hijo.id}`, `${etiquetaEntidadDirecta(padreTipo, padre)} · ${hijo.etiqueta}`);
                     pendientes.delete(hijo.id);
                 });
             }
         }));
-        if (resultados.some(resultado => resultado.status === "rejected")) {
+        if (vigente() && resultados.some(resultado => resultado.status === "rejected")) {
             window.SSALFER_UI.toast("No se pudieron cargar algunas referencias. Puedes volver a abrir Seguimiento para reintentar.", { tipo: "error" });
         }
     }

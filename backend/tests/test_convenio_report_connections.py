@@ -41,7 +41,7 @@ def real_report_env(api, test_admin_credentials):
     email = uuid.uuid4().hex + "@pool.local"
     user = api("POST", "/api/usuarios", expected=201, json={
         "nombre": "Pool", "apellido_paterno": "QA", "correo": email,
-        "rol": "visualizador", "contrasena": password,
+        "rol": "operador", "contrasena": password,
     }).json()
     admin = login(*test_admin_credentials)
     denied = login(email, password)

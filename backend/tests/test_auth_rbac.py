@@ -24,7 +24,7 @@ def _login(email: str, password: str) -> tuple[TestClient, dict[str, str]]:
 
 
 def test_auth_health_and_csrf(client, admin_headers):
-    assert client.get("/health").json()["schema"] == 29
+    assert client.get("/health").json()["schema"] == 30
     anonymous = TestClient(app, raise_server_exceptions=False)
     assert anonymous.get("/api/proyectos").status_code == 401
     response = client.post(
@@ -53,12 +53,12 @@ def test_project_rbac_filters_before_pagination(api, target_domain):
                 "contrasena": password,
             },
         ).json()
-        api(
-            "POST",
-            f"/api/proyectos/{project_id}/usuarios",
-            expected=201,
-            json={"id_usuario": user["id_usuario"]},
-        )
+        if role == "operador":
+            api("POST", f"/api/proyectos/{project_id}/usuarios", expected=201,
+                json={"id_usuario": user["id_usuario"]})
+        else:
+            api("POST", f"/api/proyectos/{project_id}/usuarios", expected=422,
+                json={"id_usuario": user["id_usuario"]})
         role_user_ids[role] = user["id_usuario"]
         role_sessions[role] = _login(email, password)
 
@@ -90,6 +90,8 @@ def test_project_rbac_filters_before_pagination(api, target_domain):
 
     viewer, viewer_headers = role_sessions["visualizador"]
     assert viewer.get(f"/api/proyecto-nucleo/{pn_id}").status_code == 200
+    assert project_id in {p["id_proyecto"] for p in viewer.get("/api/proyectos").json()}
+    assert unassigned["id_proyecto"] in {p["id_proyecto"] for p in viewer.get("/api/proyectos").json()}
     assert viewer.post(
         f"/api/proyecto-nucleo/{pn_id}/actividades",
         headers=viewer_headers,
@@ -98,6 +100,8 @@ def test_project_rbac_filters_before_pagination(api, target_domain):
 
     geographer, geographer_headers = role_sessions["geografo"]
     assert geographer.get(f"/api/proyecto-nucleo/{pn_id}").status_code == 200
+    assert project_id in {p["id_proyecto"] for p in geographer.get("/api/proyectos").json()}
+    assert unassigned["id_proyecto"] in {p["id_proyecto"] for p in geographer.get("/api/proyectos").json()}
     assert geographer.post(
         f"/api/proyecto-nucleo/{pn_id}/afectaciones",
         headers=geographer_headers,
@@ -115,12 +119,8 @@ def test_project_rbac_filters_before_pagination(api, target_domain):
         },
     ).json()
     gis_project_id = gis_project["id_proyecto"]
-    api(
-        "POST",
-        f"/api/proyectos/{gis_project_id}/usuarios",
-        expected=201,
-        json={"id_usuario": role_user_ids["geografo"]},
-    )
+    assert api("POST", f"/api/proyectos/{gis_project_id}/usuarios", expected=422,
+               json={"id_usuario": role_user_ids["geografo"]}).status_code == 422
     assert api("GET", f"/api/proyectos/{gis_project_id}/trazos").json() == []
     trace = geographer.post(
         f"/api/proyectos/{gis_project_id}/trazos",

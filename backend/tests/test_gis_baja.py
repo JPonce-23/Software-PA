@@ -151,14 +151,14 @@ def test_roles_and_project_isolation(transactional_api,tmp_path,role):
     if role!='admin':
         row=api('POST','/api/usuarios',expected=201,json={'nombre':'QA GIS','apellido_paterno':'Baja',
             'correo':uuid.uuid4().hex+'@example.invalid','rol':role,'contrasena':'Qa1!'+uuid.uuid4().hex+'Z'}).json()
-        api('POST',f'/api/proyectos/{pid}/usuarios',expected=201,json={'id_usuario':row['id_usuario']})
+        api('POST',f'/api/proyectos/{pid}/usuarios',expected=201 if role=='operador' else 422,json={'id_usuario':row['id_usuario']})
         principal=SimpleNamespace(id_usuario=row['id_usuario'],rol=role,activo=True)
     try:
         app.dependency_overrides[auth.get_current_user]=lambda:principal
         baja(api,record['id_importacion'],expected=200 if role in ['admin','geografo'] else 403)
-        baja(api,alien['id_importacion'],expected=200 if role=='admin' else 403)
-        api('GET',f'/api/proyectos/{other}/importaciones',params={'incluir_inactivas':True},expected=200 if role=='admin' else 403)
-        api('GET',f"/api/importaciones/{alien['id_importacion']}",params={'incluir_inactivas':True},expected=200 if role=='admin' else 403)
+        baja(api,alien['id_importacion'],expected=200 if role in ['admin','geografo'] else 403)
+        api('GET',f'/api/proyectos/{other}/importaciones',params={'incluir_inactivas':True},expected=200 if role in ['admin','geografo'] else 403)
+        api('GET',f"/api/importaciones/{alien['id_importacion']}",params={'incluir_inactivas':True},expected=200 if role in ['admin','geografo'] else 403)
     finally: app.dependency_overrides[auth.get_current_user]=original
 
 

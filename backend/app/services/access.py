@@ -231,14 +231,18 @@ def require_project_nucleus_access(
     project_nucleus_id: int,
     *,
     mode: AccessMode = "read",
+    load_details: bool = True,
 ) -> models.ProyectoNucleo:
-    record = db.query(models.ProyectoNucleo).filter(
+    query = db.query(models.ProyectoNucleo).filter(
         models.ProyectoNucleo.id_proyecto_nucleo == project_nucleus_id,
         models.ProyectoNucleo.activo.is_(True),
-    ).first()
+    )
+    if not load_details:
+        query = query.options(raiseload("*"))
+    record = query.first()
     if record is None:
         raise HTTPException(status_code=404, detail="ProyectoNucleo no encontrado")
-    require_project_access(db, user, record.id_proyecto, mode=mode)
+    require_project_access(db, user, record.id_proyecto, mode=mode, load_details=load_details)
     return record
 
 
@@ -307,15 +311,19 @@ def require_affectation_access(
     affectation_id: int,
     *,
     mode: AccessMode = "read",
+    load_details: bool = True,
 ) -> models.Afectacion:
-    affectation = db.query(models.Afectacion).filter(
+    query = db.query(models.Afectacion).filter(
         models.Afectacion.id_afectacion == affectation_id,
         models.Afectacion.activo.is_(True),
-    ).first()
+    )
+    if not load_details:
+        query = query.options(raiseload("*"))
+    affectation = query.first()
     if affectation is None:
         raise HTTPException(status_code=404, detail="Afectación no encontrada")
     require_project_nucleus_access(
-        db, user, affectation.id_proyecto_nucleo, mode=mode
+        db, user, affectation.id_proyecto_nucleo, mode=mode, load_details=load_details
     )
     return affectation
 

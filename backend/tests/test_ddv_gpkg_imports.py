@@ -347,7 +347,7 @@ def test_ddv_confirmation_rolls_back_previous_version_on_insert_failure(
     _confirm(api, second["id_importacion"])
 
 
-def test_ddv_upload_allows_admin_and_assigned_geographer_only(
+def test_ddv_upload_allows_geographer_without_assignment_and_denies_operator(
     transactional_api, tmp_path
 ):
     api = transactional_api["request"]
@@ -364,7 +364,7 @@ def test_ddv_upload_allows_admin_and_assigned_geographer_only(
                 "rol": role,
                 "contrasena": f"Qa1!{uuid.uuid4().hex}Z",
             }).json()
-            api("POST", f"/api/proyectos/{project_id}/usuarios", expected=201,
+            api("POST", f"/api/proyectos/{project_id}/usuarios", expected=201 if role == "operador" else 422,
                 json={"id_usuario": user["id_usuario"]})
             app.dependency_overrides[auth.get_current_user] = (
                 lambda user_id=user["id_usuario"], user_role=role:
@@ -372,7 +372,7 @@ def test_ddv_upload_allows_admin_and_assigned_geographer_only(
             )
             response = _stage(api, project_id, content, expected=expected)
             if role == "geografo":
-                _stage(api, other_project_id, content, expected=403)
+                _stage(api, other_project_id, content, expected=201)
                 _confirm(api, response.json()["id_importacion"])
             app.dependency_overrides[auth.get_current_user] = original
     finally:

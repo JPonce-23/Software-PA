@@ -302,7 +302,7 @@ def test_caso_e_rol_sin_permiso_de_captura_rechazado(api, target_domain):
     ).json()
     ran_id = procedure["id_tramite_ran"]
 
-    # Create visualizador assigned to this project
+    # Visualizador reads active projects without receiving an assignment.
     password = _new_password()
     email = f"visualizador-{uuid.uuid4().hex[:8]}@qa.local"
     viewer = api(
@@ -321,7 +321,7 @@ def test_caso_e_rol_sin_permiso_de_captura_rechazado(api, target_domain):
     api(
         "POST",
         f"/api/proyectos/{env['project']['id_proyecto']}/usuarios",
-        expected=201,
+        expected=422,
         json={"id_usuario": viewer["id_usuario"]},
     )
 

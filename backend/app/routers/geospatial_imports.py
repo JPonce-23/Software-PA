@@ -16,9 +16,13 @@ from ..services import gis_read_models as reads
 from ..services.access import require_project_access
 
 
-router = APIRouter(tags=["Importaciones geoespaciales"])
-READ_ROLES = ["admin", "operador", "visualizador", "geografo"]
 GIS_ROLES = ["admin", "geografo"]
+require_gis_management = auth.RoleChecker(GIS_ROLES)
+# Every route here exposes staging or management data, including historical reads.
+router = APIRouter(
+    tags=["Importaciones geoespaciales"],
+    dependencies=[Depends(require_gis_management)],
+)
 
 
 @router.get(
@@ -33,7 +37,7 @@ def list_imports(
     limit: int = Query(100, ge=1, le=200),
     incluir_inactivas: bool = Query(False),
     db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+    user: models.Usuario = Depends(require_gis_management),
 ):
     require_project_access(db, user, id_proyecto)
     query = db.query(models.ImportacionArchivo).filter(
@@ -57,7 +61,7 @@ async def stage_ddv_import(
     fecha_fuente: date | None = Form(default=None),
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(GIS_ROLES)),
+    user: models.Usuario = Depends(require_gis_management),
 ):
     fields = [key for key, _ in (await request.form()).multi_items()]
     if sorted(fields) != sorted(set(fields)) or set(fields) - {
@@ -85,7 +89,7 @@ async def stage_nucleus_import(
     fecha_fuente: date | None = Form(default=None),
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(GIS_ROLES)),
+    user: models.Usuario = Depends(require_gis_management),
 ):
     fields = [key for key, _ in (await request.form()).multi_items()]
     if sorted(fields) != sorted(set(fields)) or set(fields) - {
@@ -113,7 +117,7 @@ async def stage_parcel_import(
     fecha_fuente: date | None = Form(default=None),
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(GIS_ROLES)),
+    user: models.Usuario = Depends(require_gis_management),
 ):
     fields = [key for key, _ in (await request.form()).multi_items()]
     if sorted(fields) != sorted(set(fields)) or set(fields) - {
@@ -141,7 +145,7 @@ async def stage_import(
     mapeo: str = Form(default="{}"),
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(GIS_ROLES)),
+    user: models.Usuario = Depends(require_gis_management),
 ):
     try:
         mapping = json.loads(mapeo)
@@ -172,7 +176,7 @@ def get_import(
     id_importacion: int,
     incluir_inactivas: bool = Query(False),
     db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+    user: models.Usuario = Depends(require_gis_management),
 ):
     return service.require_import_access(db, id_importacion, user, incluir_inactivas=incluir_inactivas)
 
@@ -190,7 +194,7 @@ def preview_features(
     estado_conciliacion: str | None = Query(default=None),
     incluir_inactivas: bool = Query(False),
     db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+    user: models.Usuario = Depends(require_gis_management),
 ):
     service.require_import_access(db, id_importacion, user, incluir_inactivas=incluir_inactivas)
     query = db.query(models.ImportacionFeature).filter(
@@ -205,7 +209,7 @@ def preview_features(
 
 @router.post("/importaciones/{id_importacion}/baja", response_model=schemas.ImportacionArchivoResponse)
 def baja_import(id_importacion: int, data: schemas.BajaRequest,
-                db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+                db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     return service.baja_import(db, id_importacion, data, user)
 
 
@@ -217,24 +221,24 @@ def confirm_import(
     id_importacion: int,
     data: schemas.ImportacionConfirmarRequest,
     db: Session = Depends(get_db),
-    user: models.Usuario = Depends(auth.RoleChecker(GIS_ROLES)),
+    user: models.Usuario = Depends(require_gis_management),
 ):
     return service.confirm_import(db, id_importacion, data, user)
 
 
 @router.get("/proyectos/{id_proyecto}/geoespacial/configuracion", response_model=schemas.ConfiguracionGisResponse)
-def get_gis_configuration(id_proyecto: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+def get_gis_configuration(id_proyecto: int, db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     require_project_access(db,user,id_proyecto)
     return {"id_proyecto":id_proyecto,"srid_trabajo":reconciliation.working_srid(db,id_proyecto)}
 
 
 @router.put("/proyectos/{id_proyecto}/geoespacial/configuracion", response_model=schemas.ConfiguracionGisResponse)
-def configure_gis(id_proyecto: int, data: schemas.ConfiguracionGisRequest, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+def configure_gis(id_proyecto: int, data: schemas.ConfiguracionGisRequest, db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     return reconciliation.configure_project(db,id_proyecto,data.srid_trabajo,user)
 
 
 @router.get("/importaciones/{id_importacion}/resumen")
-def get_reconciliation_summary(id_importacion: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+def get_reconciliation_summary(id_importacion: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     record=service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     if record.tipo_objetivo not in reconciliation.RECONCILIATION_TARGETS:
         return record.reporte
@@ -242,19 +246,19 @@ def get_reconciliation_summary(id_importacion: int, incluir_inactivas: bool=Quer
 
 
 @router.get("/importaciones/{id_importacion}/features/{id_feature}/candidatos", response_model=list[schemas.CandidatoGisResponse])
-def get_feature_candidates(id_importacion: int, id_feature: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+def get_feature_candidates(id_importacion: int, id_feature: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     records = db.query(models.ImportacionFeatureCandidato).filter_by(id_importacion=id_importacion,id_importacion_feature=id_feature).order_by(models.ImportacionFeatureCandidato.id_candidato).all()
     return reads.with_actor(db, records, schemas.CandidatoGisResponse, "id_usuario_revision", "usuario_revision_nombre")
 
 
 @router.post("/importaciones/{id_importacion}/features/{id_feature}/decisiones", response_model=schemas.ImportacionFeatureResponse)
-def decide_feature(id_importacion: int, id_feature: int, data: schemas.DecisionGisRequest, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+def decide_feature(id_importacion: int, id_feature: int, data: schemas.DecisionGisRequest, db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     return reconciliation.decide(db,id_importacion,id_feature,data,user)
 
 
 @router.get("/importaciones/{id_importacion}/features/{id_feature}/decisiones", response_model=list[schemas.DecisionGisResponse])
-def get_feature_decisions(id_importacion: int, id_feature: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+def get_feature_decisions(id_importacion: int, id_feature: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     feature=db.query(models.ImportacionFeature).filter_by(id_importacion=id_importacion,id_importacion_feature=id_feature).first()
     if feature is None: raise HTTPException(404,"Feature no encontrada")
@@ -263,7 +267,7 @@ def get_feature_decisions(id_importacion: int, id_feature: int, incluir_inactiva
 
 
 @router.get('/importaciones/{id_importacion}/features/{id_feature}/geometria')
-def get_feature_geometry(id_importacion: int,id_feature: int,incluir_inactivas: bool=Query(False), db: Session=Depends(get_db),user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+def get_feature_geometry(id_importacion: int,id_feature: int,incluir_inactivas: bool=Query(False), db: Session=Depends(get_db),user: models.Usuario=Depends(require_gis_management)):
     from sqlalchemy import func
     service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     row=db.query(models.ImportacionFeature.id_importacion_feature,
@@ -275,7 +279,7 @@ def get_feature_geometry(id_importacion: int,id_feature: int,incluir_inactivas: 
 
 @router.post('/importaciones/{id_importacion}/reconciliar', response_model=schemas.CicloGisResponse, status_code=201)
 def reconcile_import(id_importacion: int, data: schemas.ReconciliarGisRequest,
-                     db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+                     db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     cycle = history.reconcile(db,id_importacion,data,user)
     return reads.cycle_previews(db,[cycle])[0]
 
@@ -283,7 +287,7 @@ def reconcile_import(id_importacion: int, data: schemas.ReconciliarGisRequest,
 @router.get('/importaciones/{id_importacion}/conciliaciones', response_model=list[schemas.CicloGisResponse], responses=reads.TOTAL_COUNT_RESPONSE)
 def list_cycles(id_importacion: int, response: Response, skip: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200),
                 incluir_inactivas: bool = Query(False),
-    db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+    db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     record = service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas)
     query = db.query(models.ImportacionConciliacionCiclo).filter_by(id_importacion=id_importacion)
     response.headers["X-Total-Count"] = str(query.count())
@@ -293,7 +297,7 @@ def list_cycles(id_importacion: int, response: Response, skip: int=Query(0,ge=0)
 
 @router.get('/importaciones/{id_importacion}/conciliaciones/{id_ciclo}',response_model=schemas.DetalleCicloGisResponse)
 def get_cycle(id_importacion: int, id_ciclo: int, incluir_inactivas: bool=Query(False), db: Session=Depends(get_db),
-              user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+              user: models.Usuario=Depends(require_gis_management)):
     return reads.cycle_detail(db,service.require_import_access(db,id_importacion,user,incluir_inactivas=incluir_inactivas),id_ciclo)
 
 
@@ -302,7 +306,7 @@ def list_revisions(id_proyecto: int, response: Response, estado: Literal['pendie
                    tipo_cambio: str | None=None, objetivo: Literal['ddv','nucleo','parcela'] | None=None,
                    id_proyecto_nucleo: int | None=None, desde: datetime | None=None, hasta: datetime | None=None,
                    skip: int=Query(0,ge=0), limit: int=Query(100,ge=1,le=200),
-                   db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+                   db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     from sqlalchemy import text
     require_project_access(db,user,id_proyecto)
     clauses=['id_proyecto=:project']
@@ -324,12 +328,12 @@ def list_revisions(id_proyecto: int, response: Response, estado: Literal['pendie
 
 
 @router.get('/geoespacial/revisiones/{id_revision}',response_model=schemas.DetalleRevisionGisResponse)
-def get_revision(id_revision: int, db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(READ_ROLES))):
+def get_revision(id_revision: int, db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     return reads.revision_detail(db,id_revision,user)
 
 
 @router.post('/geoespacial/revisiones/{id_revision}/decisiones', response_model=schemas.RevisionGisDecisionResponse, status_code=201)
 def decide_revision(id_revision: int, data: schemas.RevisionGisDecisionRequest,
-                    db: Session=Depends(get_db), user: models.Usuario=Depends(auth.RoleChecker(GIS_ROLES))):
+                    db: Session=Depends(get_db), user: models.Usuario=Depends(require_gis_management)):
     decision = history.decide_revision(db,id_revision,data,user)
     return reads.with_actor(db, [decision], schemas.RevisionGisDecisionResponse)[0]

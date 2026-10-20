@@ -2,6 +2,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     "use strict";
 
+    // Shared only by the two initial consumers of this document. No persistent cache.
+    let proyectosDocumento;
+    function proyectosDelDocumento() {
+        return proyectosDocumento ||= window.ProyectosAPI.listar();
+    }
+
 
     /* =====================================================
                         UTILIDADES
@@ -713,8 +719,7 @@ configurarAccesoMapa();
         try {
 
             const proyectos =
-                await window.ProyectosAPI
-                    .listar();
+                await proyectosDelDocumento();
 
 
             const parametrosActuales =
@@ -924,91 +929,21 @@ configurarAccesoMapa();
              * =============================
              */
 
-            const proyectos =
-                await window.ProyectosAPI
-                    .listar();
-
-
-            /*
-             * =============================
-             * KPI DEL DASHBOARD
-             * =============================
-             */
-
-            let kpisDashboard = [];
-
-
-            if (window.ReportesAPI) {
-
+            async function obtenerReporte(metodo, mensaje) {
                 try {
-
-                    const respuestaKpi =
-                        await window.ReportesAPI
-                            .obtenerKpiDashboard();
-
-
-                    kpisDashboard =
-                        Array.isArray(
-                            respuestaKpi
-                        )
-                            ? respuestaKpi
-                            : [];
-
-
+                    const respuesta = await window.ReportesAPI?.[metodo]?.();
+                    return Array.isArray(respuesta) ? respuesta : [];
                 } catch (error) {
-
-                    /*
-                     * Los proyectos pueden seguir
-                     * mostrándose aunque falle KPI.
-                     */
-                    console.warn(
-                        "No fue posible cargar los KPI del dashboard.",
-                        error
-                    );
+                    console.warn(mensaje, error);
+                    return [];
                 }
             }
 
-
-            /*
-             * =============================
-             * VALORES DECLARADOS DE CONVENIOS
-             * =============================
-             *
-             * Se usa el endpoint existente de reporting.
-             * Los conceptos 90 % y 100 % son universos
-             * paralelos y pueden tener distinta cobertura.
-             */
-
-            let valoresConveniosDeclarados = [];
-
-
-            if (
-                window.ReportesAPI &&
-                typeof window.ReportesAPI
-                    .obtenerConveniosValoresDeclarados === "function"
-            ) {
-
-                try {
-
-                    const respuestaValores =
-                        await window.ReportesAPI
-                            .obtenerConveniosValoresDeclarados();
-
-
-                    valoresConveniosDeclarados =
-                        Array.isArray(respuestaValores)
-                            ? respuestaValores
-                            : [];
-
-
-                } catch (error) {
-
-                    console.warn(
-                        "No fue posible cargar los valores declarados de convenios.",
-                        error
-                    );
-                }
-            }
+            const [proyectos, kpisDashboard, valoresConveniosDeclarados] = await Promise.all([
+                proyectosDelDocumento(),
+                obtenerReporte("obtenerKpiDashboard", "No fue posible cargar los KPI del dashboard."),
+                obtenerReporte("obtenerConveniosValoresDeclarados", "No fue posible cargar los valores declarados de convenios.")
+            ]);
 
 
             /*
@@ -1083,11 +1018,20 @@ configurarAccesoMapa();
              * =============================
              */
 
-            for (
-                const proyecto
-                of proyectos
-            ) {
-
+            // Keep DOM and export order while at most three projects load independently.
+            const tarjetas = proyectos.map(() => {
+                const tarjeta = document.createElement("article");
+                tarjeta.className = "tarjeta tarjeta-dashboard-ejecutivo";
+                tarjeta.setAttribute("aria-busy", "true");
+                tarjeta.textContent = "Cargando resumen del proyecto…";
+                listaProyectos.appendChild(tarjeta);
+                return tarjeta;
+            });
+            async function cargarTarjeta(proyecto, orden) {
+                const articulo = tarjetas[orden];
+                const resumenConvenios = window.ReportesAPI?.obtenerResumenConveniosDashboard
+                    ? window.ReportesAPI.obtenerResumenConveniosDashboard(proyecto.id_proyecto).catch(() => null)
+                    : Promise.resolve(null);
                 let nucleos = [];
 
 
@@ -1138,8 +1082,10 @@ configurarAccesoMapa();
                     );
 
 
-                let copResumen = null;
-                try { copResumen = await window.SSALFER_DASHBOARD_EXCEL?.contarConvenios(listaNucleos); } catch { /* Se presenta sin dato, nunca cero inventado. */ }
+                // Preserve the old empty/failed-nuclei result; a failed COP read is "Sin dato".
+                const copResumen = listaNucleos.length === 0
+                    ? {individuales: 0, colectivos: 0, formalizados: 0, convenios: []}
+                    : await resumenConvenios;
                 const copsFormalizados =
                     sumarCampoKpi(
                         kpisDashboard,
@@ -1190,16 +1136,6 @@ configurarAccesoMapa();
                         monto100.total,
                         maximoMonto
                     );
-
-
-                const articulo =
-                    document.createElement(
-                        "article"
-                    );
-
-
-                articulo.className =
-                    "tarjeta tarjeta-dashboard-ejecutivo";
 
 
                 const nombreProyecto =
@@ -1523,11 +1459,17 @@ configurarAccesoMapa();
                 `;
 
 
-                listaProyectos.appendChild(
-                    articulo
-                );
-                window.SSALFER_DASHBOARD_EXCEL?.registrar({proyecto,nucleos:listaNucleos,kpis:kpisDashboard.filter(k=>k.id_proyecto===proyecto.id_proyecto),cop:copResumen,elemento:articulo});
+                articulo.removeAttribute("aria-busy");
+                window.SSALFER_DASHBOARD_EXCEL?.registrar({orden,proyecto,nucleos:listaNucleos,kpis:kpisDashboard.filter(k=>k.id_proyecto===proyecto.id_proyecto),cop:copResumen,elemento:articulo});
             }
+            let siguienteProyecto = 0;
+            async function cargarTarjetas() {
+                while (siguienteProyecto < proyectos.length) {
+                    const orden = siguienteProyecto++;
+                    await cargarTarjeta(proyectos[orden], orden);
+                }
+            }
+            await Promise.all(Array.from({length: Math.min(3, proyectos.length)}, cargarTarjetas));
             window.SSALFER_DASHBOARD_EXCEL?.listo();
 
 

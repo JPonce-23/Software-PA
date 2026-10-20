@@ -1648,6 +1648,88 @@ class ImportacionConfirmarRequest(BaseModel):
     aceptar_advertencias: bool = False
 
 
+class DashboardConvenioDetalle(BaseModel):
+    id_convenio: int
+    ambito: Ambito
+    tipo_convenio: str | None
+    consecutivo: int
+    fecha_firma: date | None
+
+
+class ReporteNucleoReferencia(BaseModel):
+    id_proyecto_nucleo: int
+    nombre_nucleo: str
+
+
+class ReporteAfectacionReferencia(BaseModel):
+    id_afectacion: int
+    id_proyecto_nucleo: int
+    tipo_afectacion: Ambito
+    situacion: str | None
+    superficie_afectada_ha: Decimal | None
+
+
+class ReporteConvenioReferencia(BaseModel):
+    id_convenio: int
+    id_proyecto_nucleo: int
+    tipo_convenio: str | None
+    consecutivo: int
+    ambito: Ambito
+    descripcion_instrumento: str | None
+    fecha_firma: date | None
+
+
+class ReporteConvenioEventoReferencia(ReporteConvenioReferencia):
+    fecha_programada_firma: date | None
+
+
+class ReporteConvenioEventoVinculoReferencia(BaseModel):
+    item: ReporteConvenioEventoReferencia
+    id_afectacion: int
+
+
+class ReporteAsambleaReferencia(BaseModel):
+    id_asamblea: int
+    id_proyecto_nucleo: int
+    proposito: str | None
+
+
+class ReporteConvenioContextoReferencia(BaseModel):
+    item: ReporteConvenioReferencia
+    id_afectacion: int
+
+
+class ReporteReferenciasResponse(BaseModel):
+    """Solo IDs legibles; ausentes/inactivos/ajenos se omiten sin distinguirlos."""
+    nucleos: list[ReporteNucleoReferencia]
+    afectaciones: list[ReporteAfectacionReferencia]
+    convenios: list[ReporteConvenioReferencia]
+
+
+class ReporteContextoReferenciasResponse(BaseModel):
+    nucleos: list[ReporteNucleoReferencia]
+    afectaciones: list[ReporteAfectacionReferencia]
+    convenios: list[ReporteConvenioContextoReferencia]
+    asambleas: list[ReporteAsambleaReferencia]
+
+
+class MapaIndicadoresResponse(BaseModel):
+    """Indicadores del mapa; null señala catálogo de celebración no disponible."""
+
+    asambleas_realizadas: int | None = Field(ge=0)
+    convenios_individuales: int = Field(ge=0)
+    convenios_colectivos: int = Field(ge=0)
+    convenios_firmados: int = Field(ge=0)
+
+
+class DashboardConveniosResponse(BaseModel):
+    """Active unique agreements reachable from the dashboard's first 100 nuclei."""
+    individuales: int
+    colectivos: int
+    formalizados: int
+    convenios: list[DashboardConvenioDetalle]
+
+
 class DashboardKpiResponse(ORMModel):
     id_proyecto: int
     anio: int

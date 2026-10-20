@@ -1,0 +1,184 @@
+// Run with node --test. VM/DOM doubles, not browser/HAR/render measurements.
+const {test} = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const {execFileSync} = require('node:child_process');
+const root = path.resolve(__dirname, '../..');
+const ExcelJS = require(path.join(root,'frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js'));
+const vendor = new vm.Script(fs.readFileSync(path.join(root,'frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js'),'utf8'));
+const original = file => execFileSync('git', ['show', `cbc78d0:frontend-ssalfer/js/${file}`], {cwd:root,encoding:'utf8'});
+const current = file => fs.readFileSync(path.join(root,'frontend-ssalfer/js',file),'utf8');
+const baselineOnly = process.env.F04_BASELINE_ONLY === '1';
+
+function dataset(role='admin', sizes=[74,1]) {
+    const projects=sizes.map((_,i)=>({id_proyecto:i+1,nombre_proyecto:`Proyecto ${i+1} <seguro>`,
+        clave_proyecto:`=P${i+1}`,descripcion:null,fecha_inicio:null,fecha_fin:null,creado_en:`2026-01-0${i+1}`}));
+    const nuclei=new Map(), affects=new Map(), agreements=new Map();
+    let nId=0,aId=0;
+    sizes.forEach((size,p)=>{
+        nuclei.set(p+1,Array.from({length:Math.min(size,100)},(_,i)=>{
+            const id=++nId;
+            const rows=Array.from({length:1+(p===0&&i<17?1:0)},()=>({id_afectacion:++aId}));
+            affects.set(id,rows);
+            rows.forEach(a=>agreements.set(a.id_afectacion,i<2?[{
+                id_convenio:p*100+1,ambito:'colectivo',tipo_convenio:'cop_original',consecutivo:1,fecha_firma:'2026-01-02',activo:true,
+            },{
+                id_convenio:p*100+2,ambito:'individual',tipo_convenio:'modificatorio',consecutivo:2,fecha_firma:null,activo:true,
+            }]:[]));
+            return {id_proyecto_nucleo:id,nombre_nucleo:`Núcleo ${id}`,municipio:'Municipio',entidad:'Entidad'};
+        }));
+    });
+    return {role,projects:role==='admin'?projects:projects.slice(0,1),nuclei,affects,agreements};
+}
+
+function summary(data,project) {
+    const unique=new Map();
+    for(const n of data.nuclei.get(project)||[])for(const a of data.affects.get(n.id_proyecto_nucleo)||[])
+        for(const c of data.agreements.get(a.id_afectacion)||[])unique.set(c.id_convenio,c);
+    const rows=[...unique.values()].filter(c=>c.activo!==false);
+    return {individuales:rows.filter(c=>c.ambito==='individual').length,colectivos:rows.filter(c=>c.ambito==='colectivo').length,
+        formalizados:rows.filter(c=>['individual','colectivo'].includes(c.ambito)&&c.fecha_firma).length,
+        convenios:rows.map(({id_convenio,ambito,tipo_convenio,consecutivo,fecha_firma})=>({id_convenio,ambito,tipo_convenio,consecutivo,fecha_firma}))};
+}
+
+async function load({reference=false,data=dataset(),fail=()=>false,delays={},exportExcel=true,allowExportError=false}={}) {
+    const calls=[],errors=[],listeners=new Map(),nodes=new Map();let blob,lastWorkbook;
+    class Element {
+        constructor(tag='div'){this.tagName=tag;this.children=[];this.innerHTML='';this.attributes={};this.style={};
+            this.classList={add(){},remove(){},contains(){return false},toggle(){}};}
+        append(...children){this.children.push(...children)}
+        appendChild(child){this.append(child);return child}
+        setAttribute(k,v){this.attributes[k]=v}
+        getAttribute(k){return this.attributes[k]||null}
+        removeAttribute(k){delete this.attributes[k]}
+        addEventListener(){}
+        querySelectorAll(){return []}
+        querySelector(selector){return selector==='.dashboard-graficas-grid'?new Element():null}
+        before(element){nodes.set(element.id,element)}
+        click(){}
+    }
+    for(const id of ['proyectosLista','listaProyectosDashboard','dashboardMensajeError','btnExportarDashboardCsv'])nodes.set(id,new Element());
+    const document={body:new Element('body'),getElementById:id=>nodes.get(id)||null,createElement:tag=>new Element(tag),
+        querySelector:()=>null,querySelectorAll:()=>[],dispatchEvent(){},addEventListener(name,fn){
+            if(!listeners.has(name))listeners.set(name,[]);listeners.get(name).push(fn);
+        }};
+    const clone=x=>JSON.parse(JSON.stringify(x));
+    async function get(url){
+        calls.push(url);
+        if(delays[url])await new Promise(resolve=>setTimeout(resolve,delays[url]));
+        if(fail(url))throw new Error('Fallo parcial sintético');
+        if(url==='/auth/sesion')return {user:{rol:data.role,nombre:'QA',apellido_paterno:'F04'}};
+        if(url.startsWith('/proyectos?'))return clone(data.projects);
+        if(url==='/dashboard/kpi')return data.projects.flatMap(p=>[
+            {id_proyecto:p.id_proyecto,indicador:'asambleas',anio:2025,programado:2,realizado:1,cantidad:1,superficie_ha:null,monto:null},
+            {id_proyecto:p.id_proyecto,indicador:'asambleas',anio:2026,programado:3,realizado:2,cantidad:2,superficie_ha:'1.1234567',monto:'100.13'},
+        ]);
+        if(url==='/reportes/convenios/valores-declarados')return data.projects.flatMap(p=>[
+            {id_proyecto:p.id_proyecto,id_convenio:1,concepto:'monto_90_declarado',valor_declarado:'90.12'},
+            {id_proyecto:p.id_proyecto,id_convenio:1,concepto:'monto_100_declarado',valor_declarado:null},
+            {id_proyecto:p.id_proyecto,id_convenio:2,concepto:'monto_100_declarado',valor_declarado:'100.13'},
+        ]);
+        let match;
+        if((match=url.match(/^\/proyectos\/(\d+)\/nucleos$/)))return clone(data.nuclei.get(+match[1])||[]);
+        if((match=url.match(/^\/proyectos\/(\d+)\/dashboard\/convenios$/)))return summary(data,+match[1]);
+        if((match=url.match(/^\/proyecto-nucleo\/(\d+)\/afectaciones$/)))return clone(data.affects.get(+match[1])||[]);
+        if((match=url.match(/^\/afectaciones\/(\d+)\/convenios$/)))return clone(data.agreements.get(+match[1])||[]);
+        throw new Error('Unexpected GET '+url);
+    }
+    class URLDouble extends URL {}
+    URLDouble.createObjectURL=value=>{blob=value;return 'blob:fixture'};URLDouble.revokeObjectURL=()=>{};
+    const window={document,location:{pathname:'/dashboard.html',search:'',origin:'http://fixture.invalid'},
+        innerWidth:1200,ClienteAPI:{get,API_BASE_URL:'/api',mostrarErrorAPI(error){errors.push(error)},ErrorAPI:class extends Error{}},
+        SSALFER_UI:{cargando:{iniciar:()=>()=>{}},toast(){}},
+        html2canvas:async()=>({width:800,height:200,toDataURL:()=> 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6P5QAAAAASUVORK5CYII='}),
+        setTimeout};
+    const context=vm.createContext({window,document,console:{warn(){},error(){}},URL:URLDouble,URLSearchParams,Blob,
+        html2canvas:window.html2canvas,CustomEvent:class{},setTimeout,clearTimeout,setImmediate,clearImmediate,
+        localStorage:{getItem:()=>null,setItem(){}}});
+    // Keep vendor and application arrays in the same JS realm (as in a browser).
+    vendor.runInContext(context);
+    context.ExcelJS=window.ExcelJS||context.ExcelJS;
+    const VendorWorkbook=context.ExcelJS.Workbook;
+    context.ExcelJS.Workbook=class extends VendorWorkbook {constructor(){super();lastWorkbook=this}};
+    window.ExcelJS=context.ExcelJS;
+    for(const file of ['api/auth.js','api/proyectos.js','api/nucleos.js','api/afectaciones.js','api/convenios.js','api/reportes.js','utils/dashboardExcel.js','dashboard.js']){
+        vm.runInContext(reference?original(file):current(file),context,{filename:file});
+    }
+    for(const fn of listeners.get('DOMContentLoaded')||[])fn();
+    const button=()=>nodes.get('btnExportarDashboardExcel');
+    for(let i=0;i<2000&&(!button()||button().disabled);i++)await new Promise(resolve=>setTimeout(resolve,1));
+    const ready=button()&&!button().disabled;
+    const cards=nodes.get('listaProyectosDashboard').children.map(e=>e.innerHTML);
+    let sheets=null;
+    if(exportExcel&&ready){
+        await button().onclick();
+        if(!blob&&errors.length&&!allowExportError)throw errors.at(-1);
+        if(blob){
+            const restored=new ExcelJS.Workbook();await restored.xlsx.load(await blob.arrayBuffer());
+            sheets=restored.worksheets.map(sh=>({name:sh.name,rows:sh.getSheetValues().map(row=>
+                row?.map(cell=>cell instanceof Date?cell.toISOString():cell)).filter(row=>row?.[1]!=='Generado')}));
+        }
+    }
+    return {calls,cards,ready,sheets,csv:nodes.get('btnExportarDashboardCsv').href,workbookCreated:!!lastWorkbook,
+        exportError:errors.at(-1)?.message||null};
+}
+
+test('baseline: audited-size traversal issues 174 API calls (VM, not HAR)',async()=>{
+    const result=await load({reference:true});
+    assert.equal(result.calls.length,174);assert.equal(result.ready,true);assert.ok(result.sheets);
+    if(process.env.F04_EVIDENCE_DIR)fs.writeFileSync(path.join(process.env.F04_EVIDENCE_DIR,'frontend-baseline.json'),JSON.stringify({
+        kind:'VM execution of original scripts with HTTP doubles; not browser',calls:result.calls,requests:result.calls.length,cards:result.cards,sheets:result.sheets},null,2));
+});
+
+test('all roles: identical cards, actual XLSX cells, CSV URL; constant requests', {skip:baselineOnly},async()=>{
+    const results=[];
+    for(const role of ['admin','operador','visualizador','geografo']){
+        const data=dataset(role),before=await load({reference:true,data}),after=await load({data});
+        assert.deepEqual(after.cards,before.cards);assert.deepEqual(after.sheets,before.sheets);assert.equal(after.csv,before.csv);
+        assert.equal(after.calls.length,4+2*data.projects.length);
+        assert.ok(!after.calls.some(u=>u.includes('/afectaciones')));
+        results.push({role,before:before.calls.length,after:after.calls.length,identicalCards:true,identicalXlsxCells:true});
+    }
+    if(process.env.F04_EVIDENCE_DIR)fs.writeFileSync(path.join(process.env.F04_EVIDENCE_DIR,'frontend-comparison.json'),JSON.stringify(results,null,2));
+});
+
+test('over 100 nuclei keeps the current first-page contract and exports', {skip:baselineOnly},async()=>{
+    const data=dataset('admin',[105,0]);
+    const before=await load({reference:true,data}),after=await load({data});
+    assert.deepEqual(after.cards,before.cards);assert.deepEqual(after.sheets,before.sheets);
+    assert.equal(after.calls.length,8);
+});
+
+test('partial failure: one project unavailable does not block other cards/exports', {skip:baselineOnly},async()=>{
+    const data=dataset();
+    for(const kind of ['nuclei','cop','kpi','values']){
+        const beforeFail=url=>({nuclei:'/proyectos/1/nucleos',cop:'/afectaciones/1/convenios',kpi:'/dashboard/kpi',values:'/reportes/convenios/valores-declarados'})[kind]===url;
+        const afterFail=url=>kind==='cop'?url==='/proyectos/1/dashboard/convenios':beforeFail(url);
+        const before=await load({reference:true,data,fail:beforeFail}),after=await load({data,fail:afterFail});
+        assert.equal(after.ready,true);assert.deepEqual(after.cards,before.cards);assert.deepEqual(after.sheets,before.sheets);
+    }
+});
+
+test('slow first project keeps project order in DOM and XLSX', {skip:baselineOnly},async()=>{
+    const data=dataset(),before=await load({reference:true,data});
+    const after=await load({data,delays:{'/proyectos/2/dashboard/convenios':50}});
+    assert.deepEqual(after.cards,before.cards);assert.deepEqual(after.sheets,before.sheets);
+});
+
+test('new documents/users fetch afresh; export performs zero further GETs', {skip:baselineOnly},async()=>{
+    const [a,b,c]=await Promise.all([load({delays:{'/proyectos/2/dashboard/convenios':30}}),load({data:dataset('visualizador')}),load()]);
+    assert.equal(a.calls.length,8);assert.equal(b.calls.length,6);assert.equal(c.calls.length,8);
+    assert.equal(b.cards.length,1);assert.ok(!b.cards[0].includes('Proyecto 2'));
+    assert.equal(a.calls.filter(u=>u.startsWith('/proyectos?')).length,1);
+});
+
+test('preexisting Excel error for a null instrument type remains explicitly recorded', {skip:baselineOnly},async()=>{
+    const data=dataset('admin',[3,1]);
+    for(const rows of data.agreements.values())for(const c of rows)if(c.id_convenio===1)c.tipo_convenio=null;
+    const before=await load({reference:true,data,allowExportError:true});
+    const after=await load({data,allowExportError:true});
+    assert.deepEqual(after.cards,before.cards);assert.match(before.exportError,/null.*replaceAll/);
+    assert.equal(after.exportError,before.exportError);assert.equal(after.sheets,null);
+});

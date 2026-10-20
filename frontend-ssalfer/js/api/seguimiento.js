@@ -84,7 +84,12 @@
         );
     }
 
+    function obtenerReferenciasConvenios(idProyectoNucleo) {
+        return get(`/proyecto-nucleo/${encodeURIComponent(idProyectoNucleo)}/reportes/referencias-convenios`);
+    }
+
     window.SeguimientoAPI = {
+        obtenerReferenciasConvenios,
         listarPorProyectoNucleo,
         obtener,
         crear,

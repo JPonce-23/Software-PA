@@ -41,7 +41,7 @@ def search(transactional_api, transactional_target_domain, search_users):
     api = transactional_api["request"]
     project, pn = _isolated_pn(api, transactional_target_domain)
     for user in search_users.values():
-        _assign(api, project["id_proyecto"], user.id_usuario)
+        _assign(api, project["id_proyecto"], user.id_usuario, expected=201 if user.rol == "operador" else 422)
     context = SimpleNamespace(
         api=api, users=search_users, project=project, pn=pn,
         admin=app.dependency_overrides[auth.get_current_user](),
@@ -137,15 +137,20 @@ def test_all_relationship_paths_and_read_access_equivalence(search, kind):
             assert search.project["id_proyecto"] in person_project_ids(db, person["id_persona"])
             assert require_person_access(db, user, person["id_persona"]).id_persona == person["id_persona"]
     for user in search.users.values():
-        _remove(search.api, search.project["id_proyecto"], user.id_usuario)
-        assert _find(search, user=user) == []
-        with search.factory() as db:
-            with pytest.raises(HTTPException) as denied:
-                require_person_access(db, user, person["id_persona"])
-            assert denied.value.status_code == 403
+        if user.rol == "operador":
+            _remove(search.api, search.project["id_proyecto"], user.id_usuario)
+            assert _find(search, user=user) == []
+            with search.factory() as db:
+                with pytest.raises(HTTPException) as denied:
+                    require_person_access(db, user, person["id_persona"])
+                assert denied.value.status_code == 403
+        else:
+            assert _ids(_find(search, user=user)) == [person["id_persona"]]
+            with search.factory() as db:
+                assert require_person_access(db, user, person["id_persona"]).id_persona == person["id_persona"]
 
 
-def test_hidden_person_exact_identifiers_do_not_reveal_existence(search):
+def test_person_identifiers_follow_operator_and_global_read_scopes(search):
     other_project, other_pn = _isolated_pn(search.api, search.domain)
     hidden = _person(search, project=other_project, curp=search.marker, rfc=search.marker)
     _link(search, hidden, pn=other_pn)
@@ -153,7 +158,10 @@ def test_hidden_person_exact_identifiers_do_not_reveal_existence(search):
         for criterion in ({"q": search.marker}, {"curp": search.marker}, {"rfc": search.marker}):
             response = _request_as(search, user, "GET", "/api/personas", params=criterion)
             assert response.status_code == 200
-            assert response.text == "[]"
+            if user.rol == "operador":
+                assert response.text == "[]"
+            else:
+                assert _ids(response.json()) == [hidden["id_persona"]]
     response = _request_as(search, search.users["operator"], "POST",
                            f"/api/proyectos/{search.project['id_proyecto']}/personas",
                            expected=409, json={"nombre": "Otro nombre", "curp": search.marker.lower()})

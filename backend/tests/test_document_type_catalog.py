@@ -35,7 +35,7 @@ def document_resources(transactional_api, transactional_target_domain):
     users = {}
     for role in ("operador", "visualizador", "geografo"):
         record, _ = _create_user(api, role=role)
-        _assign(api, project["id_proyecto"], record["id_usuario"])
+        _assign(api, project["id_proyecto"], record["id_usuario"], expected=201 if role == "operador" else 422)
         with transactional_api["session_factory"]() as db:
             user = db.get(models.Usuario, record["id_usuario"])
             db.expunge(user)
@@ -299,7 +299,7 @@ def test_foreign_target_not_visible(docs, role):
         "id_tipo_documento": docs.types["MINUTA"]["id_tipo_documento"],
         "estado": "disponible", "titulo": docs.marker,
     }).json()
-    _as(docs, role, "GET", path, expected=403)
+    _as(docs, role, "GET", path, expected=403 if role == "operador" else 200)
     _as(docs, role, "POST", path, expected=403, json={
         "id_tipo_documento": foreign_doc["id_tipo_documento"], "estado": "disponible",
     })
@@ -307,8 +307,8 @@ def test_foreign_target_not_visible(docs, role):
         expected=403, json={"titulo": "Ajeno"})
 
 
-def test_health_029(docs):
-    assert docs.api("GET", "/health").json() == {"status": "ok", "schema": 29}
+def test_health_030(docs):
+    assert docs.api("GET", "/health").json() == {"status": "ok", "schema": 30}
 
 
 def test_existing_document_version_regression_isolated(docs):

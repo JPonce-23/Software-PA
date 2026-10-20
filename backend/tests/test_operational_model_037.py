@@ -256,7 +256,7 @@ def test_12_rbac_escritura(api, target_domain, catalogs):
     api(
         "POST",
         f"/api/proyectos/{project_id}/usuarios",
-        expected=201,
+        expected=422,  # Visualizador reads active projects without assignment.
         json={"id_usuario": user["id_usuario"]},
     )
 

@@ -127,27 +127,29 @@ def test_shared_person_requires_all_projects_for_global_edit_and_preserves_read_
         path, payload, _ = _link_request(api, scope, person_id, "parcel")
         api("POST", path, expected=201, json=payload)
     user, password = _create_user(api, role=role)
-    _assign(api, project["id_proyecto"], user["id_usuario"])
+    _assign(api, project["id_proyecto"], user["id_usuario"], expected=201 if role == "operador" else 422)
     session, headers = _login(user["correo"], password)
     try:
         before = _snapshot(person_id)
         assert session.get(f"/api/personas/{person_id}").status_code == 200
-        assert session.get(f"/api/proyecto-nucleo/{other_pn['id_proyecto_nucleo']}").status_code == 403
+        assert session.get(f"/api/proyecto-nucleo/{other_pn['id_proyecto_nucleo']}").status_code == (403 if role == "operador" else 200)
         assert session.patch(f"/api/personas/{person_id}", headers=headers,
                              json={"nombre": "Cambio global prohibido"}).status_code == 403
         assert _snapshot(person_id) == before
-        _assign(api, other["id_proyecto"], user["id_usuario"])
+        _assign(api, other["id_proyecto"], user["id_usuario"], expected=201 if role == "operador" else 422)
         response = session.patch(f"/api/personas/{person_id}", headers=headers,
                                  json={"nombre": unique("Ambos proyectos")})
         assert response.status_code == (200 if role == "operador" else 403), response.text
         if role != "operador":
             assert _snapshot(person_id) == before
-        _remove(api, project["id_proyecto"], user["id_usuario"])
+        if role == "operador":
+            _remove(api, project["id_proyecto"], user["id_usuario"])
         assert session.get(f"/api/personas/{person_id}").status_code == 200
         assert session.patch(f"/api/personas/{person_id}", headers=headers,
                              json={"nombre": "Un permiso no basta"}).status_code == 403
-        _remove(api, other["id_proyecto"], user["id_usuario"])
-        assert session.get(f"/api/personas/{person_id}").status_code == 403
+        if role == "operador":
+            _remove(api, other["id_proyecto"], user["id_usuario"])
+        assert session.get(f"/api/personas/{person_id}").status_code == (403 if role == "operador" else 200)
     finally:
         session.close()
 

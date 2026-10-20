@@ -146,7 +146,7 @@ def test_lifecycle_preserves_history_audit_other_assignments_and_sessions(api, c
         session.close()
 
 
-@pytest.mark.parametrize("role", ["operador", "visualizador", "geografo"])
+@pytest.mark.parametrize("role", ["operador"])
 def test_backend_revokes_project_and_nucleus_access_and_preserves_role(api, target_domain, role):
     user, password = _create_user(api, role=role)
     project, pn = _isolated_pn(api, target_domain)
@@ -195,6 +195,32 @@ def test_backend_revokes_project_and_nucleus_access_and_preserves_role(api, targ
         assert session.post(capture_path, headers=headers, json=capture_payload).status_code == (
             201 if role == "operador" else 403
         )
+        assert session.patch(gis_path, headers=headers, json=gis_payload).status_code == (
+            200 if role == "geografo" else 403
+        )
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("role", ["visualizador", "geografo"])
+def test_read_roles_have_global_active_project_scope_and_cannot_be_assigned(api, target_domain, role):
+    user, password = _create_user(api, role=role)
+    project, pn = _isolated_pn(api, target_domain)
+    project_id, pn_id = project["id_proyecto"], pn["id_proyecto_nucleo"]
+    api("POST", f"/api/proyectos/{project_id}/usuarios", expected=422,
+        json={"id_usuario": user["id_usuario"]})
+    session, headers = _login(user["correo"], password)
+    try:
+        listed = session.get("/api/proyectos").json()
+        assert project_id in {row["id_proyecto"] for row in listed}
+        assert session.get(f"/api/proyectos/{project_id}").status_code == 200
+        assert session.get(f"/api/proyecto-nucleo/{pn_id}").status_code == 200
+        assert session.post(f"/api/proyecto-nucleo/{pn_id}/actividades", headers=headers,
+            json={"tipo_actividad":"caminamiento","contexto_actividad":"general",
+                  "fecha_realizada":"2026-04-01"}).status_code == 403
+        gis_path = f"/api/nucleos/{pn['id_nucleo']}/geometria"
+        gis_payload = {"geometria_wkt":"MULTIPOLYGON(((-100 20,-99.9 20,-99.9 20.1,-100 20.1,-100 20)))",
+                       "fuente_geometria":"QA política por rol","fecha_fuente_geometria":"2026-01-01"}
         assert session.patch(gis_path, headers=headers, json=gis_payload).status_code == (
             200 if role == "geografo" else 403
         )

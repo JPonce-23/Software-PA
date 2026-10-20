@@ -27,7 +27,7 @@ def main():
         # Only canonical versions: an ignored legacy 001_init_schema.sql can
         # exist in a developer checkout and must never enter this test lineage.
         paths = [root / "001_baseline_v1.sql", *sorted(p for p in root.glob("[0-9][0-9][0-9]_*.sql")
-                                                       if "002" <= p.name[:3] <= "029")]
+                                                       if "002" <= p.name[:3] <= "030")]
         for path in paths:
             content = path.read_bytes()
             with conn.cursor() as cur:
@@ -47,7 +47,7 @@ def main():
             for table, column in (("usuario", "id_usuario"), ("entidad_federativa", "id_entidad"), ("municipio", "id_municipio")):
                 cur.execute(f"SELECT setval(pg_get_serial_sequence(%s,%s),(SELECT max({column}) FROM {table}),true)", (table, column))
         conn.commit()
-    print("Instancia local desechable software_pa_test: esquema 001–029 y catálogo sintético instalados")
+    print("Instancia local desechable software_pa_test: esquema 001–030 y catálogo sintético instalados")
 
 
 if __name__ == "__main__":

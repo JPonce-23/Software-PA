@@ -250,17 +250,17 @@ def test_history_endpoints_preserve_gis_roles_and_project_access(transactional_a
     else:
         created=api('POST','/api/usuarios',expected=201,json={'nombre':'QA GIS','apellido_paterno':'Sintético',
             'correo':uuid.uuid4().hex+'@example.invalid','rol':role,'contrasena':'Qa1!'+uuid.uuid4().hex+'Z'}).json()
-        api('POST',f'/api/proyectos/{pid}/usuarios',expected=201,json={'id_usuario':created['id_usuario']})
+        api('POST',f'/api/proyectos/{pid}/usuarios',expected=201 if role=='operador' else 422,json={'id_usuario':created['id_usuario']})
         principal=SimpleNamespace(id_usuario=created['id_usuario'],rol=role,activo=True)
     try:
         app.dependency_overrides[auth.get_current_user]=lambda:principal
-        assert cycles(api,iid)
-        assert reviews(api,pid)
-        api('GET',f"/api/geoespacial/revisiones/{review['id_revision']}")
+        for path in [f'/api/importaciones/{iid}/conciliaciones',f'/api/proyectos/{pid}/geoespacial/revisiones',
+                     f"/api/geoespacial/revisiones/{review['id_revision']}"]:
+            api('GET',path,expected=200 if write else 403)
         reconcile(api,iid,expected=201 if write else 403)
         api('POST',f"/api/geoespacial/revisiones/{review['id_revision']}/decisiones",expected=201 if write else 403,
             json={'accion':'revisado','motivo':'QA técnica','clave_solicitud':str(uuid.uuid4())})
-        api('GET',f'/api/proyectos/{other}/geoespacial/revisiones',expected=200 if role=='admin' else 403)
+        api('GET',f'/api/proyectos/{other}/geoespacial/revisiones',expected=200 if role in ['admin','geografo'] else 403)
     finally:
         app.dependency_overrides[auth.get_current_user]=original
 

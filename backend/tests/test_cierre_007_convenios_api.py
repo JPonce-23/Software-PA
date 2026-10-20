@@ -596,20 +596,20 @@ def test_007_reporting_rbac_aislamiento(api, target_domain, transactional_api):
     session = transactional_api["session_factory"]()
     try:
         session.execute(text("SELECT set_config('app.current_user_id', '1', true)"))
-        user_vis = models.Usuario(
-            nombre="Visualizador",
+        user_operator = models.Usuario(
+            nombre="Operador",
             apellido_paterno="Aislado",
-            correo=f"vis-{uuid.uuid4().hex[:8]}@qa.test",
+            correo=f"operator-{uuid.uuid4().hex[:8]}@qa.test",
             contrasena_hash="fake",
-            rol="visualizador",
+            rol="operador",
             activo=True,
             fecha_alta=datetime.now(timezone.utc),
         )
-        session.add(user_vis)
+        session.add(user_operator)
         session.flush()
 
         up = models.UsuarioProyecto(
-            id_usuario=user_vis.id_usuario,
+            id_usuario=user_operator.id_usuario,
             id_proyecto=id_a,
             asignado_por=1,
             activo=True,
@@ -617,8 +617,8 @@ def test_007_reporting_rbac_aislamiento(api, target_domain, transactional_api):
         )
         session.add(up)
         session.commit()
-        session.refresh(user_vis)
-        session.expunge(user_vis)
+        session.refresh(user_operator)
+        session.expunge(user_operator)
 
         previous_overrides = app.dependency_overrides.copy()
         for wrapper in app.routes:
@@ -627,7 +627,7 @@ def test_007_reporting_rbac_aislamiento(api, target_domain, transactional_api):
                 for route in router.routes:
                     for dependency in route.dependant.dependencies:
                         if isinstance(dependency.call, auth.RoleChecker):
-                            app.dependency_overrides[dependency.call] = lambda u=user_vis: u
+                            app.dependency_overrides[dependency.call] = lambda u=user_operator: u
 
         with TestClient(app, raise_server_exceptions=False) as client:
             # Acceso a proyecto B no autorizado -> 403

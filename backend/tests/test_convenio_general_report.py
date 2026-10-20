@@ -360,11 +360,12 @@ def test_sin_categoria_y_sin_resultados(report_env):
 
 
 @pytest.mark.parametrize("suffix", ["", "/entidades", "/completo"])
-def test_acceso_proyecto(report_env, suffix):
+@pytest.mark.parametrize("role", ["admin", "operador", "visualizador", "geografo"])
+def test_acceso_proyecto(report_env, suffix, role):
     original = app.dependency_overrides[auth.get_current_user]
-    app.dependency_overrides[auth.get_current_user] = lambda: models.Usuario(id_usuario=9999999, rol="visualizador")
+    app.dependency_overrides[auth.get_current_user] = lambda: models.Usuario(id_usuario=9999999, rol=role)
     try:
-        report_env["api"]("GET", report_env["path"] + suffix, expected=403)
+        report_env["api"]("GET", report_env["path"] + suffix, expected=403 if role == "operador" else 200)
     finally:
         app.dependency_overrides[auth.get_current_user] = original
 
@@ -431,10 +432,11 @@ def test_conexion_real_de_reporte_solo_lectura():
 
 
 @pytest.mark.parametrize("role", ["operador", "visualizador", "geografo"])
-def test_roles_con_asignacion_ven_solo_su_proyecto(report_env, role):
+def test_roles_lectores_respetan_alcance_actual(report_env, role):
     user = report_env["create"]("/api/usuarios", nombre="Reporte", apellido_paterno="Sintético", rol=role,
                                 correo=uuid.uuid4().hex + "@local.invalid", contrasena="Convenios2026!Aislado")
-    report_env["create"](f"/api/proyectos/{report_env['project_id']}/usuarios", id_usuario=user["id_usuario"])
+    report_env["api"]("POST", f"/api/proyectos/{report_env['project_id']}/usuarios", expected=201 if role == "operador" else 422,
+                      json={"id_usuario":user["id_usuario"]})
     original = app.dependency_overrides[auth.get_current_user]
     app.dependency_overrides[auth.get_current_user] = lambda: models.Usuario(id_usuario=user["id_usuario"], rol=role)
     try:
