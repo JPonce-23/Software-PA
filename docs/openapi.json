@@ -11379,6 +11379,56 @@
           }
         }
       }
+    },
+    "/api/proyectos/{id_proyecto}/mapa/indicadores": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa"
+        ],
+        "summary": "Map Indicators",
+        "description": "Todos los núcleos activos; asambleas celebradas y convenios activos firmados únicos.",
+        "operationId": "map_indicators_api_proyectos__id_proyecto__mapa_indicadores_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Id Proyecto"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapaIndicadoresResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida o usuario inactivo"
+          },
+          "403": {
+            "description": "Proyecto inexistente, inactivo o fuera del alcance autorizado"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -31124,6 +31174,46 @@
         ],
         "title": "DashboardConveniosResponse",
         "description": "Active unique agreements reachable from the dashboard's first 100 nuclei."
+      },
+      "MapaIndicadoresResponse": {
+        "properties": {
+          "asambleas_realizadas": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asambleas Realizadas"
+          },
+          "convenios_individuales": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Convenios Individuales"
+          },
+          "convenios_colectivos": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Convenios Colectivos"
+          },
+          "convenios_firmados": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Convenios Firmados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asambleas_realizadas",
+          "convenios_individuales",
+          "convenios_colectivos",
+          "convenios_firmados"
+        ],
+        "title": "MapaIndicadoresResponse",
+        "description": "Indicadores del mapa; null señala catálogo de celebración no disponible."
       }
     }
   }

@@ -1656,6 +1656,15 @@ class DashboardConvenioDetalle(BaseModel):
     fecha_firma: date | None
 
 
+class MapaIndicadoresResponse(BaseModel):
+    """Indicadores del mapa; null señala catálogo de celebración no disponible."""
+
+    asambleas_realizadas: int | None = Field(ge=0)
+    convenios_individuales: int = Field(ge=0)
+    convenios_colectivos: int = Field(ge=0)
+    convenios_firmados: int = Field(ge=0)
+
+
 class DashboardConveniosResponse(BaseModel):
     """Active unique agreements reachable from the dashboard's first 100 nuclei."""
     individuales: int

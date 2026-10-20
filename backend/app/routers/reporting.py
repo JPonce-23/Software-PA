@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services.access import authorized_project_ids, require_project_access
-from ..services import convenio_reports, dashboard_summary
+from ..services import convenio_reports, dashboard_summary, map_summary
 
 
 router = APIRouter(tags=["Dashboard y mapa"])
@@ -114,6 +114,22 @@ def dashboard_convenios(
     """COP and eager Excel detail; preserves the existing 100-nucleus dashboard page."""
     require_project_access(db, user, id_proyecto, load_details=False)
     return dashboard_summary.project_agreements(db, id_proyecto)
+
+
+@router.get(
+    "/proyectos/{id_proyecto}/mapa/indicadores",
+    response_model=schemas.MapaIndicadoresResponse,
+    responses={401: {"description": "Sesión inválida o usuario inactivo"},
+               403: {"description": "Proyecto inexistente, inactivo o fuera del alcance autorizado"}},
+)
+def map_indicators(
+    id_proyecto: int = Path(gt=0),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """Todos los núcleos activos; asambleas celebradas y convenios activos firmados únicos."""
+    require_project_access(db, user, id_proyecto, load_details=False)
+    return map_summary.project_indicators(db, id_proyecto)
 
 
 @router.get("/dashboard/kpi", response_model=list[schemas.DashboardKpiResponse])
