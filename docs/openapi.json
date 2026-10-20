@@ -11329,6 +11329,56 @@
           }
         }
       }
+    },
+    "/api/proyectos/{id_proyecto}/dashboard/convenios": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa"
+        ],
+        "summary": "Dashboard Convenios",
+        "description": "COP and eager Excel detail; preserves the existing 100-nucleus dashboard page.",
+        "operationId": "dashboard_convenios_api_proyectos__id_proyecto__dashboard_convenios_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Id Proyecto"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardConveniosResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida o usuario inactivo"
+          },
+          "403": {
+            "description": "Proyecto inexistente, inactivo o fuera del alcance autorizado"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -30990,6 +31040,90 @@
           "detail"
         ],
         "title": "LimiteConveniosReporteResponse"
+      },
+      "DashboardConvenioDetalle": {
+        "properties": {
+          "id_convenio": {
+            "type": "integer",
+            "title": "Id Convenio"
+          },
+          "ambito": {
+            "type": "string",
+            "enum": [
+              "colectivo",
+              "individual"
+            ],
+            "title": "Ambito"
+          },
+          "tipo_convenio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Convenio"
+          },
+          "consecutivo": {
+            "type": "integer",
+            "title": "Consecutivo"
+          },
+          "fecha_firma": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Firma"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_convenio",
+          "ambito",
+          "tipo_convenio",
+          "consecutivo",
+          "fecha_firma"
+        ],
+        "title": "DashboardConvenioDetalle"
+      },
+      "DashboardConveniosResponse": {
+        "properties": {
+          "individuales": {
+            "type": "integer",
+            "title": "Individuales"
+          },
+          "colectivos": {
+            "type": "integer",
+            "title": "Colectivos"
+          },
+          "formalizados": {
+            "type": "integer",
+            "title": "Formalizados"
+          },
+          "convenios": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardConvenioDetalle"
+            },
+            "type": "array",
+            "title": "Convenios"
+          }
+        },
+        "type": "object",
+        "required": [
+          "individuales",
+          "colectivos",
+          "formalizados",
+          "convenios"
+        ],
+        "title": "DashboardConveniosResponse",
+        "description": "Active unique agreements reachable from the dashboard's first 100 nuclei."
       }
     }
   }
