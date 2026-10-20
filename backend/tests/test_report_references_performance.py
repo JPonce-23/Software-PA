@@ -249,7 +249,7 @@ def test_real_sessions_and_inactive_accounts(references_env,monkeypatch,role):
             u.contrasena_hash=hash_password(password);email=u.correo;db.commit()
         monkeypatch.delitem(app.dependency_overrides,auth.get_current_user)
         with TestClient(app) as client:
-            paths=[f"/api/reportes/referencias?id_convenio={env['agreements'][0]}",f"/api/reportes/referencias-contexto?id_proyecto_nucleo={env['pns'][0]}"]
+            paths=[f"/api/proyecto-nucleo/{env['pns'][0]}/reportes/referencias-convenios",f"/api/reportes/referencias?id_convenio={env['agreements'][0]}",f"/api/reportes/referencias-contexto?id_proyecto_nucleo={env['pns'][0]}"]
             for path in paths:assert client.get(path).status_code==401
             client.cookies.set(AUTH_SETTINGS.session_cookie_name,"f06-invalid-session")
             for path in paths:assert client.get(path).status_code==401
@@ -266,7 +266,7 @@ def test_real_sessions_and_inactive_accounts(references_env,monkeypatch,role):
 def test_additive_and_published_openapi(references_env):
     current=app.openapi();docs=Path(os.getenv("REPORT_CONTRACT_DOCS",str(Path(__file__).resolve().parents[2]/"docs")))
     published=json.loads((docs/"openapi.json").read_text())
-    paths={"/api/reportes/referencias","/api/reportes/referencias-contexto"}
+    paths={"/api/reportes/referencias","/api/reportes/referencias-contexto","/api/proyecto-nucleo/{id_proyecto_nucleo}/reportes/referencias-convenios"}
     for path in paths:assert current["paths"][path]==published["paths"][path]
     for name,value in current["components"]["schemas"].items():
         if name.startswith("Reporte") and "Referencia" in name:assert published["components"]["schemas"][name]==value
