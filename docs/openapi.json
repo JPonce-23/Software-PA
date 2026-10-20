@@ -11429,6 +11429,156 @@
           }
         }
       }
+    },
+    "/api/reportes/referencias-contexto": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa"
+        ],
+        "summary": "Report Context References",
+        "description": "Contexto mínimo para hasta 100 núcleos legibles; conserva el orden de referencias.\n\nNo pagina ni limita registros hijos. El consumidor decide el universo de núcleos.",
+        "operationId": "report_context_references_api_reportes_referencias_contexto_get",
+        "parameters": [
+          {
+            "name": "id_proyecto_nucleo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "minItems": 1,
+              "maxItems": 100,
+              "title": "Id Proyecto Nucleo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReporteContextoReferenciasResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida o usuario inactivo"
+          },
+          "403": {
+            "description": "Rol no autorizado para lectura"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reportes/referencias": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa"
+        ],
+        "summary": "Report References",
+        "description": "Máximo 200 IDs por lote. Referencias inexistentes/inactivas/ajenas omitidas.\n\nincluir_afectaciones recupera las afectaciones activas de los núcleos pedidos,\ncomo el listado anterior, sin enviar un ID por cada afectación del reporte.",
+        "operationId": "report_references_api_reportes_referencias_get",
+        "parameters": [
+          {
+            "name": "id_proyecto_nucleo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "maxItems": 200,
+              "default": [],
+              "title": "Id Proyecto Nucleo"
+            }
+          },
+          {
+            "name": "id_afectacion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "maxItems": 200,
+              "default": [],
+              "title": "Id Afectacion"
+            }
+          },
+          {
+            "name": "id_convenio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "maxItems": 200,
+              "default": [],
+              "title": "Id Convenio"
+            }
+          },
+          {
+            "name": "incluir_afectaciones",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir Afectaciones"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReporteReferenciasResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida o usuario inactivo"
+          },
+          "403": {
+            "description": "Rol no autorizado para lectura"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -31214,6 +31364,265 @@
         ],
         "title": "MapaIndicadoresResponse",
         "description": "Indicadores del mapa; null señala catálogo de celebración no disponible."
+      },
+      "ReporteAfectacionReferencia": {
+        "properties": {
+          "id_afectacion": {
+            "type": "integer",
+            "title": "Id Afectacion"
+          },
+          "id_proyecto_nucleo": {
+            "type": "integer",
+            "title": "Id Proyecto Nucleo"
+          },
+          "tipo_afectacion": {
+            "type": "string",
+            "enum": [
+              "colectivo",
+              "individual"
+            ],
+            "title": "Tipo Afectacion"
+          },
+          "situacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Situacion"
+          },
+          "superficie_afectada_ha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superficie Afectada Ha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_afectacion",
+          "id_proyecto_nucleo",
+          "tipo_afectacion",
+          "situacion",
+          "superficie_afectada_ha"
+        ],
+        "title": "ReporteAfectacionReferencia"
+      },
+      "ReporteAsambleaReferencia": {
+        "properties": {
+          "id_asamblea": {
+            "type": "integer",
+            "title": "Id Asamblea"
+          },
+          "id_proyecto_nucleo": {
+            "type": "integer",
+            "title": "Id Proyecto Nucleo"
+          },
+          "proposito": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposito"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_asamblea",
+          "id_proyecto_nucleo",
+          "proposito"
+        ],
+        "title": "ReporteAsambleaReferencia"
+      },
+      "ReporteContextoReferenciasResponse": {
+        "properties": {
+          "nucleos": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteNucleoReferencia"
+            },
+            "type": "array",
+            "title": "Nucleos"
+          },
+          "afectaciones": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteAfectacionReferencia"
+            },
+            "type": "array",
+            "title": "Afectaciones"
+          },
+          "convenios": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteConvenioContextoReferencia"
+            },
+            "type": "array",
+            "title": "Convenios"
+          },
+          "asambleas": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteAsambleaReferencia"
+            },
+            "type": "array",
+            "title": "Asambleas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nucleos",
+          "afectaciones",
+          "convenios",
+          "asambleas"
+        ],
+        "title": "ReporteContextoReferenciasResponse"
+      },
+      "ReporteConvenioContextoReferencia": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ReporteConvenioReferencia"
+          },
+          "id_afectacion": {
+            "type": "integer",
+            "title": "Id Afectacion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "id_afectacion"
+        ],
+        "title": "ReporteConvenioContextoReferencia"
+      },
+      "ReporteConvenioReferencia": {
+        "properties": {
+          "id_convenio": {
+            "type": "integer",
+            "title": "Id Convenio"
+          },
+          "id_proyecto_nucleo": {
+            "type": "integer",
+            "title": "Id Proyecto Nucleo"
+          },
+          "tipo_convenio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Convenio"
+          },
+          "consecutivo": {
+            "type": "integer",
+            "title": "Consecutivo"
+          },
+          "ambito": {
+            "type": "string",
+            "enum": [
+              "colectivo",
+              "individual"
+            ],
+            "title": "Ambito"
+          },
+          "descripcion_instrumento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion Instrumento"
+          },
+          "fecha_firma": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Firma"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_convenio",
+          "id_proyecto_nucleo",
+          "tipo_convenio",
+          "consecutivo",
+          "ambito",
+          "descripcion_instrumento",
+          "fecha_firma"
+        ],
+        "title": "ReporteConvenioReferencia"
+      },
+      "ReporteNucleoReferencia": {
+        "properties": {
+          "id_proyecto_nucleo": {
+            "type": "integer",
+            "title": "Id Proyecto Nucleo"
+          },
+          "nombre_nucleo": {
+            "type": "string",
+            "title": "Nombre Nucleo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_proyecto_nucleo",
+          "nombre_nucleo"
+        ],
+        "title": "ReporteNucleoReferencia"
+      },
+      "ReporteReferenciasResponse": {
+        "properties": {
+          "nucleos": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteNucleoReferencia"
+            },
+            "type": "array",
+            "title": "Nucleos"
+          },
+          "afectaciones": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteAfectacionReferencia"
+            },
+            "type": "array",
+            "title": "Afectaciones"
+          },
+          "convenios": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteConvenioReferencia"
+            },
+            "type": "array",
+            "title": "Convenios"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nucleos",
+          "afectaciones",
+          "convenios"
+        ],
+        "title": "ReporteReferenciasResponse",
+        "description": "Solo IDs legibles; ausentes/inactivos/ajenos se omiten sin distinguirlos."
       }
     }
   }
