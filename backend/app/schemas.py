@@ -1679,6 +1679,15 @@ class ReporteConvenioReferencia(BaseModel):
     fecha_firma: date | None
 
 
+class ReporteConvenioEventoReferencia(ReporteConvenioReferencia):
+    fecha_programada_firma: date | None
+
+
+class ReporteConvenioEventoVinculoReferencia(BaseModel):
+    item: ReporteConvenioEventoReferencia
+    id_afectacion: int
+
+
 class ReporteAsambleaReferencia(BaseModel):
     id_asamblea: int
     id_proyecto_nucleo: int

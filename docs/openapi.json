@@ -11579,6 +11579,63 @@
           }
         }
       }
+    },
+    "/api/proyecto-nucleo/{id_proyecto_nucleo}/reportes/referencias-convenios": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa"
+        ],
+        "summary": "Report Event Agreement References",
+        "description": "Vínculos activos por afectación y convenio, sin deduplicar etiquetas.",
+        "operationId": "report_event_agreement_references_api_proyecto_nucleo__id_proyecto_nucleo__reportes_referencias_convenios_get",
+        "parameters": [
+          {
+            "name": "id_proyecto_nucleo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Id Proyecto Nucleo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReporteConvenioEventoVinculoReferencia"
+                  },
+                  "title": "Response Report Event Agreement References Api Proyecto Nucleo  Id Proyecto Nucleo  Reportes Referencias Convenios Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida o usuario inactivo"
+          },
+          "403": {
+            "description": "Proyecto sin acceso"
+          },
+          "404": {
+            "description": "ProyectoNucleo inexistente o inactivo"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -31623,6 +31680,105 @@
         ],
         "title": "ReporteReferenciasResponse",
         "description": "Solo IDs legibles; ausentes/inactivos/ajenos se omiten sin distinguirlos."
+      },
+      "ReporteConvenioEventoReferencia": {
+        "properties": {
+          "id_convenio": {
+            "type": "integer",
+            "title": "Id Convenio"
+          },
+          "id_proyecto_nucleo": {
+            "type": "integer",
+            "title": "Id Proyecto Nucleo"
+          },
+          "tipo_convenio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Convenio"
+          },
+          "consecutivo": {
+            "type": "integer",
+            "title": "Consecutivo"
+          },
+          "ambito": {
+            "type": "string",
+            "enum": [
+              "colectivo",
+              "individual"
+            ],
+            "title": "Ambito"
+          },
+          "descripcion_instrumento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion Instrumento"
+          },
+          "fecha_firma": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Firma"
+          },
+          "fecha_programada_firma": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Programada Firma"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_convenio",
+          "id_proyecto_nucleo",
+          "tipo_convenio",
+          "consecutivo",
+          "ambito",
+          "descripcion_instrumento",
+          "fecha_firma",
+          "fecha_programada_firma"
+        ],
+        "title": "ReporteConvenioEventoReferencia"
+      },
+      "ReporteConvenioEventoVinculoReferencia": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ReporteConvenioEventoReferencia"
+          },
+          "id_afectacion": {
+            "type": "integer",
+            "title": "Id Afectacion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "id_afectacion"
+        ],
+        "title": "ReporteConvenioEventoVinculoReferencia"
       }
     }
   }

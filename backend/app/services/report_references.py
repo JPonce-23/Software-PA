@@ -75,3 +75,20 @@ def context_references(db: Session, user: models.Usuario, nuclei: list[int]) -> 
     ).where(assembly.id_proyecto_nucleo.in_(ids), assembly.activo.is_(True)).order_by(
         assembly.id_asamblea.desc())).mappings())
     return result
+
+
+def event_agreement_references(db: Session, project_nucleus_id: int) -> list[dict]:
+    """Active ordered pairs; caller authorizes the root, consumer owns the stop rule.
+
+    Membership follows the active affectation link, as in list_agreements.
+    """
+    a, c, link = models.Afectacion, models.Convenio, models.ConvenioAfectacion
+    fields = (*C_FIELDS, "fecha_programada_firma")
+    rows = db.execute(select(*_columns(c, fields), a.id_afectacion).join(
+        link, link.id_convenio == c.id_convenio,
+    ).join(a, a.id_afectacion == link.id_afectacion).where(
+        a.id_proyecto_nucleo == project_nucleus_id, a.activo.is_(True),
+        link.activo.is_(True), c.activo.is_(True),
+    ).order_by(a.id_afectacion, c.id_convenio)).mappings()
+    return [{"item": {field: row[field] for field in fields},
+             "id_afectacion": row["id_afectacion"]} for row in rows]

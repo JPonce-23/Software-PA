@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
 from ..database import get_db
-from ..services.access import authorized_project_ids, require_project_access
+from ..services.access import authorized_project_ids, require_project_access, require_project_nucleus_access
 from ..services import convenio_reports, dashboard_summary, map_summary
 from ..services import report_references as report_references_service
 
@@ -60,6 +60,23 @@ def report_context_references(
     No pagina ni limita registros hijos. El consumidor decide el universo de núcleos.
     """
     return report_references_service.context_references(db, user, id_proyecto_nucleo)
+
+
+@router.get(
+    "/proyecto-nucleo/{id_proyecto_nucleo}/reportes/referencias-convenios",
+    response_model=list[schemas.ReporteConvenioEventoVinculoReferencia],
+    responses={401: {"description": "Sesión inválida o usuario inactivo"},
+               403: {"description": "Proyecto sin acceso"},
+               404: {"description": "ProyectoNucleo inexistente o inactivo"}},
+)
+def report_event_agreement_references(
+    id_proyecto_nucleo: int = Path(gt=0),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """Vínculos activos por afectación y convenio, sin deduplicar etiquetas."""
+    require_project_nucleus_access(db, user, id_proyecto_nucleo, load_details=False)
+    return report_references_service.event_agreement_references(db, id_proyecto_nucleo)
 
 
 @router.get(
