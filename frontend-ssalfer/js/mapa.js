@@ -63,26 +63,23 @@ document.addEventListener("DOMContentLoaded", () => {
             else if(!event.shiftKey && document.activeElement===ultimo){event.preventDefault();primero?.focus();}
         }
     });
-    async function metricasProyecto(pid,nucleos,vigente){
-        const pintar=(id,v)=>{if(vigente())document.getElementById(id).textContent=String(v);};
+    async function metricasProyecto(pid,vigente){
+        const pintar=(id,valor)=>{
+            if(vigente())document.getElementById(id).textContent=String(valor);
+        };
         idsMetricas.forEach(id=>pintar(id,'Consultando…'));
-        const asambleas=async()=>{
-            const catalogo=await window.ClienteAPI.get('/catalogos/operativos/resultado_convocatoria',{silencioso:true});
-            if(!Array.isArray(catalogo))throw Error('Catálogo no disponible');
-            const celebradas=new Set(catalogo.filter(r=>r.codigo==='celebrada').map(r=>Number(r.id_catalogo_opcion)));
-            if(!celebradas.size)throw Error('Resultado de celebración no disponible');
-            const ids=new Set();let cursor=0;
-            await Promise.all(Array.from({length:Math.min(3,nucleos.length)},async()=>{while(vigente()&&cursor<nucleos.length){const n=nucleos[cursor++],rows=await window.ClienteAPI.get(`/proyecto-nucleo/${n.id_proyecto_nucleo}/asambleas`,{silencioso:true});if(!Array.isArray(rows))throw Error('Respuesta no válida');for(const r of rows)if(r.activo!==false && r.convocatorias?.some(c=>c.activo!==false&&c.fecha_realizacion&&celebradas.has(Number(c.id_resultado))))ids.add(r.id_asamblea);}}));
-            pintar('valorAsambleasRealizadas',ids.size);
-        };
-        const convenios=async()=>{
-            const unicos=new Map();let cursor=0;
-            const leer=async ruta=>{const rows=await window.ClienteAPI.get(ruta,{silencioso:true});if(!Array.isArray(rows))throw Error('Respuesta no válida');return rows;};
-            await Promise.all(Array.from({length:Math.min(3,nucleos.length)},async()=>{while(vigente()&&cursor<nucleos.length){const n=nucleos[cursor++];for(const a of await leer(`/proyecto-nucleo/${n.id_proyecto_nucleo}/afectaciones`)){if(!vigente())return;if(a.activo===false)continue;for(const c of await leer(`/afectaciones/${a.id_afectacion}/convenios`))if(c.activo!==false&&c.fecha_firma)unicos.set(c.id_convenio,c);}}}));
-            const rows=[...unicos.values()],individual=rows.filter(c=>c.ambito==='individual').length,colectivo=rows.filter(c=>c.ambito==='colectivo').length;
-            pintar('valorConveniosIndividuales',individual);pintar('valorConveniosColectivos',colectivo);pintar('valorConveniosFirmados',individual+colectivo);
-        };
-        await Promise.all([asambleas().catch(()=>pintar('valorAsambleasRealizadas','No disponible')),convenios().catch(()=>idsMetricas.slice(1).forEach(id=>pintar(id,'No disponible')))]);
+        try {
+            const resumen=await window.ClienteAPI.get(
+                `/proyectos/${pid}/mapa/indicadores`,{silencioso:true}
+            );
+            const valores=[resumen?.asambleas_realizadas,resumen?.convenios_individuales,
+                resumen?.convenios_colectivos,resumen?.convenios_firmados];
+            if(valores.some((valor,i)=>!(i===0&&valor===null)&&
+                (!Number.isSafeInteger(valor)||valor<0)))throw Error('Respuesta no válida');
+            idsMetricas.forEach((id,i)=>pintar(id,valores[i]===null?'No disponible':valores[i]));
+        } catch {
+            idsMetricas.forEach(id=>pintar(id,'No disponible'));
+        }
     }
 
     const elementos = {
@@ -3692,6 +3689,10 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
 
+        // Los indicadores no bloquean las capas ni esperan al GeoJSON o a la
+        // paginación administrativa. El token descarta respuestas de otro proyecto.
+        metricasProyecto(proyecto.id_proyecto,()=>cargaActual===tokenCarga);
+
         /*
          * El mapa y el resumen se consultan en paralelo.
          *
@@ -3777,7 +3778,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 proyecto,
                 resultadoNucleos.value
             );
-            metricasProyecto(proyecto.id_proyecto,resultadoNucleos.value,()=>cargaActual===tokenCarga);
 
         } else {
 
