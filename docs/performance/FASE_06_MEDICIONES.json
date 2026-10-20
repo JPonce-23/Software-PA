@@ -1,0 +1,1174 @@
+{
+  "methodology": {
+    "base": "41d4b68",
+    "backend": "5 muestras alternadas después de calentamiento; nuevas sesiones; SQL SELECT/WITH; auth sesión excluida",
+    "screen_flows": "Recorridos reconstruidos de las fuentes, TestClient secuencial; no TCP/navegador/render; tres perfiles opt-in adicionales",
+    "frontend": "Funciones originales 41d4b68 y actuales; Node VM con API/DOM simulados, XLSX real",
+    "no_browser": true,
+    "application_commits": [
+      "d5b863d",
+      "d3bd66d",
+      "18d3b66",
+      "087217a"
+    ],
+    "validated_implementation_and_tests_commit": "f16ec94b9ff3d28079e377131fc866251743cf4e"
+  },
+  "backend": {
+    "convenios_65": {
+      "original": {
+        "median_ms": 2590.9316159995797,
+        "samples": [
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "serialization_sql": 0,
+            "ms": 2752.3903270011942,
+            "bytes": 10968
+          },
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "serialization_sql": 0,
+            "ms": 2565.4607269971166,
+            "bytes": 10968
+          },
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "serialization_sql": 0,
+            "ms": 2590.9316159995797,
+            "bytes": 10968
+          },
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "serialization_sql": 0,
+            "ms": 2520.903596003336,
+            "bytes": 10968
+          },
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "serialization_sql": 0,
+            "ms": 2609.3913490003615,
+            "bytes": 10968
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 1.575296999362763,
+        "samples": [
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 2.041618001385359,
+            "bytes": 10968
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.4232089997676667,
+            "bytes": 10968
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.575296999362763,
+            "bytes": 10968
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.3217050000093877,
+            "bytes": 10968
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.6489569970872253,
+            "bytes": 10968
+          }
+        ]
+      }
+    },
+    "contexto_3": {
+      "original": {
+        "median_ms": 41.511628001899226,
+        "samples": [
+          {
+            "sql": 62,
+            "objects": 169,
+            "serialization_sql": 0,
+            "ms": 48.07672400056617,
+            "bytes": 13410
+          },
+          {
+            "sql": 62,
+            "objects": 169,
+            "serialization_sql": 0,
+            "ms": 39.92244999972172,
+            "bytes": 13410
+          },
+          {
+            "sql": 62,
+            "objects": 169,
+            "serialization_sql": 0,
+            "ms": 41.511628001899226,
+            "bytes": 13410
+          },
+          {
+            "sql": 62,
+            "objects": 169,
+            "serialization_sql": 0,
+            "ms": 44.752271998731885,
+            "bytes": 13410
+          },
+          {
+            "sql": 62,
+            "objects": 169,
+            "serialization_sql": 0,
+            "ms": 40.38117099844385,
+            "bytes": 13410
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 8.134273000905523,
+        "samples": [
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 9.443850998650305,
+            "bytes": 13410
+          },
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 8.134273000905523,
+            "bytes": 13410
+          },
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 10.190828001213958,
+            "bytes": 13410
+          },
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 7.539689999248367,
+            "bytes": 13410
+          },
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 7.384159998764517,
+            "bytes": 13410
+          }
+        ]
+      }
+    },
+    "contexto_105": {
+      "original": {
+        "median_ms": 951.2677720013016,
+        "samples": [
+          {
+            "sql": 1476,
+            "objects": 741,
+            "serialization_sql": 0,
+            "ms": 1033.4997959980683,
+            "bytes": 20433
+          },
+          {
+            "sql": 1476,
+            "objects": 741,
+            "serialization_sql": 0,
+            "ms": 876.3782709975203,
+            "bytes": 20433
+          },
+          {
+            "sql": 1476,
+            "objects": 741,
+            "serialization_sql": 0,
+            "ms": 901.5987429993402,
+            "bytes": 20433
+          },
+          {
+            "sql": 1476,
+            "objects": 741,
+            "serialization_sql": 0,
+            "ms": 951.2677720013016,
+            "bytes": 20433
+          },
+          {
+            "sql": 1476,
+            "objects": 741,
+            "serialization_sql": 0,
+            "ms": 1021.179116996791,
+            "bytes": 20433
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 10.691151001083199,
+        "samples": [
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 9.466529998462647,
+            "bytes": 20433
+          },
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 11.076011996919988,
+            "bytes": 20433
+          },
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 10.691151001083199,
+            "bytes": 20433
+          },
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 9.581500002241228,
+            "bytes": 20433
+          },
+          {
+            "sql": 4,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 12.084353998943698,
+            "bytes": 20433
+          }
+        ]
+      }
+    },
+    "sin_resultados": {
+      "original": {
+        "median_ms": 0.9641940014262218,
+        "samples": [
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 0.8708170025784057,
+            "bytes": 47
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 0.9641940014262218,
+            "bytes": 47
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 0.7657780006411485,
+            "bytes": 47
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 0.9963109987438656,
+            "bytes": 47
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.0063139998237602,
+            "bytes": 47
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 1.3262440006656107,
+        "samples": [
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.453245000448078,
+            "bytes": 47
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.1249169983784668,
+            "bytes": 47
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.3262440006656107,
+            "bytes": 47
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.067945999238873,
+            "bytes": 47
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "serialization_sql": 0,
+            "ms": 1.4117330028966535,
+            "bytes": 47
+          }
+        ]
+      }
+    }
+  },
+  "http_references": {
+    "convenios_65": {
+      "original": {
+        "median_ms": 5241.836040000635,
+        "samples": [
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "requests": 65,
+            "response_bytes": 73789,
+            "ms": 5073.412476001977
+          },
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "requests": 65,
+            "response_bytes": 73789,
+            "ms": 5308.127248998062
+          },
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "requests": 65,
+            "response_bytes": 73789,
+            "ms": 5313.996873999713
+          },
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "requests": 65,
+            "response_bytes": 73789,
+            "ms": 5241.836040000635
+          },
+          {
+            "sql": 3307,
+            "objects": 9994,
+            "requests": 65,
+            "response_bytes": 73789,
+            "ms": 5139.525645001413
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 10.796496000693878,
+        "samples": [
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 10966,
+            "ms": 10.796496000693878
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 10966,
+            "ms": 10.84073700258159
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 10966,
+            "ms": 11.546975998498965
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 10966,
+            "ms": 9.939580999343889
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 10966,
+            "ms": 10.560487000475405
+          }
+        ]
+      }
+    },
+    "sin_resultados": {
+      "original": {
+        "median_ms": 7.852085000195075,
+        "samples": [
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 35,
+            "ms": 9.367994996864581
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 35,
+            "ms": 10.156454001844395
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 35,
+            "ms": 7.852085000195075
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 35,
+            "ms": 7.247039000503719
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 35,
+            "ms": 6.642989999818383
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 8.560211997973965,
+        "samples": [
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 47,
+            "ms": 8.263757998065557
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 47,
+            "ms": 10.833567997906357
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 47,
+            "ms": 9.500746997218812
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 47,
+            "ms": 8.560211997973965
+          },
+          {
+            "sql": 1,
+            "objects": 0,
+            "requests": 1,
+            "response_bytes": 47,
+            "ms": 8.27288199798204
+          }
+        ]
+      }
+    }
+  },
+  "screen_http_flows": {
+    "colectivos": {
+      "original": {
+        "median_ms": 176.51377100264654,
+        "samples": [
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 387.49684799768147
+          },
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 176.51377100264654
+          },
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 174.92187000243575
+          },
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 181.66988300072262
+          },
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 172.15490300077363
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 107.05237499860232,
+        "samples": [
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 106.5570039972954
+          },
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 107.05237499860232
+          },
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 107.58462000012514
+          },
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 104.66055200231494
+          },
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 123.4056729990698
+          }
+        ]
+      }
+    },
+    "derechos_colectivos": {
+      "original": {
+        "median_ms": 194.0440429971204,
+        "samples": [
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 190.96197999897413
+          },
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 186.89433799954713
+          },
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 194.52062799973646
+          },
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 194.0440429971204
+          },
+          {
+            "requests": 14,
+            "sql": 117,
+            "objects": 806,
+            "response_bytes": 176018,
+            "ms": 208.36937299827696
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 115.16647999815177,
+        "samples": [
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 112.0674189987767
+          },
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 118.28335300015169
+          },
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 112.65721200106782
+          },
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 115.16647999815177
+          },
+          {
+            "requests": 5,
+            "sql": 59,
+            "objects": 567,
+            "response_bytes": 106830,
+            "ms": 133.40450000032433
+          }
+        ]
+      }
+    },
+    "estado_financiero": {
+      "original": {
+        "median_ms": 3754.468720002478,
+        "samples": [
+          {
+            "requests": 70,
+            "sql": 3345,
+            "objects": 10687,
+            "response_bytes": 114055,
+            "ms": 3919.4751960021676
+          },
+          {
+            "requests": 70,
+            "sql": 3345,
+            "objects": 10687,
+            "response_bytes": 114055,
+            "ms": 3676.6826390012284
+          },
+          {
+            "requests": 70,
+            "sql": 3345,
+            "objects": 10687,
+            "response_bytes": 114055,
+            "ms": 3754.468720002478
+          },
+          {
+            "requests": 70,
+            "sql": 3345,
+            "objects": 10687,
+            "response_bytes": 114055,
+            "ms": 3746.6903929998807
+          },
+          {
+            "requests": 70,
+            "sql": 3345,
+            "objects": 10687,
+            "response_bytes": 114055,
+            "ms": 3820.9455169999273
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 728.0503870024404,
+        "samples": [
+          {
+            "requests": 7,
+            "sql": 107,
+            "objects": 702,
+            "response_bytes": 33535,
+            "ms": 598.2518759992672
+          },
+          {
+            "requests": 7,
+            "sql": 107,
+            "objects": 702,
+            "response_bytes": 33535,
+            "ms": 628.1842729986238
+          },
+          {
+            "requests": 7,
+            "sql": 107,
+            "objects": 702,
+            "response_bytes": 33535,
+            "ms": 728.0503870024404
+          },
+          {
+            "requests": 7,
+            "sql": 107,
+            "objects": 702,
+            "response_bytes": 33535,
+            "ms": 747.9556300022523
+          },
+          {
+            "requests": 7,
+            "sql": 107,
+            "objects": 702,
+            "response_bytes": 33535,
+            "ms": 828.1329460005509
+          }
+        ]
+      }
+    }
+  },
+  "frontend_collective": [
+    {
+      "size": 0,
+      "nucleus": "",
+      "original_requests": 4,
+      "optimized_requests": 4
+    },
+    {
+      "size": 0,
+      "nucleus": "",
+      "original_requests": 4,
+      "optimized_requests": 4
+    },
+    {
+      "size": 3,
+      "nucleus": "",
+      "original_requests": 16,
+      "optimized_requests": 5
+    },
+    {
+      "size": 3,
+      "nucleus": 1,
+      "original_requests": 16,
+      "optimized_requests": 5
+    },
+    {
+      "size": 74,
+      "nucleus": "",
+      "original_requests": 244,
+      "optimized_requests": 5
+    },
+    {
+      "size": 74,
+      "nucleus": 1,
+      "original_requests": 244,
+      "optimized_requests": 5
+    },
+    {
+      "size": 105,
+      "nucleus": "",
+      "original_requests": 322,
+      "optimized_requests": 5
+    },
+    {
+      "size": 105,
+      "nucleus": 1,
+      "original_requests": 322,
+      "optimized_requests": 5
+    }
+  ],
+  "frontend_financial": [
+    {
+      "size": 0,
+      "original_requests": 7,
+      "optimized_requests": 6
+    },
+    {
+      "size": 3,
+      "original_requests": 10,
+      "optimized_requests": 7
+    },
+    {
+      "size": 74,
+      "original_requests": 81,
+      "optimized_requests": 7
+    },
+    {
+      "size": 205,
+      "original_requests": 212,
+      "optimized_requests": 9
+    }
+  ],
+  "frontend_legacy_references": {
+    "original_requests": 616,
+    "optimized_requests": 5,
+    "max_concurrency": 1
+  },
+  "static_review": {
+    "backend/app/routers/reporting.py": {
+      "unchanged": 18,
+      "added": [
+        "report_context_references",
+        "report_event_agreement_references",
+        "report_references"
+      ]
+    },
+    "backend/app/schemas.py": {
+      "unchanged": 203,
+      "added": [
+        "ReporteAfectacionReferencia",
+        "ReporteAsambleaReferencia",
+        "ReporteContextoReferenciasResponse",
+        "ReporteConvenioContextoReferencia",
+        "ReporteConvenioEventoReferencia",
+        "ReporteConvenioEventoVinculoReferencia",
+        "ReporteConvenioReferencia",
+        "ReporteNucleoReferencia",
+        "ReporteReferenciasResponse"
+      ]
+    },
+    "backend/app/models.py": "unchanged",
+    "backend/app/services/access.py": "unchanged",
+    "backend/app/services/convenio_reports.py": "unchanged",
+    "frontend-ssalfer/js/reporteGeneralConvenios.js": "unchanged",
+    "frontend-ssalfer/js/reporteAvancePeriodo.js": "unchanged",
+    "frontend-ssalfer/js/reportesFifonafe.js": "unchanged",
+    "frontend-ssalfer/js/seguimiento.js": {
+      "changed_functions": [
+        "consultarUnaVez",
+        "cargarReferenciasEventos"
+      ],
+      "unchanged_functions": 40
+    },
+    "openapi": {
+      "existing_paths_unchanged": 142,
+      "new_paths": [
+        "/api/proyecto-nucleo/{id_proyecto_nucleo}/reportes/referencias-convenios",
+        "/api/reportes/referencias",
+        "/api/reportes/referencias-contexto"
+      ],
+      "new_schemas": [
+        "ReporteAfectacionReferencia",
+        "ReporteAsambleaReferencia",
+        "ReporteContextoReferenciasResponse",
+        "ReporteConvenioContextoReferencia",
+        "ReporteConvenioEventoReferencia",
+        "ReporteConvenioEventoVinculoReferencia",
+        "ReporteConvenioReferencia",
+        "ReporteNucleoReferencia",
+        "ReporteReferenciasResponse"
+      ]
+    }
+  },
+  "validation": {
+    "same_three_failures": true,
+    "same_27_skips": true,
+    "failures": [
+      "tests.test_convenio_general_report::test_facetas_respetan_naturaleza_sin_depender_de_pagina",
+      "tests.test_schema_018_orv_persona_ciclo_vida::test_018_backfill_specific_record_from_017_transition",
+      "tests.test_sync_catalogo_ran::test_dataset_excludes_actual_additional_ran_identities"
+    ],
+    "skips": {
+      "Backfill DDL requiere instancia desechable aislada": 2,
+      "Ledger-writing checks require the isolated disposable instance": 23,
+      "Definir RAN_REPRO_DATABASE con una DB desechable preparada": 1,
+      "La base aislada tiene más de un administrador activo": 1
+    },
+    "phase_passes": {
+      "projects_read": 38,
+      "access_context": 173,
+      "territorial_catalog": 60,
+      "dashboard_summary": 56,
+      "map_indicators": 80,
+      "report_references": 61,
+      "tracking_references": 38
+    }
+  },
+  "full_suite": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "3",
+      "skipped": "27",
+      "tests": "1473",
+      "time": "705.096",
+      "timestamp": "2026-10-20T18:55:51.839412+00:00",
+      "hostname": "2085a201c45f"
+    }
+  ],
+  "javascript_passed": 34,
+  "additional_profiles_passed": 4,
+  "tracking": {
+    "methodology": "5 muestras TestClient alternadas, API real secuencial; 53 afectaciones, recorrido completo de referencias; no página/navegador; sin auth sesión",
+    "http": {
+      "original": {
+        "median_ms": 536.6989459980687,
+        "samples": [
+          {
+            "requests": 54,
+            "sql": 380,
+            "objects": 562,
+            "response_bytes": 164435,
+            "ms": 478.69083499972476
+          },
+          {
+            "requests": 54,
+            "sql": 380,
+            "objects": 562,
+            "response_bytes": 164435,
+            "ms": 508.62759399751667
+          },
+          {
+            "requests": 54,
+            "sql": 380,
+            "objects": 562,
+            "response_bytes": 164435,
+            "ms": 553.5255359973235
+          },
+          {
+            "requests": 54,
+            "sql": 380,
+            "objects": 562,
+            "response_bytes": 164435,
+            "ms": 536.6989459980687
+          },
+          {
+            "requests": 54,
+            "sql": 380,
+            "objects": 562,
+            "response_bytes": 164435,
+            "ms": 536.8044300012116
+          }
+        ]
+      },
+      "optimized": {
+        "median_ms": 24.878146999981254,
+        "samples": [
+          {
+            "requests": 2,
+            "sql": 12,
+            "objects": 175,
+            "response_bytes": 60990,
+            "ms": 22.185679001268
+          },
+          {
+            "requests": 2,
+            "sql": 12,
+            "objects": 175,
+            "response_bytes": 60990,
+            "ms": 24.375988999963738
+          },
+          {
+            "requests": 2,
+            "sql": 12,
+            "objects": 175,
+            "response_bytes": 60990,
+            "ms": 25.042287998076063
+          },
+          {
+            "requests": 2,
+            "sql": 12,
+            "objects": 175,
+            "response_bytes": 60990,
+            "ms": 26.65656400131411
+          },
+          {
+            "requests": 2,
+            "sql": 12,
+            "objects": 175,
+            "response_bytes": 60990,
+            "ms": 24.878146999981254
+          }
+        ]
+      }
+    },
+    "scalar": {
+      "sql": 3,
+      "objects": 2,
+      "serialization_sql": 0
+    },
+    "javascript": [
+      {
+        "parents": 0,
+        "ids": [
+          1
+        ],
+        "original_requests": 1,
+        "optimized_requests": 1
+      },
+      {
+        "parents": 0,
+        "ids": [
+          1,
+          12
+        ],
+        "original_requests": 1,
+        "optimized_requests": 1
+      },
+      {
+        "parents": 0,
+        "ids": [
+          1,
+          10
+        ],
+        "original_requests": 1,
+        "optimized_requests": 1
+      },
+      {
+        "parents": 0,
+        "ids": [
+          1,
+          999999
+        ],
+        "original_requests": 1,
+        "optimized_requests": 1
+      },
+      {
+        "parents": 3,
+        "ids": [
+          1
+        ],
+        "original_requests": 2,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 3,
+        "ids": [
+          1,
+          12
+        ],
+        "original_requests": 3,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 3,
+        "ids": [
+          1,
+          13
+        ],
+        "original_requests": 4,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 3,
+        "ids": [
+          1,
+          999999
+        ],
+        "original_requests": 4,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 53,
+        "ids": [
+          1
+        ],
+        "original_requests": 2,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 53,
+        "ids": [
+          1,
+          12
+        ],
+        "original_requests": 3,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 53,
+        "ids": [
+          1,
+          63
+        ],
+        "original_requests": 54,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 53,
+        "ids": [
+          1,
+          999999
+        ],
+        "original_requests": 54,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 150,
+        "ids": [
+          1
+        ],
+        "original_requests": 2,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 150,
+        "ids": [
+          1,
+          12
+        ],
+        "original_requests": 3,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 150,
+        "ids": [
+          1,
+          160
+        ],
+        "original_requests": 151,
+        "optimized_requests": 2
+      },
+      {
+        "parents": 150,
+        "ids": [
+          1,
+          999999
+        ],
+        "original_requests": 151,
+        "optimized_requests": 2
+      }
+    ]
+  },
+  "full_suite_elapsed_seconds": 709.4600174330008,
+  "cleanup": {
+    "project_removed": "ssalfer-f06-20261020",
+    "remaining_resources": {
+      "network": [],
+      "volume": []
+    },
+    "persistent_running_container_ids_unchanged": true,
+    "persistent_running_count": 6,
+    "production_access": false
+  }
+}
