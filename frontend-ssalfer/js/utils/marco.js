@@ -60,7 +60,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const opciones = aside.querySelector(".opciones-usuario") || document.createElement("div");
     opciones.classList.add("opciones-usuario");
     opciones.replaceChildren();
-    const cuenta = (texto,href,accion) => {const a=document.createElement('a');a.textContent=texto;a.href=href;if(accion)a.dataset.action=accion;opciones.append(a);return a;};
+    const cuenta = (texto,href,accion) => {
+        const a = document.createElement(accion === 'logout' ? 'button' : 'a');
+        a.textContent = texto;
+        if (accion === 'logout') a.type = 'button'; else a.href = href;
+        if (accion) a.dataset.action = accion;
+        opciones.append(a); return a;
+    };
     cuenta('Cambiar contraseña','/pages/cambiarContrasena.html','cambiar-contrasena');
     cuenta('Cerrar sesión','#','logout');
     function usuarioCargado(usuario) {
@@ -73,6 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Fuera del aside evita que su overflow recorte las opciones.
     document.body.appendChild(opciones); opciones.classList.add("ssalfer-menu-usuario");
     opciones.id ||= "opcionesUsuario"; boton.setAttribute("aria-controls", opciones.id);
+    boton.type = 'button';
     boton.querySelectorAll(".bi-chevron-up,.bi-chevron-down").forEach(i=>i.remove());
     const indicador = document.createElement("span"); indicador.className = "ssalfer-flecha-usuario"; indicador.setAttribute("aria-hidden", "true"); boton.appendChild(indicador);
     let abierto = false;
@@ -92,6 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
     abrir(false);
     boton.addEventListener("click", e => { e.stopPropagation(); abrir(!abierto); });
     document.addEventListener("click", e => { if (!opciones.contains(e.target) && !boton.contains(e.target)) abrir(false); });
+    document.addEventListener('focusin', e => { if (abierto && !opciones.contains(e.target) && !boton.contains(e.target)) abrir(false); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && abierto) { abrir(false, true); e.preventDefault(); } });
     window.addEventListener("resize", () => { if (abierto) colocar(); });
     window.addEventListener("scroll", () => { if (abierto) colocar(); }, true);
