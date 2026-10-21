@@ -44,7 +44,7 @@ function summary(data,project) {
         convenios:rows.map(({id_convenio,ambito,tipo_convenio,consecutivo,fecha_firma})=>({id_convenio,ambito,tipo_convenio,consecutivo,fecha_firma}))};
 }
 
-async function load({reference=false,data=dataset(),fail=()=>false,delays={},exportExcel=true,allowExportError=false,freezeAgreements=false}={}) {
+async function load({reference=false,data=dataset(),fail=()=>false,delays={},exportExcel=true,allowExportError=false,freezeAgreements=false,pageAuthorization,afterDOMContentLoaded}={}) {
     const calls=[],errors=[],listeners=new Map(),nodes=new Map();let blob,lastWorkbook;
     class Element {
         constructor(tag='div'){this.tagName=tag;this.children=[];this.innerHTML='';this.attributes={};this.style={};
@@ -99,6 +99,7 @@ async function load({reference=false,data=dataset(),fail=()=>false,delays={},exp
         SSALFER_UI:{cargando:{iniciar:()=>()=>{}},toast(){}},
         html2canvas:async()=>({width:800,height:200,toDataURL:()=> 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6P5QAAAAASUVORK5CYII='}),
         setTimeout};
+    if(pageAuthorization)window.SSALFER_SESION_LISTA=pageAuthorization;
     const context=vm.createContext({window,document,console:{warn(){},error(){}},URL:URLDouble,URLSearchParams,Blob,
         html2canvas:window.html2canvas,CustomEvent:class{},setTimeout,clearTimeout,setImmediate,clearImmediate,
         localStorage:{getItem:()=>null,setItem(){}}});
@@ -112,6 +113,7 @@ async function load({reference=false,data=dataset(),fail=()=>false,delays={},exp
         vm.runInContext(reference?original(file):current(file),context,{filename:file});
     }
     for(const fn of listeners.get('DOMContentLoaded')||[])fn();
+    afterDOMContentLoaded?.({calls,cards:()=>nodes.get('listaProyectosDashboard').children});
     const button=()=>nodes.get('btnExportarDashboardExcel');
     for(let i=0;i<2000&&(!button()||button().disabled);i++)await new Promise(resolve=>setTimeout(resolve,1));
     const ready=button()&&!button().disabled;
@@ -147,6 +149,27 @@ test('all roles: identical cards, actual XLSX cells, CSV URL; constant requests'
         results.push({role,before:before.calls.length,after:after.calls.length,identicalCards:true,identicalXlsxCells:true});
     }
     if(process.env.F04_EVIDENCE_DIR)fs.writeFileSync(path.join(process.env.F04_EVIDENCE_DIR,'frontend-comparison.json'),JSON.stringify(results,null,2));
+});
+
+test('all roles: resolved page authorization preserves dashboard/sidebar requests and XLSX', {skip:baselineOnly},async()=>{
+    for(const role of ['admin','operador','visualizador','geografo']){
+        const data=dataset(role),before=await load({data});
+        const after=await load({data,pageAuthorization:Promise.resolve({user:{rol:role}})});
+        assert.deepEqual(after.calls,before.calls);assert.deepEqual(after.cards,before.cards);
+        assert.deepEqual(after.sheets,before.sheets);assert.equal(after.csv,before.csv);
+        assert.equal(after.calls.filter(url=>url.startsWith('/proyectos?')).length,1);
+    }
+});
+
+test('pending page authorization delays all shared dashboard consumers, then starts normally', {skip:baselineOnly},async()=>{
+    let authorize;
+    const pageAuthorization=new Promise(resolve=>authorize=resolve);
+    const result=await load({pageAuthorization,afterDOMContentLoaded({calls,cards}){
+        assert.deepEqual(calls,[]);assert.deepEqual(cards(),[]);
+        authorize({user:{rol:'admin'}});
+    }});
+    assert.equal(result.ready,true);assert.equal(result.cards.length,2);assert.ok(result.sheets);
+    assert.equal(result.calls.length,8);assert.equal(result.calls.filter(url=>url.startsWith('/proyectos?')).length,1);
 });
 
 test('over 100 nuclei keeps the current first-page contract and exports', {skip:baselineOnly},async()=>{

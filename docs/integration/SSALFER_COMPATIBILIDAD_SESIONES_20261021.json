@@ -1,0 +1,562 @@
+{
+  "date": "2026-10-21",
+  "branch": "integration/ssalfer-mq-f01-f06-20261020",
+  "head_before_merge": "5d2e06b9e24c2a019299668fcd11cbb5de369684",
+  "merge_head": "75598ba95ae6cd2dea5907b2054114c19a7c9b33",
+  "merge_base": "d73615f7d447159ef9512d0ef500d0ae887ee5fd",
+  "merge_committed": false,
+  "textual_conflicts": [],
+  "automatic_merge": "dashboard.js combines the account-menu changes with the F04 optimization; all other incoming source is retained",
+  "validation_status": "Authorized minimal initialization fix validated: all affected executions passed; merge remains uncommitted",
+  "javascript": {
+    "lf": {
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    "crlf_same_cases": {
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    "new_cases": 6,
+    "commands": [
+      "node --test tests/frontend-ssalfer/*.cjs",
+      "node --require ./tests/frontend-ssalfer/helpers/crlf-checkout.cjs --test tests/frontend-ssalfer/*.cjs"
+    ]
+  },
+  "backend_focused": {
+    "passed": 42,
+    "failed": 0,
+    "skipped": 0,
+    "modules": {
+      "test_auth_rbac": 2,
+      "test_gis_management_rbac": 35,
+      "audit_expiration_and_logout": 3,
+      "own_password_revocation": 1,
+      "admin_unlock_revocation": 1
+    },
+    "seconds": 22.352,
+    "reused_previous_execution": true,
+    "executed_again_for_this_fix": false
+  },
+  "browser": {
+    "engine": "Chromium Headless Shell 143.0.7499.4 / Playwright 1.57.0 on Linux",
+    "mock_api_session_checks": {
+      "passed": 23,
+      "checks": [
+        "Texto de negocio y clic sintético no cierran sesión",
+        "Evento cancelado no cierra sesión",
+        "Doble clic: un solo POST y regreso a inicio",
+        "Cerrar sesión con teclado Enter",
+        "Cerrar sesión con teclado Space",
+        "Escape, foco, límites del menú y botón sin superposición",
+        "Menú móvil visible dentro de la pantalla",
+        "Comprobación inicial 403 conserva URL y permite reintento",
+        "Comprobación inicial 500 conserva URL y permite reintento",
+        "Comprobación inicial 0 conserva URL y permite reintento",
+        "401 inicial exige inicio de sesión",
+        "Petición 403 conserva sesión y datos",
+        "Petición 500 conserva sesión y datos",
+        "Petición 0 conserva sesión y datos",
+        "401 con edición: aviso único, conserva DOM y bloquea nuevas operaciones",
+        "Cierre cancelado con formulario no envía logout",
+        "Fallo de logout permite reintento sin redirigir",
+        "Dos pestañas: un POST, aviso en la pestaña editada",
+        "Carga repetida de auth.js no duplica manejadores",
+        "401 de login no invalida la página como una sesión vencida",
+        "Cookie CSRF y credenciales incluidas; 403 conserva detalle",
+        "Cancelar una consulta conserva AbortError y no cierra sesión",
+        "401 de cambio de contraseña exige autenticación sin enviar logout"
+      ]
+    },
+    "real_html_mock_api_roles": {
+      "pantallas": 35,
+      "comprobaciones": 199,
+      "resultado": "OK",
+      "alcance": "HTML real + protección y cliente compartidos; API simulada; sin escrituras reales"
+    },
+    "real_backend_sessions_four_roles": [
+      {
+        "rol": "admin",
+        "login": true,
+        "recarga": true,
+        "navegacionMapa": true,
+        "volver": true,
+        "logoutPeticiones": 1,
+        "estadoSesionDespues": 401,
+        "errores": []
+      },
+      {
+        "rol": "operador",
+        "login": true,
+        "recarga": true,
+        "navegacionMapa": true,
+        "volver": true,
+        "logoutPeticiones": 1,
+        "estadoSesionDespues": 401,
+        "errores": []
+      },
+      {
+        "rol": "visualizador",
+        "login": true,
+        "recarga": true,
+        "navegacionMapa": true,
+        "volver": true,
+        "logoutPeticiones": 1,
+        "estadoSesionDespues": 401,
+        "errores": []
+      },
+      {
+        "rol": "geografo",
+        "login": true,
+        "recarga": true,
+        "navegacionMapa": true,
+        "volver": true,
+        "logoutPeticiones": 1,
+        "estadoSesionDespues": 401,
+        "errores": []
+      }
+    ],
+    "expanded_real_backend": {
+      "status": "passed",
+      "results": [
+        {
+          "role": "admin",
+          "cookies": true,
+          "absoluteDeadlineUnchanged": true,
+          "dashboardXlsxReopened": true,
+          "projectLinkAndBack": true,
+          "reload": true,
+          "mapScope": true,
+          "gisPolicy": true,
+          "directIdentifiers": true,
+          "trackingReportsPages": true,
+          "pageErrors": []
+        },
+        {
+          "role": "operador",
+          "cookies": true,
+          "absoluteDeadlineUnchanged": true,
+          "dashboardXlsxReopened": true,
+          "projectLinkAndBack": true,
+          "reload": true,
+          "mapScope": true,
+          "gisPolicy": true,
+          "directIdentifiers": true,
+          "trackingReportsPages": true,
+          "pageErrors": []
+        },
+        {
+          "role": "visualizador",
+          "cookies": true,
+          "absoluteDeadlineUnchanged": true,
+          "dashboardXlsxReopened": true,
+          "projectLinkAndBack": true,
+          "reload": true,
+          "mapScope": true,
+          "gisPolicy": true,
+          "directIdentifiers": true,
+          "trackingReportsPages": true,
+          "pageErrors": []
+        },
+        {
+          "role": "geografo",
+          "cookies": true,
+          "absoluteDeadlineUnchanged": true,
+          "dashboardXlsxReopened": true,
+          "projectLinkAndBack": true,
+          "reload": true,
+          "mapScope": true,
+          "gisPolicy": true,
+          "directIdentifiers": true,
+          "trackingReportsPages": true,
+          "pageErrors": []
+        },
+        {
+          "anonymousApi401": true,
+          "protectedDirectLinkLoginRecovery": true,
+          "externalReturnRejected": true,
+          "pageErrors": []
+        }
+      ],
+      "gis_console_assertions": "Empty console on direct access and reload, both authorized and denied; no assertion was suppressed"
+    },
+    "dashboard_authorization_and_recovery": {
+      "passed": 8,
+      "results": [
+        {
+          "initialStatus": 401,
+          "unauthorizedBusinessRequests": 0,
+          "initializationExceptions": 0,
+          "recovery": true,
+          "sharedProjectRequests": 1
+        },
+        {
+          "initialStatus": 403,
+          "unauthorizedBusinessRequests": 0,
+          "initializationExceptions": 0,
+          "recovery": true,
+          "sharedProjectRequests": 1
+        },
+        {
+          "initialStatus": 500,
+          "unauthorizedBusinessRequests": 0,
+          "initializationExceptions": 0,
+          "recovery": true,
+          "sharedProjectRequests": 1
+        },
+        {
+          "initialStatus": 0,
+          "unauthorizedBusinessRequests": 0,
+          "initializationExceptions": 0,
+          "recovery": true,
+          "sharedProjectRequests": 1
+        },
+        {
+          "role": "admin",
+          "pendingBusinessRequests": 0,
+          "authorizedSharedProjectRequests": 1,
+          "normalDashboard": true
+        },
+        {
+          "role": "operador",
+          "pendingBusinessRequests": 0,
+          "authorizedSharedProjectRequests": 1,
+          "normalDashboard": true
+        },
+        {
+          "role": "visualizador",
+          "pendingBusinessRequests": 0,
+          "authorizedSharedProjectRequests": 1,
+          "normalDashboard": true
+        },
+        {
+          "role": "geografo",
+          "pendingBusinessRequests": 0,
+          "authorizedSharedProjectRequests": 1,
+          "normalDashboard": true
+        }
+      ]
+    },
+    "zero_unauthorized_requests": "Verified no business fetch after page denial and no fetch while authorization is pending",
+    "harness_fixture_note": "Recovery test uses one synthetic project to exercise export-ready normal initialization; an empty dashboard does not enable export."
+  },
+  "backend_unchanged": {
+    "verified_prior_hashes": 145,
+    "full_suite_repeated": false,
+    "previous_passed": 1488,
+    "previous_failed": 3,
+    "previous_skipped": 27,
+    "migration_030_sha256": "aa8f3f568b3abb42751202301b980d9e5dda15db2d7070c661648445e050423d"
+  },
+  "known_limits": [
+    "Dashboard COP and Excel first 100 nuclei unchanged; map indicators full active scope",
+    "No new refresh endpoint, idle countdown or automatic draft recovery",
+    "No elapsed 30-minute/8-hour browser expiration test; backend expiration checked with controlled clock",
+    "Playwright default history test does not certify effective BFCache restore",
+    "Windows/Edge and all business form operations not recertified"
+  ],
+  "source_sha256": {
+    "frontend-ssalfer/deploy/QA-SESIONES-FRONTEND-2026-10-21.md": "2648cd60da8ca017a3db1550b9096a58355f5ed98d6d779bc9efb8cacccf7d9a",
+    "frontend-ssalfer/deploy/qa-proteccion-2026-10-08.cjs": "b6360dbc0f5468c26bb8aa2ae307f7aeac8b366b1f7078273dd2c90108a283d9",
+    "frontend-ssalfer/deploy/qa-sesiones-2026-10-21.cjs": "f346302e318f96f1c79d914f58915e9fda47cc8042c20ad6542b048b3da5509c",
+    "frontend-ssalfer/deploy/qa-sesiones-integracion-2026-10-21.cjs": "aae175f5b085654615571d625397a7465c6af364b2454d19f9afcf9effc86d43",
+    "frontend-ssalfer/js/api/auth.js": "9f67a6d4bc645c64b5a9a6d8e7dae499a119a96f52df6e620b2521b75170f93c",
+    "frontend-ssalfer/js/api/cliente.js": "23c1c8181cc22cb7afe065c5987526d4287b585bc584a0fb9977c60e49d7661f",
+    "frontend-ssalfer/js/conciliacionGeoespacial.js": "3a1c01ff99e64eff5ded298919643922efa9ab95b4ce268a328541b489bc3d11",
+    "frontend-ssalfer/js/dashboard.js": "ecb3880d34b7e3ae1c598086390f9bc55e3493795a93d4bc8aed74c001e43a6d",
+    "frontend-ssalfer/js/gestionGeoespacial.js": "c71e61bdc8ac3589fc9765abaa3dcbab94fcf5ee6bce85f5f67c912637645402",
+    "frontend-ssalfer/js/mapa.js": "b0ab5809fd5fe836a57ca3e6af4ebdd0f52172ae6f96d80beadbaaec25752dca",
+    "frontend-ssalfer/js/seguimiento.js": "4e9950f64abfd3bfec11b9c19e9f27ffd24fbb6b27d689a1985eeed68dd4dc60",
+    "frontend-ssalfer/js/utils/dashboardExcel.js": "3dd40bed078b615f2c26cd9478213498f26b34e9beccab2f8e57c797429b9aca",
+    "frontend-ssalfer/js/utils/marco.js": "70d0ee915ef9a7cc5d1f1b399fd3fcf88595e7c440889c40c749fa8c32bebce8",
+    "frontend-ssalfer/js/utils/proteccion.js": "d6ba617aa15d70acd4577cd1b17d3284772303c2799eb307c24b74a12e40ff92",
+    "frontend-ssalfer/styles/marco.css": "04120eaefbd1dddd931f5b933342b8ed8128a44e86468df12fd5caef64e271ec",
+    "tests/frontend-ssalfer/dashboard-authorization.cjs": "0760231ad479db91fcd357a4b5cb8342408b195edbefc26bbae3411bb36b67db",
+    "tests/frontend-ssalfer/dashboard-performance.cjs": "6d6ab65fc95ef47e1a4f19c1664e430a3f5f15141704fbc11709bb41ee74bc7b",
+    "tests/frontend-ssalfer/gis-bootstrap-rbac.cjs": "bc8f3538f1dc9c47672f63e1df3fd564a82e1c15ecbb372877e9187d021ca370",
+    "tests/frontend-ssalfer/helpers/crlf-checkout.cjs": "e2b5665cdd04543e20fea523cef1343f57fc34021ac101a910f23a558b8f6e07",
+    "tests/frontend-ssalfer/helpers/source.cjs": "a7e961eae3381606dcbfff6ebf6881e127d452f4b4dfc636ea8ce2e22be7060e",
+    "tests/frontend-ssalfer/map-gis-rbac.cjs": "423f96cfe3f6dad4cb03663f5a5ca84c505a9a1a0e0fe734096d1ea4472e209c",
+    "tests/frontend-ssalfer/map-performance.cjs": "e801d87d68f501674a9517609832c693f42535b630b4bd7993a311a12beecd90",
+    "tests/frontend-ssalfer/reports-performance.cjs": "d06f32474d599119fbd842aa1bc2320c9184292732ab257ce318a07001db2ab4",
+    "tests/frontend-ssalfer/tracking-references-performance.cjs": "5fc08914c8845c7d9f7933fac04c2d101c8b5933dad0cb3c0749f3e6b5d52cb3"
+  },
+  "evidence_sha256": {
+    "javascript-lf.tap": "2d56bf6e707b0f03ec7ab33ee8c62416be1511689e976fb86b99ae1afa9f7024",
+    "javascript-crlf.tap": "918ce278f5ab08a0893d8b6cddf446d7ea09c59725e85ea509c3af45dae5f691",
+    "negative-control.tap": "ee8e0e8a851f2980c7f052650d8d28371d9fef86f7a189cdf9e01be65c1c8a10",
+    "browser-simulated.log": "62d91431ec4eabf501a503fe0a413489ed8c6a33bed4099bd9c69df6f05c758b",
+    "sesiones-simuladas/resultados.json": "073aa28d59e1c18a63832ca1c77f7514cd72d54a0c023932fb80a7cee692a7d5",
+    "browser-roles.log": "ced6e4748bce12cbca5727318a8b6174a41f77e4224038a910bd2d13ac2b8b56",
+    "role-cwd/outputs/roles-2026-10-19/resultado.json": "aeeb5c8ef356c9cab367720417b361f20f04730380439cf75ef5eae18c7aec16",
+    "browser-real.log": "5c1c88d96ed8dadf9de1539b2356f540f8512129ab160f17f8d4b3855cb426a0",
+    "real-cwd/outputs/sesiones-2026-10-21/sesiones-reales-qa.json": "c3ddaa149d6b7f4a11d82fad89e243f3085fdcb9b40f9f80d6bd3e8792e9845c",
+    "browser-compatibility.log": "bcc54aebb33a142124423c3bc870be8cce5effeed72bc9527b3fc50f79a7846c",
+    "browser-compatibility-results.json": "94b5d0c946be2ba9e4caadbc6f973a883c9ce1b87a131cb49913db0304989e3e",
+    "dashboard-auth-browser.log": "34f5c8bd950b6cc013ea173ed8cec3240669d5edec277e6a15905f71bb9d473f",
+    "dashboard-auth-browser-results.json": "56a53138084b24930d42b2d35c7ba66dcbddfe97e5b24115cbd52f4039f8a184"
+  },
+  "next_decision": "Request authorization to commit the pending local merge and publish it on the existing integration branch/PR #2; do not change the Draft state",
+  "push_commit_rebase_deploy_executed": false,
+  "pr_snapshot": {
+    "number": 2,
+    "state": "open",
+    "draft": true,
+    "head_sha": "5d2e06b9e24c2a019299668fcd11cbb5de369684",
+    "merged": false
+  },
+  "disposable_environment": {
+    "project": "ssalfer-dashboard-guard-20261021",
+    "database": "software_pa_test",
+    "cluster": "convenio-report-disposable",
+    "database_storage": "tmpfs",
+    "database_published_ports": [],
+    "api_localhost_port": 18003,
+    "frontend_localhost_port": 15177,
+    "synthetic_users_and_projects_only": true,
+    "original_database_access": false,
+    "evidence_directory": "/tmp/ssalfer-dashboard-guard-20261021",
+    "torn_down_after_validation": true
+  },
+  "initial_validation_status": "Paused before any additional application correction: real-browser console requirement fails on a preexisting shared sidebar initializer",
+  "initial_javascript": {
+    "lf": {
+      "passed": 49,
+      "failed": 0,
+      "skipped": 0
+    },
+    "crlf_same_cases": {
+      "passed": 49,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "initial_browser_validation": {
+    "engine": "Chromium Headless Shell 143.0.7499.4 / Playwright 1.57.0 on Linux",
+    "launcher_adaptation": "Only runtime browser executable/library paths; incoming test assertions unchanged",
+    "new_session_scenarios_mock_api": {
+      "passed": 23,
+      "checks": [
+        "Texto de negocio y clic sintético no cierran sesión",
+        "Evento cancelado no cierra sesión",
+        "Doble clic: un solo POST y regreso a inicio",
+        "Cerrar sesión con teclado Enter",
+        "Cerrar sesión con teclado Space",
+        "Escape, foco, límites del menú y botón sin superposición",
+        "Menú móvil visible dentro de la pantalla",
+        "Comprobación inicial 403 conserva URL y permite reintento",
+        "Comprobación inicial 500 conserva URL y permite reintento",
+        "Comprobación inicial 0 conserva URL y permite reintento",
+        "401 inicial exige inicio de sesión",
+        "Petición 403 conserva sesión y datos",
+        "Petición 500 conserva sesión y datos",
+        "Petición 0 conserva sesión y datos",
+        "401 con edición: aviso único, conserva DOM y bloquea nuevas operaciones",
+        "Cierre cancelado con formulario no envía logout",
+        "Fallo de logout permite reintento sin redirigir",
+        "Dos pestañas: un POST, aviso en la pestaña editada",
+        "Carga repetida de auth.js no duplica manejadores",
+        "401 de login no invalida la página como una sesión vencida",
+        "Cookie CSRF y credenciales incluidas; 403 conserva detalle",
+        "Cancelar una consulta conserva AbortError y no cierra sesión",
+        "401 de cambio de contraseña exige autenticación sin enviar logout"
+      ]
+    },
+    "real_html_mock_api_roles": {
+      "pantallas": 35,
+      "comprobaciones": 199,
+      "resultado": "OK",
+      "alcance": "HTML real + protección y cliente compartidos; API simulada; sin escrituras reales"
+    },
+    "real_backend_disposable_four_roles": [
+      {
+        "rol": "admin",
+        "login": true,
+        "recarga": true,
+        "navegacionMapa": true,
+        "volver": true,
+        "logoutPeticiones": 1,
+        "estadoSesionDespues": 401,
+        "errores": []
+      },
+      {
+        "rol": "operador",
+        "login": true,
+        "recarga": true,
+        "navegacionMapa": true,
+        "volver": true,
+        "logoutPeticiones": 1,
+        "estadoSesionDespues": 401,
+        "errores": []
+      },
+      {
+        "rol": "visualizador",
+        "login": true,
+        "recarga": true,
+        "navegacionMapa": true,
+        "volver": true,
+        "logoutPeticiones": 1,
+        "estadoSesionDespues": 401,
+        "errores": []
+      },
+      {
+        "rol": "geografo",
+        "login": true,
+        "recarga": true,
+        "navegacionMapa": true,
+        "volver": true,
+        "logoutPeticiones": 1,
+        "estadoSesionDespues": 401,
+        "errores": []
+      }
+    ],
+    "expanded_real_backend": {
+      "status": "failed",
+      "completed_role": "admin",
+      "failed_role": "operador",
+      "failure": "Expected no console errors on denied GIS reload; dashboard.js sidebar logs the locally blocked project request",
+      "not_completed": [
+        "remaining expanded checks for operador",
+        "expanded visualizador/geografo flows",
+        "anonymous direct-link recovery/external-return check in this script"
+      ],
+      "not_claimed": "Whole expanded run is not green; success of the separate four-role session suite does not certify all business workflows"
+    },
+    "baseline_comparison": {
+      "results": [
+        {
+          "version": "5d2e06b",
+          "role": "operador",
+          "deniedPage": true,
+          "directApiStatus": 403,
+          "businessRequests": [],
+          "uncaughtPageErrors": [],
+          "consoleErrors": [
+            "Error de API: ErrorAPI: Inicia sesión para acceder al sistema.\n    at request (http://127.0.0.1:15177/js/api/cliente.js:179:26)\n    at async Object.listar (http://127.0.0.1:15177/js/api/proyectos.js:23:24)\n    at async http://127.0.0.1:15177/js/dashboard.js:722:17"
+          ]
+        },
+        {
+          "version": "5d2e06b",
+          "role": "visualizador",
+          "deniedPage": true,
+          "directApiStatus": 403,
+          "businessRequests": [],
+          "uncaughtPageErrors": [],
+          "consoleErrors": [
+            "Error de API: ErrorAPI: Inicia sesión para acceder al sistema.\n    at request (http://127.0.0.1:15177/js/api/cliente.js:179:26)\n    at async Object.listar (http://127.0.0.1:15177/js/api/proyectos.js:23:24)\n    at async http://127.0.0.1:15177/js/dashboard.js:722:17"
+          ]
+        },
+        {
+          "version": "merge",
+          "role": "operador",
+          "deniedPage": true,
+          "directApiStatus": 403,
+          "businessRequests": [],
+          "uncaughtPageErrors": [],
+          "consoleErrors": [
+            "Error de API: ErrorAPI: No se autorizó el acceso a esta pantalla.\n    at request (http://127.0.0.1:15177/js/api/cliente.js:183:26)\n    at async Object.listar (http://127.0.0.1:15177/js/api/proyectos.js:23:24)\n    at async http://127.0.0.1:15177/js/dashboard.js:707:17"
+          ]
+        },
+        {
+          "version": "merge",
+          "role": "visualizador",
+          "deniedPage": true,
+          "directApiStatus": 403,
+          "businessRequests": [],
+          "uncaughtPageErrors": [],
+          "consoleErrors": [
+            "Error de API: ErrorAPI: No se autorizó el acceso a esta pantalla.\n    at request (http://127.0.0.1:15177/js/api/cliente.js:183:26)\n    at async Object.listar (http://127.0.0.1:15177/js/api/proyectos.js:23:24)\n    at async http://127.0.0.1:15177/js/dashboard.js:707:17"
+          ]
+        }
+      ],
+      "conclusion": "Preexisting shared dashboard sidebar initialization logs a blocked request; no network business request or GIS API access is made. New client changes local barrier status 401 to 403."
+    }
+  },
+  "minimal_correction": {
+    "file": "frontend-ssalfer/js/dashboard.js",
+    "lines": [
+      1,
+      5,
+      6
+    ],
+    "change": "Async DOMContentLoaded handler waits for the existing page-authorization promise, returns on null before any shared component initialization; absence of that optional barrier preserves existing behavior",
+    "root_cause": "DOMContentLoaded did not imply authorization; ProyectosAPI client waited, then threw local barrier denial, and the shared sidebar logged that error after the page was denied",
+    "generic_error_suppression": false,
+    "global_permission_changes": false,
+    "new_api_calls_or_persistent_cache": false,
+    "negative_control_before_guard": {
+      "passed": 0,
+      "failed_as_expected": 4
+    }
+  },
+  "unchanged_from_75598ba": [
+    "frontend-ssalfer/deploy/QA-SESIONES-FRONTEND-2026-10-21.md",
+    "frontend-ssalfer/deploy/qa-proteccion-2026-10-08.cjs",
+    "frontend-ssalfer/deploy/qa-sesiones-2026-10-21.cjs",
+    "frontend-ssalfer/deploy/qa-sesiones-integracion-2026-10-21.cjs",
+    "frontend-ssalfer/js/api/auth.js",
+    "frontend-ssalfer/js/api/cliente.js",
+    "frontend-ssalfer/js/utils/marco.js",
+    "frontend-ssalfer/js/utils/proteccion.js",
+    "frontend-ssalfer/styles/marco.css"
+  ],
+  "source_sha256_before_correction": {
+    "frontend-ssalfer/deploy/QA-SESIONES-FRONTEND-2026-10-21.md": "2648cd60da8ca017a3db1550b9096a58355f5ed98d6d779bc9efb8cacccf7d9a",
+    "frontend-ssalfer/deploy/qa-proteccion-2026-10-08.cjs": "b6360dbc0f5468c26bb8aa2ae307f7aeac8b366b1f7078273dd2c90108a283d9",
+    "frontend-ssalfer/deploy/qa-sesiones-2026-10-21.cjs": "f346302e318f96f1c79d914f58915e9fda47cc8042c20ad6542b048b3da5509c",
+    "frontend-ssalfer/deploy/qa-sesiones-integracion-2026-10-21.cjs": "aae175f5b085654615571d625397a7465c6af364b2454d19f9afcf9effc86d43",
+    "frontend-ssalfer/js/api/auth.js": "9f67a6d4bc645c64b5a9a6d8e7dae499a119a96f52df6e620b2521b75170f93c",
+    "frontend-ssalfer/js/api/cliente.js": "23c1c8181cc22cb7afe065c5987526d4287b585bc584a0fb9977c60e49d7661f",
+    "frontend-ssalfer/js/conciliacionGeoespacial.js": "3a1c01ff99e64eff5ded298919643922efa9ab95b4ce268a328541b489bc3d11",
+    "frontend-ssalfer/js/dashboard.js": "835a3896911d4d0de12d840e04d5f46fa03cdb67ceabd8cea938b275e30d68a3",
+    "frontend-ssalfer/js/gestionGeoespacial.js": "c71e61bdc8ac3589fc9765abaa3dcbab94fcf5ee6bce85f5f67c912637645402",
+    "frontend-ssalfer/js/mapa.js": "b0ab5809fd5fe836a57ca3e6af4ebdd0f52172ae6f96d80beadbaaec25752dca",
+    "frontend-ssalfer/js/seguimiento.js": "4e9950f64abfd3bfec11b9c19e9f27ffd24fbb6b27d689a1985eeed68dd4dc60",
+    "frontend-ssalfer/js/utils/dashboardExcel.js": "3dd40bed078b615f2c26cd9478213498f26b34e9beccab2f8e57c797429b9aca",
+    "frontend-ssalfer/js/utils/marco.js": "70d0ee915ef9a7cc5d1f1b399fd3fcf88595e7c440889c40c749fa8c32bebce8",
+    "frontend-ssalfer/js/utils/proteccion.js": "d6ba617aa15d70acd4577cd1b17d3284772303c2799eb307c24b74a12e40ff92",
+    "frontend-ssalfer/styles/marco.css": "04120eaefbd1dddd931f5b933342b8ed8128a44e86468df12fd5caef64e271ec",
+    "tests/frontend-ssalfer/dashboard-performance.cjs": "94a3c515d8b215ddfd2fe86192d98bae733456e77123b8be6a88f65873a17929",
+    "tests/frontend-ssalfer/gis-bootstrap-rbac.cjs": "bc8f3538f1dc9c47672f63e1df3fd564a82e1c15ecbb372877e9187d021ca370",
+    "tests/frontend-ssalfer/helpers/crlf-checkout.cjs": "e2b5665cdd04543e20fea523cef1343f57fc34021ac101a910f23a558b8f6e07",
+    "tests/frontend-ssalfer/helpers/source.cjs": "a7e961eae3381606dcbfff6ebf6881e127d452f4b4dfc636ea8ce2e22be7060e",
+    "tests/frontend-ssalfer/map-gis-rbac.cjs": "423f96cfe3f6dad4cb03663f5a5ca84c505a9a1a0e0fe734096d1ea4472e209c",
+    "tests/frontend-ssalfer/map-performance.cjs": "e801d87d68f501674a9517609832c693f42535b630b4bd7993a311a12beecd90",
+    "tests/frontend-ssalfer/reports-performance.cjs": "d06f32474d599119fbd842aa1bc2320c9184292732ab257ce318a07001db2ab4",
+    "tests/frontend-ssalfer/tracking-references-performance.cjs": "5fc08914c8845c7d9f7933fac04c2d101c8b5933dad0cb3c0749f3e6b5d52cb3"
+  },
+  "initial_evidence_sha256": {
+    "javascript-lf.tap": "7dccebc17c2d9267393d2508cd5ca46b5f4847986d2e2adb261a75b75274a94d",
+    "javascript-crlf.tap": "10d4e356173ae4607be8efb578c9e6e417a90f1ccca90666209aee96998ec079",
+    "auth-gis-focused.xml": "9cfe723d451f47f6a77715dcc1586c49444068ca1e3f909224a3c13d8a194d68",
+    "browser-simulated.log": "dda1cfb216af6ec06c3dd8420411a4b5522cacb3cb0d10017cd58cde9f5c5d0c",
+    "sesiones-simuladas/resultados.json": "c9e32465b33945b23dd286d4dff774707213def6e91933805af0442b623f4dc4",
+    "browser-roles.log": "ced6e4748bce12cbca5727318a8b6174a41f77e4224038a910bd2d13ac2b8b56",
+    "role-cwd/outputs/roles-2026-10-19/resultado.json": "aeeb5c8ef356c9cab367720417b361f20f04730380439cf75ef5eae18c7aec16",
+    "browser-real.log": "5c1c88d96ed8dadf9de1539b2356f540f8512129ab160f17f8d4b3855cb426a0",
+    "real-cwd/outputs/sesiones-2026-10-21/sesiones-reales-qa.json": "14b7769bc2ba2732454772d1545b176e845a057a080c26407ff1ddefc34ad8de",
+    "browser-compatibility.log": "41682fc9738b5ddbaaaf978834d7bb090be8cff8d1f002f8d24b10092bf818b3",
+    "gis-console-diagnosis.json": "3cd9a091010579ca46302ae8d78ea923f47ea5059db36256d510f7812cb40ad4"
+  },
+  "evidence_capture_phase": "Validation snapshot before creation of the authorized two-parent merge commit; pre-commit flags are historical, not the later published state",
+  "authorized_publication": {
+    "branch": "integration/ssalfer-mq-f01-f06-20261020",
+    "pr_number": 2,
+    "expected_first_parent": "5d2e06b9e24c2a019299668fcd11cbb5de369684",
+    "expected_second_parent": "75598ba95ae6cd2dea5907b2054114c19a7c9b33",
+    "mode": "Two-parent merge commit and normal push of integration branch only; keep PR open and Draft; no squash/rebase/deploy",
+    "tests_reused_without_reexecution": true,
+    "new_full_backend_suite_executed": false
+  },
+  "pending_collaborative_validation": [
+    "Validate new published commit with isolated copy of teammate local database and separate worktree/browser profile",
+    "GIS writes and revision decisions by geographer without project assignment in teammate isolated environment",
+    "Verify canonical migration 030 ledger/checksum in teammate isolated copy; do not reapply if already present",
+    "Dashboard COP and Excel preserve first-100-nuclei limitation; map active scope is complete",
+    "Three historical backend failures remain open; original identifiers retained in SSALFER_VALIDACION_20261020.json",
+    "27 historical skipped tests remain recorded with original identifiers/reasons",
+    "Effective BFCache, Edge/Windows and exhaustive business operations remain outside certified coverage"
+  ]
+}

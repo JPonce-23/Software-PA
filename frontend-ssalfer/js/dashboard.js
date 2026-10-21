@@ -1,6 +1,9 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
 
     "use strict";
+
+    // La barrera autoriza la página antes de inicializar componentes compartidos.
+    if (window.SSALFER_SESION_LISTA && !(await window.SSALFER_SESION_LISTA)) return;
 
     // Shared only by the two initial consumers of this document. No persistent cache.
     let proyectosDocumento;
@@ -303,6 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
 ====================================================== */
 
 function configurarMenuCuenta() {
+    if (window.SSALFER_MARCO) return;
 
     document
         .querySelectorAll(
@@ -326,15 +330,7 @@ function configurarMenuCuenta() {
                 let enlaceContrasena =
                     enlaces.find(
                         enlace =>
-                            enlace.dataset.action ===
-                                "cambiar-contrasena" ||
-                            enlace
-                                .textContent
-                                .trim()
-                                .toLowerCase()
-                                .includes(
-                                    "cambiar contraseña"
-                                )
+                            enlace.dataset.action === "cambiar-contrasena"
                     );
 
 
@@ -375,15 +371,7 @@ function configurarMenuCuenta() {
                 let enlaceLogout =
                     enlaces.find(
                         enlace =>
-                            enlace.dataset.action ===
-                                "logout" ||
-                            enlace
-                                .textContent
-                                .trim()
-                                .toLowerCase()
-                                .includes(
-                                    "cerrar sesión"
-                                )
+                            enlace.dataset.action === "logout"
                     );
 
 

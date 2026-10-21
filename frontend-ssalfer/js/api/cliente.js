@@ -174,9 +174,13 @@ async function request(
     } = {}
 ) {
 
+    if (window.SSALFER_SESION_INVALIDA && !ruta.startsWith('/auth/')) {
+        throw new ErrorAPI(401, null, 'Tu sesión terminó. Inicia sesión nuevamente.');
+    }
+
     if(window.SSALFER_SESION_LISTA && !ruta.startsWith('/auth/')) {
         const sesion=await window.SSALFER_SESION_LISTA;
-        if(!sesion)throw new ErrorAPI(401,null,'Inicia sesión para acceder al sistema.');
+        if(!sesion)throw new ErrorAPI(403,null,'No se autorizó el acceso a esta pantalla.');
     }
     if(window.SSALFER_PERMISOS && !ruta.startsWith('/auth/') && !window.SSALFER_PERMISOS.puedeEscribir(ruta,metodo)) throw new ErrorAPI(403,null,'Tu rol no permite realizar esta acción.');
     const finalizarCarga = window.SSALFER_UI?.cargando.iniciar({ silencioso, carga, metodo });
@@ -253,6 +257,8 @@ async function request(
 
         } catch (errorRed) {
 
+            if (errorRed.name === 'AbortError') throw errorRed;
+
             throw new ErrorAPI(
                 0,
                 null,
@@ -262,7 +268,9 @@ async function request(
         }
 
         const devolver=data=>conMetadatos ? {data,status:respuesta.status,headers:Object.fromEntries(respuesta.headers.entries())} : data;
-        if (respuesta.status === 401 && window.SSALFER_PROTECCION && !ruta.startsWith('/auth/')) window.SSALFER_PROTECCION.iniciarSesion();
+        if (respuesta.status === 401 && window.SSALFER_PROTECCION && ruta.split('?')[0] !== '/auth/sesiones') {
+            document.dispatchEvent(new Event('ssalfer:sesion-invalida'));
+        }
         if (respuesta.status === 204) return devolver(null);
 
         if (respuesta.ok && tipoRespuesta === "blob") return devolver(await respuesta.blob());
