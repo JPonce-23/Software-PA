@@ -1,7 +1,8 @@
 // Execute the real map preview branch. API/DOM doubles; no browser navigation.
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const source=fs.readFileSync(path.resolve(__dirname,'../../frontend-ssalfer/js/mapa.js'),'utf8');
+const normalizeSource = require('./helpers/source.cjs');
+const source=normalizeSource(fs.readFileSync(path.resolve(__dirname,'../../frontend-ssalfer/js/mapa.js'),'utf8'));
 const start=source.indexOf('        const vista = new URLSearchParams(location.search)');
 const end=source.indexOf('        /*\n         * Resumen administrativo.',start);
 assert(start>=0 && end>start);

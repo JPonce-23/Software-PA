@@ -8,8 +8,9 @@ const {execFileSync} = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
 const ExcelJS = require(path.join(root,'frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js'));
 const vendor = new vm.Script(fs.readFileSync(path.join(root,'frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js'),'utf8'));
-const original = file => execFileSync('git', ['show', `cbc78d0:frontend-ssalfer/js/${file}`], {cwd:root,encoding:'utf8'});
-const current = file => fs.readFileSync(path.join(root,'frontend-ssalfer/js',file),'utf8');
+const normalizeSource = require('./helpers/source.cjs');
+const original = file => normalizeSource(execFileSync('git', ['show', `cbc78d0:frontend-ssalfer/js/${file}`], {cwd:root,encoding:'utf8'}));
+const current = file => normalizeSource(fs.readFileSync(path.join(root,'frontend-ssalfer/js',file),'utf8'));
 const baselineOnly = process.env.F04_BASELINE_ONLY === '1';
 
 function dataset(role='admin', sizes=[74,1]) {
@@ -43,7 +44,7 @@ function summary(data,project) {
         convenios:rows.map(({id_convenio,ambito,tipo_convenio,consecutivo,fecha_firma})=>({id_convenio,ambito,tipo_convenio,consecutivo,fecha_firma}))};
 }
 
-async function load({reference=false,data=dataset(),fail=()=>false,delays={},exportExcel=true,allowExportError=false}={}) {
+async function load({reference=false,data=dataset(),fail=()=>false,delays={},exportExcel=true,allowExportError=false,freezeAgreements=false}={}) {
     const calls=[],errors=[],listeners=new Map(),nodes=new Map();let blob,lastWorkbook;
     class Element {
         constructor(tag='div'){this.tagName=tag;this.children=[];this.innerHTML='';this.attributes={};this.style={};
@@ -82,7 +83,11 @@ async function load({reference=false,data=dataset(),fail=()=>false,delays={},exp
         ]);
         let match;
         if((match=url.match(/^\/proyectos\/(\d+)\/nucleos$/)))return clone(data.nuclei.get(+match[1])||[]);
-        if((match=url.match(/^\/proyectos\/(\d+)\/dashboard\/convenios$/)))return summary(data,+match[1]);
+        if((match=url.match(/^\/proyectos\/(\d+)\/dashboard\/convenios$/))){
+            const result=summary(data,+match[1]);
+            if(freezeAgreements){result.convenios.forEach(Object.freeze);Object.freeze(result.convenios);}
+            return result;
+        }
         if((match=url.match(/^\/proyecto-nucleo\/(\d+)\/afectaciones$/)))return clone(data.affects.get(+match[1])||[]);
         if((match=url.match(/^\/afectaciones\/(\d+)\/convenios$/)))return clone(data.agreements.get(+match[1])||[]);
         throw new Error('Unexpected GET '+url);
@@ -174,11 +179,44 @@ test('new documents/users fetch afresh; export performs zero further GETs', {ski
     assert.equal(a.calls.filter(u=>u.startsWith('/proyectos?')).length,1);
 });
 
-test('preexisting Excel error for a null instrument type remains explicitly recorded', {skip:baselineOnly},async()=>{
-    const data=dataset('admin',[3,1]);
-    for(const rows of data.agreements.values())for(const c of rows)if(c.id_convenio===1)c.tipo_convenio=null;
-    const before=await load({reference:true,data,allowExportError:true});
-    const after=await load({data,allowExportError:true});
-    assert.deepEqual(after.cards,before.cards);assert.match(before.exportError,/null.*replaceAll/);
-    assert.equal(after.exportError,before.exportError);assert.equal(after.sheets,null);
+test('all roles: null instrument type exports and reopens XLSX without changing data or indicators', {skip:baselineOnly},async()=>{
+    for(const role of ['admin','operador','visualizador','geografo']){
+        const data=dataset(role,[3,1]);
+        for(const rows of data.agreements.values())for(const c of rows)if(c.id_convenio===1)c.tipo_convenio=null;
+        const snapshot=JSON.stringify([...data.agreements]);
+        const before=await load({reference:true,data,allowExportError:true});
+        const after=await load({data,freezeAgreements:true});
+        assert.deepEqual(after.cards,before.cards);assert.equal(after.csv,before.csv);
+        assert.match(before.exportError,/null.*replaceAll/);assert.equal(before.sheets,null);
+        assert.equal(after.exportError,null);assert.ok(after.sheets);
+        assert.ok(after.sheets.some(s=>s.rows.some(r=>r?.[1]==='Tipo no informado · Consecutivo 1')));
+        assert.equal(JSON.stringify([...data.agreements]),snapshot);
+        // Only the missing presentation label differs from an otherwise identical valid workbook.
+        const presented=dataset(role,[3,1]);
+        for(const rows of presented.agreements.values())for(const c of rows)if(c.id_convenio===1)c.tipo_convenio='Tipo no informado';
+        const expected=await load({reference:true,data:presented});
+        assert.deepEqual(after.sheets,expected.sheets);
+    }
+});
+
+test('agreement export follows F04 ascending ID order, preserving every row/value and input order', {skip:baselineOnly},async()=>{
+    const rows=[
+        {id_convenio:9,tipo_convenio:'modificatorio',consecutivo:1,ambito:'individual',fecha_firma:null,activo:true},
+        {id_convenio:2,tipo_convenio:'cop_original',consecutivo:8,ambito:'colectivo',fecha_firma:'2026-01-03',activo:true},
+        {id_convenio:1,tipo_convenio:'cop_original',consecutivo:10,ambito:'colectivo',fecha_firma:'2026-01-02',activo:true},
+    ];
+    const agreements=sheets=>sheets.find(s=>s.rows.some(r=>r?.[1]==='Convenio')).rows.filter(r=>typeof r?.[1]==='string'&&r[1].includes(' · Consecutivo '));
+    let expected;
+    for(const order of [rows,[rows[1],rows[2],rows[0]],rows.toReversed?rows.toReversed():[...rows].reverse()]){
+        const data=dataset('admin',[3]);
+        for(const id of data.agreements.keys())data.agreements.set(id,order.map(c=>({...c})));
+        const snapshot=JSON.stringify([...data.agreements]);
+        const before=await load({reference:true,data}),after=await load({data,freezeAgreements:true});
+        const exported=agreements(after.sheets);
+        assert.deepEqual(after.cards,before.cards);
+        assert.deepEqual(exported.map(r=>r[1]),['cop original · Consecutivo 10','cop original · Consecutivo 8','modificatorio · Consecutivo 1']);
+        assert.deepEqual(exported.map(JSON.stringify).sort(),agreements(before.sheets).map(JSON.stringify).sort());
+        assert.equal(exported.length,3);assert.equal(JSON.stringify([...data.agreements]),snapshot);
+        if(expected)assert.deepEqual(after.sheets,expected);else expected=after.sheets;
+    }
 });

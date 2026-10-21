@@ -28,7 +28,9 @@
                 encabezado(sh,['Indicador','Año','Programado','Realizado','Cantidad','Superficie (ha)','Monto ($)']);
                 for(const k of d.kpis)fila(sh,[etiquetas[k.indicador]||k.indicador.replaceAll('_',' '),k.anio,k.programado,k.realizado,k.cantidad,k.superficie_ha==null?null:Number(k.superficie_ha),k.monto==null?null:Number(k.monto)]);
                 encabezado(sh,['Núcleo','Municipio','Entidad']);for(const n of d.nucleos)fila(sh,[n.nombre_nucleo,n.municipio,n.entidad]);
-                encabezado(sh,['Convenio','Ámbito','Fecha de firma']);if(d.cop)for(const c of d.cop.convenios)fila(sh,[`${c.tipo_convenio.replaceAll('_',' ')} · Consecutivo ${c.consecutivo}`,c.ambito,c.fecha_firma]);else fila(sh,['No se pudo consultar el detalle de convenios.']);
+                // El resumen F04 ordena por ID; conservar ese orden también en
+                // la presentación, sin reordenar ni cambiar los datos recibidos.
+                encabezado(sh,['Convenio','Ámbito','Fecha de firma']);if(d.cop)for(const c of [...d.cop.convenios].sort((a,b)=>a.id_convenio-b.id_convenio))fila(sh,[`${c.tipo_convenio==null?'Tipo no informado':c.tipo_convenio.replaceAll('_',' ')} · Consecutivo ${c.consecutivo}`,c.ambito,c.fecha_firma]);else fila(sh,['No se pudo consultar el detalle de convenios.']);
                 graficos.getCell(`A${posicion}`).value=d.proyecto.nombre_proyecto;
                 // Los gráficos existentes usan CSS. Capturarlos en canvas conserva sus cifras y rótulos.
                 const panel=d.elemento.querySelector('.dashboard-graficas-grid');

@@ -1,7 +1,8 @@
 // F06: execute immutable original and current tracking reference functions.
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {execFileSync}=require('node:child_process'),root=path.resolve(__dirname,'../..');
-const source=(file,old)=>old?execFileSync('git',['show',`41d4b68:frontend-ssalfer/js/${file}`],{cwd:root,encoding:'utf8'}):fs.readFileSync(path.join(root,'frontend-ssalfer/js',file),'utf8');
+const normalizeSource = require('./helpers/source.cjs');
+const source=(file,old)=>normalizeSource(old?execFileSync('git',['show',`41d4b68:frontend-ssalfer/js/${file}`],{cwd:root,encoding:'utf8'}):fs.readFileSync(path.join(root,'frontend-ssalfer/js',file),'utf8'));
 const section=(s,a,b)=>{const i=s.indexOf(a),j=s.indexOf(b,i);assert.ok(i>=0&&j>i,a);return s.slice(i,j)};
 const clone=x=>JSON.parse(JSON.stringify(x));
 function fixture(n=53){
