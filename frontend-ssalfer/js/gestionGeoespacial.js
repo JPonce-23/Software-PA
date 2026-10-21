@@ -25,9 +25,12 @@
  * ------------------------------------------------------------
  */
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
 
     "use strict";
+
+    const sesion = await window.SSALFER_SESION_LISTA;
+    if (!["admin", "geografo"].includes(sesion?.user?.rol)) return;
 
 
     /* =====================================================
@@ -2784,8 +2787,6 @@ document.addEventListener("DOMContentLoaded", () => {
     ====================================================== */
 
     async function iniciar() {
-        await window.AuthAPI.requerirSesion();
-
         limpiarMensajes();
 
         actualizarTipoObjetivo();
@@ -2856,6 +2857,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    iniciar();
+    await iniciar();
 
 });

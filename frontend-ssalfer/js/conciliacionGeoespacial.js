@@ -1,6 +1,9 @@
 /* Extensión del gestor: las decisiones usan siempre el contexto que abrió el panel. */
-(() => {
+document.addEventListener("DOMContentLoaded", async () => {
     "use strict";
+    const sesion = await window.SSALFER_SESION_LISTA;
+    if (!["admin", "geografo"].includes(sesion?.user?.rol)) return;
+
     const api = window.GeoespacialAPI, g = window.SSALFER_GESTION, ui = window.SSALFER_UI;
     const estados = {pendiente:"Pendiente",coincidencia_exacta:"Coincidencia fuerte",candidato:"Requiere revisión",ambiguo:"Varias coincidencias",sin_coincidencia:"Sin coincidencia",confirmado:"Confirmado",rechazado:"Rechazado",ignorado:"Ignorado"};
     const rotulos = {DIMENSION_A_2D:"Se conservaron sólo las coordenadas del plano (XY)",CRS_REPROYECTADO:"Coordenadas transformadas al sistema de visualización",GEOMETRIA_EXISTENTE_DISTINTA:"La geometría reemplaza una versión anterior distinta",NombreNucl:"Núcleo agrario",NombreMuni:"Municipio",NombreEnti:"Entidad",TipoNucleo:"Tipo de núcleo",N__CLEO_AG:"Núcleo agrario",TIPO_N__CL:"Tipo de núcleo",Num_parcela:"Número de parcela",PARCELA:"Referencia de parcela",MUNICIPIO:"Municipio",ESTADO:"Entidad",fuerte:"Coincidencia fuerte",exacta:"Coincidencia exacta",revision:"Requiere revisión"};
@@ -392,7 +395,7 @@
             }));
         }catch(err){if(ctx===revision&&token===tokenRevision)fallo(salida,err);}
     }
-    document.addEventListener("DOMContentLoaded",async()=>{
+    function iniciar() {
         document.querySelectorAll(".geoespacial-paso").forEach((p,i)=>{p.querySelector("strong").textContent=["Sistema de coordenadas","Cargar","Conciliar","Finalizar"][i];p.classList.remove("activo");});paso(1);
         document.getElementById("btnCrearImportacion").addEventListener("click",()=>paso(2));
         configuracion=document.createElement("section");configuracion.className="ssalfer-gestion-seccion";configuracion.hidden=true;
@@ -400,8 +403,7 @@
         panel=document.createElement("section");panel.className="ssalfer-gestion-seccion gis-conciliacion";panel.hidden=true;panel.id="conciliacionGeoespacial";
         revisiones=document.createElement("section");revisiones.className="ssalfer-gestion-seccion";revisiones.hidden=true;
         document.querySelector("main").append(panel,revisiones);detalle=document.createElement("div");
-        const sesion=await window.AuthAPI.requerirSesion();puede=["admin","geografo"].includes(sesion?.user?.rol);administrador=sesion?.user?.rol==="admin";
-        if(!puede){document.getElementById("btnCrearImportacion").hidden=true;document.getElementById("seccionNuevaImportacion").hidden=true;}
+        puede=true;administrador=sesion.user.rol==="admin";
         panel.addEventListener("click",event=>{const b=event.target.closest("[data-gestion]");if(!b||detalle.contains(b)||ocupado)return;const accion=b.dataset.gestion;
             if(accion==="anterior"||accion==="siguiente"){pagina+=accion==="anterior"?-1:1;cargarElementos(true);return;}
             if(accion==="elemento"){abrirElemento(Number(b.dataset.registro));return;}
@@ -427,7 +429,7 @@
                 }
             });
         });
-    });
+    }
     function limpiar() {
         if (ocupado) return false;
         registro=null; ++tokenResumen; ++tokenLista; ++tokenElemento; ++tokenCiclos;
@@ -436,4 +438,5 @@
         return true;
     }
     window.SSALFER_GIS={cambiarProyecto,mostrar,paso,limpiar,camposArchivo,resultadoTexto,diagnosticoElemento,puedeEditar:()=>puede,exclusivo:proteger,ocupado:()=>ocupado};
-})();
+    iniciar();
+});
