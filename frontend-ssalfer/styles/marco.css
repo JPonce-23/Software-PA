@@ -1,6 +1,12 @@
 body.ssalfer-marco { --ancho-menu:280px; grid-template-columns:var(--ancho-menu) minmax(0,1fr); }
 body.ssalfer-marco.ssalfer-menu-oculto { --ancho-menu:48px; grid-template-columns:48px minmax(0,1fr); }
 .ssalfer-marco .aside { box-sizing:border-box; }
+.ssalfer-marco .header .logo-pa { display:flex; align-items:center; justify-content:center; flex:0 0 75px; }
+.ssalfer-marco .header .logo-pa img { display:block; width:75px; height:75px; max-height:75px; object-fit:contain; }
+@media(max-width:650px) {
+    .ssalfer-marco .header .logo-pa { flex-basis:58px; }
+    .ssalfer-marco .header .logo-pa img { width:58px; height:58px; max-height:58px; }
+}
 .ssalfer-marco .aside.collapsed { width:48px; padding:8px; }
 .ssalfer-marco .aside.collapsed > :not(.ssalfer-accesos) { display:none; }
 .ssalfer-accesos { display:none; }
@@ -12,8 +18,13 @@ body.ssalfer-marco.ssalfer-menu-oculto { --ancho-menu:48px; grid-template-column
 .ssalfer-menu-borde:focus-visible { outline:3px solid #996b25; outline-offset:2px; }
 .ssalfer-menu-usuario { position:fixed!important; bottom:auto!important; z-index:1300; box-sizing:border-box; overflow:auto; background:#fff; color:#284737; border:1px solid #c4d4c9; border-radius:10px; box-shadow:0 4px 16px #0003; padding:10px; }
 .ssalfer-menu-usuario[hidden] { display:none!important; }
-.ssalfer-menu-usuario a, .ssalfer-menu-usuario button { display:block; box-sizing:border-box; width:100%; padding:10px; color:#284737; text-align:left; font:inherit; }
+.ssalfer-menu-usuario a, .ssalfer-menu-usuario button { display:block; box-sizing:border-box; width:100%; padding:10px; color:#284737; text-align:left; font:inherit; text-decoration:none; border-radius:6px; transition:background-color .18s ease, transform .18s ease, box-shadow .18s ease; }
 .ssalfer-menu-usuario button { border:0; background:transparent; cursor:pointer; }
+.ssalfer-menu-usuario :is(a,button):not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible) { background:#eeeeee; color:#284737; text-decoration:none; transform:translateY(-2px); box-shadow:0 3px 7px #0002; }
+@media (prefers-reduced-motion:reduce) {
+    .ssalfer-menu-usuario :is(a,button) { transition:none; }
+    .ssalfer-menu-usuario :is(a,button):is(:hover,:focus-visible) { transform:none; }
+}
 .ssalfer-menu-usuario :is(a,button):focus-visible { outline:3px solid #996b25; outline-offset:-2px; border-radius:4px; }
 .ssalfer-menu-usuario [aria-disabled="true"] { opacity:.65; cursor:wait; }
 .ssalfer-flecha-usuario { margin-left:auto; }
