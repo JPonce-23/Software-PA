@@ -70,7 +70,7 @@ async function load({reference=false,data=dataset(),fail=()=>false,delays={},exp
         calls.push(url);
         if(delays[url])await new Promise(resolve=>setTimeout(resolve,delays[url]));
         if(fail(url))throw new Error('Fallo parcial sintético');
-        if(url==='/auth/sesion')return {user:{rol:data.role,nombre:'QA',apellido_paterno:'F04'}};
+        if(url==='/auth/sesion')return {user:{id_usuario:1,rol:data.role,nombre:'QA',apellido_paterno:'F04'}};
         if(url.startsWith('/proyectos?'))return clone(data.projects);
         if(url==='/dashboard/kpi')return data.projects.flatMap(p=>[
             {id_proyecto:p.id_proyecto,indicador:'asambleas',anio:2025,programado:2,realizado:1,cantidad:1,superficie_ha:null,monto:null},
@@ -82,6 +82,18 @@ async function load({reference=false,data=dataset(),fail=()=>false,delays={},exp
             {id_proyecto:p.id_proyecto,id_convenio:2,concepto:'monto_100_declarado',valor_declarado:'100.13'},
         ]);
         let match;
+        if((match=url.match(/^\/proyectos\/(\d+)\/dashboard\/resumen$/))){
+            const cop=summary(data,+match[1]);
+            return {total_nucleos:(data.nuclei.get(+match[1])||[]).length,total_convenios:cop.convenios.length,
+                individuales:cop.individuales,colectivos:cop.colectivos,formalizados:cop.formalizados};
+        }
+        if((match=url.match(/^\/proyectos\/(\d+)\/dashboard\/exportacion\/(nucleos|convenios)\?/))){
+            const params=new URL(url,'http://qa').searchParams, cursor=Number(params.get('despues_de')),limit=Number(params.get('limit'));
+            const field=match[2]==='nucleos'?'id_proyecto_nucleo':'id_convenio';
+            const all=(match[2]==='nucleos'?(data.nuclei.get(+match[1])||[]):summary(data,+match[1]).convenios).slice().sort((a,b)=>a[field]-b[field]);
+            const remaining=all.filter(x=>x[field]>cursor),items=remaining.slice(0,limit),more=remaining.length>limit;
+            return {items,total:all.length,revision:'0123456789abcdef0123456789abcdef',hay_mas:more,siguiente_id:more?items.at(-1)[field]:null};
+        }
         if((match=url.match(/^\/proyectos\/(\d+)\/nucleos$/)))return clone(data.nuclei.get(+match[1])||[]);
         if((match=url.match(/^\/proyectos\/(\d+)\/dashboard\/convenios$/))){
             const result=summary(data,+match[1]);
@@ -94,13 +106,13 @@ async function load({reference=false,data=dataset(),fail=()=>false,delays={},exp
     }
     class URLDouble extends URL {}
     URLDouble.createObjectURL=value=>{blob=value;return 'blob:fixture'};URLDouble.revokeObjectURL=()=>{};
-    const window={document,location:{pathname:'/dashboard.html',search:'',origin:'http://fixture.invalid'},
+    const window={addEventListener(){},document,location:{pathname:'/dashboard.html',search:'',origin:'http://fixture.invalid'},
         innerWidth:1200,ClienteAPI:{get,API_BASE_URL:'/api',mostrarErrorAPI(error){errors.push(error)},ErrorAPI:class extends Error{}},
         SSALFER_UI:{cargando:{iniciar:()=>()=>{}},toast(){}},
         html2canvas:async()=>({width:800,height:200,toDataURL:()=> 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6P5QAAAAASUVORK5CYII='}),
         setTimeout};
     if(pageAuthorization)window.SSALFER_SESION_LISTA=pageAuthorization;
-    const context=vm.createContext({window,document,console:{warn(){},error(){}},URL:URLDouble,URLSearchParams,Blob,
+    const context=vm.createContext({window,document,console:{warn(){},error(){}},URL:URLDouble,URLSearchParams,Blob,AbortController,DOMException,
         html2canvas:window.html2canvas,CustomEvent:class{},setTimeout,clearTimeout,setImmediate,clearImmediate,
         localStorage:{getItem:()=>null,setItem(){}}});
     // Keep vendor and application arrays in the same JS realm (as in a browser).
@@ -115,7 +127,7 @@ async function load({reference=false,data=dataset(),fail=()=>false,delays={},exp
     for(const fn of listeners.get('DOMContentLoaded')||[])fn();
     afterDOMContentLoaded?.({calls,cards:()=>nodes.get('listaProyectosDashboard').children});
     const button=()=>nodes.get('btnExportarDashboardExcel');
-    for(let i=0;i<2000&&(!button()||button().disabled);i++)await new Promise(resolve=>setTimeout(resolve,1));
+    for(let i=0;i<2000&&(!button()||button().disabled)&&!(nodes.get('listaProyectosDashboard').children.length===data.projects.length&&nodes.get('listaProyectosDashboard').children.every(e=>!e.attributes['aria-busy']));i++)await new Promise(resolve=>setTimeout(resolve,1));
     const ready=button()&&!button().disabled;
     const cards=nodes.get('listaProyectosDashboard').children.map(e=>e.innerHTML);
     let sheets=null;
@@ -144,7 +156,7 @@ test('all roles: identical cards, actual XLSX cells, CSV URL; constant requests'
     for(const role of ['admin','operador','visualizador','geografo']){
         const data=dataset(role),before=await load({reference:true,data}),after=await load({data});
         assert.deepEqual(after.cards,before.cards);assert.deepEqual(after.sheets,before.sheets);assert.equal(after.csv,before.csv);
-        assert.equal(after.calls.length,4+2*data.projects.length);
+        assert.equal(after.calls.length,6+9*data.projects.length);
         assert.ok(!after.calls.some(u=>u.includes('/afectaciones')));
         results.push({role,before:before.calls.length,after:after.calls.length,identicalCards:true,identicalXlsxCells:true});
     }
@@ -154,7 +166,7 @@ test('all roles: identical cards, actual XLSX cells, CSV URL; constant requests'
 test('all roles: resolved page authorization preserves dashboard/sidebar requests and XLSX', {skip:baselineOnly},async()=>{
     for(const role of ['admin','operador','visualizador','geografo']){
         const data=dataset(role),before=await load({data});
-        const after=await load({data,pageAuthorization:Promise.resolve({user:{rol:role}})});
+        const after=await load({data,pageAuthorization:Promise.resolve({user:{id_usuario:1,rol:role}})});
         assert.deepEqual(after.calls,before.calls);assert.deepEqual(after.cards,before.cards);
         assert.deepEqual(after.sheets,before.sheets);assert.equal(after.csv,before.csv);
         assert.equal(after.calls.filter(url=>url.startsWith('/proyectos?')).length,1);
@@ -166,38 +178,35 @@ test('pending page authorization delays all shared dashboard consumers, then sta
     const pageAuthorization=new Promise(resolve=>authorize=resolve);
     const result=await load({pageAuthorization,afterDOMContentLoaded({calls,cards}){
         assert.deepEqual(calls,[]);assert.deepEqual(cards(),[]);
-        authorize({user:{rol:'admin'}});
+        authorize({user:{id_usuario:1,rol:'admin'}});
     }});
     assert.equal(result.ready,true);assert.equal(result.cards.length,2);assert.ok(result.sheets);
-    assert.equal(result.calls.length,8);assert.equal(result.calls.filter(url=>url.startsWith('/proyectos?')).length,1);
+    assert.equal(result.calls.length,24);assert.equal(result.calls.filter(url=>url.startsWith('/proyectos?')).length,1);
 });
 
-test('over 100 nuclei keeps the current first-page contract and exports', {skip:baselineOnly},async()=>{
+test('legacy capped fixture is compatible; full universes are covered separately', {skip:baselineOnly},async()=>{
     const data=dataset('admin',[105,0]);
     const before=await load({reference:true,data}),after=await load({data});
     assert.deepEqual(after.cards,before.cards);assert.deepEqual(after.sheets,before.sheets);
-    assert.equal(after.calls.length,8);
+    assert.equal(after.calls.length,24);
 });
 
-test('partial failure: one project unavailable does not block other cards/exports', {skip:baselineOnly},async()=>{
-    const data=dataset();
-    for(const kind of ['nuclei','cop','kpi','values']){
-        const beforeFail=url=>({nuclei:'/proyectos/1/nucleos',cop:'/afectaciones/1/convenios',kpi:'/dashboard/kpi',values:'/reportes/convenios/valores-declarados'})[kind]===url;
-        const afterFail=url=>kind==='cop'?url==='/proyectos/1/dashboard/convenios':beforeFail(url);
-        const before=await load({reference:true,data,fail:beforeFail}),after=await load({data,fail:afterFail});
-        assert.equal(after.ready,true);assert.deepEqual(after.cards,before.cards);assert.deepEqual(after.sheets,before.sheets);
+test('missing summary/KPI/value data blocks Excel instead of exporting a partial dashboard', {skip:baselineOnly},async()=>{
+    for(const url of ['/proyectos/1/dashboard/resumen','/dashboard/kpi','/reportes/convenios/valores-declarados']){
+        const result=await load({fail:u=>u===url});
+        assert.equal(result.ready,false);assert.equal(result.sheets,null);
     }
 });
 
 test('slow first project keeps project order in DOM and XLSX', {skip:baselineOnly},async()=>{
     const data=dataset(),before=await load({reference:true,data});
-    const after=await load({data,delays:{'/proyectos/2/dashboard/convenios':50}});
+    const after=await load({data,delays:{'/proyectos/2/dashboard/resumen':50}});
     assert.deepEqual(after.cards,before.cards);assert.deepEqual(after.sheets,before.sheets);
 });
 
-test('new documents/users fetch afresh; export performs zero further GETs', {skip:baselineOnly},async()=>{
-    const [a,b,c]=await Promise.all([load({delays:{'/proyectos/2/dashboard/convenios':30}}),load({data:dataset('visualizador')}),load()]);
-    assert.equal(a.calls.length,8);assert.equal(b.calls.length,6);assert.equal(c.calls.length,8);
+test('new documents/users fetch afresh; detail is requested only by explicit export', {skip:baselineOnly},async()=>{
+    const [a,b,c]=await Promise.all([load({delays:{'/proyectos/2/dashboard/resumen':30}}),load({data:dataset('visualizador')}),load()]);
+    assert.equal(a.calls.length,24);assert.equal(b.calls.length,15);assert.equal(c.calls.length,24);
     assert.equal(b.cards.length,1);assert.ok(!b.cards[0].includes('Proyecto 2'));
     assert.equal(a.calls.filter(u=>u.startsWith('/proyectos?')).length,1);
 });

@@ -917,11 +917,14 @@ configurarAccesoMapa();
              * =============================
              */
 
+            let reportesCompletos = true;
             async function obtenerReporte(metodo, mensaje) {
                 try {
                     const respuesta = await window.ReportesAPI?.[metodo]?.();
-                    return Array.isArray(respuesta) ? respuesta : [];
+                    if (!Array.isArray(respuesta)) throw new Error(mensaje);
+                    return respuesta;
                 } catch (error) {
+                    reportesCompletos = false;
                     console.warn(mensaje, error);
                     return [];
                 }
@@ -1017,40 +1020,24 @@ configurarAccesoMapa();
             });
             async function cargarTarjeta(proyecto, orden) {
                 const articulo = tarjetas[orden];
-                const resumenConvenios = window.ReportesAPI?.obtenerResumenConveniosDashboard
-                    ? window.ReportesAPI.obtenerResumenConveniosDashboard(proyecto.id_proyecto).catch(() => null)
-                    : Promise.resolve(null);
-                let nucleos = [];
-
-
-                if (window.NucleosAPI) {
-
-                    try {
-
-                        nucleos =
-                            await window
-                                .NucleosAPI
-                                .listarPorProyecto(
-                                    proyecto.id_proyecto
-                                );
-
-
-                    } catch (error) {
-
-                        /*
-                         * No bloqueamos todo el
-                         * dashboard por un proyecto.
-                         */
-                        nucleos = [];
-                    }
+                let copResumen;
+                try {
+                    copResumen = await window.NucleosAPI.resumenDashboard(proyecto.id_proyecto);
+                } catch (error) {
+                    articulo.removeAttribute('aria-busy');
+                    articulo.textContent = `${proyecto.nombre_proyecto}: no se pudo cargar el resumen. `;
+                    const reintentar = document.createElement('button');
+                    reintentar.type = 'button';
+                    reintentar.className = 'btn-secundario';
+                    reintentar.textContent = 'Reintentar resumen';
+                    reintentar.onclick = async () => {
+                        reintentar.disabled = true;
+                        await cargarTarjeta(proyecto, orden);
+                        window.SSALFER_DASHBOARD_EXCEL?.listo(proyectos.length, reportesCompletos);
+                    };
+                    articulo.appendChild(reintentar);
+                    return;
                 }
-
-
-                const listaNucleos =
-                    Array.isArray(nucleos)
-                        ? nucleos
-                        : [];
-
 
                 const totalAsambleasAnuencia =
                     sumarCampoKpi(
@@ -1070,10 +1057,6 @@ configurarAccesoMapa();
                     );
 
 
-                // Preserve the old empty/failed-nuclei result; a failed COP read is "Sin dato".
-                const copResumen = listaNucleos.length === 0
-                    ? {individuales: 0, colectivos: 0, formalizados: 0, convenios: []}
-                    : await resumenConvenios;
                 const copsFormalizados =
                     sumarCampoKpi(
                         kpisDashboard,
@@ -1215,7 +1198,7 @@ configurarAccesoMapa();
                                     <strong
                                         class="dashboard-kpi-valor"
                                     >
-                                        ${formatearEntero(listaNucleos.length)}
+                                        ${formatearEntero(copResumen.total_nucleos)}
                                     </strong>
 
                                     <small>
@@ -1448,7 +1431,7 @@ configurarAccesoMapa();
 
 
                 articulo.removeAttribute("aria-busy");
-                window.SSALFER_DASHBOARD_EXCEL?.registrar({orden,proyecto,nucleos:listaNucleos,kpis:kpisDashboard.filter(k=>k.id_proyecto===proyecto.id_proyecto),cop:copResumen,elemento:articulo});
+                window.SSALFER_DASHBOARD_EXCEL?.registrar({orden,proyecto,kpis:kpisDashboard.filter(k=>k.id_proyecto===proyecto.id_proyecto),cop:copResumen,elemento:articulo});
             }
             let siguienteProyecto = 0;
             async function cargarTarjetas() {
@@ -1458,7 +1441,7 @@ configurarAccesoMapa();
                 }
             }
             await Promise.all(Array.from({length: Math.min(3, proyectos.length)}, cargarTarjetas));
-            window.SSALFER_DASHBOARD_EXCEL?.listo();
+            window.SSALFER_DASHBOARD_EXCEL?.listo(proyectos.length, reportesCompletos);
 
 
         } catch (error) {
