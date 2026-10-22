@@ -177,6 +177,62 @@ def dashboard_convenios(
 
 
 @router.get(
+    "/proyectos/{id_proyecto}/dashboard/resumen",
+    response_model=schemas.DashboardResumenResponse,
+    responses={401: {"description": "Sesión inválida"},
+               403: {"description": "Proyecto inexistente, inactivo o fuera del alcance autorizado"}},
+)
+def dashboard_resumen(
+    id_proyecto: int = Path(gt=0),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """Totales COP de todos los ProyectoNucleo activos; sin relaciones ni detalle."""
+    require_project_access(db, user, id_proyecto, load_details=False)
+    return dashboard_summary.project_summary(db, id_proyecto)
+
+
+@router.get(
+    "/proyectos/{id_proyecto}/dashboard/exportacion/nucleos",
+    response_model=schemas.DashboardNucleosPagina,
+    responses={401: {"description": "Sesión inválida"},
+               403: {"description": "Proyecto fuera del alcance autorizado"},
+               409: {"description": "El conjunto cambió; reiniciar la exportación"}},
+)
+def dashboard_export_nuclei(
+    id_proyecto: int = Path(gt=0),
+    despues_de: int = Query(0, ge=0, description="0 al comenzar; después usar siguiente_id de la página anterior"),
+    limit: int = Query(200, ge=1, le=200),
+    revision: str | None = Query(None, pattern=r"^[0-9a-f]{32}$", description="Revisión recibida al iniciar; obligatoria si despues_de > 0. Cambio de contenido: 409"),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """Detalle mínimo de Excel por ID; enviar revision en todas las páginas siguientes."""
+    require_project_access(db, user, id_proyecto, load_details=False)
+    return dashboard_summary.project_export_page(db, id_proyecto, "nucleos", despues_de, limit, revision)
+
+
+@router.get(
+    "/proyectos/{id_proyecto}/dashboard/exportacion/convenios",
+    response_model=schemas.DashboardConveniosPagina,
+    responses={401: {"description": "Sesión inválida"},
+               403: {"description": "Proyecto fuera del alcance autorizado"},
+               409: {"description": "El conjunto cambió; reiniciar la exportación"}},
+)
+def dashboard_export_agreements(
+    id_proyecto: int = Path(gt=0),
+    despues_de: int = Query(0, ge=0, description="0 al comenzar; después usar siguiente_id de la página anterior"),
+    limit: int = Query(200, ge=1, le=200),
+    revision: str | None = Query(None, pattern=r"^[0-9a-f]{32}$", description="Revisión recibida al iniciar; obligatoria si despues_de > 0. Cambio de contenido: 409"),
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
+):
+    """Convenios únicos por ID; revisión de contenido y total independientes del cursor."""
+    require_project_access(db, user, id_proyecto, load_details=False)
+    return dashboard_summary.project_export_page(db, id_proyecto, "convenios", despues_de, limit, revision)
+
+
+@router.get(
     "/proyectos/{id_proyecto}/mapa/indicadores",
     response_model=schemas.MapaIndicadoresResponse,
     responses={401: {"description": "Sesión inválida o usuario inactivo"},

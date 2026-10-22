@@ -1730,6 +1730,40 @@ class DashboardConveniosResponse(BaseModel):
     convenios: list[DashboardConvenioDetalle]
 
 
+class DashboardResumenResponse(BaseModel):
+    """COP operativo completo; independiente de KPI históricos e indicadores GIS."""
+    total_nucleos: int = Field(ge=0)
+    total_convenios: int = Field(ge=0)
+    individuales: int = Field(ge=0)
+    colectivos: int = Field(ge=0)
+    formalizados: int = Field(ge=0)
+
+
+class DashboardNucleoDetalle(BaseModel):
+    id_proyecto_nucleo: int
+    id_nucleo: int
+    nombre_nucleo: str
+    id_municipio: int
+    municipio: str
+    id_entidad: int
+    entidad: str
+
+
+class DashboardPaginaBase(BaseModel):
+    total: int = Field(ge=0)
+    revision: str = Field(pattern=r"^[0-9a-f]{32}$")
+    hay_mas: bool
+    siguiente_id: int | None
+
+
+class DashboardNucleosPagina(DashboardPaginaBase):
+    items: list[DashboardNucleoDetalle]
+
+
+class DashboardConveniosPagina(DashboardPaginaBase):
+    items: list[DashboardConvenioDetalle]
+
+
 class DashboardKpiResponse(ORMModel):
     id_proyecto: int
     anio: int

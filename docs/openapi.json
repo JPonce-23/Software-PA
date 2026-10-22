@@ -11636,6 +11636,250 @@
           }
         }
       }
+    },
+    "/api/proyectos/{id_proyecto}/dashboard/resumen": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa"
+        ],
+        "summary": "Dashboard Resumen",
+        "description": "Totales COP de todos los ProyectoNucleo activos; sin relaciones ni detalle.",
+        "operationId": "dashboard_resumen_api_proyectos__id_proyecto__dashboard_resumen_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Id Proyecto"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResumenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Proyecto inexistente, inactivo o fuera del alcance autorizado"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{id_proyecto}/dashboard/exportacion/nucleos": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa"
+        ],
+        "summary": "Dashboard Export Nuclei",
+        "description": "Detalle mínimo de Excel por ID; enviar revision en todas las páginas siguientes.",
+        "operationId": "dashboard_export_nuclei_api_proyectos__id_proyecto__dashboard_exportacion_nucleos_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Id Proyecto"
+            }
+          },
+          {
+            "name": "despues_de",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "0 al comenzar; después usar siguiente_id de la página anterior",
+              "default": 0,
+              "title": "Despues De"
+            },
+            "description": "0 al comenzar; después usar siguiente_id de la página anterior"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Revisión recibida al iniciar; obligatoria si despues_de > 0. Cambio de contenido: 409",
+              "title": "Revision"
+            },
+            "description": "Revisión recibida al iniciar; obligatoria si despues_de > 0. Cambio de contenido: 409"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardNucleosPagina"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Proyecto fuera del alcance autorizado"
+          },
+          "409": {
+            "description": "El conjunto cambió; reiniciar la exportación"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{id_proyecto}/dashboard/exportacion/convenios": {
+      "get": {
+        "tags": [
+          "Dashboard y mapa"
+        ],
+        "summary": "Dashboard Export Agreements",
+        "description": "Convenios únicos por ID; revisión de contenido y total independientes del cursor.",
+        "operationId": "dashboard_export_agreements_api_proyectos__id_proyecto__dashboard_exportacion_convenios_get",
+        "parameters": [
+          {
+            "name": "id_proyecto",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Id Proyecto"
+            }
+          },
+          {
+            "name": "despues_de",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "0 al comenzar; después usar siguiente_id de la página anterior",
+              "default": 0,
+              "title": "Despues De"
+            },
+            "description": "0 al comenzar; después usar siguiente_id de la página anterior"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Revisión recibida al iniciar; obligatoria si despues_de > 0. Cambio de contenido: 409",
+              "title": "Revision"
+            },
+            "description": "Revisión recibida al iniciar; obligatoria si despues_de > 0. Cambio de contenido: 409"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardConveniosPagina"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Proyecto fuera del alcance autorizado"
+          },
+          "409": {
+            "description": "El conjunto cambió; reiniciar la exportación"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -31779,6 +32023,178 @@
           "id_afectacion"
         ],
         "title": "ReporteConvenioEventoVinculoReferencia"
+      },
+      "DashboardConveniosPagina": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Revision"
+          },
+          "hay_mas": {
+            "type": "boolean",
+            "title": "Hay Mas"
+          },
+          "siguiente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardConvenioDetalle"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "revision",
+          "hay_mas",
+          "siguiente_id",
+          "items"
+        ],
+        "title": "DashboardConveniosPagina"
+      },
+      "DashboardNucleoDetalle": {
+        "properties": {
+          "id_proyecto_nucleo": {
+            "type": "integer",
+            "title": "Id Proyecto Nucleo"
+          },
+          "id_nucleo": {
+            "type": "integer",
+            "title": "Id Nucleo"
+          },
+          "nombre_nucleo": {
+            "type": "string",
+            "title": "Nombre Nucleo"
+          },
+          "id_municipio": {
+            "type": "integer",
+            "title": "Id Municipio"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "id_entidad": {
+            "type": "integer",
+            "title": "Id Entidad"
+          },
+          "entidad": {
+            "type": "string",
+            "title": "Entidad"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_proyecto_nucleo",
+          "id_nucleo",
+          "nombre_nucleo",
+          "id_municipio",
+          "municipio",
+          "id_entidad",
+          "entidad"
+        ],
+        "title": "DashboardNucleoDetalle"
+      },
+      "DashboardNucleosPagina": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Revision"
+          },
+          "hay_mas": {
+            "type": "boolean",
+            "title": "Hay Mas"
+          },
+          "siguiente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardNucleoDetalle"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "revision",
+          "hay_mas",
+          "siguiente_id",
+          "items"
+        ],
+        "title": "DashboardNucleosPagina"
+      },
+      "DashboardResumenResponse": {
+        "properties": {
+          "total_nucleos": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Nucleos"
+          },
+          "total_convenios": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Convenios"
+          },
+          "individuales": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Individuales"
+          },
+          "colectivos": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Colectivos"
+          },
+          "formalizados": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Formalizados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_nucleos",
+          "total_convenios",
+          "individuales",
+          "colectivos",
+          "formalizados"
+        ],
+        "title": "DashboardResumenResponse",
+        "description": "COP operativo completo; independiente de KPI históricos e indicadores GIS."
       }
     }
   }
