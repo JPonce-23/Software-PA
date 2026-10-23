@@ -659,6 +659,27 @@
 
 
 /* Valores declarados: conceptos separados para no mezclar dinero y superficie */
+.tabla-contenedor.tabla-financiera-scroll {
+    max-height: 28rem;
+    overflow: auto;
+    scrollbar-gutter: stable;
+}
+.tabla-financiera-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--verde);
+    color: #fff;
+}
+.tabla-financiera-scroll:focus-visible {
+    outline: 3px solid #996b25;
+    outline-offset: 2px;
+}
+@media print {
+    .tabla-contenedor.tabla-financiera-scroll { max-height: none; overflow: visible; }
+    .tabla-financiera-scroll thead th { position: static; }
+}
+
 .kpi-desglose {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

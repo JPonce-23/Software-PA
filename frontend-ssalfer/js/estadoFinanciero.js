@@ -101,6 +101,43 @@ document.addEventListener("DOMContentLoaded", async () => {
         return `<tr><td colspan="${colspan}">${texto}</td></tr>`;
     }
 
+    function etiquetaIndicador(codigo) {
+        const clave = String(codigo || '').toLowerCase();
+        if (/^sensibilizacion(?:_|$)/.test(clave)) return 'Sensibilización';
+        if (/^caminamiento(?:_|$)/.test(clave)) return 'Caminamiento';
+        const etiquetas = {
+            nucleos: 'Núcleos', asambleas: 'Asambleas',
+            cop_colectivos: 'COP colectivo', cop_individuales: 'COP individual',
+            modificatorios: 'Modificatorios', superficies_adicionales: 'Superficie adicional',
+            obras_complementarias: 'Obras complementarias', ampliaciones: 'Ampliaciones',
+            ampliaciones_remanentes: 'Remanentes', otros_instrumentos: 'Otros instrumentos',
+            retiro_fondos: 'Retiro de fondos', parcelas_afectadas: 'Parcelas afectadas',
+            superficie_por_destino: 'Superficie por destino',
+            superficie_afectada_administrativa: 'Superficie afectada',
+            ingreso_ran_acta: 'Ingreso RAN · Acta', ingreso_ran_convenio: 'Ingreso RAN · Convenio',
+            inscripcion_ran_acta: 'Inscripción RAN · Acta', inscripcion_ran_convenio: 'Inscripción RAN · Convenio',
+            indemnizaciones: 'Indemnizaciones', pagos: 'Pagos', fifonafe: 'FIFONAFE',
+            informe_no_conflictos: 'Sin conflictos'
+        };
+        return etiquetas[clave] || window.SSALFER_FORMAT?.etiquetaCodigo(codigo)
+            || clave.replaceAll('_', ' ') || '—';
+    }
+
+    function ajustarScrollTabla(cuerpo, cantidad, nombre) {
+        const contenedor = cuerpo.closest('.tabla-contenedor');
+        const conScroll = cantidad > 15;
+        contenedor.classList.toggle('tabla-financiera-scroll', conScroll);
+        if (conScroll) {
+            contenedor.tabIndex = 0;
+            contenedor.setAttribute('role', 'region');
+            contenedor.setAttribute('aria-label', `${nombre}. Tabla con desplazamiento interno`);
+        } else {
+            contenedor.removeAttribute('tabindex');
+            contenedor.removeAttribute('role');
+            contenedor.removeAttribute('aria-label');
+        }
+    }
+
 
     /* =====================================================
         INDICADORES QUE CORRESPONDEN A CONVENIOS
@@ -245,6 +282,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         try {
 
             const filas = await window.ReportesAPI.obtenerAvancePeriodo({ id_proyecto: idProyecto });
+            ajustarScrollTabla(cuerpo, Array.isArray(filas) ? filas.length : 0, 'Avance por periodo');
 
             if (!Array.isArray(filas) || filas.length === 0) {
 
@@ -255,7 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             cuerpo.innerHTML = filas.map(fila => `
                 <tr>
-                    <td>${fila.indicador}</td>
+                    <td title="${window.SSALFER_UI.escaparHTML(fila.indicador || '')}">${window.SSALFER_UI.escaparHTML(etiquetaIndicador(fila.indicador))}</td>
                     <td>${fila.ambito || "—"}</td>
                     <td>${fila.anio}</td>
                     <td>${fila.mes}</td>
@@ -270,6 +308,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (error) {
 
             cuerpo.innerHTML = celdaVacia(9, "No se pudo cargar el avance de periodo.");
+            ajustarScrollTabla(cuerpo, 0, 'Avance por periodo');
             window.ClienteAPI.mostrarErrorAPI(error, contenedorError);
 
         }
@@ -288,6 +327,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         try {
 
             const filas = await valoresDeclaradosIniciales;
+            ajustarScrollTabla(cuerpo, Array.isArray(filas) ? filas.length : 0, 'Valores declarados de convenios');
 
             if (!Array.isArray(filas) || filas.length === 0) {
 
@@ -321,6 +361,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (error) {
 
             cuerpo.innerHTML = celdaVacia(6, "No se pudieron cargar los valores declarados.");
+            ajustarScrollTabla(cuerpo, 0, 'Valores declarados de convenios');
             window.ClienteAPI.mostrarErrorAPI(error, contenedorError);
 
         }
@@ -339,6 +380,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         try {
 
             const filas = await window.ReportesAPI.obtenerConveniosCoberturaImpactos({ id_proyecto: idProyecto });
+            ajustarScrollTabla(cuerpo, Array.isArray(filas) ? filas.length : 0, 'Cobertura de impactos de convenios');
 
             if (!Array.isArray(filas) || filas.length === 0) {
 
@@ -361,6 +403,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (error) {
 
             cuerpo.innerHTML = celdaVacia(6, "No se pudo cargar la cobertura de impactos.");
+            ajustarScrollTabla(cuerpo, 0, 'Cobertura de impactos de convenios');
             window.ClienteAPI.mostrarErrorAPI(error, contenedorError);
 
         }
@@ -379,6 +422,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         try {
 
             const filas = await window.ReportesAPI.obtenerFifonafeCobertura({ id_proyecto: idProyecto });
+            ajustarScrollTabla(cuerpo, Array.isArray(filas) ? filas.length : 0, 'Cobertura FIFONAFE');
 
             if (!Array.isArray(filas) || filas.length === 0) {
 
@@ -403,6 +447,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (error) {
 
             cuerpo.innerHTML = celdaVacia(8, "No se pudo cargar la cobertura FIFONAFE.");
+            ajustarScrollTabla(cuerpo, 0, 'Cobertura FIFONAFE');
             window.ClienteAPI.mostrarErrorAPI(error, contenedorError);
 
         }
