@@ -374,7 +374,12 @@
 ========================================================= */
 
 .mapa-panel-detalle {
-    align-self: stretch;
+    align-self: start;
+    box-sizing: border-box;
+    max-height: min(610px, 75dvh);
+    min-height: 0;
+    overflow: auto;
+    scrollbar-gutter: stable;
     overflow-wrap: anywhere;
 }
 

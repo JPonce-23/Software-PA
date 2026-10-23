@@ -32,6 +32,8 @@
 
     <link rel="stylesheet" href="/styles/shared.css">
 <link rel="stylesheet" href="/styles/marco.css">
+<link rel="stylesheet" href="/styles/tablasScroll.css">
+<script defer src="/js/utils/tablasScroll.js"></script>
 </head>
 
 
@@ -272,14 +274,15 @@
 
         <div class="dashboard-acciones">
 
-            <a
-                id="btnExportarDashboardCsv"
+            <button
+                id="btnExportarDashboardExcel"
                 class="btn-secundario"
-                href="#"
+                type="button"
+                disabled
             >
                 <i class="bi bi-download"></i>
-                Exportar dashboard (CSV)
-            </a>
+                Exportar dashboard (Excel)
+            </button>
 
         </div>
 

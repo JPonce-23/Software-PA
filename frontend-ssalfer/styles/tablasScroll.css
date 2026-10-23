@@ -1,0 +1,19 @@
+.ssalfer-tabla-scroll {
+    max-height: 28rem !important;
+    min-height: 0;
+    min-width: 0;
+    overflow: auto !important;
+    scrollbar-gutter: stable;
+}
+.ssalfer-tabla-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--verde, #285438);
+    color: #fff;
+}
+.ssalfer-tabla-scroll:focus-visible { outline:3px solid #996b25; outline-offset:2px; }
+@media print {
+    .ssalfer-tabla-scroll { max-height:none !important; overflow:visible !important; }
+    .ssalfer-tabla-scroll thead th { position:static; }
+}

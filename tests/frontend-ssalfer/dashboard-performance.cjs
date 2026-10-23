@@ -60,7 +60,7 @@ async function load({reference=false,data=dataset(),fail=()=>false,delays={},exp
         before(element){nodes.set(element.id,element)}
         click(){}
     }
-    for(const id of ['proyectosLista','listaProyectosDashboard','dashboardMensajeError','btnExportarDashboardCsv'])nodes.set(id,new Element());
+    for(const id of ['proyectosLista','listaProyectosDashboard','dashboardMensajeError','btnExportarDashboardCsv','btnExportarDashboardExcel'])nodes.set(id,new Element());
     const document={body:new Element('body'),getElementById:id=>nodes.get(id)||null,createElement:tag=>new Element(tag),
         querySelector:()=>null,querySelectorAll:()=>[],dispatchEvent(){},addEventListener(name,fn){
             if(!listeners.has(name))listeners.set(name,[]);listeners.get(name).push(fn);

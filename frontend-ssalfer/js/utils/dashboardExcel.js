@@ -3,7 +3,7 @@
     const proyectosDatos=[];
     let operacion = null, disponible = false;
     const boton = () => document.getElementById('btnExportarDashboardExcel');
-    const estado = mensaje => { const el = document.getElementById('estadoExportacionDashboard'); if (el) el.textContent = mensaje; };
+    const estado = mensaje => { const el = document.getElementById('estadoExportacionDashboard'); if (el) { el.textContent = mensaje; el.hidden = !mensaje; } };
     function cancelar() { operacion?.abort(); }
     window.addEventListener('pagehide', cancelar);
     window.addEventListener('popstate', cancelar);
@@ -99,15 +99,16 @@
         disponible = total > 0 && proyectosDatos.length === total && reportesCompletos;
         if (boton()) boton().disabled = !disponible || !!operacion;
         if (!disponible) estado('Falta información del dashboard. Reintenta los resúmenes o actualiza la pantalla antes de exportar.');
-        else estado('El detalle completo se consultará al exportar.');
+        else estado('');
     }};
     document.addEventListener('DOMContentLoaded',()=>{
-        const csv=document.getElementById('btnExportarDashboardCsv');if(!csv)return;
-        const b=document.createElement('button');b.type='button';b.className='btn-secundario';b.textContent='Exportar dashboard (Excel)';b.id='btnExportarDashboardExcel';b.disabled=true;csv.before(b);csv.textContent='CSV de respaldo';
+        const b=boton();if(!b)return;
+        b.disabled = true;
         const aviso = document.createElement('p'); aviso.id = 'estadoExportacionDashboard';
+        aviso.hidden = true;
         aviso.setAttribute('role', 'status'); aviso.setAttribute('aria-live', 'polite');
-        aviso.style.cssText = 'margin:0 0 1rem;text-align:right;font-size:.95rem;';
-        if (csv.parentElement) csv.parentElement.insertAdjacentElement('afterend', aviso); else csv.before(aviso);
+        aviso.style.cssText = 'margin:0;text-align:right;font-size:.95rem;';
+        if (b.parentElement) b.parentElement.insertAdjacentElement('afterend', aviso); else b.before(aviso);
         b.setAttribute('aria-describedby', aviso.id);
         b.onclick = async () => {
             if (!disponible || operacion) return;

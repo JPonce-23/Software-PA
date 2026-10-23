@@ -123,22 +123,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             || clave.replaceAll('_', ' ') || '—';
     }
 
-    function ajustarScrollTabla(cuerpo, cantidad, nombre) {
-        const contenedor = cuerpo.closest('.tabla-contenedor');
-        const conScroll = cantidad > 15;
-        contenedor.classList.toggle('tabla-financiera-scroll', conScroll);
-        if (conScroll) {
-            contenedor.tabIndex = 0;
-            contenedor.setAttribute('role', 'region');
-            contenedor.setAttribute('aria-label', `${nombre}. Tabla con desplazamiento interno`);
-        } else {
-            contenedor.removeAttribute('tabindex');
-            contenedor.removeAttribute('role');
-            contenedor.removeAttribute('aria-label');
-        }
-    }
-
-
     /* =====================================================
         INDICADORES QUE CORRESPONDEN A CONVENIOS
         (según vw_dashboard_kpi / migración 001-006)
@@ -282,7 +266,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         try {
 
             const filas = await window.ReportesAPI.obtenerAvancePeriodo({ id_proyecto: idProyecto });
-            ajustarScrollTabla(cuerpo, Array.isArray(filas) ? filas.length : 0, 'Avance por periodo');
 
             if (!Array.isArray(filas) || filas.length === 0) {
 
@@ -308,7 +291,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (error) {
 
             cuerpo.innerHTML = celdaVacia(9, "No se pudo cargar el avance de periodo.");
-            ajustarScrollTabla(cuerpo, 0, 'Avance por periodo');
             window.ClienteAPI.mostrarErrorAPI(error, contenedorError);
 
         }
@@ -327,7 +309,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         try {
 
             const filas = await valoresDeclaradosIniciales;
-            ajustarScrollTabla(cuerpo, Array.isArray(filas) ? filas.length : 0, 'Valores declarados de convenios');
 
             if (!Array.isArray(filas) || filas.length === 0) {
 
@@ -361,7 +342,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (error) {
 
             cuerpo.innerHTML = celdaVacia(6, "No se pudieron cargar los valores declarados.");
-            ajustarScrollTabla(cuerpo, 0, 'Valores declarados de convenios');
             window.ClienteAPI.mostrarErrorAPI(error, contenedorError);
 
         }
@@ -380,7 +360,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         try {
 
             const filas = await window.ReportesAPI.obtenerConveniosCoberturaImpactos({ id_proyecto: idProyecto });
-            ajustarScrollTabla(cuerpo, Array.isArray(filas) ? filas.length : 0, 'Cobertura de impactos de convenios');
 
             if (!Array.isArray(filas) || filas.length === 0) {
 
@@ -403,7 +382,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (error) {
 
             cuerpo.innerHTML = celdaVacia(6, "No se pudo cargar la cobertura de impactos.");
-            ajustarScrollTabla(cuerpo, 0, 'Cobertura de impactos de convenios');
             window.ClienteAPI.mostrarErrorAPI(error, contenedorError);
 
         }
@@ -422,7 +400,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         try {
 
             const filas = await window.ReportesAPI.obtenerFifonafeCobertura({ id_proyecto: idProyecto });
-            ajustarScrollTabla(cuerpo, Array.isArray(filas) ? filas.length : 0, 'Cobertura FIFONAFE');
 
             if (!Array.isArray(filas) || filas.length === 0) {
 
@@ -447,7 +424,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (error) {
 
             cuerpo.innerHTML = celdaVacia(8, "No se pudo cargar la cobertura FIFONAFE.");
-            ajustarScrollTabla(cuerpo, 0, 'Cobertura FIFONAFE');
             window.ClienteAPI.mostrarErrorAPI(error, contenedorError);
 
         }

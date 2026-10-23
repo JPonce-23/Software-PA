@@ -2985,3 +2985,8 @@ body:has(.aside.collapsed) .nucleo-info h3 {
         animation-duration: 0.01ms;
     }
 }
+/* Mantiene próximas las acciones y el resumen del dashboard. */
+.contenedor:has(> .lista-proyectos-dashboard) {
+    gap: 12px;
+    padding-top: 16px;
+}
