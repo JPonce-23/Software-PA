@@ -105,15 +105,6 @@ services:
       start_period: 20s
     logging: *default-logging
 
-  frontend:
-    build:
-      context: ./frontend
-    restart: always
-    depends_on:
-      backend:
-        condition: service_healthy
-    logging: *default-logging
-
 volumes:
   postgres_data:
   pgadmin_data:

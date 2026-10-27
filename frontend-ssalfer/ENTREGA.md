@@ -1,5 +1,7 @@
 # Entrega — Frontend SSALFER conectado al backend
 
+> **Documento histórico.** Para el frontend vigente y su operación, consultar [DEPLOY.md](DEPLOY.md), [README](../README.md) y [arquitectura](../docs/ARQUITECTURA.md); prevalecen sobre esta entrega.
+
 ## 1. Alcance de este release (declarado explícitamente)
 
 Estas cuatro áreas **quedan fuera de este release** porque el

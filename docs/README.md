@@ -19,7 +19,7 @@ Los documentos canónicos de referencia son los siguientes. Los informes fechado
    **Matriz de cobertura funcional de columnas, bloques, relaciones, comportamientos y excepciones relevantes observadas en los Excel.** Documenta los cinco libros Excel auditados (clasificando los cuatro operativos y señalando `BD-PA_v2-geo(1).xlsx` / `BD-PA_v2-geo.xlsx` como referencia/prototipo de modelado sin autoridad operativa sobre liberación), define los tratamientos de ingeniería (`PERSISTIR`, `DERIVAR`, `REFERENCIA`, `DOCUMENTAR`, `REVISAR`, `NO IMPLEMENTAR`) y detalla la correspondencia funcional hacia el modelo de datos.
 
 3. **[ARQUITECTURA.md](ARQUITECTURA.md):**  
-   **Arquitectura técnica del sistema.** Describe lo que existe e interactúa hoy en el repositorio: stack tecnológico (FastAPI, PostgreSQL 15/PostGIS, React 19, Docker), separación backend/frontend vía REST HTTP JSON, autenticación por cookies seguras, protección CSRF, autorización por proyecto (`UsuarioProyecto`), auditoría append-only, subsistema documental, motor de eventos y arquitectura de reporting en dos capas.
+   **Arquitectura técnica del sistema.** Describe lo que existe e interactúa hoy en el repositorio: stack tecnológico (FastAPI, PostgreSQL 15/PostGIS, SSALFER estático HTML/CSS/JavaScript en Nginx, Docker), separación backend/frontend vía REST HTTP JSON, autenticación por cookies seguras, protección CSRF, autorización por proyecto (`UsuarioProyecto`), auditoría append-only, subsistema documental, motor de eventos y arquitectura de reporting en dos capas.
 
 4. **[DICCIONARIO_DATOS.md](DICCIONARIO_DATOS.md):**  
    **Diccionario de datos físico y lógico.** Especifica de forma exhaustiva las tablas de dominio, campos, tipos de datos PostgreSQL, nulabilidad, llaves foráneas, restricciones, catálogos operativos y vistas de reporting (read-models), verificado contra `backend/app/models.py` y las migraciones vigentes.
@@ -38,6 +38,8 @@ Los documentos canónicos de referencia son los siguientes. Los informes fechado
 ## 2. Precedencia Documental y Jerarquía de Autoridad
 
 En caso de divergencia conceptual o técnica entre artefactos, rige la siguiente jerarquía de precedencia:
+
+Para el frontend, prevalecen el código vigente de `frontend-ssalfer/`, los Compose seleccionados explícitamente, el [README raíz](../README.md), [ARQUITECTURA.md](ARQUITECTURA.md) y [DEPLOY.md](../frontend-ssalfer/DEPLOY.md). `ENTREGA.md`, `TESTING.md` y los informes fechados de entregas/QA son registros históricos: sus referencias a React, Live Server o despliegues anteriores no son instrucciones operativas vigentes. Las pruebas que crean sesiones o datos requieren un entorno aislado.
 
 ```text
 1. Archivos Excel operativos + docs/MODELO_FUNCIONAL.md

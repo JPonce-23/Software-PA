@@ -1,219 +1,165 @@
-# Despliegue del frontend SSALFER con Docker Desktop
+# SSALFER — instalación y QA aislado
 
-Esta guía asume que usas **Docker Desktop** (la app de escritorio) y
-que prefieres evitar la terminal en lo posible. Te aviso desde ya lo
-más honesto: Docker Desktop es excelente para *ver y administrar*
-contenedores (logs, reinicios, apagar/prender) desde su interfaz
-gráfica, pero para *construir imágenes nuevas* (lo que necesitamos
-aquí, porque el frontend SSALFER es una imagen nueva que no existe
-todavía) no tiene un botón de "construir desde una carpeta" en todas
-las versiones — así que hay **un único comando** que sí tendrás que
-pegar en una terminal. Después de ese paso, todo lo demás (arrancar,
-detener, ver logs, reconstruir) lo puedes hacer con clics desde
-Docker Desktop sin volver a tocar la terminal.
+El frontend oficial vive en `frontend-ssalfer/` y contiene HTML, CSS y JavaScript
+estáticos. Nginx sirve `Index.html`, páginas y recursos locales, y reenvía
+`/api/` a `http://backend:8000/api/`. No necesita React ni Vite.
 
-Hay dos escenarios distintos. Empieza por el primero.
+Esta fase retira React únicamente del repositorio local. No autoriza despliegue,
+TLS, cambios en servicios existentes ni intervenciones sobre patrenes. Las
+instrucciones de arranque de abajo requieren antes un daemon/VM exclusivo
+expresamente autorizado, DB, uploads, red, puertos y credenciales desechables.
+No usar la base activa del desarrollador ni destinos HTTP reales para QA.
 
+La opción preferida para QA funcional es una VM aislada donde residan tanto el
+repositorio como su Docker Engine. Ejecutar Compose y las pruebas HTTP desde
+esa misma VM, con todos los recursos de QA desechables dentro de ella.
 
-## Parte 1 — Conectar en LOCAL (para probar en tu máquina)
+Un Docker context remoto solo selecciona el daemon; no garantiza aislamiento de
+rutas, bind mounts ni puertos. Los orígenes de los bind mounts deben existir en
+el host del daemon, en las rutas que Compose resuelva; el contexto no transfiere
+esos directorios. Los puertos publicados en `127.0.0.1` pertenecen al host del
+daemon, no al equipo cliente. Ejecutar las comprobaciones HTTP desde una
+ubicación con acceso al servicio: para esos puertos, desde el propio host del
+daemon o mediante un acceso QA explícitamente autorizado y verificado. Un
+`curl localhost` desde el cliente del contexto remoto no comprueba ese servicio.
 
-En desarrollo, backend y frontend pueden vivir en orígenes distintos
-(`localhost:8000` y el puerto que uses para el frontend) sin
-problema, porque en modo desarrollo las cookies de sesión usan
-`AUTH_COOKIE_SAMESITE=lax` y `AUTH_COOKIE_SECURE=false` (los valores
-por defecto de tu `.env`), y los navegadores tratan los distintos
-puertos de `localhost` como el mismo "sitio". **No necesitas nginx
-ni el `docker-compose.ssalfer.yml` todavía para esto.**
+## Estructura y configuración del cliente
 
-### Paso 1 — Backend corriendo
+El overlay `docker-compose.ssalfer.yml` ya está en la **raíz del repositorio**,
+al mismo nivel que `docker-compose.yml`, `backend/` y `frontend-ssalfer/`.
+No hay que moverlo desde `deploy/`. El Compose base define `db`, `pgadmin` y
+`backend`; el overlay añade el cuarto servicio, `frontend_ssalfer`.
 
-Si ya tienes el stack del backend levantado (`db` + `backend`) desde
-Docker Desktop, continúa. Si no:
+`js/env.js` se carga antes de `config.js` y ya asigna:
 
-1. Abre Docker Desktop.
-2. Ve a la pestaña **Containers**. Si ves un grupo llamado como tu
-   proyecto (por el nombre de la carpeta del repo) con `db` y
-   `backend` corriendo (círculo verde), ya está listo.
-3. Si no existe ese grupo todavía, es la primera vez — necesitas el
-   comando `docker compose up -d --build` una sola vez desde la
-   carpeta del backend (pídele el `.env` ya configurado a tu equipo
-   si no lo tienes, con `SECRET_KEY`, `POSTGRES_ADMIN_PASSWORD`, etc.
-   — son los valores marcados `change_me` en `.env.example`).
-
-### Paso 2 — Permitir el origen del frontend en CORS
-
-Abre el archivo `.env` del backend (la carpeta donde está
-`docker-compose.yml`) y ubica la línea:
-
-```
-CORS_ORIGINS=http://localhost:5173
+```js
+window.SSALFER_API_URL = "/api";
 ```
 
-Cámbiala (o agrega, separado por comas si el backend lo soporta —
-si no, dale el valor exacto) por el puerto donde vas a servir el
-frontend SSALFER en tu máquina. Por ejemplo, si lo vas a servir en
-el puerto `5500`:
+La URL relativa utiliza el proxy del Nginx oficial. Live Server o un Nginx
+genérico sin esa configuración no reenvían `/api/` a FastAPI y no reproducen
+este flujo. Las variables del contenedor no reescriben automáticamente el JS
+empaquetado; los cambios en estáticos requieren reconstrucción dirigida.
 
-```
-CORS_ORIGINS=http://localhost:5500
-```
+## Origen, cookies y CSRF
 
-Después, en Docker Desktop, ve a **Containers → tu proyecto →
-backend** y dale a **Restart** (ícono de flecha circular) para que
-tome la variable nueva. No hace falta reconstruir la imagen, solo
-reiniciar el contenedor.
+Para QA HTTP de desarrollo, un archivo `.env.qa` nuevo y exclusivo debe definir
+`APP_ENV=development`, `AUTH_COOKIE_SECURE=false`,
+`CORS_ORIGINS=http://localhost:5174` y `SSALFER_HOST_PORT=5174`, además de las
+variables obligatorias de DB y autenticación con valores propios desechables.
+No sobrescribir `.env`, `.env.deploy-mq` ni reutilizar credenciales productivas.
+`.env.qa` está excluido de Git por la regla `.env.*` de `.gitignore`; comprobarlo
+con `git check-ignore -v -- .env.qa` antes de preparar el archivo.
 
-### Paso 3 — Servir el frontend SSALFER localmente
+`http://localhost:5174` no equivale a `http://127.0.0.1:5174`: esquema, host y
+puerto forman el origen. Configurar el origen exacto de la URL del navegador.
+El proxy del mismo origen no elimina las validaciones CSRF del backend: el
+login exige origen permitido y las peticiones mutables con sesión deben cumplir
+la validación de origen, cookie y cabecera `X-CSRF-Token`. No desactivar estas
+protecciones para resolver errores de configuración.
 
-La forma más simple sin usar la terminal: si usas VS Code, instala
-la extensión **"Live Server"** y dale clic derecho a `Index.html` →
-**"Open with Live Server"**. Anota el puerto que use (normalmente
-`5500`) y asegúrate de que coincida con el que pusiste en
-`CORS_ORIGINS` en el paso 2.
+Se conservan como excepción mínima los fallbacks `http://localhost:5173` en
+`docker-compose.yml` y `backend/app/config.py`. Para SSALFER, definir siempre
+`CORS_ORIGINS` explícitamente; no depender de esos fallbacks.
 
-Si prefieres usar Docker Desktop para esto también:
+## Selecciones declarativas, sin arranque
 
-1. Ve a la pestaña **Images** → botón **Pull** (o el buscador de
-   arriba) → busca `nginx:alpine` → **Pull**.
-2. Cuando termine, en la lista de imágenes da clic en `nginx:alpine`
-   y luego en **Run**.
-3. En el diálogo que aparece, abre **Optional settings** y llena:
-   - **Container name**: `ssalfer-local`
-   - **Ports** → Host port: `5500`, Container port: `80`
-   - **Volumes** → Host path: la carpeta donde descomprimiste este
-     entregable (la que contiene `Index.html`); Container path:
-     `/usr/share/nginx/html`
-4. Dale **Run**. Abre `http://localhost:5500` en el navegador.
+Usar todos los archivos explícitamente evita cargar un override accidental:
 
-Con esto, `config.js` usará su valor por defecto
-(`http://localhost:8000/api`) porque `env.js` no define nada — no
-necesitas tocar `env.js` para este escenario local.
+| Selección de archivos raíz | Servicios | Backend / uploads |
+| --- | --- | --- |
+| base | db, pgadmin, backend | Sin reload / volumen nombrado |
+| base + override | Los tres | Reload / bind `./backend/uploads` |
+| base + ssalfer | Los tres + frontend_ssalfer | Sin reload / volumen nombrado |
+| base + override + ssalfer | Los cuatro | Reload / bind `./backend/uploads` |
+| base + prod + ssalfer | Los cuatro | Producción, Secure / volumen nombrado |
 
-### Verificar que sí quedó conectado
+`base`, `override`, `prod` y `ssalfer` corresponden a `docker-compose.yml`,
+`docker-compose.override.yml`, `docker-compose.prod.yml` y
+`docker-compose.ssalfer.yml`. No combinar desarrollo (`override`) con `prod`.
+`config --quiet` y `config --services` validan la selección sin arrancar nada;
+usar un entorno sintético y no volcar configuraciones con secretos.
 
-Abre `http://localhost:5500/Index.html`, inicia sesión con un
-usuario real del backend y confirma que `dashboard.html` te muestre
-proyectos reales (no "Cargando proyectos…" indefinidamente). Si ves
-un error de CORS en la consola del navegador (F12 → Console), casi
-siempre es porque `CORS_ORIGINS` no coincide EXACTAMENTE con el
-origen del frontend (incluyendo el puerto).
+Ejemplo solo declarativo con un archivo QA sin secretos:
 
-
-## Parte 2 — Deploy real (mismo origen, con nginx y Docker Desktop)
-
-Para producción SÍ es obligatorio que frontend y backend compartan
-el mismo origen (mismo dominio y puerto tal como lo ve el
-navegador), porque las cookies de sesión en producción usan el
-prefijo `__Host-` (`__Host-pa_session`, `__Host-pa_csrf`), que el
-navegador solo acepta si viajan por HTTPS y bajo el dominio exacto
-que las emitió. Este entregable ya incluye todo lo necesario para
-que un solo contenedor de nginx sirva el frontend Y reenvíe `/api/`
-al backend, para que el navegador solo vea un origen.
-
-### Paso 1 — Acomodar las carpetas
-
-En la máquina donde vas a desplegar (o en tu repo, para subirlo a
-control de versiones), deja esta estructura junto al backend:
-
-```
-Software-PA-feature-backend-logica/
-  docker-compose.yml           <- del backend, tal cual está, sin tocar
-  backend/                     <- del backend, sin tocar
-  frontend-ssalfer/            <- todo el contenido de este entregable
-    Index.html
-    dashboard.html
-    js/
-    styles/
-    img/
-    pages/
-    deploy/
-      Dockerfile
-      nginx.conf
-      docker-compose.ssalfer.yml
+```bash
+docker compose --env-file .env.qa -f docker-compose.yml \
+  -f docker-compose.override.yml -f docker-compose.ssalfer.yml config --quiet
+docker compose --env-file .env.qa -f docker-compose.yml \
+  -f docker-compose.override.yml -f docker-compose.ssalfer.yml config --services
 ```
 
-Mueve `docker-compose.ssalfer.yml` de `frontend-ssalfer/deploy/` a
-la raíz del repo (al mismo nivel que el `docker-compose.yml` del
-backend) — ábrelo con un editor de texto primero si quieres
-confirmar las rutas, están comentadas ahí mismo.
+## Instalación y actualización dirigida, solo tras autorizar infraestructura QA
 
-### Paso 2 — Variables de entorno de producción
+Seguir los prerrequisitos de una instalación nueva del [README](../README.md)
+y [MIGRACIONES](../docs/MIGRACIONES.md) únicamente en el entorno desechable.
+Dentro de la VM, verificar que `QA_DOCKER_CONTEXT` identifica el contexto local
+de su Docker Engine exclusivo antes de ejecutar estos ejemplos Bash/Zsh:
 
-En el `.env` que use el backend en el servidor de producción,
-confirma o agrega:
-
-```
-APP_ENV=production
-AUTH_COOKIE_SECURE=true
-CORS_ORIGINS=https://<el-dominio-público-real>
-SSALFER_HOST_PORT=5174
-```
-
-`CORS_ORIGINS` en este esquema no es estrictamente necesario para
-que las cookies funcionen (el navegador solo habla con nginx, nunca
-directo con el backend), pero déjalo correcto de todas formas como
-buena práctica y por si algo llega a llamar al backend directo.
-
-`https://<el-dominio-público-real>` debe ser el dominio final desde
-el que la gente va a entrar (p. ej. `https://ssalfer.pa.gob.mx`).
-Ese dominio también es el que debe apuntar (DNS / balanceador /
-reverse proxy institucional de PA) al puerto `SSALFER_HOST_PORT`
-(`5174` por defecto) del servidor donde corra este contenedor — la
-gestión de HTTPS/certificado normalmente la resuelve un proxy
-institucional delante de este contenedor (o puedes agregar Traefik/
-Certbot si el servidor no tiene uno ya).
-
-### Paso 3 — El único comando
-
-Abre una terminal (en Windows: busca "PowerShell" o "Símbolo del
-sistema" en el menú de inicio; en Mac: "Terminal") **en la carpeta
-raíz del repo** (donde está `docker-compose.yml`) y pega:
-
-```
-docker compose -f docker-compose.yml -f docker-compose.ssalfer.yml up -d --build
+```bash
+# QA_DOCKER_CONTEXT debe identificar el contexto local del Engine de la VM QA.
+dcqa() {
+  docker --context "${QA_DOCKER_CONTEXT:?Define el contexto QA exclusivo}" compose \
+    --env-file .env.qa --project-name software-pa-qa \
+    -f docker-compose.yml -f docker-compose.override.yml \
+    -f docker-compose.ssalfer.yml "$@"
+}
+dcqa config --quiet
+# Solo para la instalación QA nueva y autorizada:
+dcqa up -d db
+# Tras preparar DB y resolver los prerrequisitos del backend:
+dcqa build backend frontend_ssalfer
+dcqa up -d --no-deps backend
+# Esperar backend saludable; luego iniciar SSALFER por nombre:
+dcqa up -d --no-deps frontend_ssalfer
+dcqa ps
+dcqa logs --tail=100 backend frontend_ssalfer
 ```
 
-Esto:
-- No modifica nada del backend (usa su `docker-compose.yml` tal cual).
-- Construye la imagen nueva de `frontend_ssalfer` a partir del
-  `Dockerfile` que incluimos.
-- Levanta el contenedor ya conectado a la misma red que `backend`.
+Para actualizar únicamente estáticos en ese QA autorizado:
 
-### Paso 4 — Todo lo demás, desde Docker Desktop
+```bash
+dcqa build frontend_ssalfer
+dcqa up -d --no-deps frontend_ssalfer
+```
 
-A partir de aquí ya no necesitas la terminal:
+El botón Restart no actualiza variables de creación. Cambios de entorno del
+backend requieren recrear específicamente backend, con revisión y autorización
+del entorno afectado; un cambio de JS empaquetado requiere reconstruir SSALFER.
+No ejecutar un `up --build` general para esta limpieza ni asumir que un proyecto
+Compose compartido corresponde a un único checkout. El diff no elimina ni
+reconfigura contenedores React existentes ni su política de reinicio.
 
-- Abre Docker Desktop → pestaña **Containers**. Verás el grupo del
-  proyecto con `db`, `backend`, `pgadmin`, `frontend` (el React
-  existente) y el nuevo `frontend_ssalfer`.
-- Clic en `frontend_ssalfer` → pestaña **Logs** para ver si nginx
-  arrancó bien (debe decir algo como "start worker process").
-- Para reiniciarlo tras algún cambio de configuración: botón
-  **Restart** en esa misma fila.
-- Para volver a construir después de que te entreguemos una
-  actualización del frontend: sí tendrías que repetir el comando del
-  Paso 3 una vez más (Docker Desktop no reconstruye solo cuando
-  cambian archivos, a menos que actives "Watch" en Docker Desktop
-  4.x+, que si quieres te explico aparte).
+## QA funcional pendiente de entorno exclusivo
 
-### Verificar
+Ejecutar las pruebas HTTP desde la misma VM QA. Si se usa un contexto remoto,
+respetar las condiciones de acceso HTTP indicadas al inicio de esta guía.
+Usar la URL QA verificada (predeterminada `http://localhost:5174/Index.html`)
+y cuentas desechables de cada rol. Login y cualquier petición autenticada pueden
+escribir sesiones/actividad, incluso mediante GET. Revisar individualmente los
+scripts de `deploy/`: no ejecutar sus 37 QA indiscriminadamente.
 
-1. Entra a `http://localhost:5174` (o al dominio público una vez
-   que el proxy institucional esté enfrente) → deberías ver el login
-   de SSALFER.
-2. Inicia sesión. Si el dashboard carga proyectos reales, la cookie
-   de sesión y el proxy `/api/` están funcionando.
-3. Revisa en el navegador (F12 → Application/Storage → Cookies) que
-   la cookie de sesión aparezca bajo el MISMO origen que la URL de
-   la barra de direcciones — si aparece un dominio distinto, algo en
-   el proxy institucional está rompiendo el mismo-origen.
+- Acceso a `Index.html`, rutas HTML directas, estáticos y 404.
+- Login, sesión, logout, expiración y CSRF; origen permitido y rechazado.
+- Roles, permisos por proyecto y rutas administrativas.
+- Dashboard, GIS/mapas, expedientes, documentos y descargas.
+- CSV/XLSX y reportes, verificando contenido y permisos.
+- Proxy `/api/` a FastAPI. Comparar `/health` de backend con `/health` de Nginx:
+  este último solo devuelve `ok` estático y no acredita salud de DB/API.
 
+El overlay no define un healthcheck de contenedor para SSALFER; su dependencia
+exige backend saludable al inicio. No presentar el health estático como prueba
+integral ni los tests Node con dobles como certificación de navegador/API.
 
-## Resumen de qué toca cada quién
+## Operación real y producción fuera de esta fase
 
-| Qué | Dónde vive | ¿Se modificó el backend? |
-|---|---|---|
-| `window.SSALFER_API_URL` | `frontend-ssalfer/js/env.js` | No |
-| `CORS_ORIGINS`, `AUTH_COOKIE_SECURE` | `.env` del backend (variables, no código) | No se tocó código, solo config por variables de entorno que ya existían |
-| Proxy `/api/` → backend | `frontend-ssalfer/deploy/nginx.conf` (nuevo) | No |
-| Nuevo servicio de Docker | `docker-compose.ssalfer.yml` (nuevo, archivo aparte) | No — el `docker-compose.yml` original queda intacto |
+La selección base + prod + ssalfer conserva `APP_ENV=production`,
+`AUTH_COOKIE_SECURE=true` y un origen HTTPS explícito obligatorio. Su validación
+estática no autoriza arrancarla: requiere QA HTTPS real compatible con cookies
+Secure y revisión de la cadena de proxies. TLS y despliegue productivo requieren
+un procedimiento y autorización separados; aquí no se prescribe su ejecución.
+
+Los antecedentes de patrenes (proyecto compartido entre checkouts, montajes de
+backend/uploads y publicación local no versionada en puerto 80) requieren un
+inventario operativo aparte antes de cualquier recreación. No se corrigen con
+este retiro local, que tampoco interviene en Control Vehicular.

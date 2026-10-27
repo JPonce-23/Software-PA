@@ -5,11 +5,14 @@ de derechos de vía.
 
 ## Arquitectura
 
-El entorno base se ejecuta con Docker Compose y contiene cuatro servicios:
+El Compose base define tres servicios: `db`, `backend` y `pgadmin`.
+El frontend oficial es `frontend-ssalfer/`: HTML/CSS/JavaScript estático servido
+por Nginx. El cuarto servicio, `frontend_ssalfer`, se incorpora únicamente al
+seleccionar explícitamente el overlay `docker-compose.ssalfer.yml` de la raíz:
 
 | Servicio | Función | Puerto local predeterminado |
 | --- | --- | --- |
-| `frontend` | React 19 y Vite; Nginx en modo producción | `5173` |
+| `frontend_ssalfer` (overlay) | SSALFER estático en Nginx, proxy `/api/` | `5174` |
 | `backend` | API FastAPI y SQLAlchemy | `8000` |
 | `db` | PostgreSQL 15 con PostGIS 3.3 | `5433` |
 | `pgadmin` | Administración web de PostgreSQL | `5050` |
@@ -66,7 +69,8 @@ abre el proyecto desde Ubuntu con `code .`.
 
 ## Configuración
 
-Desde la raíz del repositorio:
+Solo para una instalación local nueva y aislada, desde la raíz del repositorio
+y sin sobrescribir un archivo de entorno existente:
 
 ```bash
 cp .env.example .env
@@ -83,7 +87,7 @@ El archivo `.env` contiene secretos, está ignorado por Git y no debe
 confirmarse. Comprueba antes de iniciar:
 
 ```bash
-docker compose config --quiet
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.override.yml -f docker-compose.ssalfer.yml config --quiet
 ```
 
 Compose detendrá la validación si falta una variable obligatoria.
@@ -135,44 +139,91 @@ minúscula, número y símbolo. Para automatizaciones controladas puede pasarse
 archivos compartidos, historial de shell, logs ni capturas. El script rechaza
 placeholders y no contiene una contraseña predeterminada.
 
-## Desarrollo
+## Desarrollo y QA aislado
 
-`docker-compose.override.yml` se carga automáticamente. Mantiene los bind
-mounts y el hot reload del backend y frontend:
+Estos ejemplos de construcción, arranque y comprobación son exclusivamente para
+un daemon/VM desechable previamente autorizado, con DB, uploads, red, puertos y
+credenciales propios. No son instrucciones para patrenes ni para una base activa
+del desarrollador. La fase de retiro local de React solo valida estáticamente;
+no autoriza ejecutar los comandos de arranque de esta sección ni los de DB de
+las secciones siguientes.
+
+La opción preferida para QA funcional es una VM aislada donde residan tanto el
+repositorio como su Docker Engine. Ejecutar Compose y las pruebas HTTP desde
+esa misma VM, con todos los recursos de QA desechables dentro de ella.
+
+Un Docker context remoto solo selecciona el daemon; no garantiza aislamiento de
+rutas, bind mounts ni puertos. Los orígenes de los bind mounts deben existir en
+el host del daemon, en las rutas que Compose resuelva; el contexto no transfiere
+esos directorios. Los puertos publicados en `127.0.0.1` pertenecen al host del
+daemon, no al equipo cliente. Ejecutar las comprobaciones HTTP desde una
+ubicación con acceso al servicio: para esos puertos, desde el propio host del
+daemon o mediante un acceso QA explícitamente autorizado y verificado. Un
+`curl localhost` desde el cliente del contexto remoto no comprueba ese servicio.
+
+Prepara un archivo `.env.qa` nuevo con valores sintéticos propios del entorno,
+sin copiar secretos de un despliegue. `.env.qa` está excluido de Git por la regla
+`.env.*` de `.gitignore`; comprobarlo con `git check-ignore -v -- .env.qa` antes
+de preparar el archivo. Define `CORS_ORIGINS=http://localhost:5174`
+y `SSALFER_HOST_PORT=5174`. `http://localhost:5174` y
+`http://127.0.0.1:5174` son orígenes distintos: CORS/CSRF deben reflejar exactamente
+la URL usada en el navegador (esquema, host y puerto), incluso detrás del proxy.
+No se cambian cookies ni protecciones CSRF.
+
+Se conservan deliberadamente dos fallbacks históricos `5173`: el de
+`CORS_ORIGINS` del backend en `docker-compose.yml` y el de `backend/app/config.py`.
+No son la configuración de SSALFER; proporciona `CORS_ORIGINS` explícitamente.
+
+Dentro de la VM, en Bash/Zsh, verificar que `QA_DOCKER_CONTEXT` identifica el
+contexto local de su Docker Engine exclusivo y usar siempre la misma selección
+explícita. El nombre de proyecto por sí solo no
+prueba aislamiento del daemon ni de los binds:
 
 ```bash
-docker compose up -d --build
-docker compose ps
-docker compose logs -f
+# QA_DOCKER_CONTEXT debe identificar el contexto local del Engine de la VM QA.
+dcqa() {
+  docker --context "${QA_DOCKER_CONTEXT:?Define el contexto QA exclusivo}" compose \
+    --env-file .env.qa --project-name software-pa-qa \
+    -f docker-compose.yml -f docker-compose.override.yml \
+    -f docker-compose.ssalfer.yml "$@"
+}
+dcqa config --quiet
+# Solo en ese entorno nuevo y autorizado: preparar db según MIGRACIONES.md.
+dcqa up -d db
+# Tras tener db saludable y los prerrequisitos de la instalación resueltos:
+dcqa build backend frontend_ssalfer
+dcqa up -d --no-deps backend
+# Esperar a que backend esté saludable antes de iniciar Nginx.
+dcqa up -d --no-deps frontend_ssalfer
+# pgAdmin es opcional y se inicia por nombre, si hace falta.
+dcqa ps
 ```
 
-Servicios disponibles:
+`docker-compose.override.yml` proporciona `--reload` y binds de backend,
+incluido `./backend/uploads:/app/uploads`. El hot reload solo aplica al backend;
+SSALFER se empaqueta como estáticos en Nginx, sin servidor Vite ni bind de fuentes.
+Con `-f` explícitos, el override no se añade automáticamente: hay que enumerarlo.
 
-- Frontend: <http://localhost:5173>
+Servicios locales (si se han iniciado en el QA autorizado):
+
+- SSALFER: <http://localhost:5174/Index.html>
 - API y documentación: <http://localhost:8000/docs>
-- PgAdmin: <http://localhost:5050>
+- PgAdmin, si se inicia: <http://localhost:5050>
 - PostgreSQL para herramientas locales: `localhost:5433`
 
-Los puertos se publican únicamente en `127.0.0.1`. Pueden cambiarse en `.env`.
+Los puertos versionados se publican en `127.0.0.1`; cualquier cambio de puerto
+QA requiere revisar también el origen exacto. El Nginx oficial reenvía `/api/`
+a FastAPI; Live Server sin ese proxy no reproduce esta instalación.
 
-## Ejecución sin bind mounts
+## Selección sin bind mounts
 
-La configuración `docker-compose.prod.yml` construye un frontend estático con
-Nginx y ejecuta el backend sin hot reload:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-```
-
-Esta variante es útil para validar imágenes inmutables. Antes de un despliegue
-expuesto a Internet todavía deben definirse TLS, gestión externa de secretos,
-respaldos y una política de publicación de puertos.
-
-Para detener esta variante usa los mismos archivos:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml down
-```
+La combinación declarativa de `docker-compose.yml`, `docker-compose.prod.yml`
+y `docker-compose.ssalfer.yml` incluye SSALFER y conserva backend sin reload,
+con `APP_ENV=production`, cookies `Secure` y `CORS_ORIGINS` HTTPS obligatorio.
+No combinar `override` con `prod`. Validar esta selección con `config` no arranca
+servicios. Su ejecución requiere QA HTTPS real compatible con cookies Secure;
+el despliegue productivo y TLS quedan fuera de esta fase. Ver
+[frontend-ssalfer/DEPLOY.md](frontend-ssalfer/DEPLOY.md).
 
 ## Base de datos, migraciones y datos iniciales
 
@@ -310,55 +361,47 @@ Si la base de pruebas no tiene administrador, créalo primero con
 `scripts/create_admin.py` usando valores propios del entorno. La contraseña
 debe cumplir la política mínima y no puede ser un placeholder.
 
-## Operación diaria
+## Operación dirigida en QA aislado
+
+Usar la función `dcqa` y el entorno exclusivo definidos arriba; estos comandos
+no aplican a patrenes. Revisar estado y logs por servicio:
 
 ```bash
-# Iniciar o actualizar servicios
-docker compose up -d
-
-# Estado y salud
-docker compose ps
-
-# Logs de todos los servicios o de uno
-docker compose logs -f
-docker compose logs -f backend
-
-# Reconstruir únicamente backend
-docker compose build backend
-docker compose up -d backend
-
-# Reconstruir únicamente frontend
-docker compose up -d --build frontend
-
-# Detener sin eliminar contenedores ni datos
-docker compose stop
-
-# Eliminar contenedores y red, conservando volúmenes
-docker compose down
+dcqa ps
+dcqa logs --tail=100 backend frontend_ssalfer
+# Tras cambiar los estáticos, reconstruir y recrear solo SSALFER:
+dcqa build frontend_ssalfer
+dcqa up -d --no-deps frontend_ssalfer
+# Si se autoriza por separado actualizar backend en ese QA:
+dcqa build backend
+dcqa up -d --no-deps backend
 ```
 
-Advertencia: el siguiente comando elimina los volúmenes de PostgreSQL y
-PgAdmin. Supone pérdida de datos y configuraciones persistentes:
+Un `restart` no actualiza las variables con las que se creó un contenedor ni
+reconstruye archivos empaquetados. No usar arranques/reconstrucciones generales,
+limpieza de huérfanos o eliminación de volúmenes para este retiro. Quitar React
+del código no retira un contenedor ya existente: su tratamiento en un servidor
+requiere inventario y autorización independiente.
+
+## Comprobaciones en QA aislado
+
+Ejecutar desde la misma VM QA, solo con los puertos verificados del entorno
+exclusivo (los siguientes ejemplos usan los valores predeterminados). Si se usa
+un contexto remoto, respetar las condiciones de acceso HTTP indicadas arriba:
 
 ```bash
-docker compose down -v
+dcqa ps
+dcqa logs --tail=100 backend frontend_ssalfer
+curl --fail http://localhost:8000/health
+curl --fail http://localhost:5174/health
+curl --fail http://localhost:5174/Index.html
 ```
 
-## Validación rápida
-
-```bash
-docker compose ps
-docker compose logs --tail=100 db backend frontend pgadmin
-curl --fail http://localhost:8000/
-curl --fail http://localhost:5173/
-docker compose exec db sh -lc \
-  'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
-docker compose exec frontend \
-  node -e "fetch('http://backend:8000/').then(r=>{console.log(r.status);process.exit(r.ok?0:1)})"
-```
-
-Todos los servicios deben aparecer activos y saludables, sin reinicios
-constantes.
+`/health` de Nginx solo devuelve un estado estático; no comprueba FastAPI ni DB.
+El healthcheck de backend consulta su propio `/health`. SSALFER espera backend
+saludable al iniciar, pero su overlay no define un healthcheck de contenedor.
+Probar `/api/`, login, permisos y flujos en navegador es una comprobación aparte;
+incluso un GET autenticado puede actualizar la actividad de sesión en DB.
 
 ## Documentación del proyecto
 

@@ -96,7 +96,7 @@ Para toda petición `POST`, `PUT`, `PATCH` o `DELETE` bajo `/api/`:
 ```http
 DELETE /api/proyectos/17/usuarios/42
 Content-Type: application/json
-Origin: http://localhost:5173
+Origin: http://localhost:5174
 X-CSRF-Token: <token de la cookie CSRF>
 Cookie: <cookies de sesión y CSRF>
 

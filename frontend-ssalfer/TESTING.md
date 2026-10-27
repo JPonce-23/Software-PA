@@ -1,5 +1,7 @@
 # Guía de pruebas — flujo completo SSALFER
 
+> **Documento histórico.** Estas pruebas pueden crear sesiones y datos: ejecutarlas únicamente en un entorno aislado con recursos desechables y autorización. Consultar [DEPLOY.md](DEPLOY.md) y el [README vigente](../README.md) antes de usarlas; prevalecen sobre esta guía.
+
 Esta guía sigue el flujo real que exige el backend (confirmado
 contra `app/schemas.py` y `app/routers/domain.py`), no un flujo
 "lógico" inventado. Cada paso indica: la pantalla real a usar, qué

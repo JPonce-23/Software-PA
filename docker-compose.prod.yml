@@ -1,20 +1,9 @@
 # Configuración sin bind mounts ni hot reload.
-# Uso: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Uso con SSALFER: selección explícita de base + prod + ssalfer.
+# Ver frontend-ssalfer/DEPLOY.md; operación real y TLS requieren autorización aparte.
 services:
   backend:
     environment:
       APP_ENV: production
       AUTH_COOKIE_SECURE: "true"
       CORS_ORIGINS: ${CORS_ORIGINS:?Define el origen HTTPS público exacto}
-
-  frontend:
-    build:
-      target: production
-    ports:
-      - "127.0.0.1:${FRONTEND_HOST_PORT:-5173}:80"
-    healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s

@@ -12,7 +12,8 @@ SOFTWARE-PA está implementado como una aplicación web modular desacoplada, ori
 ```text
 ┌────────────────────────────────────────────────────────┐
 │                   Cliente Web (Frontend)                │
-│       React 19 + Vite + React Router 7 + Leaflet       │
+│       SSALFER: HTML / CSS / JavaScript + Leaflet        │
+│       Nginx: estáticos y proxy /api/ hacia FastAPI      │
 └───────────────────────────┬────────────────────────────┘
                             │ HTTPS / HTTP (REST API JSON)
                             │ Cookies HttpOnly + X-CSRF-Token
@@ -47,14 +48,13 @@ SOFTWARE-PA está implementado como una aplicación web modular desacoplada, ori
   - **Extensión Espacial:** PostGIS 3.3.
   - **Versionado de Esquema:** Motor de migraciones SQL secuenciales y verificadas por SHA-256 (`backend/scripts/run_migrations.sh`). Linaje canónico vigente: **001–029**.
 - **Frontend:**
-  - **Librería de Interfaz:** React 19.
-  - **Herramienta de Construcción:** Vite.
-  - **Enrutamiento:** React Router DOM v7.
-  - **Cliente HTTP:** Axios configurado con `withCredentials: true`.
-  - **Componentes Cartográficos:** Leaflet y React-Leaflet con utilerías WKT (`wellknown`).
-  - **Iconografía:** Lucide React.
+  - **Interfaz:** HTML, CSS y JavaScript estáticos en `frontend-ssalfer/`.
+  - **Navegación:** páginas HTML y scripts locales, sin React ni Vite.
+  - **Cliente HTTP:** `fetch` mediante `js/api/cliente.js`, con cookies y cabecera CSRF.
+  - **Bibliotecas locales:** Leaflet para mapas; ExcelJS y SheetJS para exportaciones, con sus licencias conservadas.
+  - **Servidor web:** Nginx sirve los estáticos y reenvía `/api/` a `backend:8000/api/`; `env.js` define `/api` antes de cargar `config.js`.
 - **Entorno e Infraestructura:**
-  - Orquestación local mediante Docker Compose con cuatro servicios base: `db`, `backend`, `frontend` y `pgadmin`. No hay un servicio `alertas_scheduler` en la configuración vigente.
+  - Orquestación local mediante Docker Compose con tres servicios base: `db`, `backend` y `pgadmin`. El cuarto, `frontend_ssalfer`, se incorpora seleccionando explícitamente `docker-compose.ssalfer.yml` de la raíz. No hay un servicio `alertas_scheduler` en la configuración vigente.
 
 ---
 
