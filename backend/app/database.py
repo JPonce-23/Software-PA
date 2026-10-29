@@ -42,7 +42,10 @@ engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_size=20,
     max_overflow=10,
-    pool_pre_ping=True
+    pool_pre_ping=True,
+    hide_parameters=True,
+    echo=False,
+    echo_pool=False,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

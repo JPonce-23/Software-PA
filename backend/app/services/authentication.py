@@ -2,7 +2,6 @@ import hashlib
 import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
-from ipaddress import ip_address
 
 import bcrypt
 from fastapi import HTTPException, Request, status
@@ -13,6 +12,7 @@ from .. import models
 from ..config import AUTH_SETTINGS
 from ..passwords import is_within_bcrypt_limit
 from .common import commit_or_conflict, set_audit_context
+from .request_origin import resolve_client_ip
 
 
 _DUMMY_PASSWORD_HASH = bcrypt.hashpw(
@@ -51,17 +51,11 @@ def _safe_user_agent(request: Request) -> str | None:
 
 def _request_ip(request: Request) -> str | None:
     peer = request.client.host if request.client else None
-    candidate = peer
-    if peer in AUTH_SETTINGS.trusted_proxy_ips:
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            candidate = forwarded.split(",", 1)[0].strip()
-    if not candidate:
-        return None
-    try:
-        return str(ip_address(candidate))
-    except ValueError:
-        return None
+    return resolve_client_ip(
+        peer,
+        request.headers.getlist("x-forwarded-for"),
+        AUTH_SETTINGS.trusted_proxy_ips,
+    )
 
 
 def _event(
