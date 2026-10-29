@@ -1,9 +1,72 @@
-# Configuración sin bind mounts ni hot reload.
-# Uso con SSALFER: selección explícita de base + prod + ssalfer.
-# Ver frontend-ssalfer/DEPLOY.md; operación real y TLS requieren autorización aparte.
 services:
   backend:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "${BACKEND_WORKERS:-2}", "--no-proxy-headers"]
     environment:
       APP_ENV: production
       AUTH_COOKIE_SECURE: "true"
-      CORS_ORIGINS: ${CORS_ORIGINS:?Define el origen HTTPS público exacto}
+      CORS_ORIGINS: https://${PUBLIC_HOST:?Define la IP publica o dominio sin esquema ni ruta}
+      AUTH_TRUSTED_PROXY_IPS: ${TLS_PROXY_IP:-172.30.84.2}
+    networks:
+      default:
+      tls_backend:
+        aliases: [backend_secure]
+
+  tls_proxy:
+    build:
+      context: ./deploy/tls
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Define la IP publica o dominio sin esquema ni ruta}
+      NGINX_ENVSUBST_FILTER: ^PUBLIC_HOST$
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - tls_certificates:/etc/letsencrypt:ro
+      - acme_challenges:/var/www/certbot:ro
+    networks:
+      default:
+      tls_backend:
+        ipv4_address: ${TLS_PROXY_IP:-172.30.84.2}
+    depends_on:
+      frontend_ssalfer:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+  acme_http:
+    image: nginx:1.27-alpine
+    profiles: ["certificate-bootstrap"]
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/tls/bootstrap.conf:/etc/nginx/conf.d/default.conf:ro
+      - acme_challenges:/var/www/certbot:ro
+
+  certbot:
+    image: certbot/certbot:v5.4.0
+    profiles: ["certificate-tools"]
+    volumes:
+      - tls_certificates:/etc/letsencrypt
+      - acme_challenges:/var/www/certbot
+
+  certificate_renewal:
+    image: certbot/certbot:v5.4.0
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command: ["-c", "while :; do certbot renew --non-interactive --webroot -w /var/www/certbot; sleep 43200; done"]
+    volumes:
+      - tls_certificates:/etc/letsencrypt
+      - acme_challenges:/var/www/certbot
+
+networks:
+  tls_backend:
+    ipam:
+      config:
+        - subnet: ${TLS_PROXY_SUBNET:-172.30.84.0/24}
+
+volumes:
+  tls_certificates:
+  acme_challenges:

@@ -28,6 +28,9 @@ app = FastAPI(
     title="SOFTWARE-PA",
     description="Seguimiento administrativo por ProyectoNucleo",
     version="2.0.0",
+    docs_url=None if AUTH_SETTINGS.environment == "production" else "/docs",
+    redoc_url=None if AUTH_SETTINGS.environment == "production" else "/redoc",
+    openapi_url=None if AUTH_SETTINGS.environment == "production" else "/openapi.json",
 )
 
 app.add_middleware(

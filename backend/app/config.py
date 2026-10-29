@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from ipaddress import ip_address
+from urllib.parse import urlsplit
 
 
 def _read_bool(name: str, default: bool) -> bool:
@@ -67,6 +68,16 @@ def load_auth_settings() -> AuthSettings:
     allowed_origins = _read_csv("CORS_ORIGINS", "http://localhost:5173")
     if not allowed_origins or "*" in allowed_origins:
         raise RuntimeError("CORS_ORIGINS debe contener orígenes explícitos")
+
+    if environment == "production":
+        if len(allowed_origins) != 1:
+            raise RuntimeError("Producción requiere un único origen HTTPS público")
+        origin = allowed_origins[0]
+        parsed = urlsplit(origin)
+        if (parsed.scheme != "https" or not parsed.hostname or parsed.username
+                or parsed.password or parsed.path or parsed.query or parsed.fragment
+                or any(c.isspace() for c in origin) or "*" in origin):
+            raise RuntimeError("CORS_ORIGINS debe ser el origen HTTPS exacto, sin ruta")
 
     trusted_proxy_ips = _read_csv("AUTH_TRUSTED_PROXY_IPS")
     for value in trusted_proxy_ips:

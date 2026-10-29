@@ -46,3 +46,16 @@ backend/excel.xlsx
 backend/check_schema.py
 backend/extract.py
 ssalfer-deploy.bundle
+
+# Artefactos privados y secretos locales
+outputs/
+.qa-backups/
+*.env.local
+*.pem
+*.key
+*.dump
+*.backup
+frontend-ssalfer/deploy/*.png
+frontend-ssalfer/deploy/*.jpg
+frontend-ssalfer/deploy/*.json
+frontend-ssalfer/deploy/*.cjs

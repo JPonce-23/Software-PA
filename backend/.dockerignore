@@ -14,3 +14,10 @@ fuentes_locales/
 /excel_info.json
 /schema_dump.txt
 /schema_info.json
+
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
