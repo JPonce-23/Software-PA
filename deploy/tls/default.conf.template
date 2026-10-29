@@ -1,0 +1,39 @@
+limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+server {
+    listen 80 default_server;
+    server_name ${PUBLIC_HOST};
+    server_tokens off;
+    location ^~ /.well-known/acme-challenge/ { root /var/www/certbot; try_files $uri =404; }
+    location / { return 308 https://${PUBLIC_HOST}$request_uri; }
+}
+server {
+    listen 443 ssl default_server;
+    server_name ${PUBLIC_HOST};
+    server_tokens off;
+    ssl_certificate /etc/letsencrypt/live/ssalfer/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ssalfer/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_tickets off;
+    include /etc/nginx/security-headers.conf;
+    client_max_body_size 101m;
+    if ($host != "${PUBLIC_HOST}") { return 421; }
+
+    location ~ ^/api/auth/sesiones/?$ {
+        limit_req zone=login;
+        limit_req_status 429;
+        client_max_body_size 16k;
+        include /etc/nginx/proxy-settings.conf;
+        proxy_pass http://backend_secure:8000;
+    }
+    location ~ ^/(api/)?(docs|redoc|openapi[.]json)(/|$) { return 404; }
+    location ~* ^/(deploy|outputs|docs|tests|[.]git)(/|$) { return 404; }
+    location ~ (^|/)[.] { return 404; }
+    location /api/ {
+        include /etc/nginx/proxy-settings.conf;
+        proxy_pass http://backend_secure:8000;
+    }
+    location / {
+        include /etc/nginx/proxy-settings.conf;
+        proxy_pass http://frontend_ssalfer:80;
+    }
+}
