@@ -2145,11 +2145,16 @@ document.addEventListener("DOMContentLoaded", () => {
                                         ?.nombre_proyecto;
 
 
-                                capa.bindTooltip(
+                                const textoTooltip = document.createElement("span");
+                                // Leaflet interpreta las cadenas como HTML; la etiqueta es texto.
+                                textoTooltip.textContent =
                                     tipo ===
                                     "trazo_proyecto"
                                         ? proyectoNombre
-                                        : nombre,
+                                        : nombre;
+
+                                capa.bindTooltip(
+                                    textoTooltip,
                                     {
                                         sticky: true
                                     }
