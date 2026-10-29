@@ -1,4 +1,5 @@
 import uuid
+from tests._document_samples import minimal_pdf
 
 
 def test_document_version_is_immutable_and_downloadable(
@@ -15,7 +16,7 @@ def test_document_version_is_immutable_and_downloadable(
             "titulo": "Soporte de prueba",
         },
     ).json()
-    content = b"%PDF-1.4\nSOFTWARE-PA QA\n%%EOF\n"
+    content = minimal_pdf("SOFTWARE-PA QA")
     first = client.post(
         f"/api/documentos/{document['id_documento']}/versiones",
         headers=admin_headers,

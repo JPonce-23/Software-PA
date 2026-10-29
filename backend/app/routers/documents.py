@@ -8,6 +8,7 @@ from .. import auth, models, schemas
 from ..database import get_db
 from ..services import documents as service
 from ..services.document_read_models import consolidated_documents
+from ..services.document_validation import download_media_type
 from ..services.access import (
     require_document_access,
     require_document_target_access,
@@ -194,7 +195,9 @@ def download_version(
     return FileResponse(
         service.safe_version_path(version),
         filename=version.nombre_original,
-        media_type=version.tipo_mime or "application/octet-stream",
+        media_type=download_media_type(),
+        content_disposition_type="attachment",
+        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"},
     )
 
 
