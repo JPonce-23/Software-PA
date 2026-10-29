@@ -1,0 +1,1463 @@
+diff --git a/backend/app/services/geospatial_imports.py b/backend/app/services/geospatial_imports.py
+index 364aac3..c6a333d 100644
+--- a/backend/app/services/geospatial_imports.py
++++ b/backend/app/services/geospatial_imports.py
+@@ -9,6 +9,7 @@ import re
+ import shutil
+ import uuid
+ import zipfile
++from contextlib import closing
+ from datetime import date, datetime, timezone
+ from pathlib import Path, PurePath
+ from typing import Any
+@@ -27,6 +28,7 @@ from .access import (
+ )
+ from .common import set_audit_context
+ from .gis_ingestion import IngestionError, inspect_dataset, iter_features
++from .gis_archives import extract_shapefile_zip
+ 
+ 
+ ALLOWED_TARGETS = {"trazo_proyecto", "nucleo_agrario", "parcela"}
+@@ -85,45 +87,14 @@ async def _store_upload(
+                 stream.write(chunk)
+         if total == 0:
+             raise HTTPException(status_code=422, detail="El archivo está vacío")
+-    except Exception:
++    except BaseException:
+         destination.unlink(missing_ok=True)
+         raise
+     return destination, digest.hexdigest(), total, original, declared
+ 
+ 
+ def _extract_zip(path: Path) -> Path:
+-    destination = path.with_suffix("")
+-    destination.mkdir(mode=0o700)
+-    max_bytes = int(os.getenv("IMPORT_MAX_UNCOMPRESSED_MB", "500")) * 1024 * 1024
+-    total = 0
+-    with zipfile.ZipFile(path) as archive:
+-        for info in archive.infolist():
+-            member = PurePath(info.filename)
+-            if (
+-                member.is_absolute()
+-                or ".." in member.parts
+-                or info.is_dir()
+-                or (info.external_attr >> 16) & 0o170000 == 0o120000
+-            ):
+-                if info.is_dir():
+-                    continue
+-                raise HTTPException(status_code=422, detail="ZIP no seguro")
+-            total += info.file_size
+-            if total > max_bytes:
+-                raise HTTPException(status_code=413, detail="ZIP expandido demasiado grande")
+-            target = (destination / Path(*member.parts)).resolve()
+-            if destination.resolve() not in target.parents:
+-                raise HTTPException(status_code=422, detail="ZIP no seguro")
+-            target.parent.mkdir(parents=True, exist_ok=True)
+-            with archive.open(info) as source, target.open("xb") as output:
+-                shutil.copyfileobj(source, output)
+-    shapes = sorted(destination.rglob("*.shp"))
+-    if len(shapes) != 1:
+-        raise HTTPException(
+-            status_code=422,
+-            detail="El ZIP debe contener exactamente un dataset Shapefile",
+-        )
+-    return shapes[0]
++    return extract_shapefile_zip(path)
+ 
+ 
+ def _normalize_geometry(
+@@ -341,127 +312,136 @@ async def stage_import(
+             detail="Núcleo y parcela requieren mapeo explícito de id_destino",
+         )
+     path, digest, size, original, declared = await _store_upload(upload)
+-    existing = db.query(models.ImportacionArchivo).filter(
+-        models.ImportacionArchivo.id_proyecto == project_id,
+-        models.ImportacionArchivo.tipo_objetivo == target,
+-        models.ImportacionArchivo.sha256 == digest,
+-        models.ImportacionArchivo.activo.is_(True),
+-    ).first()
+-    if existing is not None:
+-        path.unlink(missing_ok=True)
+-        return existing
++    staged_ok = False
+     dataset_path = path
+     try:
+-        if declared == "zip":
+-            dataset_path = _extract_zip(path)
+-        dataset = inspect_dataset(dataset_path)
+-    except (IngestionError, zipfile.BadZipFile) as exc:
+-        path.unlink(missing_ok=True)
+-        if path.with_suffix("").is_dir():
+-            shutil.rmtree(path.with_suffix(""), ignore_errors=True)
+-        detail = getattr(exc, "public_detail", "Archivo geoespacial no procesable")
+-        raise HTTPException(status_code=422, detail=detail) from exc
+-    detected = declared if declared == "zip" else dataset.format
+-    if detected not in {"geojson", "kml", "gpkg", "zip", "shp"}:
+-        raise HTTPException(status_code=415, detail="Formato detectado no permitido")
+-    set_audit_context(db, user.id_usuario)
+-    record = models.ImportacionArchivo(
+-        id_proyecto=project_id,
+-        tipo_objetivo=target,
+-        nombre_original=original,
+-        nombre_almacenado=path.name,
+-        formato_detectado=detected,
+-        tamano_bytes=size,
+-        sha256=digest,
+-        fuente=source,
+-        fecha_fuente=source_date,
+-        crs_original=dataset.crs_description,
+-        columnas_detectadas=dataset.columns,
+-        mapeo=mapping,
+-        estado="procesando",
+-        total_features=dataset.total_features,
+-        id_usuario_carga=user.id_usuario,
+-        creado_por=user.id_usuario,
+-        fecha_procesamiento_inicio=datetime.now(timezone.utc),
+-    )
+-    db.add(record)
+-    try:
+-        db.commit()
+-        db.refresh(record)
+-        valid = warnings = errors = processed = 0
+-        destination_key = mapping.get("id_destino")
++        existing = db.query(models.ImportacionArchivo).filter(
++            models.ImportacionArchivo.id_proyecto == project_id,
++            models.ImportacionArchivo.tipo_objetivo == target,
++            models.ImportacionArchivo.sha256 == digest,
++            models.ImportacionArchivo.activo.is_(True),
++        ).first()
++        if existing is not None:
++            path.unlink(missing_ok=True)
++            return existing
++        dataset_path = path
++        try:
++            if declared == "zip":
++                dataset_path = _extract_zip(path)
++            dataset = inspect_dataset(dataset_path)
++        except (IngestionError, zipfile.BadZipFile) as exc:
++            path.unlink(missing_ok=True)
++            detail = getattr(exc, "public_detail", "Archivo geoespacial no procesable")
++            raise HTTPException(status_code=422, detail=detail) from exc
++        detected = declared if declared == "zip" else dataset.format
++        if detected not in {"geojson", "kml", "gpkg", "zip", "shp"}:
++            raise HTTPException(status_code=415, detail="Formato detectado no permitido")
+         set_audit_context(db, user.id_usuario)
+-        for index, (layer, feature) in enumerate(iter_features(dataset_path, dataset)):
+-            properties = feature.get("properties") or {}
+-            geometry_wkt, geometry_error = _normalize_geometry(
+-                db, feature.get("geometry"), target
+-            )
+-            messages: list[dict[str, str]] = []
+-            normalized: dict[str, Any] = {}
+-            if geometry_error:
+-                messages.append({"codigo": geometry_error, "campo": "geometry"})
+-            if destination_key:
+-                raw_id = properties.get(destination_key)
+-                try:
+-                    normalized["id_destino"] = int(raw_id)
+-                except (TypeError, ValueError):
+-                    messages.append(
+-                        {"codigo": "ID_DESTINO_INVALIDO", "campo": destination_key}
+-                    )
+-            state = "error" if messages else "valido"
+-            errors += int(state == "error")
+-            valid += int(state == "valido")
+-            staged = models.ImportacionFeature(
+-                id_importacion=record.id_importacion,
+-                indice_feature=index,
+-                capa_origen=layer,
+-                id_externo=str(feature.get("id")) if feature.get("id") is not None else None,
+-                tipo_geometria=(feature.get("geometry") or {}).get("type"),
+-                atributos_originales=properties,
+-                atributos_normalizados=normalized,
+-                geometria_normalizada=(
+-                    WKTElement(geometry_wkt, srid=4326) if geometry_wkt else None
+-                ),
+-                estado=state,
+-                errores=messages,
+-                advertencias=[],
+-                transformaciones=[
+-                    {"codigo": "CRS_NORMALIZADO", "destino": "EPSG:4326"},
+-                    {"codigo": "TIPO_NORMALIZADO", "objetivo": target},
+-                ],
+-            )
+-            db.add(staged)
+-            processed += 1
+-        record.features_procesados = processed
+-        record.validos = valid
+-        record.advertencias = warnings
+-        record.errores = errors
+-        record.estado = "previsualizado"
+-        record.fecha_procesamiento_fin = datetime.now(timezone.utc)
+-        record.reporte = {
+-            "capas": [layer.name for layer in dataset.layers],
+-            "procesados": processed,
+-            "validos": valid,
+-            "errores": errors,
+-        }
+-        db.commit()
+-        db.refresh(record)
+-        return record
+-    except Exception as exc:
+-        db.rollback()
+-        failed = db.get(models.ImportacionArchivo, record.id_importacion)
+-        if failed is not None:
++        record = models.ImportacionArchivo(
++            id_proyecto=project_id,
++            tipo_objetivo=target,
++            nombre_original=original,
++            nombre_almacenado=path.name,
++            formato_detectado=detected,
++            tamano_bytes=size,
++            sha256=digest,
++            fuente=source,
++            fecha_fuente=source_date,
++            crs_original=dataset.crs_description,
++            columnas_detectadas=dataset.columns,
++            mapeo=mapping,
++            estado="procesando",
++            total_features=dataset.total_features,
++            id_usuario_carga=user.id_usuario,
++            creado_por=user.id_usuario,
++            fecha_procesamiento_inicio=datetime.now(timezone.utc),
++        )
++        db.add(record)
++        try:
++            db.commit()
++            db.refresh(record)
++            valid = warnings = errors = processed = 0
++            destination_key = mapping.get("id_destino")
+             set_audit_context(db, user.id_usuario)
+-            failed.estado = "error"
+-            failed.error_codigo = "STAGING_FALLIDO"
+-            failed.error_detalle = "No fue posible completar la previsualización"
+-            failed.fecha_procesamiento_fin = datetime.now(timezone.utc)
++            with closing(iter_features(dataset_path, dataset)) as features:
++                for index, (layer, feature) in enumerate(features):
++                    properties = feature.get("properties") or {}
++                    geometry_wkt, geometry_error = _normalize_geometry(
++                        db, feature.get("geometry"), target
++                    )
++                    messages: list[dict[str, str]] = []
++                    normalized: dict[str, Any] = {}
++                    if geometry_error:
++                        messages.append({"codigo": geometry_error, "campo": "geometry"})
++                    if destination_key:
++                        raw_id = properties.get(destination_key)
++                        try:
++                            normalized["id_destino"] = int(raw_id)
++                        except (TypeError, ValueError):
++                            messages.append(
++                                {"codigo": "ID_DESTINO_INVALIDO", "campo": destination_key}
++                            )
++                    state = "error" if messages else "valido"
++                    errors += int(state == "error")
++                    valid += int(state == "valido")
++                    staged = models.ImportacionFeature(
++                        id_importacion=record.id_importacion,
++                        indice_feature=index,
++                        capa_origen=layer,
++                        id_externo=str(feature.get("id")) if feature.get("id") is not None else None,
++                        tipo_geometria=(feature.get("geometry") or {}).get("type"),
++                        atributos_originales=properties,
++                        atributos_normalizados=normalized,
++                        geometria_normalizada=(
++                            WKTElement(geometry_wkt, srid=4326) if geometry_wkt else None
++                        ),
++                        estado=state,
++                        errores=messages,
++                        advertencias=[],
++                        transformaciones=[
++                            {"codigo": "CRS_NORMALIZADO", "destino": "EPSG:4326"},
++                            {"codigo": "TIPO_NORMALIZADO", "objetivo": target},
++                        ],
++                    )
++                    db.add(staged)
++                    processed += 1
++            record.total_features = processed
++            record.features_procesados = processed
++            record.validos = valid
++            record.advertencias = warnings
++            record.errores = errors
++            record.estado = "previsualizado"
++            record.fecha_procesamiento_fin = datetime.now(timezone.utc)
++            record.reporte = {
++                "capas": [layer.name for layer in dataset.layers],
++                "procesados": processed,
++                "validos": valid,
++                "errores": errors,
++            }
+             db.commit()
+-        if isinstance(exc, HTTPException):
+-            raise
+-        raise HTTPException(
+-            status_code=422, detail="No fue posible procesar el archivo"
+-        ) from exc
++            db.refresh(record)
++            staged_ok = True
++            return record
++        except Exception as exc:
++            db.rollback()
++            failed = db.get(models.ImportacionArchivo, record.id_importacion)
++            if failed is not None:
++                set_audit_context(db, user.id_usuario)
++                failed.estado = "error"
++                failed.error_codigo = "STAGING_FALLIDO"
++                failed.error_detalle = "No fue posible completar la previsualización"
++                failed.fecha_procesamiento_fin = datetime.now(timezone.utc)
++                db.commit()
++            if isinstance(exc, HTTPException):
++                raise
++            raise HTTPException(
++                status_code=422, detail=getattr(exc, "public_detail", "No fue posible procesar el archivo")
++            ) from exc
++    finally:
++        if not staged_ok:
++            path.unlink(missing_ok=True)
++            if dataset_path != path and path.with_suffix('').is_dir():
++                shutil.rmtree(path.with_suffix(''))
+ 
+ 
+ def require_import_access(
+diff --git a/backend/app/services/gis_ingestion.py b/backend/app/services/gis_ingestion.py
+index 74adfa7..df11862 100644
+--- a/backend/app/services/gis_ingestion.py
++++ b/backend/app/services/gis_ingestion.py
+@@ -4,14 +4,16 @@ from __future__ import annotations
+ 
+ import json
+ import os
+-import codecs
+ import select
+ import subprocess
+ import time
++from contextlib import closing
+ from dataclasses import dataclass
+ from pathlib import Path
+ from typing import Iterator
+ 
++from .gis_limits import load_limits
++
+ 
+ class IngestionError(RuntimeError):
+     def __init__(self, code: str, public_detail: str):
+@@ -42,7 +44,11 @@ class DatasetInfo:
+ 
+     @property
+     def total_features(self) -> int:
+-        return sum(layer.feature_count for layer in self.layers)
++        return sum(max(0, layer.feature_count) for layer in self.layers)
++
++    @property
++    def counts_known(self) -> bool:
++        return all(layer.feature_count >= 0 for layer in self.layers)
+ 
+     @property
+     def columns(self) -> list[str]:
+@@ -62,47 +68,66 @@ def _gdal_environment() -> dict[str, str]:
+             "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": "",
+             "CPL_CURL_VERBOSE": "NO",
+             "OGR_GEOJSON_MAX_OBJ_SIZE": str(
+-                int(os.getenv("IMPORT_MAX_FILE_SIZE_MB", "100")) * 1024 * 1024
++                load_limits().geojson_feature_mb
+             ),
+         }
+     )
+     return env
+ 
+ 
+-def _run_json(command: list[str]) -> dict:
++def _process_chunks(command: list[str], max_bytes: int) -> Iterator[bytes]:
++    """Bound stdout before accumulation; always reap the direct GDAL child."""
+     timeout = int(os.getenv("IMPORT_GDAL_TIMEOUT_SECONDS", "300"))
+     try:
+-        result = subprocess.run(
+-            command,
+-            stdin=subprocess.DEVNULL,
+-            capture_output=True,
+-            check=False,
+-            timeout=timeout,
+-            env=_gdal_environment(),
+-            text=True,
+-        )
++        process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
++            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=_gdal_environment())
+     except FileNotFoundError as exc:
+-        raise IngestionError(
+-            "GDAL_NO_DISPONIBLE",
+-            "El servicio geoespacial no esta disponible en el backend.",
+-        ) from exc
++        raise IngestionError("GDAL_NO_DISPONIBLE", "El servicio geoespacial no esta disponible.") from exc
++    stdout = process.stdout
++    assert stdout is not None
++    deadline = time.monotonic() + timeout
++    total = 0
++    try:
++        while True:
++            remaining = deadline - time.monotonic()
++            if remaining <= 0 or not select.select([stdout], [], [], remaining)[0]:
++                raise subprocess.TimeoutExpired(command, timeout)
++            chunk = os.read(stdout.fileno(), min(64 * 1024, max_bytes - total + 1))
++            if not chunk:
++                break
++            total += len(chunk)
++            if total > max_bytes:
++                raise IngestionError("LIMITE_SALIDA_GDAL", "La salida GIS excede el presupuesto permitido.")
++            yield chunk
++        remaining = deadline - time.monotonic()
++        if remaining <= 0:
++            raise subprocess.TimeoutExpired(command, timeout)
++        process.wait(timeout=remaining)
++        if process.returncode != 0:
++            raise IngestionError("CONVERSION_OGR_FALLIDA", "GDAL/OGR no pudo procesar el archivo.")
+     except subprocess.TimeoutExpired as exc:
+-        raise IngestionError(
+-            "GDAL_TIMEOUT",
+-            "El archivo excedio el tiempo permitido de inspeccion.",
+-        ) from exc
+-    if result.returncode != 0:
+-        raise IngestionError(
+-            "ARCHIVO_NO_PROCESABLE",
+-            "GDAL/OGR no pudo abrir el contenido como un archivo vectorial permitido.",
+-        )
++        raise IngestionError("GDAL_TIMEOUT", "El archivo excedio el tiempo permitido de procesamiento.") from exc
++    finally:
++        try:
++            if process.poll() is None:
++                process.kill()
++                process.wait()
++        finally:
++            stdout.close()
++
++
++def _run_json(command: list[str]) -> dict:
++    output = bytearray()
++    with closing(_process_chunks(command, load_limits().inspection_bytes)) as chunks:
++        for chunk in chunks:
++            output.extend(chunk)
+     try:
+-        return json.loads(result.stdout)
+-    except json.JSONDecodeError as exc:
+-        raise IngestionError(
+-            "METADATOS_INVALIDOS",
+-            "GDAL/OGR no devolvio metadatos validos para el archivo.",
+-        ) from exc
++        metadata = json.loads(output)
++        if not isinstance(metadata, dict):
++            raise ValueError("metadata object required")
++        return metadata
++    except (ValueError, UnicodeError, RecursionError) as exc:
++        raise IngestionError("METADATOS_INVALIDOS", "GDAL/OGR no devolvio metadatos validos.") from exc
+ 
+ 
+ def _authority_from_coordinate_system(coordinate_system: dict | None) -> tuple[str, bool]:
+@@ -137,6 +162,16 @@ def get_spatial_layers(metadata: dict) -> list[dict]:
+     )]
+ 
+ 
++def _feature_count(value) -> int:
++    if value is None:
++        return -1
++    try:
++        count = int(value)
++    except (ValueError, TypeError, OverflowError) as exc:
++        raise IngestionError("METADATOS_INVALIDOS", "Conteo GDAL invalido.") from exc
++    return max(-1, count)
++
++
+ def inspect_dataset(path: Path) -> DatasetInfo:
+     metadata = _run_json(["ogrinfo", "-ro", "-so", "-al", "-json", str(path)])
+     driver = str(metadata.get("driverShortName") or metadata.get("driverLongName") or "")
+@@ -155,8 +190,12 @@ def inspect_dataset(path: Path) -> DatasetInfo:
+             "El contenido detectado no es KML, GeoJSON, GeoPackage ni Shapefile.",
+         )
+ 
++    limits = load_limits()
++    spatial_layers = get_spatial_layers(metadata)
++    if len(spatial_layers) > limits.layers:
++        raise IngestionError("LIMITE_CAPAS", "El archivo excede el limite de capas GIS.")
+     layers: list[LayerInfo] = []
+-    for raw_layer in get_spatial_layers(metadata):
++    for raw_layer in spatial_layers:
+         name = str(raw_layer.get("name") or "").strip()
+         if not name:
+             continue
+@@ -178,7 +217,7 @@ def inspect_dataset(path: Path) -> DatasetInfo:
+         layers.append(
+             LayerInfo(
+                 name=name,
+-                feature_count=max(0, int(raw_layer.get("featureCount") or 0)),
++                feature_count=_feature_count(raw_layer.get("featureCount")),
+                 columns=columns,
+                 crs=crs,
+                 is_wgs84=is_wgs84,
+@@ -191,7 +230,9 @@ def inspect_dataset(path: Path) -> DatasetInfo:
+         )
+     if not layers:
+         raise IngestionError("SIN_CAPAS", "El archivo no contiene capas vectoriales procesables.")
+-    if sum(layer.feature_count for layer in layers) <= 0:
++    if sum(max(0, layer.feature_count) for layer in layers) > limits.features:
++        raise IngestionError("LIMITE_FEATURES", "El archivo excede el limite de features GIS.")
++    if all(layer.feature_count == 0 for layer in layers):
+         raise IngestionError("SIN_FEATURES", "El archivo no contiene features.")
+     return DatasetInfo(driver=driver, format=detected_format, layers=tuple(layers))
+ 
+@@ -204,7 +245,14 @@ def iter_features(
+     preserve_source_geometry: bool = False,
+ ) -> Iterator[tuple[str, dict]]:
+     """Convierte cada capa a GeoJSONSeq en stdout y entrega un feature a la vez."""
+-    timeout = int(os.getenv("IMPORT_GDAL_TIMEOUT_SECONDS", "300"))
++    limits = load_limits()
++    if len(dataset.layers) > limits.layers:
++        raise IngestionError("LIMITE_CAPAS", "El archivo excede el limite de capas GIS.")
++    if dataset.total_features > limits.features:
++        raise IngestionError("LIMITE_FEATURES", "El archivo excede el limite de features GIS.")
++    if limit_per_layer is not None and limit_per_layer <= 0:
++        raise IngestionError("LIMITE_FEATURES", "El limite por capa debe ser positivo.")
++    observed = output_bytes = 0
+     for layer in dataset.layers:
+         command = [
+             "ogr2ogr",
+@@ -224,8 +272,6 @@ def iter_features(
+                 f'SELECT *{select_fid}, hex(ST_AsBinary("{quoted_geom}")) AS "__pa_source_wkb" FROM "{quoted_layer}"'])
+         else:
+             command.append(layer.name)
+-        if limit_per_layer is not None:
+-            command.extend(["-limit", str(max(1, limit_per_layer))])
+         command.extend([
+             "-t_srs",
+             "EPSG:4326",
+@@ -234,77 +280,48 @@ def iter_features(
+             "-lco",
+             "COORDINATE_PRECISION=15",
+         ])
+-        try:
+-            process = subprocess.Popen(
+-                command,
+-                stdin=subprocess.DEVNULL,
+-                stdout=subprocess.PIPE,
+-                stderr=subprocess.DEVNULL,
+-                env=_gdal_environment(),
+-            )
+-        except FileNotFoundError as exc:
+-            raise IngestionError(
+-                "GDAL_NO_DISPONIBLE",
+-                "El servicio geoespacial no esta disponible en el backend.",
+-            ) from exc
+-        assert process.stdout is not None
+-        stdout = process.stdout
+-        deadline = time.monotonic() + timeout
+-        decoder = codecs.getincrementaldecoder("utf-8")()
+-        pending = ""
+-
+-        def consume_line(line: str) -> dict | None:
+-            payload = line.lstrip("\x1e").strip()
++        pending = bytearray()
++        layer_count = 0
++
++        def consume_line(line: bytes) -> dict | None:
++            payload = line.lstrip(b"\x1e").strip()
+             if not payload:
+                 return None
+             try:
+-                return json.loads(payload)
+-            except json.JSONDecodeError as exc:
+-                raise IngestionError(
+-                    "FEATURE_OGR_INVALIDO",
+-                    f'GDAL produjo un feature invalido en la capa "{layer.name}".',
+-                ) from exc
++                item = json.loads(payload)
++                if not isinstance(item, dict) or item.get("type") != "Feature":
++                    raise ValueError("feature object required")
++                return item
++            except (ValueError, UnicodeError, RecursionError) as exc:
++                raise IngestionError("FEATURE_OGR_INVALIDO", "GDAL produjo un feature invalido.") from exc
+ 
+-        try:
+-            while True:
+-                remaining = deadline - time.monotonic()
+-                if remaining <= 0:
+-                    raise subprocess.TimeoutExpired(command, timeout)
+-                readable, _, _ = select.select([stdout], [], [], remaining)
+-                if not readable:
+-                    raise subprocess.TimeoutExpired(command, timeout)
+-                chunk = os.read(stdout.fileno(), 64 * 1024)
+-                if not chunk:
+-                    break
+-                pending += decoder.decode(chunk)
+-                while "\n" in pending:
+-                    line, pending = pending.split("\n", 1)
+-                    feature = consume_line(line)
+-                    if feature is not None:
+-                        yield layer.name, feature
+-            pending += decoder.decode(b"", final=True)
+-            feature = consume_line(pending)
+-            if feature is not None:
+-                yield layer.name, feature
+-            remaining = deadline - time.monotonic()
+-            if remaining <= 0:
+-                raise subprocess.TimeoutExpired(command, timeout)
+-            process.wait(timeout=remaining)
+-        except subprocess.TimeoutExpired as exc:
+-            raise IngestionError(
+-                "GDAL_TIMEOUT",
+-                f'La capa "{layer.name}" excedio el tiempo permitido de conversion.',
+-            ) from exc
+-        finally:
+-            if process.poll() is None:
+-                process.kill()
+-                try:
+-                    process.wait(timeout=5)
+-                except subprocess.TimeoutExpired:
+-                    pass
+-            stdout.close()
+-        if process.returncode != 0:
+-            raise IngestionError(
+-                "CONVERSION_OGR_FALLIDA",
+-                f'No fue posible normalizar la capa "{layer.name}".',
+-            )
++        # Bytes avoid splitting UTF-8 code points; decode only complete records.
++        with closing(_process_chunks(command, limits.output_bytes - output_bytes)) as chunks:
++            for chunk in chunks:
++                output_bytes += len(chunk)
++                parts = chunk.split(b"\n")
++                for index, part in enumerate(parts):
++                    if len(pending) + len(part) > limits.record_bytes:
++                        raise IngestionError("LIMITE_REGISTRO", "Una feature GIS excede el limite de bytes por registro.")
++                    pending.extend(part)
++                    if index == len(parts) - 1:
++                        continue
++                    item = consume_line(pending)
++                    pending.clear()
++                    if item is not None:
++                        observed += 1
++                        layer_count += 1
++                        if observed > limits.features or (limit_per_layer is not None and layer_count > limit_per_layer):
++                            raise IngestionError("LIMITE_FEATURES", "La lectura excede el limite de features GIS.")
++                        yield layer.name, item
++            item = consume_line(pending)
++            if item is not None:
++                observed += 1
++                layer_count += 1
++                if observed > limits.features or (limit_per_layer is not None and layer_count > limit_per_layer):
++                    raise IngestionError("LIMITE_FEATURES", "La lectura excede el limite de features GIS.")
++                yield layer.name, item
++        if layer.feature_count >= 0 and layer_count != layer.feature_count:
++            raise IngestionError("CONTEO_FEATURES_INCONSISTENTE", "El conteo observado no coincide con GDAL.")
++    if observed == 0:
++        raise IngestionError("SIN_FEATURES", "El archivo no contiene features.")
+diff --git a/backend/app/services/gis_reconciliation.py b/backend/app/services/gis_reconciliation.py
+index 00b1e45..2132737 100644
+--- a/backend/app/services/gis_reconciliation.py
++++ b/backend/app/services/gis_reconciliation.py
+@@ -2,6 +2,7 @@
+ from __future__ import annotations
+ 
+ import unicodedata
++from contextlib import closing
+ from datetime import datetime, timezone
+ 
+ from fastapi import HTTPException
+@@ -263,66 +264,68 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
+             administrative_context = current_context(db,record,universe=universe,nuclei=nucleus_universe)
+             register_context(cycle,administrative_context)
+         by_layer={l.name:l for l in dataset.layers}
+-        for index,(layer_name,item) in enumerate(iter_features(dataset_path,dataset,preserve_source_geometry=True)):
+-            layer=by_layer[layer_name]; raw=item.get('properties') or {}; geometry=item.get('geometry')
+-            source_fid=raw.pop('__pa_source_fid',item.get('id'))
+-            source_wkb=raw.pop('__pa_source_wkb',None)
+-            source_is_valid=None
+-            original_geometry=None
+-            dimension='XY'
+-            if source_wkb:
+-                inspected=db.execute(text("""WITH source AS (SELECT ST_GeomFromWKB(:g,:s) AS geom)
++        with closing(iter_features(dataset_path,dataset,preserve_source_geometry=True)) as features:
++            for index,(layer_name,item) in enumerate(features):
++                layer=by_layer[layer_name]; raw=item.get('properties') or {}; geometry=item.get('geometry')
++                source_fid=raw.pop('__pa_source_fid',item.get('id'))
++                source_wkb=raw.pop('__pa_source_wkb',None)
++                source_is_valid=None
++                original_geometry=None
++                dimension='XY'
++                if source_wkb:
++                    inspected=db.execute(text("""WITH source AS (SELECT ST_GeomFromWKB(:g,:s) AS geom)
+                     SELECT ST_Zmflag(geom) AS flags,ST_AsEWKB(geom) AS ewkb,
+                            ST_IsValid(ST_Force2D(geom)) AS valid FROM source"""),
+-                    {'g':bytes.fromhex(source_wkb),'s':layer.srid or 0}).mappings().one()
+-                original_geometry=WKBElement(bytes(inspected['ewkb']),extended=True)
+-                source_is_valid=inspected['valid']
+-                dimension={0:'XY',1:'XYM',2:'XYZ',3:'XYZM'}[inspected['flags']]
+-            elif geometry:
+-                # GeoJSON input has no M representation.
+-                def coordinates_have_z(coords):
+-                    return bool(coords and (len(coords)>2 if isinstance(coords[0],(float,int)) else any(coordinates_have_z(c) for c in coords)))
+-                dimension='XYZ' if coordinates_have_z(geometry.get('coordinates',[])) else 'XY'
+-            wkt,errors,warnings,transformations=legacy._normalize_ddv_geometry(db,geometry,source_is_valid=source_is_valid)
+-            if dimension!='XY':
+-                transformations.append({'codigo':'DIMENSION_A_2D','origen':dimension,'destino':'XY'})
+-            if not layer.is_wgs84:
+-                transformations.insert(0,{'codigo':'CRS_REPROYECTADO','origen':layer.crs,'destino':'EPSG:4326'})
+-            working_geom=None
+-            if wkt:
+-                if srid != 4326 and srid == layer.srid and source_is_valid:
+-                    # Preserve native coordinates when source already uses the
+-                    # project's CRS. No 4326 -> source round-trip is necessary.
+-                    working_wkt=db.execute(text('SELECT ST_AsText(ST_Multi(ST_Force2D(ST_GeomFromEWKB(:g))),17)'),
+-                        {'g':bytes(inspected['ewkb'])}).scalar_one()
+-                    transformations.append({'codigo':'CRS_TRABAJO_SIN_REPROYECCION','crs':layer.crs})
+-                else:
+-                    working_wkt=db.execute(text('SELECT ST_AsText(ST_Transform(ST_GeomFromText(:g,4326),:s),17)'),{'g':wkt,'s':srid}).scalar_one()
+-                    if srid!=4326: transformations.append({'codigo':'CRS_TRABAJO','origen':'EPSG:4326','destino':f'EPSG:{srid}'})
+-                work_validation=db.execute(text('SELECT ST_IsValid(g),ST_IsEmpty(g),ST_IsValidReason(g) FROM (SELECT ST_GeomFromText(:g,:s) g) q'),{'g':working_wkt,'s':srid}).one()
+-                if work_validation[0] and not work_validation[1]:
+-                    working_geom=WKTElement(working_wkt,srid=srid)
+-                else:
+-                    errors.append({'codigo':'CRS_TRABAJO_ALTERO_TOPOLOGIA','razon':work_validation[2]})
+-            attrs=sanitize_attributes(raw)
+-            feature=models.ImportacionFeature(id_importacion=record.id_importacion,indice_feature=index,capa_origen=layer_name,
+-                id_externo=str(source_fid) if source_fid is not None else None,tipo_geometria=(geometry or {}).get('type'),
+-                atributos_originales=attrs,atributos_normalizados={},geometria_original=original_geometry,
+-                geometria_normalizada=WKTElement(wkt,srid=4326) if wkt else None,geometria_trabajo=working_geom,
+-                crs_fuente=layer.crs,dimension_fuente=dimension,
+-                estado='error' if errors else 'advertencia' if warnings else 'valido',errores=errors,advertencias=warnings,transformaciones=transformations)
+-            db.add(feature); db.flush()
+-            if target in RECONCILIATION_TARGETS:
+-                direct_id=None
+-                if mapping.get('id_destino'):
+-                    try: direct_id=int(raw[mapping['id_destino']])
+-                    except (ValueError,TypeError,KeyError): direct_id=-1
+-                if direct_id is not None: feature.atributos_normalizados={'id_destino':direct_id}
+-                build_candidates(db,record,feature,attrs,universe,user,direct_id=direct_id,cycle=cycle,nucleus_universe=nucleus_universe)
++                        {'g':bytes.fromhex(source_wkb),'s':layer.srid or 0}).mappings().one()
++                    original_geometry=WKBElement(bytes(inspected['ewkb']),extended=True)
++                    source_is_valid=inspected['valid']
++                    dimension={0:'XY',1:'XYM',2:'XYZ',3:'XYZM'}[inspected['flags']]
++                elif geometry:
++                    # GeoJSON input has no M representation.
++                    def coordinates_have_z(coords):
++                        return bool(coords and (len(coords)>2 if isinstance(coords[0],(float,int)) else any(coordinates_have_z(c) for c in coords)))
++                    dimension='XYZ' if coordinates_have_z(geometry.get('coordinates',[])) else 'XY'
++                wkt,errors,warnings,transformations=legacy._normalize_ddv_geometry(db,geometry,source_is_valid=source_is_valid)
++                if dimension!='XY':
++                    transformations.append({'codigo':'DIMENSION_A_2D','origen':dimension,'destino':'XY'})
++                if not layer.is_wgs84:
++                    transformations.insert(0,{'codigo':'CRS_REPROYECTADO','origen':layer.crs,'destino':'EPSG:4326'})
++                working_geom=None
++                if wkt:
++                    if srid != 4326 and srid == layer.srid and source_is_valid:
++                        # Preserve native coordinates when source already uses the
++                        # project's CRS. No 4326 -> source round-trip is necessary.
++                        working_wkt=db.execute(text('SELECT ST_AsText(ST_Multi(ST_Force2D(ST_GeomFromEWKB(:g))),17)'),
++                            {'g':bytes(inspected['ewkb'])}).scalar_one()
++                        transformations.append({'codigo':'CRS_TRABAJO_SIN_REPROYECCION','crs':layer.crs})
++                    else:
++                        working_wkt=db.execute(text('SELECT ST_AsText(ST_Transform(ST_GeomFromText(:g,4326),:s),17)'),{'g':wkt,'s':srid}).scalar_one()
++                        if srid!=4326: transformations.append({'codigo':'CRS_TRABAJO','origen':'EPSG:4326','destino':f'EPSG:{srid}'})
++                    work_validation=db.execute(text('SELECT ST_IsValid(g),ST_IsEmpty(g),ST_IsValidReason(g) FROM (SELECT ST_GeomFromText(:g,:s) g) q'),{'g':working_wkt,'s':srid}).one()
++                    if work_validation[0] and not work_validation[1]:
++                        working_geom=WKTElement(working_wkt,srid=srid)
++                    else:
++                        errors.append({'codigo':'CRS_TRABAJO_ALTERO_TOPOLOGIA','razon':work_validation[2]})
++                attrs=sanitize_attributes(raw)
++                feature=models.ImportacionFeature(id_importacion=record.id_importacion,indice_feature=index,capa_origen=layer_name,
++                    id_externo=str(source_fid) if source_fid is not None else None,tipo_geometria=(geometry or {}).get('type'),
++                    atributos_originales=attrs,atributos_normalizados={},geometria_original=original_geometry,
++                    geometria_normalizada=WKTElement(wkt,srid=4326) if wkt else None,geometria_trabajo=working_geom,
++                    crs_fuente=layer.crs,dimension_fuente=dimension,
++                    estado='error' if errors else 'advertencia' if warnings else 'valido',errores=errors,advertencias=warnings,transformaciones=transformations)
++                db.add(feature); db.flush()
++                if target in RECONCILIATION_TARGETS:
++                    direct_id=None
++                    if mapping.get('id_destino'):
++                        try: direct_id=int(raw[mapping['id_destino']])
++                        except (ValueError,TypeError,KeyError): direct_id=-1
++                    if direct_id is not None: feature.atributos_normalizados={'id_destino':direct_id}
++                    build_candidates(db,record,feature,attrs,universe,user,direct_id=direct_id,cycle=cycle,nucleus_universe=nucleus_universe)
+         counts=dict(db.query(models.ImportacionFeature.estado,func.count()).filter_by(id_importacion=record.id_importacion).group_by(models.ImportacionFeature.estado).all())
+         record.validos=counts.get('valido',0); record.advertencias=counts.get('advertencia',0); record.errores=counts.get('error',0)
+         record.features_procesados=sum(counts.values())
+-        if record.features_procesados!=dataset.total_features: raise IngestionError('CONTEO_FEATURES_INCONSISTENTE','Conteo inconsistente')
++        if dataset.counts_known and record.features_procesados!=dataset.total_features: raise IngestionError('CONTEO_FEATURES_INCONSISTENTE','Conteo inconsistente')
++        record.total_features=record.features_procesados
+         record.estado='previsualizado'; record.fecha_procesamiento_fin=datetime.now(timezone.utc)
+         record.reporte={'capas':[l.name for l in dataset.layers],'procesados':record.features_procesados,
+             'validos':record.validos,'advertencias':record.advertencias,'errores':record.errores,
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 4efde2e..faddf76 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -14,6 +14,15 @@ x-backend-environment: &backend-environment
+   AUTH_LOCK_MINUTES: ${AUTH_LOCK_MINUTES:-15}
+   AUTH_TRUSTED_PROXY_IPS: ${AUTH_TRUSTED_PROXY_IPS:-}
+   IMPORT_MAX_FILE_SIZE_MB: ${IMPORT_MAX_FILE_SIZE_MB:-100}
++  IMPORT_GEOJSON_MAX_FEATURE_MB: ${IMPORT_GEOJSON_MAX_FEATURE_MB:-16}
++  IMPORT_MAX_RECORD_BYTES: ${IMPORT_MAX_RECORD_BYTES:-67108864}
++  IMPORT_MAX_OUTPUT_BYTES: ${IMPORT_MAX_OUTPUT_BYTES:-536870912}
++  IMPORT_MAX_INSPECTION_BYTES: ${IMPORT_MAX_INSPECTION_BYTES:-8388608}
++  IMPORT_MAX_LAYERS: ${IMPORT_MAX_LAYERS:-16}
++  IMPORT_MAX_FEATURES: ${IMPORT_MAX_FEATURES:-100000}
++  IMPORT_ZIP_MAX_ENTRIES: ${IMPORT_ZIP_MAX_ENTRIES:-2048}
++  IMPORT_ZIP_MAX_MEMBER_BYTES: ${IMPORT_ZIP_MAX_MEMBER_BYTES:-268435456}
++  IMPORT_MAX_UNCOMPRESSED_MB: ${IMPORT_MAX_UNCOMPRESSED_MB:-500}
+   IMPORT_STAGING_BATCH_SIZE: ${IMPORT_STAGING_BATCH_SIZE:-250}
+   IMPORT_CONFIRM_BATCH_SIZE: ${IMPORT_CONFIRM_BATCH_SIZE:-100}
+   IMPORT_GDAL_TIMEOUT_SECONDS: ${IMPORT_GDAL_TIMEOUT_SECONDS:-300}
+diff --git a/backend/app/services/gis_limits.py b/backend/app/services/gis_limits.py
+new file mode 100644
+index 0000000..bd19b8a
+--- /dev/null
++++ b/backend/app/services/gis_limits.py
+@@ -0,0 +1,40 @@
++"""Finite per-import budgets. Values are policy ceilings, not host capacity claims."""
++import os
++from dataclasses import dataclass
++
++
++def positive_int(name: str, default: int) -> int:
++    try:
++        value = int(os.getenv(name, str(default)))
++    except ValueError as exc:
++        raise ValueError(f"{name} debe ser un entero positivo") from exc
++    if value <= 0:
++        raise ValueError(f"{name} debe ser un entero positivo")
++    return value
++
++
++@dataclass(frozen=True)
++class GisLimits:
++    geojson_feature_mb: int
++    record_bytes: int
++    output_bytes: int
++    inspection_bytes: int
++    layers: int
++    features: int
++    zip_entries: int
++    zip_member_bytes: int
++    zip_total_bytes: int
++
++
++def load_limits() -> GisLimits:
++    return GisLimits(
++        geojson_feature_mb=positive_int('IMPORT_GEOJSON_MAX_FEATURE_MB', 16),
++        record_bytes=positive_int('IMPORT_MAX_RECORD_BYTES', 64 * 1024 * 1024),
++        output_bytes=positive_int('IMPORT_MAX_OUTPUT_BYTES', 512 * 1024 * 1024),
++        inspection_bytes=positive_int('IMPORT_MAX_INSPECTION_BYTES', 8 * 1024 * 1024),
++        layers=positive_int('IMPORT_MAX_LAYERS', 16),
++        features=positive_int('IMPORT_MAX_FEATURES', 100_000),
++        zip_entries=positive_int('IMPORT_ZIP_MAX_ENTRIES', 2048),
++        zip_member_bytes=positive_int('IMPORT_ZIP_MAX_MEMBER_BYTES', 256 * 1024 * 1024),
++        zip_total_bytes=positive_int('IMPORT_MAX_UNCOMPRESSED_MB', 500) * 1024 * 1024,
++    )
+diff --git a/backend/app/services/gis_archives.py b/backend/app/services/gis_archives.py
+new file mode 100644
+index 0000000..d0cdce2
+--- /dev/null
++++ b/backend/app/services/gis_archives.py
+@@ -0,0 +1,68 @@
++"""ZIP/Shapefile extraction into a private directory owned by this attempt."""
++import shutil
++import stat
++import zipfile
++from pathlib import Path, PurePosixPath
++
++from .gis_ingestion import IngestionError
++from .gis_limits import load_limits
++
++
++def extract_shapefile_zip(path: Path) -> Path:
++    limits = load_limits()
++    destination = path.with_suffix('')
++    # Deliberately outside try: never remove a pre-existing directory on failure.
++    try:
++        destination.mkdir(mode=0o700)
++    except FileExistsError as exc:
++        raise IngestionError('ZIP_DESTINO_EXISTENTE', 'El directorio de extracción ya existe.') from exc
++    try:
++        with zipfile.ZipFile(path) as archive:
++            entries = archive.infolist()
++            if len(entries) > limits.zip_entries:
++                raise IngestionError('LIMITE_ZIP_ENTRADAS', 'El ZIP excede el limite de entradas.')
++            declared = 0
++            for info in entries:
++                member = PurePosixPath(info.filename.replace('\\', '/'))
++                mode = stat.S_IFMT(info.external_attr >> 16)
++                if (member.is_absolute() or '..' in member.parts or not member.parts
++                        or ':' in member.parts[0] or '\x00' in info.filename
++                        or mode not in (0, stat.S_IFREG, stat.S_IFDIR)):
++                    raise IngestionError('ZIP_NO_SEGURO', 'ZIP no seguro.')
++                if info.file_size > limits.zip_member_bytes:
++                    raise IngestionError('LIMITE_ZIP_MIEMBRO', 'Un archivo ZIP excede el limite expandido individual.')
++                declared += info.file_size
++                if declared > limits.zip_total_bytes:
++                    raise IngestionError('LIMITE_ZIP_TOTAL', 'ZIP expandido demasiado grande.')
++            total = 0
++            for info in entries:
++                if info.is_dir():
++                    continue
++                member = PurePosixPath(info.filename.replace('\\', '/'))
++                target = (destination / Path(*member.parts)).resolve()
++                if destination.resolve() not in target.parents:
++                    raise IngestionError('ZIP_NO_SEGURO', 'ZIP no seguro.')
++                target.parent.mkdir(parents=True, exist_ok=True)
++                size = 0
++                with archive.open(info) as source, target.open('xb') as output:
++                    while True:
++                        chunk = source.read(min(64 * 1024, limits.zip_member_bytes - size + 1,
++                                                limits.zip_total_bytes - total + 1))
++                        if not chunk:
++                            break
++                        size += len(chunk)
++                        total += len(chunk)
++                        if size > limits.zip_member_bytes or total > limits.zip_total_bytes:
++                            raise IngestionError('LIMITE_ZIP_BYTES', 'La extracción ZIP excede el presupuesto real de bytes.')
++                        output.write(chunk)
++                if size != info.file_size:
++                    raise IngestionError('ZIP_TAMANO_INCONSISTENTE', 'El tamaño extraído no coincide con el ZIP.')
++        shapes = list(destination.rglob('*.shp'))
++        if len(shapes) != 1:
++            raise IngestionError('ZIP_SHAPEFILE_INVALIDO', 'El ZIP debe contener exactamente un dataset Shapefile.')
++        return shapes[0]
++    except BaseException as exc:
++        shutil.rmtree(destination)
++        if isinstance(exc, (OSError, zipfile.BadZipFile, RuntimeError)) and not isinstance(exc, IngestionError):
++            raise IngestionError('ZIP_INVALIDO', 'No fue posible extraer el ZIP.') from exc
++        raise
+diff --git a/tests/security/test_gis_resource_limits.py b/tests/security/test_gis_resource_limits.py
+new file mode 100644
+index 0000000..581a172
+--- /dev/null
++++ b/tests/security/test_gis_resource_limits.py
+@@ -0,0 +1,379 @@
++"""SS-03: stdlib-only, synthetic data, no conftest/app/DB/GDAL imports or network.
++Run: python3 -B -m unittest discover -s tests/security -p 'test_gis_resource_limits.py' -v
++"""
++import ast
++import asyncio
++from contextlib import contextmanager, closing
++import io
++import json
++import os
++from pathlib import Path
++import stat
++import sys
++import tempfile
++from types import SimpleNamespace, ModuleType
++import unittest
++from unittest.mock import MagicMock, patch
++import zipfile
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / 'backend'))
++from app.services import gis_ingestion as ing, gis_archives as archives, gis_limits
++
++
++class Stdout(io.BytesIO):
++    def fileno(self):
++        return 42
++
++
++@contextmanager
++def process_output(chunks, *, returncode=0):
++    """No child is launched. Feed exact byte fragments through os.read doubles."""
++    proc = SimpleNamespace(stdout=Stdout(), returncode=None)
++    proc.poll = lambda: proc.returncode
++    def wait(**kwargs):
++        proc.returncode = returncode
++        return returncode
++    proc.wait = MagicMock(side_effect=wait)
++    proc.kill = MagicMock()
++    fragments = iter([*chunks, b''])
++    with patch.object(ing.subprocess, 'Popen', return_value=proc) as popen, \
++         patch.object(ing.select, 'select', return_value=([proc.stdout], [], [])), \
++         patch.object(ing.os, 'read', side_effect=lambda *args: next(fragments)):
++        yield proc, popen
++
++
++def dataset(count=1, layers=1, fmt='geojson'):
++    return ing.DatasetInfo(fmt, fmt, tuple(ing.LayerInfo(f'layer{i}', count, ('name',),
++        'EPSG:4326', True, 'fid', 'geom', 'Polygon', 'synthetic WKT', 4326) for i in range(layers)))
++
++
++def row(name='José ñ 😀'):
++    return {'type': 'Feature', 'properties': {'name': name},
++        'geometry': {'type': 'Polygon', 'coordinates': [[[0, 0, 17], [1, 0, 17], [1, 1, 17], [0, 0, 17]]]}}
++
++
++def encoded(name='José ñ 😀'):
++    return json.dumps(row(name), ensure_ascii=False).encode('utf-8')
++
++
++def metadata(count=1, driver='GeoJSON', layers=1):
++    return {'driverShortName': driver, 'layers': [dict(name=f'layer{i}', featureCount=count,
++        geometryFields=[{'name': 'geom', 'type': 'Polygon'}], fields=[{'name': 'name'}],
++        coordinateSystem={'wkt': 'synthetic WKT', 'projjson': {'id': {'authority': 'EPSG', 'code': 4326}}})
++        for i in range(layers)]}
++
++
++class ResourceTests(unittest.TestCase):
++    def setUp(self):
++        # Tests do not consume runtime .env; isolate all limit overrides to defaults.
++        self.env = patch.dict(os.environ, {}, clear=True)
++        self.env.start()
++        self.addCleanup(self.env.stop)
++
++    def assert_code(self, code, call):
++        with self.assertRaises(ing.IngestionError) as ctx:
++            call()
++        self.assertEqual(ctx.exception.code, code)
++
++    def test_gdal_megabytes_independent_of_upload_bytes(self):
++        with patch.dict(os.environ, {'IMPORT_MAX_FILE_SIZE_MB': '100', 'IMPORT_GEOJSON_MAX_FEATURE_MB': '7'}):
++            self.assertEqual(ing._gdal_environment()['OGR_GEOJSON_MAX_OBJ_SIZE'], '7')
++            limits = gis_limits.load_limits()
++            self.assertEqual(limits.record_bytes, 64 * 1024 * 1024)
++            self.assertEqual(limits.output_bytes, 512 * 1024 * 1024)
++
++    def test_default_feature_unit_is_mb(self):
++        self.assertEqual(ing._gdal_environment()['OGR_GEOJSON_MAX_OBJ_SIZE'], '16')
++
++    def test_invalid_configuration_rejected(self):
++        for value in ['0', '-1', 'oops']:
++            with self.subTest(value=value), patch.dict(os.environ, {'IMPORT_MAX_RECORD_BYTES': value}):
++                with self.assertRaises(ValueError): gis_limits.load_limits()
++
++    def test_fragmented_utf8_and_final_unterminated_record(self):
++        data = encoded()
++        with process_output([data[i:i+1] for i in range(len(data))]) as (proc, _):
++            result = list(ing.iter_features(Path('synthetic.geojson'), dataset()))
++        self.assertEqual(result, [('layer0', row())])
++        self.assertTrue(proc.stdout.closed)
++        proc.kill.assert_not_called()
++
++    def test_multiple_records_crlf_rs_and_trailing_newline(self):
++        with process_output([b'\x1e' + encoded() + b'\r\n' + encoded('Dos') + b'\n']):
++            values = list(ing.iter_features(Path('synthetic'), dataset(2)))
++        self.assertEqual([v for _, v in values], [row(), row('Dos')])
++
++    def test_record_at_limit_accepted(self):
++        data = encoded('geometría legítima')
++        with patch.dict(os.environ, {'IMPORT_MAX_RECORD_BYTES': str(len(data))}), process_output([data]):
++            self.assertEqual(list(ing.iter_features(Path('synthetic'), dataset()))[0][1], row('geometría legítima'))
++
++    def test_record_over_limit_kills_and_closes(self):
++        with patch.dict(os.environ, {'IMPORT_MAX_RECORD_BYTES': '10'}), process_output([b'x' * 11]) as (proc, _):
++            self.assert_code('LIMITE_REGISTRO', lambda: list(ing.iter_features(Path('synthetic'), dataset())))
++        proc.kill.assert_called_once()
++        self.assertTrue(proc.stdout.closed)
++
++    def test_fragmented_record_limit_counts_bytes_not_characters(self):
++        data = encoded('é' * 10)
++        with patch.dict(os.environ, {'IMPORT_MAX_RECORD_BYTES': str(len(data) - 1)}), process_output([data[:20], data[20:]]):
++            self.assert_code('LIMITE_REGISTRO', lambda: list(ing.iter_features(Path('synthetic'), dataset())))
++
++    def test_output_limit(self):
++        with patch.dict(os.environ, {'IMPORT_MAX_OUTPUT_BYTES': '5'}), process_output([b'123456']) as (proc, _):
++            self.assert_code('LIMITE_SALIDA_GDAL', lambda: list(ing.iter_features(Path('synthetic'), dataset())))
++        self.assertTrue(proc.stdout.closed)
++
++    def test_output_budget_is_shared_across_layers(self):
++        data = encoded()
++        with patch.dict(os.environ, {'IMPORT_MAX_OUTPUT_BYTES': str(2 * len(data) - 1)}):
++            original = ing._process_chunks
++            commands = []
++            def per_layer(command, budget):
++                commands.append(command)
++                with process_output([data]): yield from original(command, budget)
++            with patch.object(ing, '_process_chunks', side_effect=per_layer):
++                self.assert_code('LIMITE_SALIDA_GDAL', lambda: list(ing.iter_features(Path('synthetic'), dataset(layers=2))))
++            self.assertEqual(len(commands), 2)
++
++    def test_cancel_close_and_consumer_error_reap_child(self):
++        for failure in [None, RuntimeError('consumer'), asyncio.CancelledError()]:
++            with self.subTest(failure=type(failure).__name__), process_output([encoded() + b'\n']) as (proc, _):
++                try:
++                    with closing(ing.iter_features(Path('synthetic'), dataset())) as stream:
++                        next(stream)
++                        if failure is not None: raise failure
++                except (RuntimeError, asyncio.CancelledError): pass
++                proc.kill.assert_called_once()
++                self.assertTrue(proc.stdout.closed)
++                proc.wait.assert_called_once()
++
++    def test_timeout_reaps_child(self):
++        with process_output([]) as (proc, _), patch.object(ing.select, 'select', return_value=([], [], [])):
++            self.assert_code('GDAL_TIMEOUT', lambda: list(ing.iter_features(Path('synthetic'), dataset())))
++        self.assertTrue(proc.stdout.closed)
++        proc.kill.assert_called_once()
++
++    def test_invalid_json_utf8_or_non_feature(self):
++        for payload in [b'{', b'\xff', b'[]', b'{"type":"Point"}']:
++            with self.subTest(payload=payload), process_output([payload]) as (proc, _):
++                self.assert_code('FEATURE_OGR_INVALIDO', lambda: list(ing.iter_features(Path('synthetic'), dataset())))
++            self.assertTrue(proc.stdout.closed)
++
++    def test_inspection_stdout_budget(self):
++        with patch.dict(os.environ, {'IMPORT_MAX_INSPECTION_BYTES': '5'}), process_output([b'123456']) as (proc, _):
++            self.assert_code('LIMITE_SALIDA_GDAL', lambda: ing._run_json(['ogrinfo', 'synthetic']))
++        self.assertTrue(proc.stdout.closed)
++
++    def test_inspection_valid_and_invalid_metadata(self):
++        with process_output([json.dumps(metadata()).encode()]):
++            self.assertEqual(ing._run_json(['ogrinfo']), metadata())
++        for payload in [b'[]', b'\xff', b'{']:
++            with process_output([payload]): self.assert_code('METADATOS_INVALIDOS', lambda: ing._run_json(['ogrinfo']))
++
++    def test_inspection_layer_and_feature_limits(self):
++        for options, info, code in [({'IMPORT_MAX_LAYERS': '1'}, metadata(layers=2), 'LIMITE_CAPAS'),
++                                  ({'IMPORT_MAX_FEATURES': '1'}, metadata(2), 'LIMITE_FEATURES')]:
++            with patch.dict(os.environ, options), patch.object(ing, '_run_json', return_value=info):
++                self.assert_code(code, lambda: ing.inspect_dataset(Path('synthetic')))
++
++    def test_driver_crs_and_columns_compatibility(self):
++        for driver, fmt in [('GeoJSON', 'geojson'), ('KML', 'kml'), ('GPKG', 'gpkg'), ('ESRI Shapefile', 'shp')]:
++            with patch.object(ing, '_run_json', return_value=metadata(driver=driver)):
++                d = ing.inspect_dataset(Path('synthetic'))
++            self.assertEqual((d.format, d.total_features, d.columns, d.layers[0].srid), (fmt, 1, ['name'], 4326))
++
++    def test_unknown_counts_observed_and_mismatches_rejected(self):
++        for count in [None, -1]:
++            with patch.object(ing, '_run_json', return_value=metadata(count)):
++                d = ing.inspect_dataset(Path('synthetic'))
++            self.assertFalse(d.counts_known)
++            with process_output([encoded()]): self.assertEqual(len(list(ing.iter_features(Path('synthetic'), d))), 1)
++        for count in [0, 2]:
++            with process_output([encoded()]):
++                self.assert_code('CONTEO_FEATURES_INCONSISTENTE', lambda: list(ing.iter_features(Path('synthetic'), dataset(count))))
++
++    def test_observed_feature_limit_rejects_unknown_metadata(self):
++        with patch.dict(os.environ, {'IMPORT_MAX_FEATURES': '1'}), process_output([encoded() + b'\n' + encoded()]):
++            self.assert_code('LIMITE_FEATURES', lambda: list(ing.iter_features(Path('synthetic'), dataset(-1))))
++
++    def test_per_layer_cap_rejects_instead_of_silent_ogr_limit(self):
++        with process_output([encoded() + b'\n' + encoded()]) as (_, popen):
++            self.assert_code('LIMITE_FEATURES', lambda: list(ing.iter_features(Path('synthetic'), dataset(2), limit_per_layer=1)))
++            command = popen.call_args.args[0]
++            self.assertNotIn('-limit', command)
++            self.assertIn('EPSG:4326', command)
++
++    def test_wkb_sql_quoting_and_dimensions_not_rewritten(self):
++        source = row();source['properties']['__pa_source_wkb'] = '010203'
++        payload = json.dumps(source).encode()
++        d = dataset(fmt='gpkg')
++        with process_output([payload]) as (_, popen):
++            self.assertEqual(list(ing.iter_features(Path('synthetic'), d, preserve_source_geometry=True))[0][1], source)
++            self.assertIn('hex(ST_AsBinary("geom"))', popen.call_args.args[0][popen.call_args.args[0].index('-sql') + 1])
++
++    def test_nonzero_exit_rejected(self):
++        with process_output([encoded()], returncode=1):
++            self.assert_code('CONVERSION_OGR_FALLIDA', lambda: list(ing.iter_features(Path('synthetic'), dataset())))
++
++    def zip_file(self, directory, entries):
++        p = Path(directory) / 'synthetic.zip'
++        with zipfile.ZipFile(p, 'w') as z:
++            for name, data in entries: z.writestr(name, data)
++        return p
++
++    def test_zip_legitimate_shapefile_bytes_preserved(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            p = self.zip_file(tmp, [('nested/data.shp', b'synthetic shape'), ('nested/data.dbf', b'attributes')])
++            result = archives.extract_shapefile_zip(p)
++            self.assertEqual(result.read_bytes(), b'synthetic shape')
++            self.assertEqual(result.with_suffix('.dbf').read_bytes(), b'attributes')
++
++    def test_zip_entry_count_member_and_declared_total_limits(self):
++        options = [{'IMPORT_ZIP_MAX_ENTRIES': '1'}, {'IMPORT_ZIP_MAX_MEMBER_BYTES': '1'}, {'IMPORT_MAX_UNCOMPRESSED_MB': '1'}]
++        for setting in options:
++            with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, setting):
++                p = self.zip_file(tmp, [('data.shp', b'ab'), ('data.dbf', b'x' * (1024 * 1024))])
++                with self.assertRaises(ing.IngestionError): archives.extract_shapefile_zip(p)
++                self.assertFalse(p.with_suffix('').exists())
++                self.assertTrue(p.exists())
++
++    def test_zip_observed_budget_does_not_trust_metadata(self):
++        for individual in [True, False]:
++            with tempfile.TemporaryDirectory() as tmp:
++                p = Path(tmp) / 'synthetic.zip'
++                info = zipfile.ZipInfo('data.shp');info.file_size = 0
++                fake = MagicMock()
++                fake.__enter__.return_value = fake
++                fake.infolist.return_value = [info]
++                fake.open.return_value = io.BytesIO(b'actual bytes exceed the declared size')
++                limits = gis_limits.load_limits()
++                from dataclasses import replace
++                limits = replace(limits, zip_member_bytes=4 if individual else 100, zip_total_bytes=100 if individual else 4)
++                with patch.object(archives, 'load_limits', return_value=limits), patch.object(archives.zipfile, 'ZipFile', return_value=fake):
++                    self.assert_code('LIMITE_ZIP_BYTES', lambda: archives.extract_shapefile_zip(p))
++                self.assertFalse(p.with_suffix('').exists())
++
++    def test_zip_real_total_accumulates_across_members(self):
++        from dataclasses import replace
++        with tempfile.TemporaryDirectory() as tmp:
++            p = Path(tmp) / 'synthetic.zip'
++            entries = [zipfile.ZipInfo('data.shp'), zipfile.ZipInfo('data.dbf')]
++            fake = MagicMock();fake.__enter__.return_value = fake
++            fake.infolist.return_value = entries
++            fake.open.side_effect = [io.BytesIO(b'abcd'), io.BytesIO(b'efgh')]
++            limits = replace(gis_limits.load_limits(), zip_member_bytes=6, zip_total_bytes=6)
++            with patch.object(archives, 'load_limits', return_value=limits), patch.object(archives.zipfile, 'ZipFile', return_value=fake):
++                # Bypass only the first member's metadata consistency check: 4+4
++                # actual bytes must exceed the total even though each member fits.
++                entries[0].file_size = 4
++                self.assert_code('LIMITE_ZIP_BYTES', lambda: archives.extract_shapefile_zip(p))
++            self.assertFalse(p.with_suffix('').exists())
++
++    def test_zip_paths_symlinks_duplicates_and_bad_archives_clean_up(self):
++        link = zipfile.ZipInfo('link.shp');link.external_attr = (stat.S_IFLNK | 0o777) << 16
++        for entries in [[('../outside.shp', b'x')], [('C:\\outside.shp', b'x')], [(link, b'target')],
++                        [('data.shp', b'a'), ('data.shp', b'b')], [('no-shape.txt', b'x')]]:
++            with tempfile.TemporaryDirectory() as tmp:
++                import warnings
++                with warnings.catch_warnings():
++                    warnings.simplefilter('ignore', UserWarning)
++                    p = self.zip_file(tmp, entries)
++                with self.assertRaises(ing.IngestionError): archives.extract_shapefile_zip(p)
++                self.assertFalse(p.with_suffix('').exists())
++                self.assertFalse((Path(tmp).parent / 'outside.shp').exists())
++        with tempfile.TemporaryDirectory() as tmp:
++            p = Path(tmp) / 'bad.zip';p.write_bytes(b'not zip')
++            with self.assertRaises(ing.IngestionError): archives.extract_shapefile_zip(p)
++            self.assertFalse(p.with_suffix('').exists())
++
++    def test_zip_existing_directory_and_foreign_files_preserved(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            p = self.zip_file(tmp, [('data.shp', b'valid')])
++            target = p.with_suffix('');target.mkdir();keep = target / 'foreign';keep.write_bytes(b'keep')
++            self.assert_code('ZIP_DESTINO_EXISTENTE', lambda: archives.extract_shapefile_zip(p))
++            self.assertEqual(keep.read_bytes(), b'keep')
++
++    def test_zip_cancellation_cleans_created_tree(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            p = self.zip_file(tmp, [('data.shp', b'valid')])
++            with patch.object(zipfile.ZipFile, 'open', side_effect=asyncio.CancelledError()):
++                with self.assertRaises(asyncio.CancelledError): archives.extract_shapefile_zip(p)
++            self.assertFalse(p.with_suffix('').exists())
++
++    def load_function(self, file, name, namespace):
++        tree = ast.parse((ROOT / file).read_text())
++        function = next(n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name)
++        future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
++        code = ast.fix_missing_locations(ast.Module(body=[future, function], type_ignores=[]))
++        exec(compile(code, file, 'exec'), namespace)
++        return namespace[name]
++
++    def test_legacy_staging_error_closes_reader_rolls_back_and_cleans_owned_files(self):
++        from unittest.mock import AsyncMock
++        class HTTPError(Exception):
++            def __init__(self, status_code, detail): self.status_code, self.detail = status_code, detail
++        with tempfile.TemporaryDirectory() as tmp:
++            path = Path(tmp) / 'upload.geojson';path.write_bytes(b'synthetic')
++            record = SimpleNamespace(id_importacion=1, estado='procesando')
++            models = MagicMock()
++            models.ImportacionArchivo.side_effect = lambda **kwargs: record
++            db = MagicMock();db.query.return_value.filter.return_value.first.return_value = None
++            db.get.return_value = record
++            commits = []
++            db.commit.side_effect = lambda: commits.append(record.estado)
++            closed = []
++            def reader(*args):
++                try:
++                    yield 'layer0', row()
++                    raise ing.IngestionError('LIMITE_FEATURES', 'Limite sintetico')
++                finally: closed.append(True)
++            ns = dict(HTTPException=HTTPError, ALLOWED_TARGETS={'trazo_proyecto'},
++                _store_upload=AsyncMock(return_value=(path, '0'*64, 9, path.name, 'geojson')),
++                require_project_access=MagicMock(), models=models, _extract_zip=archives.extract_shapefile_zip,
++                inspect_dataset=lambda p: dataset(), set_audit_context=MagicMock(), iter_features=reader,
++                closing=closing, _normalize_geometry=lambda *a: ('POINT(0 0)', None),
++                WKTElement=lambda *a, **kw: None, datetime=__import__('datetime').datetime,
++                timezone=__import__('datetime').timezone, IngestionError=ing.IngestionError,
++                zipfile=zipfile, shutil=__import__('shutil'))
++            stage = self.load_function('backend/app/services/geospatial_imports.py', 'stage_import', ns)
++            with self.assertRaises(HTTPError) as error:
++                asyncio.run(stage(db, 1, 'trazo_proyecto', 'Synthetic', None, {}, None, SimpleNamespace(id_usuario=1)))
++            self.assertEqual(error.exception.detail, 'Limite sintetico')
++            self.assertEqual(record.estado, 'error')
++            self.assertNotIn('previsualizado', commits)
++            db.rollback.assert_called_once()
++            self.assertEqual(closed, [True])
++            self.assertFalse(path.exists())
++
++    def test_reconciliation_inspection_failure_rolls_back_without_residue(self):
++        from unittest.mock import AsyncMock
++        class HTTPError(Exception):
++            def __init__(self, status_code, detail): self.status_code, self.detail = status_code, detail
++        with tempfile.TemporaryDirectory() as tmp:
++            path = self.zip_file(tmp, [('data.shp', b'synthetic')])
++            legacy = ModuleType('app.services.geospatial_imports')
++            legacy._store_upload = AsyncMock(return_value=(path, '0'*64, path.stat().st_size, path.name, 'zip'))
++            legacy._extract_zip = archives.extract_shapefile_zip
++            db = MagicMock();db.query.return_value.filter_by.return_value.first.return_value = None
++            ns = dict(__package__='app.services', HTTPException=HTTPError, require_project_access=lambda *a, **k: SimpleNamespace(id_proyecto=1),
++                working_srid=lambda *a: 4326, models=MagicMock(), set_audit_context=MagicMock(),
++                PIPELINE_VERSION='synthetic', inspect_dataset=MagicMock(side_effect=ing.IngestionError('LIMITE_CAPAS','Limite sintetico')))
++            stage = self.load_function('backend/app/services/gis_reconciliation.py', 'stage', ns)
++            with patch.dict(sys.modules, {'app.services.geospatial_imports': legacy}):
++                with self.assertRaises(HTTPError) as error:
++                    asyncio.run(stage(db, 1, 'Synthetic', None, None, SimpleNamespace(id_usuario=1), target='nucleo_agrario', strict=False))
++            self.assertEqual(error.exception.detail, 'Limite sintetico')
++            db.rollback.assert_called_once()
++            self.assertFalse(path.exists())
++            self.assertFalse(path.with_suffix('').exists())
++            db.commit.assert_not_called()
++
++    def test_no_database_or_application_loaded(self):
++        for name in ['app.database', 'app.main', 'sqlalchemy', 'app.models']:
++            self.assertNotIn(name, sys.modules)
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/docs/security/SS-03-ETAPA1-CORRECCION-2026-10-28.md b/docs/security/SS-03-ETAPA1-CORRECCION-2026-10-28.md
+new file mode 100644
+index 0000000..bc33568
+--- /dev/null
++++ b/docs/security/SS-03-ETAPA1-CORRECCION-2026-10-28.md
+@@ -0,0 +1,148 @@
++# SS-03 — Etapa 1: corrección de presupuestos de inspección, lectura y ZIP
++
++Fecha de entrega: 2026-10-28. Referencia: `dev`, HEAD `683ff75613768de28a7127c7e33a6e2ef4fc40ff`.
++
++## Resultado y alcance
++
++Primera etapa implementada y comprobada con **32 pruebas aisladas aprobadas, 0 fallos**. Corrige unidades GDAL y limita la salida de inspección, los registros GeoJSONSeq, bytes totales procesados, capas/features y extracción ZIP. Los excesos se rechazan explícitamente, sin truncar geometrías ni aceptar una importación parcial por un límite de recursos. No se declara cerrado SS-03 completo ni se acredita rendimiento o aislamiento de producción.
++
++Se preservaron íntegros los cambios locales anteriores de SS-01, su prueba, patch e informes mediante comparación SHA-256 antes/después. No se editaron sus documentos para cambiar su estado. El índice y HEAD permanecen intactos. No hubo SSH, acceso a servicios institucionales, conexión a PostgreSQL, Docker, migraciones, instalación, commit/push/merge/checkout ni despliegue.
++
++## Inventario e inspección previa
++
++Se leyeron gis_ingestion.py, geospatial_imports.py, gis_reconciliation.py, el router geospatial_imports, database.py, Compose y las fuentes de pruebas de importaciones DDV/núcleos/parcelas, preflight, conciliación y concurrencia. También los cuatro informes de auditoría solicitados. database.py y el router no se modificaron; las sesiones, autorizaciones y políticas de roles quedan fuera de esta intervención.
++
++| Flujo | Entrada y recorrido | Presupuestos aplicados |
++|---|---|---|
++| Legacy trazo | GeoJSON/JSON, KML, GPKG o ZIP/Shapefile → stage_import | Almacenamiento existente, ZIP si corresponde, inspección y lectura comunes; error explícito y limpieza del intento fallido |
++| Legacy núcleo/parcela con mapping | stage_import delega a reconciliation.stage(strict=False) | Mismos límites comunes y extracción; reglas de matching existentes |
++| DDV | stage_ddv_import → stage estricto GPKG | Inspección/lectura comunes, una capa espacial como antes, entrega completa |
++| Núcleo/parcela GPKG | stage_nucleus_import/stage_parcel_import → stage estricto | Inspección/lectura comunes, una capa espacial, entrega completa/parcial conservada |
++
++Todos los consumidores de inspect_dataset/iter_features localizados pertenecen a esos flujos y sus pruebas. No hay archivos .gpkg/.geojson/.kml/.zip/.shp versionados en el SHA; las fuentes inspeccionadas generan fixtures sintéticas de pocas features, por ejemplo 1–6, polígonos pequeños y casos multicapas/CRS/dimensiones. No hay evidencia para dimensionar datasets institucionales o capacidad de RAM/disco. Los archivos auxiliares locales ignorados y los datos institucionales no se procesaron.
++
++Compose y .env.example declaraban 100 MiB por archivo y timeout GDAL de 300 s. El extractor tenía 500 MiB expandidos como default Python, sin exponer esa variable en el entorno de Compose. El proceso de auditoría no tenía overrides de las variables IMPORT de recursos consultadas. No se leyó .env ni se inspeccionó configuración efectiva de contenedores/servidor.
++
++## Archivos de esta intervención
++
++| Archivo | Tipo / propósito |
++|---|---|
++| backend/app/services/gis_ingestion.py | Modificado: unidades, stdout limitado, buffers y conteos |
++| backend/app/services/geospatial_imports.py | Modificado: extracción común, cierre explícito del lector y limpieza legacy ante fallos |
++| backend/app/services/gis_reconciliation.py | Modificado: cierre del lector y conteos observados cuando GDAL no informa cantidad |
++| docker-compose.yml | Modificado: sólo exposición de variables de presupuestos en el anchor del backend |
++| backend/app/services/gis_limits.py | Nuevo: configuración positiva, independiente y con valores finitos |
++| backend/app/services/gis_archives.py | Nuevo: extracción ZIP aislable mediante stdlib, límites y propiedad del directorio |
++| tests/security/test_gis_resource_limits.py | Nuevo: suite unittest fuera de conftest de backend |
++| docs/security/SS-03-ETAPA1-CORRECCION-2026-10-28.md | Nuevo: este informe |
++| docs/security/SS-03-ETAPA1-CORRECCION-2026-10-28.patch | Nuevo: diff completo de la intervención salvo el patch mismo |
++
++No hay cambios propios en frontend, documentos, autenticación, roles, esquema, migraciones, Dockerfiles ni dependencias. El patch incluye los siete archivos de código/configuración/pruebas y este informe; excluye expresamente todos los cambios previos de SS-01 y no puede incluirse a sí mismo. La mayor parte de la diferencia de indentación de staging se debe a closing/try/finally. Se comprobó por AST que los cuerpos de los bucles de procesamiento de features, incluidas sus cadenas SQL, son idénticos a HEAD; sólo cambia el envoltorio de control de recursos y el cierre de conteos.
++
++## Límites, unidades y justificación
++
++Son **techos iniciales de política por operación**, configurables y sujetos a validación QA con datasets representativos. No son capacidades medidas ni garantías de consumo RSS. Se eligió margen sobre fixtures pequeñas, conservando el techo de archivo/ZIP previo y separando los tamaños de fuente, registro y salida. Ningún valor habilita ilimitado: las nuevas variables deben ser enteros positivos. Una configuración inválida falla cerrada; no se sustituye por cero o ilimitado.
++
++| Variable | Default | Unidad y alcance | Justificación |
++|---|---:|---|---|
++| IMPORT_MAX_FILE_SIZE_MB | 100 (sin cambio) | MiB por archivo de entrada; conversión a bytes en _store_upload | Techo previo, independiente del driver y de su salida |
++| IMPORT_GEOJSON_MAX_FEATURE_MB | 16 | MB según opción nativa GDAL, por feature GeoJSON | Sustituye el valor erróneo; limita un objeto grande sin imponer tamaño de archivo de 16 MB |
++| IMPORT_MAX_RECORD_BYTES | 67108864 | 64 MiB por registro de salida GeoJSONSeq | Margen para geometría, atributos, WKB hexadecimal y representaciones duplicadas; no trunca |
++| IMPORT_MAX_OUTPUT_BYTES | 536870912 | 512 MiB de stdout de ogr2ogr, acumulado entre capas | Expansión finita para todos los formatos, separada del archivo/registro |
++| IMPORT_MAX_INSPECTION_BYTES | 8388608 | 8 MiB de stdout de ogrinfo | Evita capture_output sin límite; metadatos de más capas/columnas se rechazan |
++| IMPORT_MAX_LAYERS | 16 | Capas espaciales por operación | Límite para formatos genéricos; GPKG estricto conserva máximo una capa espacial |
++| IMPORT_MAX_FEATURES | 100000 | Features globales por operación, declaradas y observadas | Techo finito de crecimiento de staging; no sustituye CPU/RAM/cuotas globales |
++| IMPORT_ZIP_MAX_ENTRIES | 2048 | Entradas ZIP, incluidos directorios | Acota cantidad de archivos y evita bypass mediante entradas vacías |
++| IMPORT_ZIP_MAX_MEMBER_BYTES | 268435456 | 256 MiB expandidos por miembro | Evita que un único auxiliar consuma todo el presupuesto |
++| IMPORT_MAX_UNCOMPRESSED_MB | 500 | MiB expandidos totales | Preserva el techo previo y ahora verifica bytes reales acumulados |
++| IMPORT_GDAL_TIMEOUT_SECONDS | 300 (sin cambio) | Segundos por proceso | No es un timeout integral de importación; permanece pendiente etapa 2 |
++
++La [documentación oficial de GeoJSON GDAL](https://gdal.org/en/stable/drivers/vector/geojson.html) expresa OGR_GEOJSON_MAX_OBJ_SIZE en MBytes y permite cero como ilimitado. Ahora recibe el entero positivo 16 por defecto, **sin multiplicarlo por 1048576**. El caso configurable de prueba usa 7 y comprueba que la entrada de 100 MiB no cambia ese valor. La función anterior evaluada aisladamente con defaults producía 104857600: falla la nueva expectativa de unidades. La elección del default 16 es una política explícita adicional a corregir la unidad, no una afirmación de equivalencia con el umbral accidental anterior.
++
++Compose sólo añade las variables al anchor ya utilizado por backend. Esto es necesario para que una variable del archivo de entorno Compose llegue realmente al contenedor; no basta con documentarla en .env. No se alteraron servicios, red, montajes o límites del daemon y no se ejecutó Compose. La configuración efectiva del despliegue queda pendiente de una fase autorizada.
++
++## Comportamiento e integridad
++
++### Inspección y GeoJSONSeq
++
++_run_json usa Popen y lectura binaria acotada de stdout en lugar de capture_output. stderr se descarta sin acumularlo. Se rechaza antes de incorporar al buffer un chunk que exceda el presupuesto. La inspección JSON se valida como objeto y los errores se convierten en IngestionError con mensaje controlado.
++
++iter_features conserva bytes en un bytearray acotado y decodifica JSON sólo cuando hay registro completo. Soporta UTF-8 fragmentado, CRLF, separador RS, múltiples registros por lectura y última línea sin LF. El LF delimitador no cuenta en el máximo del registro; RS/CR sí cuentan si están presentes. La salida total cuenta todos los bytes, incluidos delimitadores y líneas vacías. No se recortan atributos, coordenadas ni geometrías para que quepan.
++
++El helper de proceso conserva stdin cerrado, argumentos como lista sin shell y timeout; en finally mata el hijo GDAL directo si sigue vivo, espera su terminación y cierra stdout. Tanto iter_features como sus consumidores usan closing para propagar el cierre al fallar el parser, el presupuesto o el cuerpo de procesamiento de una feature. GeneratorExit/cancelación y errores de consumo no dependen del garbage collector para limpiar. Las pruebas usan procesos simulados: el comportamiento nativo del sistema operativo y GDAL requiere validación posterior.
++
++Se verifican capas y suma de features declaradas antes de iterar, y features realmente leídas antes de entregarlas al consumidor. Conteos ausentes/negativos se representan internamente como desconocidos, no como archivo vacío. El total inicial para persistencia es la suma no negativa disponible; al terminar se sustituye por el total observado. Cada conteo conocido debe coincidir con su capa; una discrepancia rechaza la operación. El argumento interno limit_per_layer, sin consumidores actuales localizados, ahora es un presupuesto de rechazo; **no añade -limit al comando GDAL**.
++
++Los rechazos pueden ocurrir tras haber entregado features válidas al servicio; no equivalen a una importación aceptada parcialmente. Legacy revierte staging, marca su cabecera existente en error y devuelve 422 con detalle controlado. Conciliación revierte su transacción y devuelve 422; sólo llega a previsualizado al terminar el lector y validar los conteos. No se modifica la semántica funcional de entrega completa/parcial ni decisiones de confirmar/ignorar features. Su atomicidad real contra PostgreSQL permanece pendiente de las suites QA.
++
++### ZIP y almacenamiento
++
++Se validan rutas normalizadas, absolutos, .., symlinks/archivos especiales y pertenencia a raíz; se crean archivos de forma exclusiva y se conserva la exigencia de un único .shp. Antes de extraer se verifican número de entradas y tamaños declarados individual/total. Durante copia se cuentan los bytes efectivamente leídos y escritos por miembro y en toda la extracción; una discrepancia de tamaño se rechaza. Los presupuestos efectivos no dependen sólo del directorio central ZIP.
++
++El directorio privado de extracción se crea sin exist_ok y antes del bloque que podría borrarlo. Si ya existe, se rechaza sin eliminarlo. Ante error, rechazo o cancelación se elimina únicamente el directorio recién creado; el caller elimina el upload fallido. Los callers sólo limpian una extracción después de que _extract_zip haya retornado una ruta, evitando borrar una carpeta ajena cuando falla la creación. Las cancelaciones durante almacenamiento de upload también limpian el archivo parcial.
++
++La política previa de retención de originales legacy exitosos se conserva; conciliación sigue eliminando originales en finally. No se añade borrado global ni tarea de retención. Las cuotas son por operación, no un máximo de uso total del volumen.
++
++### Contratos conservados
++
++No se editaron normalización CRS/4326, SQL de geometría, dimensiones/WKB, identificación/matching, SAFE_FIELDS, SHA-256, versiones, historial, decisiones o autorizaciones. Las funciones de normalización/confirmación y demás funciones de esos módulos no cambiaron por AST; los cuerpos de procesamiento dentro de los dos bucles iteradores son idénticos. La nueva configuración y el rechazo explícito sí pueden impedir importar datos legítimos que superen los techos: esto requiere ajuste deliberado y revisión con datasets representativos.
++
++## Pruebas, resultados y omisiones
++
++Comando seguro ejecutado, sin importar conftest de backend:
++
++```sh
++python3 -B -m unittest discover -s tests/security -p 'test_gis_resource_limits.py' -v
++```
++
++Resultado final: **Ran 32 tests; OK**. Todos son stdlib, datos sintéticos y directorios temporales; se mockean Popen/select/read para no lanzar GDAL. Los tests de staging ejecutan funciones extraídas por AST con DB/modelos simulados; no importan app.database/app.main/SQLAlchemy ni conectan a BD. La prueba dedicada verifica que esos módulos no fueron cargados. No se crearon usuarios, sesiones, importaciones reales ni servicios.
++
++| Escenario requerido | Evidencia |
++|---|---|
++| Unidades correctas | Default 16 y override 7; independencia de upload; baseline 104857600 contradice la nueva expectativa |
++| Features válidas y excesos | Exactamente en límite, por encima, salida agregada y por capa, límites observados y declarados |
++| UTF-8 y ausencia de LF final | Fragmentación de un byte, texto con acentos/emoji y registro final completo |
++| ZIP entradas/presupuesto | Conteo máximo, declarado individual/total y bytes reales con metadatos simulados incorrectos |
++| Temporales y cancelación | Directorio ajeno intacto, extracción fallida/bad ZIP/symlink/duplicados, cancelación y cierre de lector |
++| Conteos inconsistentes | Menos/más que GDAL, desconocidos aceptados sólo bajo control observado |
++| Compatibilidad legítima | CRS/columnas por cuatro drivers en metadatos simulados, coordenadas Z/WKB intactas, archivos auxiliares copiados byte a byte |
++| Error de servicio | Legacy simulado: rollback, cabecera error, lector cerrado y upload eliminado; conciliación: rollback/limpieza al fallar inspección |
++
++Comprobaciones adicionales: ast.parse de seis archivos Python válidos; git diff --check sin problemas; AST de bucles y funciones comparado con HEAD; hashes de todos los archivos preexistentes SS-01/documentos iguales al inicio; índice Git sin cambios. La comprobación inversa del patch se hace con --check, no aplica ni revierte nada.
++
++Omitidas: suites backend/tests/test_geospatial_imports.py, test_ddv_gpkg_imports.py, test_nucleus_gpkg_imports.py, test_parcel_gpkg_imports.py, test_gis_preflight_024.py, test_gis_confirmation_024.py, test_gis_concurrency_026.py y demás suites GIS con PostgreSQL/GDAL. conftest exige BD test pero también abre conexiones y hace escrituras. No hay autorización ni BD QA desechable verificada. ogrinfo/ogr2ogr no están instalados aquí. No se instaló nada ni se usó Docker para suplirlos. Las pruebas puras de extracción no certifican que el contenido sintético de un .shp sea un dataset nativo válido; prueban el extractor, no el parser GDAL.
++
++## Riesgos de regresión y aceptación posterior
++
++1. Features grandes, WKB hexadecimal, muchas columnas/capas o conversiones expansivas pueden superar presupuestos legítimamente. Medir en QA con muestras autorizadas antes de decidir cambios de límites; no liberar valores ilimitados como solución.
++2. Drivers con conteos conocidos pero inexactos ahora rechazan explícitamente; cotejar versiones GDAL y fixtures por formato. Conteos desconocidos se resuelven por observación y deben probarse con triggers reales.
++3. Cerrar el lector y limpiar archivos ante fallos modifica la retención de intentos fallidos. No se cambia la procedencia técnica guardada ni se elimina evidencia ajena; revisar recuperación operacional con BD real de QA.
++4. El helper de procesos usa pipes/select de Linux, como la implementación existente. No se validó Windows ni comportamiento nativo bajo señales, fallos del disco o procesos no interrumpibles del kernel.
++5. Los consumidores que monkeypatcheen iter_features con objetos sin close deben ajustarse al contrato de generador; los consumidores reales utilizan el generador existente. No se aceptan colecciones parciales por presupuesto.
++
++Antes de aprobar para despliegue se requiere ensayo GDAL real en sandbox/QA con fixtures válidas de cada formato, CRS/Z/M y límites justo debajo/encima; suites de conciliación, idempotencia, historial y concurrencia en PostgreSQL desechable; y verificación del entorno efectivo de límites. No se ejecutan en esta intervención.
++
++## Residuales: SS-03 etapa 2 y SS-02
++
++- No hay límite integral de tiempo/CPU/RSS de la importación, ni cuotas agregadas de disco/BD/concurrencia por usuario/proyecto. JSON/Python/ORM pueden ocupar más memoria que los bytes de entrada/salida. Un archivo menor al máximo puede ser costoso para PostGIS.
++- ogrinfo/GDAL aún pueden consumir memoria antes de escribir stdout. ZipFile analiza el directorio central antes de poder contar entradas; no es un sandbox del parser. El límite de upload restringe el archivo pero no todo el coste interno de lectura.
++- La conversión sigue siendo síncrona dentro de rutas async y las transacciones/bloqueos existentes no fueron rediseñados. Timeout por proceso/capa no equivale a deadline integral ni cancela SQL. Los grandes universos administrativos y queries siguen pendientes.
++- El cierre supervisa al hijo directo GDAL, no crea un worker ni una frontera para descendientes/red/filesystem. La terminación y recuperación bajo muerte abrupta del host, falta de espacio/permisos o proceso no interrumpible requiere controles operativos.
++- SS-02 debe resolver usuario mínimo, entorno sin secretos, drivers permitidos, filesystem privado, red/egress y límites del contenedor/worker. La herencia de entorno GDAL se conserva y no se presenta como remediada.
++- Nuevas cuotas de vértices/complejidad, almacenamiento agregado, colas/worker, statement_timeout/lock_timeout y cancelación integral pertenecen a una etapa posterior revisada, no a cambios improvisados de esta entrega.
++
++Se detiene después de entregar esta etapa. No se inicia SS-02 ni SS-03 etapa 2.
++
++## Identidad de los cambios de código
++
++| Archivo | SHA-256 final |
++|---|---|
++| `backend/app/services/gis_ingestion.py` | `49c150998b8354f337ca5f07fc1b235d99cdc92af7fa64af103cbcd85ab666de` |
++| `backend/app/services/geospatial_imports.py` | `63b6df6caff39f6154f3e2713285800fb10fc8c4158162d5c7ce9581257d66b9` |
++| `backend/app/services/gis_reconciliation.py` | `9f8c4bf1b37e3354ed70b33e35e0550bdbd97a51373d722a336ffdd09a1d1977` |
++| `docker-compose.yml` | `007ab97b951ee84ea7feba0b06e76c04a2d5b2fbc3434c7e96a2a3c7cad8b5ee` |
++| `backend/app/services/gis_limits.py` | `a5063763a87e9e92a3a6376436b9322bda2268e07c700592de505ec6bb294aad` |
++| `backend/app/services/gis_archives.py` | `ac2a1adccb60bf82b73568cabcb78dd5eaf2b9fb043d72668008175229e74ba2` |
++| `tests/security/test_gis_resource_limits.py` | `435763a2b4bd72ffb646488a13460bc35581a79f5ca8f92b04d27afc35ca3dea` |
++
++Diff completo: [SS-03-ETAPA1-CORRECCION-2026-10-28.patch](SS-03-ETAPA1-CORRECCION-2026-10-28.patch). No incluye la corrección previa de SS-01.
