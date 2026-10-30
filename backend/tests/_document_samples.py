@@ -35,7 +35,7 @@ def minimal_png():
 
 def minimal_jpeg():
     # Baseline grayscale 1x1: one all-zero DCT block, Huffman codes DC0/EOB0,
-    # entropy bits 00 padded with 1s. No native decoder is executed in tests.
+    # entropy bits 00 padded with 1s. Decoded by Pillow in the isolated SS-06 worker tests.
     def segment(marker, payload): return bytes([255, marker]) + struct.pack('>H', len(payload) + 2) + payload
     counts = b'\x01' + b'\x00' * 15
     return (b'\xff\xd8' + segment(0xdb, b'\x00' + b'\x01' * 64)

@@ -60,13 +60,17 @@ class FormatTests(unittest.TestCase):
                         re.sub(rb'startxref\n\d+', b'startxref\n99999999', valid)]:
             self.rejects(invalid, '.pdf')
 
-    def test_pdf_incremental_final_reference_and_xref_stream_envelope(self):
+    def test_pdf_genuine_incremental_update_and_forged_xref_stream(self):
+        from pypdf import PdfWriter
         valid = minimal_pdf()
-        # Synthetic incremental tail points at an existing object. Envelope only,
-        # not a claim that this fixture has a semantically valid XRef stream.
+        writer = PdfWriter(io.BytesIO(valid), incremental=True)
+        writer.add_metadata({'/Title': 'SS06 genuine incremental update'})
+        output = io.BytesIO(); writer.write(output)
+        self.assertEqual(self.validate(output.getvalue(), '.pdf'), 'application/pdf')
+        # A pointer to an ordinary object is not a valid XRef stream.
         offset = valid.index(b'1 0 obj')
         wrapped = valid + f'\nstartxref\n{offset}\n%%EOF\n'.encode()
-        self.assertEqual(self.validate(wrapped, '.pdf'), 'application/pdf')
+        self.rejects(wrapped, '.pdf')
 
     def test_png_truncation_crc_dimensions_and_arbitrary_signature_bytes(self):
         valid = minimal_png()
@@ -152,12 +156,16 @@ class FormatTests(unittest.TestCase):
         data = package(office_parts())
         for changes in [dict(entries=2), dict(directory_bytes=1)]:
             with patch.object(validator.zipfile, 'ZipFile', side_effect=AssertionError('must reject before indexing')):
-                self.rejects(data, '.docx', 'DOCUMENT_ZIP_LIMIT', limits=replace(self.limits, **changes))
+                with self.assertRaises(validator.DocumentValidationError) as error:
+                    validator._ooxml(data, '.docx', replace(self.limits, **changes))
+                self.assertEqual(error.exception.code, 'DOCUMENT_ZIP_LIMIT')
         # Lie about declared entry count; observed central records still checked.
         forged = bytearray(data); end = forged.rfind(b'PK\x05\x06')
         struct.pack_into('<HH', forged, end + 8, 1, 1)
         with patch.object(validator.zipfile, 'ZipFile', side_effect=AssertionError('must reject before indexing')):
-            self.rejects(bytes(forged), '.docx', 'DOCUMENT_ZIP_INVALID')
+            with self.assertRaises(validator.DocumentValidationError) as error:
+                validator._ooxml(bytes(forged), '.docx', self.limits)
+            self.assertEqual(error.exception.code, 'DOCUMENT_ZIP_INVALID')
 
     def test_zip_profile_crc_truncation_prefix_trailing_data_and_zip64_rejected(self):
         data = package(office_parts(), zipfile.ZIP_STORED)
@@ -190,7 +198,9 @@ class FormatTests(unittest.TestCase):
         archive = MagicMock(); archive.__enter__.return_value = archive; archive.infolist.return_value = infos
         stream = io.BytesIO(b'xx'); archive.open.return_value = stream
         with patch.object(validator.zipfile, 'ZipFile', return_value=archive):
-            self.rejects(data, '.docx', 'DOCUMENT_ZIP_LIMIT', limits=replace(self.limits, member_bytes=1))
+            with self.assertRaises(validator.DocumentValidationError) as error:
+                validator._ooxml(data, '.docx', replace(self.limits, member_bytes=1))
+            self.assertEqual(error.exception.code, 'DOCUMENT_ZIP_LIMIT')
         self.assertTrue(stream.closed); archive.__exit__.assert_called_once()
 
     def test_client_mime_generic_alias_normalization_and_mismatch(self):
@@ -201,11 +211,11 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(self.validate(package(office_parts()), '.docx', 'application/zip'), validator.MIME_BY_EXTENSION['.docx'])
         self.assertEqual(self.validate(minimal_jpeg(), '.jpeg', 'image/jpg'), 'image/jpeg')
 
-    def test_explicit_limitations_no_claim_of_pixel_decode_or_pdf_semantics(self):
-        # Correct framing/CRCs with undecodable IDAT is outside this stage.
+    def test_real_pixel_decode_and_embedded_binary_limitation(self):
+        # Correct framing/CRCs do not make an invalid pixel stream acceptable.
         data = b'\x89PNG\r\n\x1a\n' + png_chunk(b'IHDR', struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0))
         data += png_chunk(b'IDAT', b'synthetic not zlib') + png_chunk(b'IEND', b'')
-        self.assertEqual(self.validate(data, '.png'), 'image/png')
+        self.rejects(data, '.png')
         # Ancillary Office binaries are checked for CRC/budget, not disarmed.
         parts = office_parts(); parts['word/embeddings/synthetic.bin'] = b'INERT SYNTHETIC EMBEDDED OBJECT'
         self.assertEqual(self.validate(package(parts), '.docx'), validator.MIME_BY_EXTENSION['.docx'])
@@ -224,7 +234,8 @@ def service_functions():
     tree = ast.parse((ROOT / 'backend/app/services/documents.py').read_text())
     names = {'store_version', '_safe_original_name', 'upload_root', 'safe_version_path'}
     nodes = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in names]
-    ns = dict(Path=Path, os=os, re=re, uuid=uuid, hashlib=hashlib, func=MagicMock(),
+    from starlette.concurrency import run_in_threadpool
+    ns = dict(run_in_threadpool=run_in_threadpool, Path=Path, os=os, re=re, uuid=uuid, hashlib=hashlib, func=MagicMock(),
         ALLOWED_EXTENSIONS={'.pdf', '.docx', '.xlsx', '.jpg', '.jpeg', '.png'}, MAX_UPLOAD_BYTES=65536,
         models=SimpleNamespace(DocumentoVersion=Version), require_document_access=MagicMock(),
         set_audit_context=MagicMock(), HTTPException=HTTPError,

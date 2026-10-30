@@ -341,8 +341,18 @@ class ServiceFailureTests(unittest.TestCase):
         self.assertEqual(list(self.root.rglob('.pending-*')), [])
 
     def test_storage_error_rejects_before_record_commit(self):
-        with patch.object(storage.os, 'write', side_effect=OSError(errno.ENOSPC, 'synthetic')):
-            with self.assertRaises(Exception) as caught: self.upload()
+        # Inject failure only during storage, not the validation worker's stdin.
+        original_stage = self.ns['stage_document']
+        def failing_stage(*args):
+            from contextlib import contextmanager
+            @contextmanager
+            def context():
+                with patch.object(storage.os, 'write', side_effect=OSError(errno.ENOSPC, 'synthetic')):
+                    with original_stage(*args) as staged:
+                        yield staged
+            return context()
+        self.ns['stage_document'] = failing_stage
+        with self.assertRaises(Exception) as caught: self.upload()
         self.assertEqual(caught.exception.status_code, 507)
         self.db.add.assert_not_called(); self.db.commit.assert_not_called()
         self.assertEqual(list(self.root.rglob('*.pdf')), [])

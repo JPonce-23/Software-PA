@@ -24,7 +24,7 @@ SOURCES=('backend/requirements.txt','backend/tests/requirements-convenio-report.
  'docker-compose.prod.yml','docker-compose.ssalfer.yml',
  'backend/tests/convenio_report_compose.yml','backend/tests/lineage_compose.yml')
 LEGACY_SOURCES=('frontend/package.json','frontend/package-lock.json','frontend/Dockerfile','frontend/.dockerignore')
-APP_IMPORTS={'fastapi':'fastapi','sqlalchemy':'sqlalchemy','pydantic':'pydantic',
+APP_IMPORTS={'PIL':'pillow','pypdf':'pypdf','fastapi':'fastapi','sqlalchemy':'sqlalchemy','pydantic':'pydantic',
  'geoalchemy2':'geoalchemy2','psycopg2':'psycopg2-binary','bcrypt':'bcrypt',
  'dotenv':'python-dotenv','pandas':'pandas','numpy':'numpy','openpyxl':'openpyxl',
  'httpx':'httpx','aiofiles':'aiofiles','starlette':'starlette','passlib':'passlib'}

@@ -52,9 +52,13 @@ class SupplyChainTests(unittest.TestCase):
         self.assertEqual(json.dumps(one,sort_keys=True),json.dumps(two,sort_keys=True))
         self.assertEqual(one['assessment'],'incomplete_requires_qa')
         self.assertTrue(one['local_integrity_ok'])
-        self.assertEqual(len(one['python']),42);self.assertEqual(len(one['node']['locked']),0)
+        self.assertEqual(len(one['python']),44);self.assertEqual(len(one['node']['locked']),0)
         self.assertEqual(one['node']['source_status'],'absent_retired')
         self.assertEqual(len(one['vendors']['files']),20)
+        parsers = {row['name']: row for row in one['python'] if row['name'] in ('pypdf', 'pillow')}
+        self.assertEqual({name: row['declared_version'] for name, row in parsers.items()},
+                         {'pypdf': '6.21.4', 'pillow': '13.0.0'})
+        self.assertTrue(all(row['app_import_observed'] for row in parsers.values()))
         self.assertTrue(all(p['installed_version'] is None and p['distribution_hash'] is None for p in one['python']))
         self.assertTrue(all(p['installed_version'] is None and not p['distribution_bytes_verified'] for p in one['node']['locked']))
         self.assertIn('CVE_SCA_NOT_PERFORMED',one['issues'])

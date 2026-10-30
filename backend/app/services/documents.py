@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -164,7 +165,7 @@ async def store_version(
     if not content or len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Archivo vacío o demasiado grande")
     try:
-        canonical_mime = validate_document(content, extension, upload.content_type,
+        canonical_mime = await run_in_threadpool(validate_document, content, extension, upload.content_type,
             max_file_bytes=MAX_UPLOAD_BYTES)
     except DocumentValidationError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
