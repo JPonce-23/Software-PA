@@ -289,7 +289,14 @@ async function request(
             throw new ErrorAPI(
                 respuesta.status,
                 detail,
-                formatearDetalle(detail)
+                detail ? formatearDetalle(detail) : ({
+                    413: "La solicitud supera el tamaño permitido. Si estás subiendo un archivo, reduce su tamaño; si está dentro del límite indicado, solicita revisar el límite de carga del servidor.",
+                    429: "Has realizado demasiados intentos. Espera un momento y vuelve a intentarlo.",
+                    502: "El servicio no está disponible en este momento. Intenta de nuevo más tarde.",
+                    503: "El servicio no está disponible en este momento. Intenta de nuevo más tarde.",
+                    504: "La consulta tardó demasiado. Reduce los filtros y vuelve a intentarlo.",
+                    507: "No se pudo almacenar el archivo. Solicita ayuda al administrador."
+                }[respuesta.status] || formatearDetalle(detail))
             );
 
         }
