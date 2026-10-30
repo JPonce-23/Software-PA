@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 import os
-import codecs
 import select
 import subprocess
 import time
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
+
+from .gis_limits import load_limits
 
 
 class IngestionError(RuntimeError):
@@ -42,7 +44,11 @@ class DatasetInfo:
 
     @property
     def total_features(self) -> int:
-        return sum(layer.feature_count for layer in self.layers)
+        return sum(max(0, layer.feature_count) for layer in self.layers)
+
+    @property
+    def counts_known(self) -> bool:
+        return all(layer.feature_count >= 0 for layer in self.layers)
 
     @property
     def columns(self) -> list[str]:
@@ -55,54 +61,95 @@ class DatasetInfo:
 
 
 def _gdal_environment() -> dict[str, str]:
-    env = os.environ.copy()
-    env.update(
-        {
-            "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
-            "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": "",
-            "CPL_CURL_VERBOSE": "NO",
-            "OGR_GEOJSON_MAX_OBJ_SIZE": str(
-                int(os.getenv("IMPORT_MAX_FILE_SIZE_MB", "100")) * 1024 * 1024
-            ),
-        }
-    )
+    """Linux GDAL child environment: fixed policy plus local data directories only.
+
+    Never forward API credentials, loader/plugin settings, proxies or user config.
+    This reduces ambient configuration; it is not a network/filesystem sandbox.
+    """
+    env = {
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "TZ": "UTC",
+        "HOME": "/nonexistent",
+        "XDG_CONFIG_HOME": "/nonexistent",
+        "XDG_CACHE_HOME": "/nonexistent",
+        "TMPDIR": "/tmp",
+        "CPL_TMPDIR": "/tmp",
+        "GDAL_CONFIG_FILE": "/dev/null",
+        "PROJ_NETWORK": "OFF",
+        "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
+        "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": "",
+        "CPL_CURL_VERBOSE": "NO",
+        "OGR_GEOJSON_MAX_OBJ_SIZE": str(load_limits().geojson_feature_mb),
+    }
+    # Resource directories may differ between packaged GDAL/PROJ builds.
+    # PROJ_DATA (>=9.1) and its older PROJ_LIB fallback support search lists.
+    for name in ("GDAL_DATA", "PROJ_DATA", "PROJ_LIB"):
+        value = os.getenv(name)
+        if not value:
+            continue
+        paths = [value] if name == "GDAL_DATA" else value.split(os.pathsep)
+        if (any(ord(char) < 32 for char in value)
+                or any(not Path(part).is_absolute() or part.startswith("/vsi") for part in paths)):
+            raise IngestionError("GDAL_CONFIG_INVALIDA", f"{name} requiere directorios locales absolutos.")
+        env[name] = value
     return env
 
 
-def _run_json(command: list[str]) -> dict:
+def _process_chunks(command: list[str], max_bytes: int) -> Iterator[bytes]:
+    """Bound stdout before accumulation; always reap the direct GDAL child."""
     timeout = int(os.getenv("IMPORT_GDAL_TIMEOUT_SECONDS", "300"))
     try:
-        result = subprocess.run(
-            command,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            check=False,
-            timeout=timeout,
-            env=_gdal_environment(),
-            text=True,
-        )
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=_gdal_environment(), shell=False)
     except FileNotFoundError as exc:
-        raise IngestionError(
-            "GDAL_NO_DISPONIBLE",
-            "El servicio geoespacial no esta disponible en el backend.",
-        ) from exc
-    except subprocess.TimeoutExpired as exc:
-        raise IngestionError(
-            "GDAL_TIMEOUT",
-            "El archivo excedio el tiempo permitido de inspeccion.",
-        ) from exc
-    if result.returncode != 0:
-        raise IngestionError(
-            "ARCHIVO_NO_PROCESABLE",
-            "GDAL/OGR no pudo abrir el contenido como un archivo vectorial permitido.",
-        )
+        raise IngestionError("GDAL_NO_DISPONIBLE", "El servicio geoespacial no esta disponible.") from exc
+    stdout = process.stdout
+    assert stdout is not None
+    deadline = time.monotonic() + timeout
+    total = 0
     try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise IngestionError(
-            "METADATOS_INVALIDOS",
-            "GDAL/OGR no devolvio metadatos validos para el archivo.",
-        ) from exc
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([stdout], [], [], remaining)[0]:
+                raise subprocess.TimeoutExpired(command, timeout)
+            chunk = os.read(stdout.fileno(), min(64 * 1024, max_bytes - total + 1))
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise IngestionError("LIMITE_SALIDA_GDAL", "La salida GIS excede el presupuesto permitido.")
+            yield chunk
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(command, timeout)
+        process.wait(timeout=remaining)
+        if process.returncode != 0:
+            raise IngestionError("CONVERSION_OGR_FALLIDA", "GDAL/OGR no pudo procesar el archivo.")
+    except subprocess.TimeoutExpired as exc:
+        raise IngestionError("GDAL_TIMEOUT", "El archivo excedio el tiempo permitido de procesamiento.") from exc
+    finally:
+        try:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+        finally:
+            stdout.close()
+
+
+def _run_json(command: list[str]) -> dict:
+    output = bytearray()
+    with closing(_process_chunks(command, load_limits().inspection_bytes)) as chunks:
+        for chunk in chunks:
+            output.extend(chunk)
+    try:
+        metadata = json.loads(output)
+        if not isinstance(metadata, dict):
+            raise ValueError("metadata object required")
+        return metadata
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        raise IngestionError("METADATOS_INVALIDOS", "GDAL/OGR no devolvio metadatos validos.") from exc
 
 
 def _authority_from_coordinate_system(coordinate_system: dict | None) -> tuple[str, bool]:
@@ -137,6 +184,16 @@ def get_spatial_layers(metadata: dict) -> list[dict]:
     )]
 
 
+def _feature_count(value) -> int:
+    if value is None:
+        return -1
+    try:
+        count = int(value)
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise IngestionError("METADATOS_INVALIDOS", "Conteo GDAL invalido.") from exc
+    return max(-1, count)
+
+
 def inspect_dataset(path: Path) -> DatasetInfo:
     metadata = _run_json(["ogrinfo", "-ro", "-so", "-al", "-json", str(path)])
     driver = str(metadata.get("driverShortName") or metadata.get("driverLongName") or "")
@@ -155,8 +212,12 @@ def inspect_dataset(path: Path) -> DatasetInfo:
             "El contenido detectado no es KML, GeoJSON, GeoPackage ni Shapefile.",
         )
 
+    limits = load_limits()
+    spatial_layers = get_spatial_layers(metadata)
+    if len(spatial_layers) > limits.layers:
+        raise IngestionError("LIMITE_CAPAS", "El archivo excede el limite de capas GIS.")
     layers: list[LayerInfo] = []
-    for raw_layer in get_spatial_layers(metadata):
+    for raw_layer in spatial_layers:
         name = str(raw_layer.get("name") or "").strip()
         if not name:
             continue
@@ -178,7 +239,7 @@ def inspect_dataset(path: Path) -> DatasetInfo:
         layers.append(
             LayerInfo(
                 name=name,
-                feature_count=max(0, int(raw_layer.get("featureCount") or 0)),
+                feature_count=_feature_count(raw_layer.get("featureCount")),
                 columns=columns,
                 crs=crs,
                 is_wgs84=is_wgs84,
@@ -191,7 +252,9 @@ def inspect_dataset(path: Path) -> DatasetInfo:
         )
     if not layers:
         raise IngestionError("SIN_CAPAS", "El archivo no contiene capas vectoriales procesables.")
-    if sum(layer.feature_count for layer in layers) <= 0:
+    if sum(max(0, layer.feature_count) for layer in layers) > limits.features:
+        raise IngestionError("LIMITE_FEATURES", "El archivo excede el limite de features GIS.")
+    if all(layer.feature_count == 0 for layer in layers):
         raise IngestionError("SIN_FEATURES", "El archivo no contiene features.")
     return DatasetInfo(driver=driver, format=detected_format, layers=tuple(layers))
 
@@ -204,7 +267,14 @@ def iter_features(
     preserve_source_geometry: bool = False,
 ) -> Iterator[tuple[str, dict]]:
     """Convierte cada capa a GeoJSONSeq en stdout y entrega un feature a la vez."""
-    timeout = int(os.getenv("IMPORT_GDAL_TIMEOUT_SECONDS", "300"))
+    limits = load_limits()
+    if len(dataset.layers) > limits.layers:
+        raise IngestionError("LIMITE_CAPAS", "El archivo excede el limite de capas GIS.")
+    if dataset.total_features > limits.features:
+        raise IngestionError("LIMITE_FEATURES", "El archivo excede el limite de features GIS.")
+    if limit_per_layer is not None and limit_per_layer <= 0:
+        raise IngestionError("LIMITE_FEATURES", "El limite por capa debe ser positivo.")
+    observed = output_bytes = 0
     for layer in dataset.layers:
         command = [
             "ogr2ogr",
@@ -223,9 +293,10 @@ def iter_features(
             command.extend(["-dialect", "SQLite", "-sql",
                 f'SELECT *{select_fid}, hex(ST_AsBinary("{quoted_geom}")) AS "__pa_source_wkb" FROM "{quoted_layer}"'])
         else:
+            # argv prevents shell commands, but a leading '-' could be an OGR option.
+            if layer.name.startswith("-"):
+                raise IngestionError("CAPA_NO_SEGURA", "El nombre de capa no puede comenzar con un guion.")
             command.append(layer.name)
-        if limit_per_layer is not None:
-            command.extend(["-limit", str(max(1, limit_per_layer))])
         command.extend([
             "-t_srs",
             "EPSG:4326",
@@ -234,77 +305,48 @@ def iter_features(
             "-lco",
             "COORDINATE_PRECISION=15",
         ])
-        try:
-            process = subprocess.Popen(
-                command,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                env=_gdal_environment(),
-            )
-        except FileNotFoundError as exc:
-            raise IngestionError(
-                "GDAL_NO_DISPONIBLE",
-                "El servicio geoespacial no esta disponible en el backend.",
-            ) from exc
-        assert process.stdout is not None
-        stdout = process.stdout
-        deadline = time.monotonic() + timeout
-        decoder = codecs.getincrementaldecoder("utf-8")()
-        pending = ""
+        pending = bytearray()
+        layer_count = 0
 
-        def consume_line(line: str) -> dict | None:
-            payload = line.lstrip("\x1e").strip()
+        def consume_line(line: bytes) -> dict | None:
+            payload = line.lstrip(b"\x1e").strip()
             if not payload:
                 return None
             try:
-                return json.loads(payload)
-            except json.JSONDecodeError as exc:
-                raise IngestionError(
-                    "FEATURE_OGR_INVALIDO",
-                    f'GDAL produjo un feature invalido en la capa "{layer.name}".',
-                ) from exc
+                item = json.loads(payload)
+                if not isinstance(item, dict) or item.get("type") != "Feature":
+                    raise ValueError("feature object required")
+                return item
+            except (ValueError, UnicodeError, RecursionError) as exc:
+                raise IngestionError("FEATURE_OGR_INVALIDO", "GDAL produjo un feature invalido.") from exc
 
-        try:
-            while True:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise subprocess.TimeoutExpired(command, timeout)
-                readable, _, _ = select.select([stdout], [], [], remaining)
-                if not readable:
-                    raise subprocess.TimeoutExpired(command, timeout)
-                chunk = os.read(stdout.fileno(), 64 * 1024)
-                if not chunk:
-                    break
-                pending += decoder.decode(chunk)
-                while "\n" in pending:
-                    line, pending = pending.split("\n", 1)
-                    feature = consume_line(line)
-                    if feature is not None:
-                        yield layer.name, feature
-            pending += decoder.decode(b"", final=True)
-            feature = consume_line(pending)
-            if feature is not None:
-                yield layer.name, feature
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise subprocess.TimeoutExpired(command, timeout)
-            process.wait(timeout=remaining)
-        except subprocess.TimeoutExpired as exc:
-            raise IngestionError(
-                "GDAL_TIMEOUT",
-                f'La capa "{layer.name}" excedio el tiempo permitido de conversion.',
-            ) from exc
-        finally:
-            if process.poll() is None:
-                process.kill()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    pass
-            stdout.close()
-        if process.returncode != 0:
-            raise IngestionError(
-                "CONVERSION_OGR_FALLIDA",
-                f'No fue posible normalizar la capa "{layer.name}".',
-            )
+        # Bytes avoid splitting UTF-8 code points; decode only complete records.
+        with closing(_process_chunks(command, limits.output_bytes - output_bytes)) as chunks:
+            for chunk in chunks:
+                output_bytes += len(chunk)
+                parts = chunk.split(b"\n")
+                for index, part in enumerate(parts):
+                    if len(pending) + len(part) > limits.record_bytes:
+                        raise IngestionError("LIMITE_REGISTRO", "Una feature GIS excede el limite de bytes por registro.")
+                    pending.extend(part)
+                    if index == len(parts) - 1:
+                        continue
+                    item = consume_line(pending)
+                    pending.clear()
+                    if item is not None:
+                        observed += 1
+                        layer_count += 1
+                        if observed > limits.features or (limit_per_layer is not None and layer_count > limit_per_layer):
+                            raise IngestionError("LIMITE_FEATURES", "La lectura excede el limite de features GIS.")
+                        yield layer.name, item
+            item = consume_line(pending)
+            if item is not None:
+                observed += 1
+                layer_count += 1
+                if observed > limits.features or (limit_per_layer is not None and layer_count > limit_per_layer):
+                    raise IngestionError("LIMITE_FEATURES", "La lectura excede el limite de features GIS.")
+                yield layer.name, item
+        if layer.feature_count >= 0 and layer_count != layer.feature_count:
+            raise IngestionError("CONTEO_FEATURES_INCONSISTENTE", "El conteo observado no coincide con GDAL.")
+    if observed == 0:
+        raise IngestionError("SIN_FEATURES", "El archivo no contiene features.")

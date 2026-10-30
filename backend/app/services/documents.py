@@ -3,7 +3,6 @@
 import hashlib
 import os
 import re
-import uuid
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
@@ -13,6 +12,8 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from .access import require_document_access, require_document_target_access
 from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_context
+from .document_validation import DocumentValidationError, validate_document
+from .document_storage import DocumentStorageError, stage_document, storage_event
 
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png"}
@@ -162,6 +163,11 @@ async def store_version(
     content = await upload.read(MAX_UPLOAD_BYTES + 1)
     if not content or len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Archivo vacío o demasiado grande")
+    try:
+        canonical_mime = validate_document(content, extension, upload.content_type,
+            max_file_bytes=MAX_UPLOAD_BYTES)
+    except DocumentValidationError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
     digest = hashlib.sha256(content).hexdigest()
     previous = db.query(models.DocumentoVersion).filter(
         models.DocumentoVersion.id_documento == document_id,
@@ -169,40 +175,48 @@ async def store_version(
     ).first()
     if previous is not None:
         raise HTTPException(status_code=409, detail="Esta versión ya fue cargada")
-    next_version = (
-        db.query(func.coalesce(func.max(models.DocumentoVersion.numero_version), 0))
-        .filter(models.DocumentoVersion.id_documento == document_id)
-        .scalar()
-        + 1
-    )
-    relative = Path(str(document_id)) / f"{next_version:04d}-{uuid.uuid4().hex}{extension}"
-    destination = (upload_root() / relative).resolve()
-    if upload_root() not in destination.parents:
-        raise HTTPException(status_code=422, detail="Ruta documental no válida")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(content)
-    set_audit_context(db, user.id_usuario)
-    version = models.DocumentoVersion(
-        id_documento=document_id,
-        numero_version=next_version,
-        hash_sha256=digest,
-        tamano_bytes=len(content),
-        nombre_original=original,
-        ruta_almacenamiento=str(relative),
-        tipo_mime=upload.content_type,
-        id_usuario_carga=user.id_usuario,
-    )
-    db.add(version)
     try:
-        db.commit()
-    except Exception as exc:
+        root = upload_root()
+    except OSError as exc:
         db.rollback()
-        destination.unlink(missing_ok=True)
-        raise HTTPException(
-            status_code=409, detail="No fue posible registrar la versión"
-        ) from exc
-    db.refresh(version)
-    return version
+        raise HTTPException(status_code=507, detail="No fue posible completar el almacenamiento documental.") from exc
+    try:
+        with stage_document(root, document_id, content, digest) as staged:
+            # Parent-row serialization is pending PostgreSQL QA. Existing unique
+            # constraints remain the last defense; no process-local mutex/retry.
+            next_version = (
+                db.query(func.coalesce(func.max(models.DocumentoVersion.numero_version), 0))
+                .filter(models.DocumentoVersion.id_documento == document_id)
+                .scalar() + 1
+            )
+            relative = Path(str(document_id)) / f"{next_version:04d}-{staged.operation_id}{extension}"
+            staged.publish(relative.name)
+            try:
+                set_audit_context(db, user.id_usuario)
+                version = models.DocumentoVersion(
+                    id_documento=document_id,
+                    numero_version=next_version,
+                    hash_sha256=digest,
+                    tamano_bytes=len(content),
+                    nombre_original=original,
+                    ruta_almacenamiento=str(relative),
+                    tipo_mime=canonical_mime,
+                    id_usuario_carga=user.id_usuario,
+                )
+                db.add(version)
+                db.commit()
+            except BaseException as exc:
+                storage_event('DOCUMENT_REGISTRATION_UNCONFIRMED', staged.operation_id)
+                db.rollback()
+                if not isinstance(exc, Exception):
+                    raise
+                raise HTTPException(status_code=409,
+                    detail="No fue posible confirmar el registro de la versión; consulte el historial antes de reintentar.") from exc
+            db.refresh(version)
+            return version
+    except DocumentStorageError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
 
 
 def safe_version_path(version: models.DocumentoVersion) -> Path:

@@ -1,0 +1,78 @@
+{
+  "date": "2026-10-28",
+  "scope": "SS-01 exclusivamente",
+  "branch": "dev",
+  "head": "683ff75613768de28a7127c7e33a6e2ef4fc40ff",
+  "verdict": "PENDIENTE DE VALIDACION EN NAVEGADOR REAL",
+  "logic_modified_this_run": false,
+  "browser_run": {
+    "executed": false,
+    "reason": "No se localizó Playwright/Chromium utilizable; no se instalaron herramientas.",
+    "checks": [
+      "PATH: chromium, chromium-browser, google-chrome, firefox, playwright ausentes",
+      "Resolución Node local/frontend/tmp: playwright, @playwright/test, playwright-core, puppeteer, puppeteer-core ausentes",
+      "Python: playwright ausente",
+      "PLAYWRIGHT_BROWSERS_PATH no configurado",
+      "Caché ms-playwright ausente; ms-playwright-go/1.57.0 vacío",
+      "Cachés npm _npx inspeccionadas: no se localizó paquete Playwright/Puppeteer",
+      "Ubicaciones estándar revisadas en /usr/bin, /usr/local/bin y /opt sin navegador localizado"
+    ]
+  },
+  "tests": [
+    {
+      "file": "tests/frontend-ssalfer/map-tooltip-security.cjs",
+      "passed": 33,
+      "failed": 0,
+      "mode": "Node VM/DOM/API simulados y método real _updateContent de Leaflet local"
+    },
+    {
+      "file": "tests/frontend-ssalfer/map-gis-rbac.cjs",
+      "passed": 4,
+      "failed": 0,
+      "mode": "Node VM/DOM/API simulados"
+    },
+    {
+      "file": "tests/frontend-ssalfer/gis-bootstrap-rbac.cjs",
+      "passed": 10,
+      "failed": 0,
+      "mode": "Node VM/DOM/API simulados"
+    },
+    {
+      "file": "tests/frontend-ssalfer/map-performance.cjs",
+      "passed": 11,
+      "failed": 0,
+      "mode": "Node VM; git show local de sólo lectura; ejecución autorizada fuera del sandbox tras EPERM"
+    }
+  ],
+  "total_passed": 58,
+  "final_failed": 0,
+  "initial_environment_failure": "map-performance.cjs no pudo iniciar en sandbox: spawnSync git EPERM; reintento autorizado: 11/11 aprobadas.",
+  "checks_passed": [
+    "node --check mapa.js",
+    "node --check map-tooltip-security.cjs",
+    "git diff --check",
+    "git apply --reverse --check --whitespace=error-all del patch previo"
+  ],
+  "pending": [
+    "Apertura/cierre por interacción real",
+    "Posicionamiento sticky y seguimiento del puntero",
+    "Zoom/pan y anclaje del tooltip",
+    "DOM/layout/CSS de navegador real",
+    "Interacción con mapa y accesibilidad en navegador"
+  ],
+  "regressions_found": [],
+  "hashes_sha256": {
+    "frontend-ssalfer/js/mapa.js": "2d051e4204701a9bb63775422bc882f11b10c138f7ee8f577c0a9d94b229bfab",
+    "tests/frontend-ssalfer/map-tooltip-security.cjs": "1ae6ad7471ef4a565a65d39d3ed84a8165a2511ae08279f365e224f528b0d192",
+    "docs/security/AUDITORIA-SEGURIDAD-2026-10.md": "81c5711fbb9e2d0b320c8877ca024abd2049d2b80421f4c475368ebed6e480b1",
+    "docs/security/CHECKLIST-AUDITORIA-SERVIDOR.md": "a4798de8de9a006956a3d1ea4ec07de971031f1c27449772477f56a1b7560333",
+    "docs/security/COBERTURA-PRUEBAS-SEGURIDAD.md": "faac2a907f2f023432d751285497fd84d52d77076264af127beb7ab6984ef5cd",
+    "docs/security/MATRIZ-ENDPOINTS-RBAC.md": "264de5ee448d559e8be8bdc992dc900f659a549c84d1190d8035c7f9a5c18a08",
+    "docs/security/MATRIZ-RIESGOS-SEGURIDAD.md": "3ab2a9cf5d60380aef27e2afd5e71e6dc53b9df5722aab10d13a386975484d05",
+    "docs/security/PLAN-REMEDIACION-SEGURIDAD.md": "90148afd69ffb0f2bd563ced087983b7506a9f5ce9b6c3847108b95a4ad4ebf0",
+    "docs/security/SS-01-CORRECCION-2026-10-28.patch": "00d04c2e9e5bb5bf4456b766caa04c900ac1f71d40f674ae397b9f47c056c0bf"
+  },
+  "network_or_backend_access": false,
+  "dependencies_modified": false,
+  "git_writes": false
+}

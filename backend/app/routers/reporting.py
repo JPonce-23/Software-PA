@@ -1,8 +1,7 @@
 """Dashboard, export and project map read models."""
 
-import csv
-import io
 import json
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.responses import StreamingResponse
@@ -15,10 +14,33 @@ from ..database import get_db
 from ..services.access import authorized_project_ids, require_project_access, require_project_nucleus_access
 from ..services import convenio_reports, dashboard_summary, map_summary
 from ..services import report_references as report_references_service
+from ..services import report_limits
 
 
 router = APIRouter(tags=["Dashboard y mapa"])
 READ_ROLES = ["admin", "operador", "visualizador", "geografo"]
+
+
+class DashboardCsvResponse(StreamingResponse):
+    """Own the file even if ASGI is cancelled before iteration starts."""
+    def __init__(self, output):
+        self.output = output
+        super().__init__(report_limits.file_chunks(output),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=dashboard.csv"})
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self.output.close()
+
+
+def _complete_report_rows(db, query, limits, *, already_read=0):
+    try:
+        return report_limits.read_complete_rows(db, query, limits, already_read=already_read)
+    except report_limits.ReportLimitError as exc:
+        raise HTTPException(exc.status, detail=exc.detail) from exc
 
 
 @router.get(
@@ -264,7 +286,8 @@ def dashboard(
     ).offset(skip).limit(limit).all()
 
 
-@router.get("/reportes/avance-periodo", response_model=list[schemas.ReporteAvancePeriodoResponse])
+@router.get("/reportes/avance-periodo", response_model=list[schemas.ReporteAvancePeriodoResponse],
+    responses={413: {"description": "El conjunto completo excede el límite; acote los filtros. No se devuelve una página parcial."}})
 def reporte_avance_periodo(
     id_proyecto: int | None = None,
     id_entidad: int | None = Query(default=None, gt=0),
@@ -303,15 +326,23 @@ def reporte_avance_periodo(
         query = query.filter(models.ReporteAvancePeriodo.tipo_convenio == tipo_convenio)
     if destino_superficie is not None:
         query = query.filter(models.ReporteAvancePeriodo.destino_superficie == destino_superficie)
-    return query.order_by(
+    query = query.with_entities(*(getattr(models.ReporteAvancePeriodo, name)
+        for name in report_limits.ADVANCE_COLUMNS)).order_by(
         models.ReporteAvancePeriodo.id_proyecto,
         models.ReporteAvancePeriodo.anio,
         models.ReporteAvancePeriodo.mes,
         models.ReporteAvancePeriodo.indicador,
-    ).all()
+        models.ReporteAvancePeriodo.id_entidad,
+        models.ReporteAvancePeriodo.ambito.nulls_last(),
+        models.ReporteAvancePeriodo.tipo_cop_operativo.nulls_last(),
+        models.ReporteAvancePeriodo.tipo_convenio.nulls_last(),
+        models.ReporteAvancePeriodo.destino_superficie.nulls_last(),
+    )
+    return _complete_report_rows(db, query, report_limits.load_limits())
 
 
-@router.get("/reportes/resumen-actual", response_model=list[schemas.ReporteSnapshotActualResponse])
+@router.get("/reportes/resumen-actual", response_model=list[schemas.ReporteSnapshotActualResponse],
+    responses={413: {"description": "El conjunto completo excede el límite; acote los filtros. No se devuelve una página parcial."}})
 def reporte_resumen_actual(
     id_proyecto: int | None = None,
     id_entidad: int | None = Query(default=None, gt=0),
@@ -331,10 +362,17 @@ def reporte_resumen_actual(
     for field, value in ((models.ReporteSnapshotActual.id_entidad, id_entidad), (models.ReporteSnapshotActual.ambito, ambito), (models.ReporteSnapshotActual.indicador, indicador), (models.ReporteSnapshotActual.tipo_cop_operativo, tipo_cop_operativo), (models.ReporteSnapshotActual.destino_superficie, destino_superficie)):
         if value is not None:
             query = query.filter(field == value)
-    rows = query.order_by(
+    limits = report_limits.load_limits()
+    query = query.with_entities(*(getattr(models.ReporteSnapshotActual, name)
+        for name in report_limits.SNAPSHOT_COLUMNS)).order_by(
         models.ReporteSnapshotActual.id_proyecto,
         models.ReporteSnapshotActual.indicador,
-    ).all()
+        models.ReporteSnapshotActual.id_entidad,
+        models.ReporteSnapshotActual.ambito.nulls_last(),
+        models.ReporteSnapshotActual.tipo_cop_operativo.nulls_last(),
+        models.ReporteSnapshotActual.destino_superficie.nulls_last(),
+    )
+    rows = _complete_report_rows(db, query, limits)
 
     # 006 no publicó un snapshot de esta condición. Se calcula en la capa de
     # lectura desde el valor vigente de afectaciones activas y se deduplica por
@@ -392,11 +430,12 @@ def reporte_resumen_actual(
             models.ProyectoNucleo.id_proyecto,
             models.Municipio.id_entidad,
         )
-        rows.extend(current.all())
+        current = current.order_by(models.ProyectoNucleo.id_proyecto, models.Municipio.id_entidad)
+        rows.extend(_complete_report_rows(db, current, limits, already_read=len(rows)))
 
     return sorted(
         rows,
-        key=lambda row: (row.id_proyecto, row.indicador, row.id_entidad),
+        key=report_limits.snapshot_key,
     )
 
 
@@ -683,51 +722,44 @@ def reporte_fifonafe_indicador_institucional(
     ).all()
 
 
-@router.get("/exportaciones/dashboard.csv")
+@router.get("/exportaciones/dashboard.csv", responses={
+    413: {"description": "La exportación excede filas o bytes; acote los filtros. No se entrega un CSV parcial."},
+    504: {"description": "Se excedió el plazo cooperativo de preparación configurado."},
+})
 def export_dashboard(
     id_proyecto: int | None = None,
     anio: int | None = Query(default=None, ge=2000, le=2200),
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    rows = _dashboard_query(db, user, id_proyecto, anio).order_by(
-        models.DashboardKpi.id_proyecto,
-        models.DashboardKpi.anio,
-        models.DashboardKpi.indicador,
-    ).all()
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(
-        [
-            "id_proyecto",
-            "anio",
-            "indicador",
-            "programado",
-            "realizado",
-            "cantidad",
-            "superficie_ha",
-            "monto",
-        ]
-    )
-    for row in rows:
-        writer.writerow(
-            [
-                row.id_proyecto,
-                row.anio,
-                row.indicador,
-                row.programado,
-                row.realizado,
-                row.cantidad,
-                row.superficie_ha,
-                row.monto,
-            ]
-        )
-    output.seek(0)
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=dashboard.csv"},
-    )
+    output = None
+    try:
+        try:
+            limits = report_limits.load_limits()
+            deadline = time.monotonic() + limits.build_seconds if limits.build_seconds is not None else None
+            query = _dashboard_query(db, user, id_proyecto, anio).with_entities(
+                *(getattr(models.DashboardKpi, name) for name in report_limits.CSV_COLUMNS)
+            ).order_by(models.DashboardKpi.id_proyecto, models.DashboardKpi.anio,
+                       models.DashboardKpi.indicador).limit(limits.rows + 1)
+            result = db.execute(query.statement, execution_options={"yield_per": limits.batch_rows,
+                "stream_results": True, "max_row_buffer": limits.batch_rows})
+            try:
+                output = report_limits.build_csv(result, limits, deadline=deadline)
+            finally:
+                result.close()
+        finally:
+            # This read-only endpoint has completed all DB work. Slow clients
+            # retain only the private file, never a dependency-owned cursor.
+            db.close()
+        return DashboardCsvResponse(output)
+    except report_limits.ReportLimitError as exc:
+        if output is not None:
+            output.close()
+        raise HTTPException(exc.status, detail=exc.detail) from exc
+    except BaseException:
+        if output is not None:
+            output.close()
+        raise
 
 
 @router.get("/proyectos/{id_proyecto}/mapa")

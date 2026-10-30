@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 from psycopg2.extensions import parse_dsn
 
@@ -222,12 +223,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(verify_coverage(args.expected_database, audit)))
         print("CATALOGO RAN SINCRONIZADO")
         return 0
-    except (ValueError, OSError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+    except (ValueError, OSError):
+        print(f"ERROR [RAN_SYNC_INPUT_ERROR] correlacion={uuid4().hex}", file=sys.stderr)
         return 1
-    except Exception as exc:
-        # Los errores de conexión pueden contener datos sensibles: sólo mostrar la clase.
-        print(f"ERROR: sincronización abortada ({type(exc).__name__})", file=sys.stderr)
+    except Exception:
+        print(f"ERROR [RAN_SYNC_FAILED] correlacion={uuid4().hex}", file=sys.stderr)
         return 1
 
 
