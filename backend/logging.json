@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "safe": {"()": "app.safe_logging.SafeJSONFormatter"}
+  },
+  "handlers": {
+    "safe": {
+      "()": "app.safe_logging.SafeStreamHandler",
+      "formatter": "safe",
+      "stream": "ext://sys.stderr"
+    }
+  },
+  "root": {"level": "INFO", "handlers": ["safe"]},
+  "loggers": {
+    "ssalfer.diagnostics": {"level": "INFO", "handlers": ["safe"], "propagate": false},
+    "uvicorn": {"level": "INFO", "handlers": ["safe"], "propagate": false},
+    "uvicorn.error": {"level": "INFO", "handlers": ["safe"], "propagate": false},
+    "uvicorn.access": {"level": "INFO", "handlers": ["safe"], "propagate": false},
+    "sqlalchemy": {"level": "WARNING", "handlers": ["safe"], "propagate": false},
+    "psycopg2": {"level": "WARNING", "handlers": ["safe"], "propagate": false}
+  }
+}

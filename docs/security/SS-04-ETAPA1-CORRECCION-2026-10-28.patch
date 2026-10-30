@@ -1,0 +1,742 @@
+diff --git a/backend/app/services/authentication.py b/backend/app/services/authentication.py
+--- a/backend/app/services/authentication.py
++++ b/backend/app/services/authentication.py
+@@ -2,7 +2,6 @@
+ import hmac
+ import secrets
+ from datetime import datetime, timedelta, timezone
+-from ipaddress import ip_address
+ 
+ import bcrypt
+ from fastapi import HTTPException, Request, status
+@@ -13,6 +12,7 @@
+ from ..config import AUTH_SETTINGS
+ from ..passwords import is_within_bcrypt_limit
+ from .common import commit_or_conflict, set_audit_context
++from .request_origin import resolve_client_ip
+ 
+ 
+ _DUMMY_PASSWORD_HASH = bcrypt.hashpw(
+@@ -51,17 +51,11 @@
+ 
+ def _request_ip(request: Request) -> str | None:
+     peer = request.client.host if request.client else None
+-    candidate = peer
+-    if peer in AUTH_SETTINGS.trusted_proxy_ips:
+-        forwarded = request.headers.get("x-forwarded-for", "")
+-        if forwarded:
+-            candidate = forwarded.split(",", 1)[0].strip()
+-    if not candidate:
+-        return None
+-    try:
+-        return str(ip_address(candidate))
+-    except ValueError:
+-        return None
++    return resolve_client_ip(
++        peer,
++        request.headers.getlist("x-forwarded-for"),
++        AUTH_SETTINGS.trusted_proxy_ips,
++    )
+ 
+ 
+ def _event(
+diff --git a/backend/Dockerfile b/backend/Dockerfile
+--- a/backend/Dockerfile
++++ b/backend/Dockerfile
+@@ -15,4 +15,4 @@
+ 
+ EXPOSE 8000
+ 
+-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
++CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers", "--reload"]
+diff --git a/docker-compose.yml b/docker-compose.yml
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -88,7 +88,7 @@
+     image: software-pa-backend
+     build:
+       context: ./backend
+-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
++    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
+     restart: always
+     environment:
+       <<: *backend-environment
+diff --git a/docker-compose.override.yml b/docker-compose.override.yml
+--- a/docker-compose.override.yml
++++ b/docker-compose.override.yml
+@@ -9,6 +9,7 @@
+       - 0.0.0.0
+       - --port
+       - "8000"
++      - --no-proxy-headers
+       - --reload
+     volumes:
+       - ./backend:/app
+diff --git a/backend/app/services/request_origin.py b/backend/app/services/request_origin.py
+new file mode 100644
+index 0000000..87cf472
+--- /dev/null
++++ b/backend/app/services/request_origin.py
+@@ -0,0 +1,57 @@
++"""Resolve audit IPs from an unchanged socket peer and an explicit proxy chain.
++
++Uvicorn must run with --no-proxy-headers: rewriting the ASGI peer first loses
++the trust boundary. This helper neither authenticates users nor limits requests.
++"""
++
++from ipaddress import ip_address
++from typing import Sequence
++
++
++MAX_FORWARDED_CHARACTERS = 1024
++MAX_FORWARDED_HOPS = 16
++
++
++def _canonical_ip(value: str | None) -> str | None:
++    if not value or "%" in value:
++        return None
++    try:
++        address = ip_address(value)
++    except ValueError:
++        return None
++    # Treat IPv4-mapped peers like their equivalent exact IPv4 configuration.
++    mapped = getattr(address, "ipv4_mapped", None)
++    return str(mapped if mapped is not None else address)
++
++
++def resolve_client_ip(
++    peer: str | None,
++    forwarded_values: Sequence[str],
++    trusted_proxy_ips: Sequence[str],
++) -> str | None:
++    """Use the nearest untrusted hop; ambiguous headers fall back to the peer.
++
++    Every trusted proxy must append its actual peer or overwrite with a verified
++    chain. Never configure client/NAT addresses as trusted proxy addresses.
++    """
++    peer = _canonical_ip(peer)
++    if peer is None:
++        return None
++    trusted = {_canonical_ip(value) for value in trusted_proxy_ips}
++    trusted.discard(None)
++    if peer not in trusted or len(forwarded_values) != 1:
++        return peer
++    forwarded = forwarded_values[0]
++    if (len(forwarded) > MAX_FORWARDED_CHARACTERS
++            or any(ord(char) < 32 or ord(char) == 127 for char in forwarded)):
++        return peer
++    hops = forwarded.split(",")
++    if len(hops) > MAX_FORWARDED_HOPS:
++        return peer
++    addresses = [_canonical_ip(hop.strip()) for hop in hops]
++    if any(address is None for address in addresses):
++        return peer
++    for address in reversed(addresses):
++        if address not in trusted:
++            return address
++    return peer
+diff --git a/tests/security/test_auth_origin_security.py b/tests/security/test_auth_origin_security.py
+new file mode 100644
+index 0000000..96f20cc
+--- /dev/null
++++ b/tests/security/test_auth_origin_security.py
+@@ -0,0 +1,342 @@
++"""SS-04: pure origin tests and extracted auth branches with synthetic doubles.
++
++No app startup, DB, HTTP server, bcrypt work, conftest or dependency installs.
++These tests do NOT validate a distributed rate limiter (none is activated).
++Run: python3 -B -m unittest discover -s tests/security -p 'test_auth_origin_security.py' -v
++"""
++
++import ast
++import asyncio
++from concurrent.futures import ThreadPoolExecutor
++from datetime import datetime, timedelta, timezone
++import hashlib
++import importlib.util
++import json
++from pathlib import Path
++from types import SimpleNamespace
++import unittest
++from unittest.mock import AsyncMock, MagicMock
++
++
++ROOT = Path(__file__).resolve().parents[2]
++AUTH = ROOT / 'backend/app/services/authentication.py'
++ROUTER = ROOT / 'backend/app/routers/authentication.py'
++spec = importlib.util.spec_from_file_location('ss04_request_origin',
++    ROOT / 'backend/app/services/request_origin.py')
++origin = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(origin)
++PROXIES = ('10.0.0.2', '10.0.0.3', '2001:db8::2')
++NOW = datetime(2026, 10, 28, tzinfo=timezone.utc)
++
++
++def functions(path, names, namespace):
++    """Execute only named source definitions, never module imports/startup."""
++    tree = ast.parse(path.read_text())
++    definitions = [node for node in tree.body
++        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names]
++    assert {node.name for node in definitions} == set(names)
++    for node in definitions:
++        node.decorator_list = []
++    future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
++    module = ast.fix_missing_locations(ast.Module(body=[future, *definitions], type_ignores=[]))
++    exec(compile(module, str(path), 'exec'), namespace)
++    return namespace
++
++
++class Headers:
++    def __init__(self, values=()):
++        self.values = list(values)
++
++    def getlist(self, name):
++        return [v for k, v in self.values if k.lower() == name.lower()]
++
++    def get(self, name, default=None):
++        values = self.getlist(name)
++        return values[0] if values else default
++
++
++def request(peer='10.0.0.2', forwarded=('192.0.2.8',), *, headers=(), cookies=None,
++            path='/api/auth/sesiones'):
++    return SimpleNamespace(client=SimpleNamespace(host=peer) if peer else None,
++        headers=Headers([*(('x-forwarded-for', v) for v in forwarded), *headers]),
++        cookies=cookies or {}, method='POST', url=SimpleNamespace(path=path))
++
++
++class OriginTests(unittest.TestCase):
++    def resolve(self, peer='10.0.0.2', headers=('192.0.2.8',), trusted=PROXIES):
++        return origin.resolve_client_ip(peer, headers, trusted)
++
++    def test_untrusted_direct_peer_ignores_forged_headers(self):
++        for spoof in ['192.0.2.99', '10.0.0.2', 'invalid', 'x' * 2048]:
++            self.assertEqual(self.resolve('198.51.100.7', (spoof,)), '198.51.100.7')
++
++    def test_empty_trust_does_not_accept_forwarded_or_wildcard(self):
++        for trusted in [(), ('*',), ('10.0.0.0/8',)]:
++            self.assertEqual(self.resolve(trusted=trusted), '10.0.0.2')
++
++    def test_single_verified_proxy(self):
++        self.assertEqual(self.resolve(), '192.0.2.8')
++
++    def test_forged_leftmost_address_cannot_override_actual_appended_peer(self):
++        self.assertEqual(self.resolve(headers=('192.0.2.99, 198.51.100.7',)), '198.51.100.7')
++
++    def test_multiple_trusted_proxies_walk_from_right_to_left(self):
++        self.assertEqual(self.resolve(headers=('192.0.2.99, 198.51.100.7, 10.0.0.3',)),
++            '198.51.100.7')
++
++    def test_untrusted_intermediary_stops_chain(self):
++        self.assertEqual(self.resolve(headers=('192.0.2.8, 198.51.100.7, 10.0.0.3',)),
++            '198.51.100.7')
++
++    def test_all_trusted_hops_conservatively_fall_back_to_socket_peer(self):
++        self.assertEqual(self.resolve(headers=('10.0.0.3, 2001:db8::2',)), '10.0.0.2')
++
++    def test_duplicate_headers_are_ambiguous_even_when_equal(self):
++        for values in [('192.0.2.8', '198.51.100.7'), ('192.0.2.8', '192.0.2.8')]:
++            self.assertEqual(self.resolve(headers=values), '10.0.0.2')
++
++    def test_missing_empty_or_malformed_chain_uses_peer(self):
++        for values in [(), ('',), (' , ',), (',192.0.2.8',), ('192.0.2.8,',),
++                       ('garbage, 192.0.2.8',), ('unknown',), ('[2001:db8::8]',),
++                       ('192.0.2.8:443',), ('host.example',), ('fe80::1%eth0',)]:
++            with self.subTest(values=values):
++                self.assertEqual(self.resolve(headers=values), '10.0.0.2')
++
++    def test_no_valid_peer_never_uses_header(self):
++        for peer in [None, '', 'host.example', 'fe80::1%eth0', '192.0.2.8:80']:
++            self.assertIsNone(self.resolve(peer=peer))
++
++    def test_whitespace_and_ipv6_canonicalization(self):
++        self.assertEqual(self.resolve('2001:0db8:0:0:0:0:0:2', (' 2001:0db8::9 , 10.0.0.3 ',)),
++            '2001:db8::9')
++
++    def test_ipv4_mapped_ipv6_peers_and_hops_use_exact_ipv4_trust(self):
++        self.assertEqual(self.resolve('::ffff:10.0.0.2', ('::ffff:192.0.2.8',)), '192.0.2.8')
++
++    def test_control_characters_are_rejected(self):
++        for char in ['\x00', '\n', '\r', '\t', '\x7f']:
++            self.assertEqual(self.resolve(headers=('192.0.2.8' + char,)), '10.0.0.2')
++
++    def test_chain_length_and_hop_budgets(self):
++        self.assertEqual(self.resolve(headers=('192.0.2.8' + ' ' * 1015,)), '192.0.2.8')
++        self.assertEqual(self.resolve(headers=('192.0.2.8' + ' ' * 1016,)), '10.0.0.2')
++        self.assertEqual(self.resolve(headers=(','.join(['192.0.2.8'] * 16),)), '192.0.2.8')
++        self.assertEqual(self.resolve(headers=(','.join(['192.0.2.8'] * 17),)), '10.0.0.2')
++
++    def test_other_forwarding_headers_do_not_change_auth_ip(self):
++        namespace = functions(AUTH, ['_request_ip'], {
++            'resolve_client_ip': origin.resolve_client_ip,
++            'AUTH_SETTINGS': SimpleNamespace(trusted_proxy_ips=PROXIES)})
++        req = request(forwarded=(), headers=[('Forwarded', 'for=192.0.2.99'),
++            ('X-Real-IP', '192.0.2.99')])
++        self.assertEqual(namespace['_request_ip'](req), '10.0.0.2')
++
++    def test_auth_wrapper_retains_duplicates_for_ambiguity_check(self):
++        namespace = functions(AUTH, ['_request_ip'], {
++            'resolve_client_ip': origin.resolve_client_ip,
++            'AUTH_SETTINGS': SimpleNamespace(trusted_proxy_ips=PROXIES)})
++        self.assertEqual(namespace['_request_ip'](request(forwarded=('192.0.2.8', '192.0.2.99'))),
++            '10.0.0.2')
++
++    def test_shared_nat_resolution_is_stateless_and_does_not_reject_users(self):
++        for _ in range(20):
++            self.assertEqual(self.resolve(headers=('198.51.100.7',)), '198.51.100.7')
++
++    def test_concurrent_resolution_has_no_shared_mutable_request_state(self):
++        values = [f'192.0.2.{i}' for i in range(1, 33)]
++        with ThreadPoolExecutor(max_workers=4) as pool:
++            result = list(pool.map(lambda v: self.resolve(headers=(v + ', 10.0.0.3',)), values))
++        self.assertEqual(result, values)
++
++
++class SyntheticHTTPError(Exception):
++    def __init__(self, status_code, detail):
++        self.status_code, self.detail = status_code, detail
++
++
++class ExistingAuthenticationTests(unittest.TestCase):
++    """Test actual unchanged auth bodies with fake ORM/bcrypt, not DB guarantees."""
++    def harness(self, *, exists=True, active=True, valid=True, failures=0, blocked=None):
++        user = SimpleNamespace(id_usuario=7, contrasena_hash='synthetic-hash', activo=active)
++        state = SimpleNamespace(intentos_fallidos=failures, bloqueado_hasta=blocked)
++        models = SimpleNamespace(Usuario=MagicMock(), EstadoAutenticacionUsuario=MagicMock(),
++            SesionUsuario=lambda **kw: SimpleNamespace(id_sesion=11, **kw),
++            EventoAcceso=lambda **kw: SimpleNamespace(id_evento=13, **kw))
++        db = MagicMock()
++        def query(model):
++            q = MagicMock()
++            q.filter.return_value = q
++            q.with_for_update.return_value = q
++            q.first.return_value = user if exists else None
++            q.one_or_none.return_value = state
++            return q
++        db.query.side_effect = query
++        ns = functions(AUTH, ['_request_ip', '_safe_user_agent', '_event', '_hash_secret',
++            '_credentials_error', 'create_session'], {
++            'models': models, 'func': MagicMock(), 'hashlib': hashlib,
++            'timedelta': timedelta, '_utcnow': lambda: NOW,
++            'AUTH_SETTINGS': SimpleNamespace(trusted_proxy_ips=PROXIES, lock_minutes=15,
++                absolute_minutes=480),
++            'resolve_client_ip': origin.resolve_client_ip,
++            'password_matches': MagicMock(return_value=valid),
++            '_DUMMY_PASSWORD_HASH': 'synthetic-dummy',
++            'HTTPException': SyntheticHTTPError,
++            'status': SimpleNamespace(HTTP_401_UNAUTHORIZED=401),
++            '_link_state_event': MagicMock(), 'set_audit_context': MagicMock(),
++            'secrets': SimpleNamespace(token_urlsafe=MagicMock(side_effect=['synthetic-session', 'synthetic-csrf']))})
++        return ns, db, user, state
++
++    def failure(self, ns, db):
++        with self.assertRaises(SyntheticHTTPError) as caught:
++            ns['create_session'](db, request(), ' User@qa.invalid ', 'synthetic-password')
++        self.assertEqual((caught.exception.status_code, caught.exception.detail),
++            (401, 'Credenciales incorrectas'))
++
++    def test_existing_missing_inactive_and_blocked_keep_generic_error(self):
++        for options in [dict(valid=False), dict(exists=False), dict(active=False),
++                        dict(blocked=NOW + timedelta(minutes=5))]:
++            ns, db, _, _ = self.harness(**options)
++            self.failure(ns, db)
++            ns['password_matches'].assert_called_once()
++            db.commit.assert_called_once()
++
++    def test_unknown_account_keeps_dummy_bcrypt_and_single_event(self):
++        ns, db, _, _ = self.harness(exists=False)
++        self.failure(ns, db)
++        self.assertEqual(ns['password_matches'].call_args.args[1], 'synthetic-dummy')
++        self.assertEqual(db.add.call_count, 1)
++        self.assertIsNone(db.add.call_args.args[0].id_usuario)
++
++    def test_fifth_failure_sets_existing_fifteen_minute_lock(self):
++        ns, db, _, state = self.harness(valid=False, failures=4)
++        self.failure(ns, db)
++        self.assertEqual((state.intentos_fallidos, state.bloqueado_hasta),
++            (5, NOW + timedelta(minutes=15)))
++        self.assertEqual(db.add.call_args.args[0].motivo_codigo, 'quinto_fallo')
++        ns['_link_state_event'].assert_called_once_with(db, 13)
++
++    def test_requests_during_lock_do_not_extend_it_or_mutate_failure_count(self):
++        deadline = NOW + timedelta(minutes=5)
++        ns, db, _, state = self.harness(failures=5, blocked=deadline)
++        for _ in range(3): self.failure(ns, db)
++        self.assertEqual((state.intentos_fallidos, state.bloqueado_hasta), (5, deadline))
++        self.assertEqual(db.add.call_count, 3)  # Existing residual: one DB event per rejected login.
++
++    def test_expired_lock_with_bad_password_restarts_failure_count(self):
++        ns, db, _, state = self.harness(valid=False, failures=5, blocked=NOW)
++        self.failure(ns, db)
++        self.assertEqual((state.intentos_fallidos, state.bloqueado_hasta), (1, None))
++
++    def test_success_after_expired_lock_keeps_tokens_hashes_and_audit_origin(self):
++        ns, db, user, state = self.harness(failures=5, blocked=NOW - timedelta(seconds=1))
++        result = ns['create_session'](db, request(forwarded=('192.0.2.99, 198.51.100.7',)),
++            'user@qa.invalid', 'synthetic-password')
++        self.assertIs(result[0], user)
++        session = result[1]
++        self.assertEqual(result[2:], ('synthetic-session', 'synthetic-csrf'))
++        self.assertEqual(session.token_hash, hashlib.sha256(b'synthetic-session').hexdigest())
++        self.assertEqual(session.csrf_hash, hashlib.sha256(b'synthetic-csrf').hexdigest())
++        self.assertEqual(session.expira_en, NOW + timedelta(minutes=480))
++        self.assertEqual((state.intentos_fallidos, state.bloqueado_hasta), (0, None))
++        event = db.add.call_args.args[0]
++        self.assertEqual(event.motivo_codigo, 'inicio_sesion')
++        self.assertEqual((session.ip_creacion, event.ip_origen), ('198.51.100.7', '198.51.100.7'))
++        db.commit.assert_called_once()
++
++    def test_synthetic_users_sharing_nat_keep_independent_authentication_state(self):
++        for _ in range(6):
++            ns, db, _, state = self.harness()
++            ns['create_session'](db, request(), 'user@qa.invalid', 'synthetic-password')
++            self.assertEqual(state.intentos_fallidos, 0)
++
++    def test_event_sanitizes_agent_and_uses_nearest_untrusted_hop(self):
++        ns, db, _, _ = self.harness(valid=False)
++        req = request(forwarded=('192.0.2.99, 198.51.100.7, 10.0.0.3',),
++            headers=[('user-agent', 'synthetic\nagent' + 'x' * 600)])
++        with self.assertRaises(SyntheticHTTPError):
++            ns['create_session'](db, req, 'user@qa.invalid', 'synthetic-password')
++        event = db.add.call_args.args[0]
++        self.assertEqual(event.ip_origen, '198.51.100.7')
++        self.assertEqual(len(event.user_agent), 512)
++        self.assertNotIn('\n', event.user_agent)
++
++
++class CookieAndCSRFTests(unittest.TestCase):
++    def test_existing_secure_cookie_flags_and_clearing(self):
++        settings = SimpleNamespace(absolute_minutes=480, cookie_secure=True,
++            cookie_samesite='lax', session_cookie_name='__Host-pa_session',
++            csrf_cookie_name='__Host-pa_csrf')
++        ns = functions(ROUTER, ['_set_auth_cookies', '_clear_auth_cookies'], {'AUTH_SETTINGS': settings})
++        response = MagicMock()
++        ns['_set_auth_cookies'](response, session_token='synthetic-session', csrf_token='synthetic-csrf')
++        calls = response.set_cookie.call_args_list
++        self.assertEqual([c.args[0] for c in calls], ['__Host-pa_session', '__Host-pa_csrf'])
++        self.assertEqual([c.kwargs['httponly'] for c in calls], [True, False])
++        for call in calls:
++            self.assertEqual({k: call.kwargs[k] for k in ['secure', 'samesite', 'path', 'max_age']},
++                dict(secure=True, samesite='lax', path='/', max_age=28800))
++            self.assertNotIn('domain', call.kwargs)
++        ns['_clear_auth_cookies'](response)
++        self.assertEqual(response.delete_cookie.call_count, 2)
++
++    def guard(self):
++        self.db = MagicMock()
++        self.validate = MagicMock(return_value=True)
++        self.next = AsyncMock(return_value='accepted')
++        self.settings = SimpleNamespace(allowed_origins=('https://qa.invalid',),
++            session_cookie_name='session', csrf_cookie_name='csrf')
++        ns = functions(ROOT / 'backend/app/main.py', ['csrf_cookie_guard'], {
++            'AUTH_SETTINGS': self.settings, 'SessionLocal': lambda: self.db,
++            'authentication_service': SimpleNamespace(validate_csrf=self.validate),
++            'JSONResponse': lambda **kw: SimpleNamespace(**kw)})
++        return lambda req: asyncio.run(ns['csrf_cookie_guard'](req, self.next))
++
++    def test_login_origin_is_still_required(self):
++        guard = self.guard()
++        rejected = guard(request(headers=[('Origin', 'https://forged.invalid')]))
++        self.assertEqual(rejected.status_code, 403)
++        self.assertEqual(guard(request(headers=[('Origin', 'https://qa.invalid')])), 'accepted')
++        self.validate.assert_not_called()
++
++    def test_mutation_with_session_without_csrf_is_rejected_before_db(self):
++        guard = self.guard()
++        rejected = guard(request(cookies={'session': 'synthetic'}, path='/api/auth/logout'))
++        self.assertEqual(rejected.status_code, 403)
++        self.validate.assert_not_called()
++        self.next.assert_not_awaited()
++
++    def test_valid_csrf_still_checks_session_secret_and_closes_db_double(self):
++        guard = self.guard()
++        req = request(headers=[('Origin', 'https://qa.invalid'), ('X-CSRF-Token', 'synthetic-csrf')],
++            cookies={'session': 'synthetic-session', 'csrf': 'synthetic-csrf'}, path='/api/auth/logout')
++        self.assertEqual(guard(req), 'accepted')
++        self.validate.assert_called_once_with(self.db, 'synthetic-session', 'synthetic-csrf')
++        self.db.close.assert_called_once()
++
++    def test_invalid_csrf_hash_is_rejected_and_db_double_closed(self):
++        guard = self.guard()
++        self.validate.return_value = False
++        req = request(headers=[('Origin', 'https://qa.invalid'), ('X-CSRF-Token', 'synthetic-csrf')],
++            cookies={'session': 'synthetic-session', 'csrf': 'synthetic-csrf'}, path='/api/auth/logout')
++        self.assertEqual(guard(req).status_code, 403)
++        self.db.close.assert_called_once()
++        self.next.assert_not_awaited()
++
++
++class StartupPolicyTests(unittest.TestCase):
++    def test_image_and_both_compose_commands_disable_peer_rewriting(self):
++        dockerfile = (ROOT / 'backend/Dockerfile').read_text()
++        image_command = json.loads(next(line[4:] for line in dockerfile.splitlines() if line.startswith('CMD ')))
++        base = (ROOT / 'docker-compose.yml').read_text()
++        base_command = json.loads(next(line.strip()[9:] for line in base.splitlines()
++            if line.strip().startswith('command: ["uvicorn"')))
++        override = (ROOT / 'docker-compose.override.yml').read_text().split('    volumes:', 1)[0]
++        override_command = [line.strip()[2:] for line in override.splitlines() if line.strip().startswith('- ')]
++        for command in [image_command, base_command, override_command]:
++            self.assertIn('--no-proxy-headers', command)
++            self.assertNotIn('--proxy-headers', command)
++            self.assertNotIn('--forwarded-allow-ips', command)
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/docs/security/SS-04-ETAPA1-CORRECCION-2026-10-28.md b/docs/security/SS-04-ETAPA1-CORRECCION-2026-10-28.md
+new file mode 100644
+index 0000000..e3b5269
+--- /dev/null
++++ b/docs/security/SS-04-ETAPA1-CORRECCION-2026-10-28.md
+@@ -0,0 +1,251 @@
++# SS-04 etapa 1 — Origen de red verificable y diseño de limitación compartida
++
++Fecha: 2026-10-28. Rama `dev`, HEAD `683ff75613768de28a7127c7e33a6e2ef4fc40ff`, con correcciones locales SS-01, SS-02 etapa 1 y SS-03 etapa 1.
++
++## Dictamen y alcance efectivo
++
++**SS-04 permanece abierto.** Se implementa únicamente el endurecimiento de la atribución de IP: cadena X-Forwarded-For validada desde el extremo confiable y preservación del peer de transporte en los comandos Uvicorn versionados. **No se activa un limitador de solicitudes**, ni se afirma protección global contra fuerza bruta, agotamiento de bcrypt/eventos o bloqueo inducido.
++
++La inspección no encontró un almacén compartido de admisión ni un proxy de entrada cuya topología efectiva esté acreditada. El PostgreSQL de negocio existente no se convierte en contador consultando el histórico por petición: añadiría carga, acoplaría disponibilidad al histórico y requeriría diseño de índices/retención/transacciones y pruebas QA autorizadas. Un diccionario por proceso no controla varias instancias. Conforme a la condición del encargo, se entrega primero el diseño compartido para esos controles; no se introduce un limitador incompleto ni un servicio nuevo.
++
++**81 pruebas aisladas aprobadas:** 32 nuevas SS-04 y 49 existentes SS-02/SS-03. Se ejercitan funciones reales con dependencias sintéticas; no equivalen a pruebas HTTP/ORM de la aplicación integrada. No hay FastAPI, Starlette, Uvicorn ni SQLAlchemy instalados en el intérprete local utilizado. No se instalaron dependencias ni se ejecutaron Docker, PostgreSQL, migraciones, servidores, cargas o fuerza bruta.
++
++## Inspección y preservación
++
++Se revisaron authentication.py (servicio/router), config.py, main.py, auth.py, passwords.py, database.py, Nginx SSALFER, Dockerfile y los cuatro Compose, pruebas auth/RBAC/credenciales, conftest y QA de sesiones frontend; SS-04 de la auditoría y su plan. Las migraciones de credenciales/eventos se inspeccionaron como texto para contrastar la atribución y los motivos permitidos; no se modificaron.
++
++El estado inicial coincide con el SHA de referencia y contiene trabajo sin integrar. Se tomaron hashes de todos los archivos versionados y de los archivos locales no ignorados antes de editar. Sólo cambian cuatro archivos preexistentes de este alcance; todo el material previo SS-01/SS-02/SS-03 conserva sus bytes. En docker-compose.yml se añade únicamente un argumento al comando, conservando íntegramente las variables y presupuestos de SS-03.
++
++Comparación AST antes/después del servicio: la única función modificada es `_request_ip`. create_session, password_matches, eventos, desbloqueo, expiración, cambio de contraseña y revocaciones conservan sus cuerpos. Frontend, Nginx, config, main, auth, router, dependencias, roles, DB y migraciones permanecen intactos. El nuevo helper no mantiene estado, no deniega logins ni vincula sesiones a una IP.
++
++## Modelo de amenazas y controles observados
++
++| Escenario | Evidencia y control actual | Pendiente / efecto de esta entrega |
++|---|---|---|
++| Muchos intentos a una cuenta | Usuario/estado bloqueados con FOR UPDATE; quinto fallo bloquea por AUTH_LOCK_MINUTES, 15 min predeterminados | El atacante puede inducir el bloqueo. No cambia la política |
++| Cuentas inexistentes / enumeración | Dummy bcrypt y 401 «Credenciales incorrectas»; inactivos y bloqueados también devuelven el mensaje genérico | No se prueban tiempos de red ni equivalencia temporal absoluta |
++| Ataque repartido por cuentas/orígenes | Cada intento admitido ejecuta bcrypt; alternar identidades evita el contador individual | Requiere presupuesto global compartido antes de bcrypt |
++| CPU y eventos | Se verifica contraseña incluso con bloqueo vigente; cada intento crea evento y commit | Sigue pendiente limitar admisiones y agregar rechazos fuera de evento_acceso |
++| Prolongación del bloqueo | Durante un bloqueo vigente no se cambia su fecha ni contador | Tras vencer, cinco nuevos fallos pueden iniciar otro bloqueo; no hay garantía frente a ataque sostenido |
++| NAT institucional | Muchas personas pueden compartir una dirección; IP no equivale a identidad | No se añade ningún rechazo ni sanción por IP |
++| XFF manipulado | Antes se elegía el primer valor si el peer estaba en la lista | Ahora se elige el hop no confiable más cercano, con validación acotada |
++| Proxy que reescribe el peer | Uvicorn puede sustituir ASGI client/scheme antes de FastAPI | --no-proxy-headers explícito en los comandos versionados; despliegue efectivo no comprobado |
++| Varios procesos / instancias | Los locks del estado de cuenta son DB; no hay contador global de solicitudes | El helper es puro y consistente entre procesos, pero no es rate limiting |
++| Origin permitido | main.py exige Origin explícito para login | Un cliente no navegador puede enviarlo: no es una defensa contra automatización |
++
++La guía [OWASP de autenticación](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) trata mensajes genéricos, throttling y riesgo de denegación por bloqueo de cuentas. En SSALFER deben resolverse conjuntamente: bajar el umbral o añadir un cooldown por correo no permite distinguir al dueño de un atacante no autenticado.
++
++## Implementación de origen de red
++
++Nuevo `backend/app/services/request_origin.py`, stdlib exclusivamente:
++
++1. Canonicalizar el peer de socket y las IP exactas configuradas. IPv4-mapped IPv6 se normaliza a IPv4. Peer inválido/ausente produce None; no se inventa identidad usando cabeceras.
++2. Sin peer confiable se ignora XFF. No se habilitan CIDR, comodines, nombres DNS ni confianza en toda la red Docker. La configuración existente conserva su validación de IP exactas.
++3. Con peer confiable sólo se admite una cabecera XFF, hasta 1024 caracteres y 16 hops. Rechazar como cadena controles/DEL, segmentos vacíos, hostnames, puertos, zonas IPv6 o direcciones no válidas. «Rechazar cadena» significa volver al peer, no bloquear al usuario ni responder 4xx.
++4. Validar toda la cadena y recorrerla de derecha a izquierda, saltando exclusivamente proxies configurados; el primer hop no confiable es el origen atribuible. Nunca saltar un intermediario desconocido para confiar en texto a su izquierda.
++5. Si todos los hops son confiables, usar el peer conservadoramente. Cabeceras duplicadas, ausentes, demasiado grandes o inválidas también usan el peer. No se consulta Forwarded ni X-Real-IP.
++
++El caso de regresión usa sólo direcciones de documentación: peer confiable 10.0.0.2, XFF `192.0.2.99, 198.51.100.7`. La versión previa atribuía el evento al prefijo 192.0.2.99 controlable por el cliente; la nueva devuelve 198.51.100.7, añadido por el proxy confiable. Se ejecutó el cuerpo previo con datos sintéticos y se confirmó que falla esta expectativa.
++
++| Límite activado | Valor / unidad | Fundamento y alcance |
++|---|---|---|
++| Longitud XFF | 1024 caracteres | Acota sólo el análisis de esta cabecera; suficiente para la topología propuesta. No limita el cuerpo ni todas las cabeceras HTTP |
++| Hops XFF | 16 direcciones | Margen para una cadena pequeña de proxies explícitos. No es una afirmación de topología real |
++| Cabeceras XFF | Una | Evita interpretaciones discrepantes de cabeceras duplicadas; fallback a peer, sin lockout |
++| Intentos de login nuevos | Ninguno | No se activa presupuesto local/global/por IP sin almacenamiento compartido y pruebas |
++| Bloqueo existente | 5 fallos; 15 minutos por defecto, configurable | Se conserva la política vigente, incluidos recuperación/desbloqueo |
++
++Los límites de parsing son constantes deliberadas, no variables de rate limiting. Excederlos degrada la precisión de la traza al peer, sin impedir acceso. No hay mapas por usuario/IP, contadores, temporizadores o logs nuevos que crezcan por solicitud.
++
++## Cadena de confianza exigida antes de desplegar
++
++Cadena propuesta: cliente → proxy HTTPS de entrada administrado → Nginx SSALFER opcional → Uvicorn sin reescritura de headers → FastAPI/helper. Cada proxy confiable debe sobrescribir con una cadena verificada o añadir la IP real de su peer, y no permitir que el cliente elija el sufijo confiable. La selección desde la derecha es coherente con el criterio de último hop no confiable documentado por [Nginx real_ip_recursive](https://nginx.org/en/docs/http/ngx_http_realip_module.html).
++
++El Nginx versionado usa `$proxy_add_x_forwarded_for`, por lo que añade su peer a la cadena. No prueba cómo funciona el proxy externo, ni que existan real_ip/set_real_ip_from seguros o direcciones estables de contenedor. Si el proxy exterior no está en la lista, se atribuirá conservadoramente su dirección; **no resolver añadiendo todos los clientes/NAT o un wildcard como proxies confiables**.
++
++Uvicorn procesa XFF/XFP antes de la aplicación cuando su política lo permite; por eso se desactiva esa segunda interpretación mediante --no-proxy-headers en Dockerfile, Compose base y override dev. Prod y SSALFER no redefinen ese comando. La [configuración Uvicorn](https://uvicorn.dev/settings/) permite controlar proxy headers; su [middleware en la versión fijada 0.49.0](https://raw.githubusercontent.com/Kludex/uvicorn/0.49.0/uvicorn/middleware/proxy_headers.py) modifica client/scheme. No basta definir AUTH_TRUSTED_PROXY_IPS si otro nivel ya sustituyó el peer.
++
++Antes de desplegar, acreditar conexiones y ACL de red: sólo proxies administrados deben alcanzar la entrada del backend; puertos loopback versionados no demuestran firewall o exposición real. Verificar el comando efectivo de cada réplica, incluyendo despliegues externos a estos Compose. Confirmar valores exactos de proxies contra sockets reales, sin volcados de .env ni secretos.
++
++**Regresión a revisar:** --no-proxy-headers también impide interpretar X-Forwarded-Proto. Las cookies Secure y CSRF siguen usando configuración/Origin, no request.scheme; pero redirecciones automáticas de slash y URLs absolutas generadas por framework pueden observar http detrás de TLS. Antes de integrar, probar las rutas canónicas y con slash en QA HTTPS, comprobar Location/esquema/OpenAPI; resolver esquema en un único nivel administrado sin reintroducir confianza arbitraria en XFF. No se modifican ahora main.py ni middleware de esquema para ocultar esa dependencia. No se acredita compatibilidad del proxy de producción.
++
++Un proxy configurado como confiable que sobrescriba XFF con datos del cliente, o un proceso comprometido en esa misma identidad de red, sigue pudiendo falsear trazas. La aplicación sólo puede verificar estructura y peer, no la honestidad de ese proxy. Las cabeceras inválidas no registran su contenido ni un evento adicional.
++
++## Diseño del limitador compartido — no implementado
++
++### Decisión de infraestructura
++
++Se recomienda evaluar **un almacén Redis dedicado de admisión**, sin exposición pública, con identidad/ACL mínima, timeouts y cotas de memoria/conexiones, común a todas las réplicas y procesos. Requiere autorización de servicio/dependencia/configuración y QA desechable: no se añade a Compose ni se instala aquí. Redis permite [scripts atómicos](https://redis.io/docs/latest/develop/programmability/eval-intro/), pero eso no prueba una implementación de rate limiting: deben probarse conjuntamente todos los presupuestos y su recuperación.
++
++Alternativas: PostgreSQL con tabla/operación atómica específica y retención puede coordinar instancias, pero necesita migración nueva, permisos y pruebas de concurrencia/fallos; no usar scans del histórico ni advisory locks con espera como sustituto. Nginx shared zones sirven para procesos de una misma instancia de proxy, no para varias máquinas independientes ni para identidad normalizada de OAuth2 form por sí solas. Un limitador local sólo sería una defensa adicional explícitamente local; no se incorpora ni se presenta como global.
++
++### Punto de admisión y presupuestos
++
++- En la única ruta de login, limitar primero bytes de cuerpo/cabeceras y tiempo de lectura en el proxy y ASGI, antes de parsear form o abrir DB. Rechazar explícitamente un cuerpo excesivo, sin truncarlo. No aplicar esos tamaños a uploads GIS/documentales.
++- Tras parseo acotado, normalizar identidad exactamente como create_session (strip/lower); calcular claves mediante HMAC con secreto propio compartido, separado de tokens de sesión. No guardar el correo/IP en claro en claves, logs o etiquetas de métricas. Mantener límite de cardinalidad y TTL; HMAC sigue siendo dato seudonimizado sujeto a acceso/retención.
++- Ejecutar una sola operación atómica de admisión que compruebe presupuesto global y combinación identidad/origen confiable. Las cuentas existentes, inexistentes, inactivas y bloqueadas entran por el mismo algoritmo **sin consultar su existencia**. No lanzar DB/bcrypt si no se admite. En Redis Cluster, diseñar claves/script en un slot compatible o elegir topología que garantice la operación conjunta.
++- La IP sirve de señal agregada, no de causa única de bloqueo en una NAT compartida. Rotar cuentas desde un origen y rotar orígenes contra una cuenta exige correlación más presupuesto global. Un bucket sólo por identidad también permite denegar al dueño: no activarlo como sanción larga automática ni afirmar que distingue intención.
++- Ventanas/recargas finitas, usando reloj del coordinador, sin renovar la penalización/TTL por peticiones rechazadas. No incrementar intentos_fallidos, crear estado de cuenta ni extender bloqueado_hasta por un rechazo del limitador. No resetear todos los presupuestos con un login exitoso ni permitir alternar errores/éxitos para evadir el límite global.
++- Separar tasa de admisiones de concurrencia bcrypt. Una cota de peticiones por segundo no limita por sí sola hashes simultáneos o peticiones ya en vuelo. Dimensionar concurrencia total entre réplicas, sin colas ilimitadas ni sleeps mientras se retienen DB locks. Los semáforos locales no equivalen a cota compartida. Si se usan leases, no reutilizar una plaza sólo por vencer TTL mientras un bcrypt anterior siga vivo; diseñar supervisión/terminación o partición explícita de capacidad antes de afirmar garantía global.
++
++No se seleccionan cifras de producción de RPS/burst/concurrencia sin medir coste bcrypt y pico legítimo multiusuario en QA, incluyendo NAT institucional. No hay variables ficticias para aparentar un control activo. Para ensayos funcionales futuros pueden usarse presupuestos artificiales pequeños (por ejemplo dos admisiones por ventana corta), **sólo en QA**, sin inferir capacidad del servidor.
++
++### Respuestas, fallos y trazabilidad
++
++Admisión rechazada por cuota: 429 con cuerpo genérico único «Demasiadas solicitudes; inténtalo más tarde», Retry-After entero acotado y Cache-Control: no-store; sin revelar existencia, motivo de bloqueo, correo o contadores. No borrar cookies de sesiones existentes ni revocarlas por rate limiting. El login ya admitido conserva el 401 genérico o la creación actual de sesión/cookies.
++
++Coordinador indisponible: definir explícitamente 503 genérico y Retry-After acotado antes de DB/bcrypt para login, sin fallback ilimitado local. Esa elección afecta disponibilidad de nuevos accesos y necesita aceptación operativa; las sesiones existentes no deben depender del almacén de admisión. Failover, pérdida/evicción de contadores y reloj/reinicio deben tener comportamiento probado: la atomicidad de un script no garantiza estado durable ni límites bajo todas las fallas. No reclamar cotas exactas con replicación asíncrona sin analizar esa ventana.
++
++Los 429 no insertan evento_acceso ni auth_event de DB por petición. Contadores agregados de admisiones/rechazos por ventana y tipo limitado, alertas y resúmenes acotados conservan trazabilidad operativa sin replicar la carga. Identidades seudonimizadas sólo en una salida protegida, con muestreo/retención y cardinalidad máximos; no incluirlas como labels ilimitados. El propio access log de proxy/API debe revisarse con rotación/cotas: no basta ahorrar eventos DB. Los eventos del login admitido y las transiciones de estado conservan su contrato actual.
++
++### Bloqueo inducido y recuperación
++
++La política actual bloquea al quinto fallo sin prueba de posesión. Un atacante que conoce el correo puede consumir esos cinco fallos, esperar recuperación y repetir; un bucket por cuenta puede producir la misma denegación incluso sin tocar PostgreSQL. Ningún límite previo a verificar la contraseña distingue infaliblemente al dueño de un atacante con los mismos identificadores públicos.
++
++En esta entrega se conserva el desbloqueo administrativo/recuperación y la fecha fija durante un bloqueo vigente. Para resolver la disponibilidad selectiva hay que revisar con el dueño funcional la recuperación acreditada y/o la semántica de bloqueo, sin CAPTCHA ni servicio externo automático. No se cambia esa política sin autorización ni se reduce dummy bcrypt sólo para bloqueados: introduciría una nueva diferencia temporal. El limitador reduce capacidad de abuso; no se promete erradicación de bloqueos sostenidos con el contrato actual.
++
++## Pruebas ejecutadas y alcance de la evidencia
++
++Antes de ejecutar se inspeccionaron conftest, imports y efectos de las suites. El conftest backend exige una base de prueba explícita, importa la app/engine y sus fixtures escriben en PostgreSQL. No se ejecutó pytest ni collect-only. La suite nueva usa stdlib y datos sintéticos: importa directamente el helper puro y extrae por AST cuerpos de funciones seleccionadas de fuentes reales, sin ejecutar imports/top-level, dummy hash bcrypt, routers, DB engine o startup. ORM, bcrypt, Request, Response y middleware HTTP se sustituyen por dobles. La extracción de funciones no acredita integración del framework ni constraints/triggers/atomicidad DB.
++
++```sh
++python3 -B -m unittest discover -s tests/security -p 'test_auth_origin_security.py' -v
++# Ran 32 tests; OK
++python3 -B -m unittest discover -s tests/security -p 'test_*.py' -v
++# Ran 81 tests; OK (incluye los 32 anteriores y las 49 regresiones SS-02/SS-03)
++```
++
++| Escenario | Evidencia ejecutada | Límite de cobertura |
++|---|---|---|
++| XFF directo falsificado / prefijo inyectado / hops confiables | Helper y wrapper reales con peers sintéticos | Sin proxy ni Uvicorn nativo |
++| Duplicados, IPv4/IPv6, mapped, controles, inválidos, límites | Casos positivos/negativos y fronteras 1024/16 | No mide todo el parser HTTP del servidor |
++| NAT compartida | Helper sin estado y logins sintéticos independientes admitidos | No demuestra equidad de un limitador futuro |
++| Concurrencia | 32 resoluciones sintéticas en cuatro threads, deterministas | No prueba locks DB ni un contador distribuido |
++| Existente/inexistente/inactivo/bloqueado | 401 genérico y un password_matches simulado por intento | No mide timing bcrypt/HTTP |
++| Quinto fallo y recuperación | Estado/evento simulado; bloqueo vigente no se extiende; expirado reinicia y permite éxito | Persistencia, triggers y carreras requieren DB QA |
++| Eventos y procedencia | Un evento por intento actual, agente saneado y mismo origen en sesión/evento | El crecimiento por abuso sigue sin limitarse |
++| Cookies | Función real con Response simulado conserva Secure/HttpOnly/SameSite/__Host/path/max-age | No navegador/HTTPS ni FastAPI nativo |
++| CSRF | Cuerpo real del guard: Origin login, ausencia/token válido/inválido y cierre del DB simulado | No prueba criptografía/DB, orden completo ASGI o middleware desplegado |
++| Arranques | Flags en Dockerfile/base/override; prod/SSALFER no redefinen comando | Revisión textual/YAML, no Compose efectivo ni contenedores |
++| Rechazo por exceso / intentos distribuidos / recuperación de cuotas | **No ejecutado: no hay limitador compartido implementado** | Debe pasar aceptación siguiente antes de activar |
++
++Además: fallo esperado de la función previa ante prefijo XFF sintético; YAML de los cuatro Compose analizado con safe_load ya disponible (sin expansión de .env); AST de autenticación sin cambios salvo _request_ip; hashes de material previo preservados. git diff --check y comprobación inversa --check del patch sin aplicar/revertir. No se imprimieron secretos ni se leyeron archivos .env.
++
++Pruebas omitidas: TestClient/FastAPI/Uvicorn reales por ausencia de esas dependencias; suites backend que necesitan PostgreSQL por falta de BD QA autorizada; navegador/proxy HTTPS/topología real; rate limiting distribuido y carga. No se instalaron herramientas para suplirlos. Las pruebas frontend existentes no se reejecutaron porque no se modifica frontend ni su lógica de sesión.
++
++## Aceptación pendiente para limitador e infraestructura
++
++| Prueba futura en QA desechable | Resultado exigido |
++|---|---|
++| Umbral pequeño parametrizado con N y N+1 solicitudes sintéticas | N admisiones; siguiente 429 antes de bcrypt/DB/evento, Retry-After finito; mismo tratamiento con cuentas existentes/inexistentes |
++| Usuarios distintos detrás de la misma NAT | Acceso legítimo sin sanción general por IP; documentar límite de capacidad global inevitable y tiempos de espera |
++| Identidades y orígenes alternados entre dos o más procesos/réplicas | Un único presupuesto global; sin multiplicación por número de procesos |
++| Solicitudes concurrentes en borde de cuota | Operación atómica sin sobre-admisión; fallos no consumen/actualizan parcialmente presupuestos ajenos |
++| Esperar ventana y enviar rechazos durante ella | Se recupera según plazo fijo; el atacante no prolonga el plazo por solicitudes denegadas; no confundir esto con garantía de disponibilidad frente a nuevas oleadas |
++| Coordinador caído/reiniciado/particionado, eviction y failover | Resultado explícito, finito y documentado; no bcrypt/DB ilimitado ni borrado de sesiones existentes |
++| Ataque a cuenta bloqueada / desbloqueo administrativo | Rechazos del limitador no cambian estado; verificar recuperación real y riesgo residual de re-bloqueo |
++| Cookies, CSRF, roles, expiración/revocación | Suites auth/RBAC/credenciales en BD QA desechable autorizada sin regresión |
++| Cadena TLS/proxies/peer real, acceso directo y XFF malicioso | Ningún prefijo del cliente se convierte en origen confiable; comandos/ACL/red/scheme y Location comprobados |
++| Volumen de eventos/logs/métricas | Rechazos agregados, storage/cardinalidad acotados, sin secretos ni PII completa |
++
++No se han ejecutado estas pruebas de aceptación de infraestructura; esta tabla no es una evidencia de cierre.
++
++## Archivos, parche y riesgos de revisión
++
++Modificados: backend/app/services/authentication.py, backend/Dockerfile, docker-compose.yml, docker-compose.override.yml. Nuevos: backend/app/services/request_origin.py, tests/security/test_auth_origin_security.py, este informe y SS-04-ETAPA1-CORRECCION-2026-10-28.patch. Ningún otro archivo previo cambia.
++
++El patch se genera contra snapshots locales anteriores a esta intervención, no contra HEAD, e incluye exclusivamente los cuatro cambios anteriores más helper, pruebas e informe (no se incluye a sí mismo). Requiere la base local con las remediaciones previas: no duplicarlas ni reemplazarlas. Los informes/patches previos se conservan sin modificación. Los hashes finales permiten identificar las fuentes revisadas:
++
++| Archivo | SHA-256 final |
++|---|---|
++| backend/app/services/authentication.py | `c6aa445c565db2c7b536e596ef3dd1a0d0cab8820ee2d6fa3bda904ec0ba1f09` |
++| backend/Dockerfile | `94c0dbc2602b52f6a9b88587a82416e0d8ce83788e04b84fb23134e856f773d8` |
++| docker-compose.yml | `6122b1bcc1639f36e40de2ee398c4e18dae210dac31d26d38b75fba9d1b97fb6` |
++| docker-compose.override.yml | `f590a6396ab5af9556d87bc047abb6ebfcc1736ca839c41bd5dd4ac76705fafe` |
++| backend/app/services/request_origin.py | `defab18911b29fd771b2ec7c7b895a2b29e62a16c00b9b98c545e62f7bc95943` |
++| tests/security/test_auth_origin_security.py | `62efe433284cf009262d883d8b4d32e8f02fa16a314e331bf61677c043e3c7b8` |
++
++Riesgos de regresión: topologías de proxies no inventariadas producirán una IP de proxy en auditoría; cabeceras duplicadas antes aceptadas ahora caen al peer; IPv4-mapped cambia a representación IPv4; direcciones scope/puerto inválidas no se persisten; esquema/redirects de Uvicorn requiere la QA TLS descrita. No se modifica el comportamiento de autenticación según esa IP, ni se hacen cierres de sesión por cambios de red.
++
++Riesgos residuales: admisiones/bcrypt/eventos aún sin límite complementario, bloqueos inducibles, capacidad global no probada, confianza/ACL del proxy sólo propuesta y no constatada. La entrega es **parcial y pendiente de validación integrada**, lista para revisión de código; no permite declarar SS-04 resuelto ni el despliegue institucional preparado.
++
++## Diff de archivos preexistentes de esta intervención
++
++```diff
++diff --git a/backend/app/services/authentication.py b/backend/app/services/authentication.py
++--- a/backend/app/services/authentication.py
+++++ b/backend/app/services/authentication.py
++@@ -2,7 +2,6 @@
++ import hmac
++ import secrets
++ from datetime import datetime, timedelta, timezone
++-from ipaddress import ip_address
++ 
++ import bcrypt
++ from fastapi import HTTPException, Request, status
++@@ -13,6 +12,7 @@
++ from ..config import AUTH_SETTINGS
++ from ..passwords import is_within_bcrypt_limit
++ from .common import commit_or_conflict, set_audit_context
+++from .request_origin import resolve_client_ip
++ 
++ 
++ _DUMMY_PASSWORD_HASH = bcrypt.hashpw(
++@@ -51,17 +51,11 @@
++ 
++ def _request_ip(request: Request) -> str | None:
++     peer = request.client.host if request.client else None
++-    candidate = peer
++-    if peer in AUTH_SETTINGS.trusted_proxy_ips:
++-        forwarded = request.headers.get("x-forwarded-for", "")
++-        if forwarded:
++-            candidate = forwarded.split(",", 1)[0].strip()
++-    if not candidate:
++-        return None
++-    try:
++-        return str(ip_address(candidate))
++-    except ValueError:
++-        return None
+++    return resolve_client_ip(
+++        peer,
+++        request.headers.getlist("x-forwarded-for"),
+++        AUTH_SETTINGS.trusted_proxy_ips,
+++    )
++ 
++ 
++ def _event(
++diff --git a/backend/Dockerfile b/backend/Dockerfile
++--- a/backend/Dockerfile
+++++ b/backend/Dockerfile
++@@ -15,4 +15,4 @@
++ 
++ EXPOSE 8000
++ 
++-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+++CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers", "--reload"]
++diff --git a/docker-compose.yml b/docker-compose.yml
++--- a/docker-compose.yml
+++++ b/docker-compose.yml
++@@ -88,7 +88,7 @@
++     image: software-pa-backend
++     build:
++       context: ./backend
++-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+++    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
++     restart: always
++     environment:
++       <<: *backend-environment
++diff --git a/docker-compose.override.yml b/docker-compose.override.yml
++--- a/docker-compose.override.yml
+++++ b/docker-compose.override.yml
++@@ -9,6 +9,7 @@
++       - 0.0.0.0
++       - --port
++       - "8000"
+++      - --no-proxy-headers
++       - --reload
++     volumes:
++       - ./backend:/app
++```
++
++El [parche completo](SS-04-ETAPA1-CORRECCION-2026-10-28.patch) añade también helper, pruebas y este documento. **Se detiene la intervención para revisión.** No se instala el coordinador propuesto, no se despliega, no hay commits/push/merge y no se continúa con otros hallazgos.

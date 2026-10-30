@@ -1,0 +1,3788 @@
+diff --git a/backend/.dockerignore b/backend/.dockerignore
+--- a/backend/.dockerignore
++++ b/backend/.dockerignore
+@@ -14,3 +14,45 @@
+ /excel_info.json
+ /schema_dump.txt
+ /schema_info.json
++
++# SS-09: secretos y metadatos locales no deben entrar al contexto de build.
++.env
++.env.*
++**/.env
++**/.env.*
++.git
++**/.git
++.ssh
++**/.ssh
++.aws
++**/.aws
++.pgpass
++**/.pgpass
++.npmrc
++**/.npmrc
++.pypirc
++**/.pypirc
++.netrc
++**/.netrc
++.git-credentials
++**/.git-credentials
++*.pem
++**/*.pem
++*.key
++**/*.key
++*.p12
++**/*.p12
++*.pfx
++**/*.pfx
++*.jks
++**/*.jks
++*.dump
++**/*.dump
++*.backup
++**/*.backup
++/backups/
++
++# QA usa fuentes montadas o un artefacto de pruebas separado, no la imagen API.
++/tests/
++/db/tests/
++/pytest.ini
+diff --git a/docs/security/ss09/verificar_cadena.py b/docs/security/ss09/verificar_cadena.py
+new file mode 100644
+index 0000000..6d1d744
+--- /dev/null
++++ b/docs/security/ss09/verificar_cadena.py
+@@ -0,0 +1,330 @@
++"""SS-09 read-only standard-library audit of local declarations, never a build/SCA.
++
++No environment loading, connectors, network, subprocesses, package tools or writes.
++The small Compose/ignore recognizers cover this repository's reviewed subset;
++Docker/Compose/npm/pip remain the authorities for actual resolution in QA.
++"""
++import argparse
++import ast
++import base64
++import fnmatch
++import hashlib
++import json
++import os
++from pathlib import Path, PurePosixPath
++import re
++import stat
++import sys
++from urllib.parse import urlsplit
++
++MAX_SOURCE_BYTES=8*1024*1024
++VENDOR_PREFIX='frontend-ssalfer/js/vendor/'
++SOURCES=('backend/requirements.txt','backend/tests/requirements-convenio-report.txt','backend/Dockerfile','backend/.dockerignore',
++ 'frontend/package.json','frontend/package-lock.json','frontend/Dockerfile','frontend/.dockerignore',
++ 'frontend-ssalfer/deploy/Dockerfile','docker-compose.yml','docker-compose.override.yml',
++ 'docker-compose.prod.yml','docker-compose.ssalfer.yml',
++ 'backend/tests/convenio_report_compose.yml','backend/tests/lineage_compose.yml')
++APP_IMPORTS={'fastapi':'fastapi','sqlalchemy':'sqlalchemy','pydantic':'pydantic',
++ 'geoalchemy2':'geoalchemy2','psycopg2':'psycopg2-binary','bcrypt':'bcrypt',
++ 'dotenv':'python-dotenv','pandas':'pandas','numpy':'numpy','openpyxl':'openpyxl',
++ 'httpx':'httpx','aiofiles':'aiofiles','starlette':'starlette','passlib':'passlib'}
++IMAGE_ROOTS={'python','node','nginx','postgis/postgis','dpage/pgadmin4','software-pa-backend'}
++ALLOWED_SERVICES={'backend','frontend','frontend_ssalfer','db','pgadmin','worker'}
++REQUIRED_IGNORE={'.env','.env.*','**/.env','**/.env.*','.git','**/.git','.ssh','**/.ssh',
++ '.aws','**/.aws','.pgpass','**/.pgpass','.npmrc','**/.npmrc','.pypirc','**/.pypirc',
++ '.netrc','**/.netrc','.git-credentials','**/.git-credentials',
++ '*.pem','**/*.pem','*.key','**/*.key','/tests/','/db/tests/'}
++
++class AuditError(ValueError):
++    def __init__(self,code):self.code=code;super().__init__(code)
++
++class QuietParser(argparse.ArgumentParser):
++    def error(self,message):raise AuditError('ARGUMENTS_INVALID')
++
++
++def read_bytes(root,relative):
++    """Bounded descriptor walk; reject secret-like paths and symlinks before reading."""
++    parts=PurePosixPath(relative).parts
++    if not parts or PurePosixPath(relative).is_absolute() or any(p in ('.','..') or '\\' in p for p in parts):
++        raise AuditError('SOURCE_PATH_INVALID')
++    if any(p.startswith('.env') or p in {'.aws','.ssh','.pgpass','.npmrc','.pypirc','.netrc','.git-credentials'} for p in parts):
++        raise AuditError('SECRET_PATH_FORBIDDEN')
++    if Path(parts[-1]).suffix.lower() in {'.pem','.key','.p12','.pfx','.jks','.dump','.backup'}:
++        raise AuditError('SECRET_PATH_FORBIDDEN')
++    # Opening a FIFO without NONBLOCK could hang before fstat rejects its type.
++    flags=os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC|os.O_NONBLOCK
++    fd=os.open(root,flags|os.O_DIRECTORY)
++    try:
++        for part in parts[:-1]:
++            nxt=os.open(part,flags|os.O_DIRECTORY,dir_fd=fd);os.close(fd);fd=nxt
++        source=os.open(parts[-1],flags,dir_fd=fd)
++        try:
++            info=os.fstat(source)
++            if not stat.S_ISREG(info.st_mode) or info.st_size>MAX_SOURCE_BYTES:raise AuditError('SOURCE_TYPE_OR_SIZE_INVALID')
++            chunks=[];count=0
++            while True:
++                chunk=os.read(source,min(65536,MAX_SOURCE_BYTES-count+1))
++                if not chunk:break
++                count+=len(chunk)
++                if count>MAX_SOURCE_BYTES:raise AuditError('SOURCE_TYPE_OR_SIZE_INVALID')
++                chunks.append(chunk)
++            return b''.join(chunks)
++        finally:os.close(source)
++    finally:os.close(fd)
++
++
++def read_text(root,name):return read_bytes(root,name).decode('utf-8')
++def canonical_name(value):return re.sub(r'[-_.]+','-',value).lower()
++def safe_version(value):
++    if not isinstance(value,str) or not re.fullmatch(r'[0-9][0-9A-Za-z.+_-]{0,49}',value):raise AuditError('VERSION_FORMAT_INVALID')
++    return value
++
++
++def python_inventory(text):
++    result=[];seen=set()
++    for line in text.splitlines():
++        if not line.strip() or line.lstrip().startswith('#'):continue
++        match=re.fullmatch(r'([A-Za-z0-9][A-Za-z0-9_.-]*)==([0-9][0-9A-Za-z.+_-]{0,49})',line.strip())
++        if not match:raise AuditError('PYTHON_REQUIREMENT_NOT_REVIEWED_EXACT_PIN')
++        name=canonical_name(match[1]);version=safe_version(match[2])
++        if name in seen:raise AuditError('PYTHON_DUPLICATE_PIN')
++        seen.add(name);result.append(dict(name=name,declared_version=version,installed_version=None,
++            distribution_hash=None,dependency_topology='flat_unverified',vulnerability_review='pending'))
++    return sorted(result,key=lambda r:r['name'])
++
++
++def semver_subset(requirement,resolved):
++    """Only exact/^/~ three-part stable versions; other npm syntax stays pending."""
++    match=re.fullmatch(r'([\^~]?)([0-9]+)\.([0-9]+)\.([0-9]+)',requirement)
++    actual=re.fullmatch(r'([0-9]+)\.([0-9]+)\.([0-9]+)',resolved)
++    if not match or not actual:return None
++    op=match[1];minimum=tuple(map(int,match.groups()[1:]));version=tuple(map(int,actual.groups()))
++    if not op:return version==minimum
++    if op=='~':upper=(minimum[0],minimum[1]+1,0)
++    elif minimum[0]:upper=(minimum[0]+1,0,0)
++    elif minimum[1]:upper=(0,minimum[1]+1,0)
++    else:upper=(0,0,minimum[2]+1)
++    return minimum<=version<upper
++
++
++def node_inventory(package,lock):
++    if lock.get('lockfileVersion')!=3 or not isinstance(lock.get('packages'),dict):raise AuditError('NODE_LOCK_SCHEMA_UNSUPPORTED')
++    tree=lock['packages'];declared=[]
++    for section in ('dependencies','devDependencies'):
++        values=package.get(section,{})
++        if not isinstance(values,dict) or values!=tree.get('',{}).get(section,{}):raise AuditError('NODE_ROOT_DECLARATION_MISMATCH')
++        for name,requirement in sorted(values.items()):
++            if not re.fullmatch(r'(?:@[a-z0-9._-]+/)?[a-z0-9._-]+',name):raise AuditError('NODE_PACKAGE_NAME_INVALID')
++            resolved=tree.get('node_modules/'+name,{}).get('version')
++            if resolved is None:raise AuditError('NODE_DIRECT_RESOLUTION_MISSING')
++            version=safe_version(resolved)
++            if not isinstance(requirement,str) or not re.fullmatch(r'[\^~]?[0-9]+\.[0-9]+\.[0-9]+',requirement):
++                status='unsupported_range_pending_npm';display=None
++            else:
++                valid=semver_subset(requirement,version);status='matches_reviewed_range' if valid else 'mismatch'
++                display=requirement
++            declared.append(dict(name=name,kind=section,declared_range=display,lock_version=version,coherence=status))
++    resolved=[]
++    for path,record in sorted(tree.items()):
++        if not path:continue
++        if not re.fullmatch(r'node_modules/(?:[a-z0-9@._-]+/)*[a-z0-9@._-]+',path):raise AuditError('NODE_LOCK_PATH_UNSUPPORTED')
++        version=safe_version(record.get('version'))
++        integrity=record.get('integrity','');match=re.fullmatch(r'(sha256|sha384|sha512)-([A-Za-z0-9+/]+={0,2})',integrity) if isinstance(integrity,str) else None
++        valid=False
++        if match:
++            try:valid=len(base64.b64decode(match[2],validate=True))=={'sha256':32,'sha384':48,'sha512':64}[match[1]]
++            except ValueError:pass
++        try:
++            url=urlsplit(record.get('resolved',''))
++            origin_ok=(url.scheme=='https' and url.hostname=='registry.npmjs.org' and not url.username
++                and not url.password and not url.query and not url.fragment and url.port in (None,443))
++        except (ValueError,TypeError):origin_ok=False
++        resolved.append(dict(path=path,lock_version=version,installed_version=None,
++            integrity=integrity if valid else None,integrity_format_valid=valid,
++            distribution_bytes_verified=False,origin='registry.npmjs.org' if origin_ok else 'unapproved_or_credentialed',
++            has_install_script=record.get('hasInstallScript') is True,dev=record.get('dev') is True,
++            optional=record.get('optional') is True,vulnerability_review='pending'))
++    return dict(lockfile_version=3,direct=declared,locked=resolved,installed_tree='not_observed')
++
++
++def vendor_inventory(root):
++    manifest=json.loads(read_text(root,'docs/security/ss09/vendors-sha256.json'))
++    if manifest.get('schema_version')!=1 or not isinstance(manifest.get('files'),list):raise AuditError('VENDOR_MANIFEST_INVALID')
++    results=[];seen=set()
++    families={'leaflet','bootstrap-icons','sheetjs','exceljs','html2canvas','vendor-documentation'}
++    for entry in manifest['files']:
++        path=entry.get('path');digest=entry.get('sha256');size=entry.get('size')
++        if not isinstance(path,str) or not path.startswith(VENDOR_PREFIX) or not re.fullmatch(r'[A-Za-z0-9_./-]+',path):raise AuditError('VENDOR_PATH_INVALID')
++        if Path(path).suffix not in {'.js','.css','.woff','.woff2','.png','.txt','.md'}:raise AuditError('VENDOR_PATH_INVALID')
++        if path in seen:raise AuditError('VENDOR_DUPLICATE_PATH')
++        seen.add(path)
++        if not isinstance(digest,str) or not re.fullmatch(r'[0-9a-f]{64}',digest) or type(size) is not int:raise AuditError('VENDOR_DIGEST_INVALID')
++        if entry.get('family') not in families:raise AuditError('VENDOR_FAMILY_INVALID')
++        version=entry.get('declared_version')
++        if version is not None:version=safe_version(version)
++        content=read_bytes(root,path)
++        results.append(dict(path=path,family=entry['family'],declared_version=version,size=len(content),
++            sha256=hashlib.sha256(content).hexdigest(),matches_local_baseline=(len(content)==size and hashlib.sha256(content).hexdigest()==digest),
++            version_literal_present=version.encode() in content if version and path.endswith(('.js','.css')) else None,
++            upstream_authenticity='not_verified',vulnerability_review='pending'))
++    # Names of unreviewed files are not echoed, and their contents are not read.
++    directory=root/VENDOR_PREFIX
++    if directory.is_symlink():raise AuditError('VENDOR_DIRECTORY_SYMLINK')
++    actual={str(p.relative_to(root)) for p in directory.rglob('*') if p.is_file() or p.is_symlink()}
++    return dict(files=results,unmanifested_count=len(actual-seen),missing_count=len(seen-actual),
++                baseline_is_authenticity_proof=False)
++
++
++def image_record(value,source):
++    # Fixed registry families used in the reviewed repository; do not echo new
++    # credentialed registry refs/URLs/variables before they receive review.
++    match=re.fullmatch(r'([a-z0-9./-]+)(?::([a-z0-9._-]+))?(?:@sha256:([0-9a-f]{64}))?',value)
++    if not match or match[1] not in IMAGE_ROOTS:
++        return dict(source=source,reference=None,immutable_reference=False,actual_digest_verified=False,review='unapproved_reference')
++    return dict(source=source,reference=value,immutable_reference=bool(match[3]),
++        actual_digest_verified=False,platform='not_observed',review='digest_pending' if not match[3] else 'digest_reference_only')
++
++
++def service_blocks(text):
++    """Extract simple service blocks only; no YAML merge/interpolation/resolution."""
++    lines=text.splitlines();inside=False;current=None;blocks={}
++    for line in lines:
++        if line=='services:':inside=True;continue
++        if inside and line and not line[0].isspace() and not line.startswith('#'):inside=False
++        if not inside:continue
++        match=re.fullmatch(r'  ([a-z_][a-z0-9_]*):\s*',line)
++        if match:
++            current=match[1]
++            if current not in ALLOWED_SERVICES:raise AuditError('COMPOSE_SERVICE_UNREVIEWED')
++            blocks[current]=[]
++        elif current:blocks[current].append(line)
++    return {key:'\n'.join(value) for key,value in blocks.items()}
++
++
++def inspect_images(sources):
++    images=[]
++    for name,text in sources.items():
++        if name.endswith('Dockerfile'):
++            stages=set()
++            for line in text.splitlines():
++                match=re.fullmatch(r'FROM\s+(\S+)(?:\s+AS\s+(\w+))?',line,re.I)
++                if match:
++                    if match[1] not in stages:images.append(image_record(match[1],name))
++                    if match[2]:stages.add(match[2])
++        elif name.endswith('.yml'):
++            for line in text.splitlines():
++                match=re.fullmatch(r'\s+image:\s+([^\s#]+)\s*',line)
++                if match:images.append(image_record(match[1],name))
++    return images
++
++
++def ignore_subset(path,source):
++    """Model the current simple patterns only; Docker matcher still requires QA."""
++    candidates=[path,*[str(p) for p in PurePosixPath(path).parents if str(p)!='.']]
++    for raw in source.splitlines():
++        pattern=raw.strip()
++        if not pattern or pattern.startswith('#'):continue
++        if pattern.startswith('!'):raise AuditError('IGNORE_NEGATION_NEEDS_REVIEW')
++        pattern=pattern.strip('/')
++        if any(fnmatch.fnmatchcase(candidate,pattern) for candidate in candidates):return True
++    return False
++
++
++def deployment_inventory(sources):
++    base=service_blocks(sources['docker-compose.yml']);prod=service_blocks(sources['docker-compose.prod.yml'])
++    dev=service_blocks(sources['docker-compose.override.yml']);ssalfer=service_blocks(sources['docker-compose.ssalfer.yml'])
++    return dict(compose_parser='reviewed_literal_subset_not_compose_resolution',
++        base_services=sorted(base),additional_ssalfer_services=sorted(ssalfer),
++        uvicorn_no_proxy_headers_in_base='--no-proxy-headers' in base.get('backend',''),
++        uvicorn_no_access_log_in_base='--no-access-log' in base.get('backend',''),
++        secure_cookie_literal_in_prod=bool(re.search(r'AUTH_COOKIE_SECURE:\s*"true"',prod.get('backend',''))),
++        production_mode_literal='APP_ENV: production' in prod.get('backend',''),
++        explicit_cors_required_in_prod='CORS_ORIGINS: ${CORS_ORIGINS:?' in prod.get('backend',''),
++        development_reload='--reload' in dev.get('backend',''),
++        frontend_selection='not_approved_here',combinations=[
++          dict(profile='implicit_base_override',files=['docker-compose.yml','docker-compose.override.yml'],review='development_not_production'),
++          dict(profile='base_prod',files=['docker-compose.yml','docker-compose.prod.yml'],review='react_present_ssalfer_absent'),
++          dict(profile='base_ssalfer',files=['docker-compose.yml','docker-compose.ssalfer.yml'],review='production_settings_not_guaranteed'),
++          dict(profile='base_prod_ssalfer',files=['docker-compose.yml','docker-compose.prod.yml','docker-compose.ssalfer.yml'],review='both_frontends_declared_explicit_service_selection_required')])
++
++
++def audit(root):
++    root=Path(root)
++    sources={name:read_text(root,name) for name in SOURCES}
++    py=python_inventory(sources['backend/requirements.txt'])
++    observed=set()
++    for path in sorted((root/'backend/app').rglob('*.py')):
++        tree=ast.parse(read_text(root,str(path.relative_to(root))))
++        for node in ast.walk(tree):
++            if isinstance(node,ast.Import):observed.update(a.name.split('.')[0] for a in node.names)
++            if isinstance(node,ast.ImportFrom) and node.level==0 and node.module:observed.add(node.module.split('.')[0])
++    for row in py:row['app_import_observed']=row['name'] in {APP_IMPORTS[n] for n in observed if n in APP_IMPORTS}
++    node=node_inventory(json.loads(sources['frontend/package.json']),json.loads(sources['frontend/package-lock.json']))
++    vendors=vendor_inventory(root);images=inspect_images(sources)
++    ignore=sources['backend/.dockerignore'];patterns={s.strip() for s in ignore.splitlines() if s.strip() and not s.lstrip().startswith('#')}
++    docker=sources['backend/Dockerfile'];ssalfer=sources['frontend-ssalfer/deploy/Dockerfile']
++    preserved=('requirements.txt','Dockerfile','logging.json','app/main.py','app/safe_logging.py',
++               'app/services/document_storage.py','db/init/001_bootstrap_roles.sh',
++               'db/migrations/001_baseline_v1.sql','scripts/run_migrations.sh')
++    context=dict(root='./backend',global_copy='COPY . .' in docker,missing_required_ignore_patterns=len(REQUIRED_IGNORE-patterns),
++        required_resources_excluded=[name for name in preserved if ignore_subset(name,ignore)],
++        test_sources_excluded=ignore_subset('tests/test_synthetic.py',ignore),
++        build_reconstruction='pending_native_docker',scan_is_not_secret_scanner=True)
++    workflow_dir=root/'.github/workflows'
++    if workflow_dir.is_symlink():raise AuditError('WORKFLOW_DIRECTORY_SYMLINK')
++    workflows=sum(1 for p in workflow_dir.iterdir() if p.suffix in ('.yml','.yaml')) if workflow_dir.is_dir() else 0
++    issues=['PYTHON_DISTRIBUTION_HASHES_UNVERIFIED','PYTHON_GRAPH_UNVERIFIED','NATIVE_AND_INSTALLED_ARTIFACTS_UNOBSERVED',
++            'CVE_SCA_NOT_PERFORMED','GITHUB_EFFECTIVE_POLICIES_UNOBSERVED','INSTITUTIONAL_PROFILE_PENDING_APPROVAL']
++    if any(not r['immutable_reference'] for r in images):issues.append('MUTABLE_IMAGE_REFERENCES')
++    if any(r['reference'] is None for r in images):issues.append('UNAPPROVED_IMAGE_REFERENCE')
++    if context['missing_required_ignore_patterns']:issues.append('BACKEND_IGNORE_POLICY_INCOMPLETE')
++    if context['required_resources_excluded']:issues.append('BACKEND_REQUIRED_RESOURCE_EXCLUDED')
++    if not workflows:issues.append('NO_LOCAL_WORKFLOW_CONFIGURATION')
++    if any(not r['integrity_format_valid'] or r['origin']!='registry.npmjs.org' for r in node['locked']):issues.append('NODE_RESOLUTION_METADATA_REQUIRES_REVIEW')
++    if any(r['coherence']!='matches_reviewed_range' for r in node['direct']):issues.append('NODE_DIRECT_RANGE_MISMATCH_OR_UNSUPPORTED')
++    if vendors['unmanifested_count'] or vendors['missing_count'] or any(not r['matches_local_baseline'] for r in vendors['files']):issues.append('VENDOR_LOCAL_INTEGRITY_FAILURE')
++    deployment=deployment_inventory(sources)
++    if not deployment['uvicorn_no_proxy_headers_in_base'] or not deployment['uvicorn_no_access_log_in_base']:
++        issues.append('SS04_SS10_RUNTIME_COMMAND_DRIFT')
++    if not all(deployment[k] for k in ('secure_cookie_literal_in_prod','production_mode_literal','explicit_cors_required_in_prod')):
++        issues.append('PRODUCTION_SETTINGS_DRIFT')
++    if 'COPY . ' in ssalfer or 'COPY Index.html dashboard.html' not in ssalfer:
++        issues.append('SS08_SELECTIVE_COPY_DRIFT')
++    if not (root/'frontend-ssalfer/.dockerignore').is_file():
++        issues.append('SSALFER_BUILD_CONTEXT_IGNORE_NOT_DECLARED')
++    if '--reload' in docker:issues.append('DOCKERFILE_DEFAULT_RELOAD_DECLARED')
++    integrity_failure=any(code in issues for code in ('VENDOR_LOCAL_INTEGRITY_FAILURE',
++        'NODE_DIRECT_RANGE_MISMATCH_OR_UNSUPPORTED','NODE_RESOLUTION_METADATA_REQUIRES_REVIEW',
++        'BACKEND_REQUIRED_RESOURCE_EXCLUDED','BACKEND_IGNORE_POLICY_INCOMPLETE',
++        'UNAPPROVED_IMAGE_REFERENCE','SS04_SS10_RUNTIME_COMMAND_DRIFT',
++        'PRODUCTION_SETTINGS_DRIFT','SS08_SELECTIVE_COPY_DRIFT'))
++    return dict(schema_version=1,scope='local_declarations_not_installed_sbom_or_deployment',
++        assessment='incomplete_requires_qa',local_integrity_ok=not integrity_failure,
++        python=py,qa_python=python_inventory(sources['backend/tests/requirements-convenio-report.txt']),
++        node=node,vendors=vendors,images=images,
++        native=dict(apt_declared_packages=[p for p in ('gdal-bin','libpq-dev','gcc') if re.search(r'\b'+re.escape(p)+r'\b',docker)],
++                    apt_versions=None,gdal_geos_proj_libpq_versions=None,postgresql_postgis_installed_versions=None,
++                    build_tools_in_backend_runtime='gcc' in docker),
++        contexts=dict(backend=context,ssalfer_selective_copy=('COPY . ' not in ssalfer and 'COPY Index.html dashboard.html' in ssalfer),
++            ssalfer_ignore_file_present=(root/'frontend-ssalfer/.dockerignore').is_file(),
++            react_uses_npm_ci='RUN npm ci' in sources['frontend/Dockerfile'],
++            react_dockerignore_env_patterns=all(p in sources['frontend/.dockerignore'].splitlines() for p in ('.env','.env.*'))),
++        deployment=deployment,github=dict(local_workflow_count=workflows,
++            dependabot_file_present=(root/'.github/dependabot.yml').is_file() or (root/'.github/dependabot.yaml').is_file(),
++            effective_branch_protection='not_observed',rulesets='not_observed',secrets='not_accessed'),
++        issues=sorted(issues))
++
++
++def main(argv=None):
++    parser=QuietParser(description='SS-09 offline read-only inspection; no build or SCA.')
++    parser.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[3])
++    try:
++        args=parser.parse_args(argv);result=audit(args.root)
++    except (AuditError,OSError,ValueError,TypeError,KeyError,SyntaxError,AttributeError):
++        print(json.dumps({'schema_version':1,'status':'inspection_failed','code':'SOURCE_OR_ARGUMENTS_INVALID'},sort_keys=True))
++        return 2
++    print(json.dumps(result,ensure_ascii=True,sort_keys=True,indent=2))
++    return 0 if result['local_integrity_ok'] else 2
++
++
++if __name__=='__main__':raise SystemExit(main())
+diff --git a/docs/security/ss09/vendors-sha256.json b/docs/security/ss09/vendors-sha256.json
+new file mode 100644
+index 0000000..d087f5f
+--- /dev/null
++++ b/docs/security/ss09/vendors-sha256.json
+@@ -0,0 +1,206 @@
++{
++  "schema_version": 1,
++  "scope": "Current local vendor bytes; integrity baseline, not upstream authenticity or installed SBOM",
++  "files": [
++    {
++      "path": "frontend-ssalfer/js/vendor/EXCELJS-LICENSE.txt",
++      "size": 1084,
++      "sha256": "2ed526b7e7c7681dc2347995b5036ddf73dc27d0539cdea59b6d4a72b63a57a0",
++      "family": "exceljs",
++      "declared_version": "4.4.0",
++      "version_evidence": "filename and README only; main JS banner has date, not semantic version",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/HTML2CANVAS-LICENSE.txt",
++      "size": 1061,
++      "sha256": "86200ce4e92d9a22c41c8647a55f7a5fddff304ff89b4d36ecc699ed8c123d2c",
++      "family": "html2canvas",
++      "declared_version": "1.4.1",
++      "version_evidence": "banner in main JS; README claim for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/README.md",
++      "size": 1270,
++      "sha256": "83bdd4ab077b4c4fc4bc821a87513088f88d7cd5b2ca669b2e8d2ba50d25a879",
++      "family": "vendor-documentation",
++      "declared_version": null,
++      "version_evidence": "local documentation only",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/SheetJS-LICENSE.txt",
++      "size": 11355,
++      "sha256": "4d2a38ac35cda06a555c84074a819d413339cd3691b822cae50f8f322fe01f64",
++      "family": "sheetjs",
++      "declared_version": "0.20.3",
++      "version_evidence": "internal version literal in xlsx; README claim for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/SheetJS-README.md",
++      "size": 498,
++      "sha256": "22e910300bc86e3517e6d6b6b1fe4e12dba3d4a72fe03141d18f927cc83c0d58",
++      "family": "sheetjs",
++      "declared_version": "0.20.3",
++      "version_evidence": "internal version literal in xlsx; README claim for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/LICENSE.txt",
++      "size": 1093,
++      "sha256": "0fb3e11bd57e896c5a512afd64864d28a37de45d19835016c87ca1ad19ead969",
++      "family": "bootstrap-icons",
++      "declared_version": "1.13.1",
++      "version_evidence": "banner in CSS; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++      "size": 99556,
++      "sha256": "004322721c8557331759bc6ddaacbb689b0f0715d688aec82bd056d2d5b5cc3b",
++      "family": "bootstrap-icons",
++      "declared_version": "1.13.1",
++      "version_evidence": "banner in CSS; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff",
++      "size": 180288,
++      "sha256": "f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15",
++      "family": "bootstrap-icons",
++      "declared_version": "1.13.1",
++      "version_evidence": "banner in CSS; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff2",
++      "size": 134044,
++      "sha256": "6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61",
++      "family": "bootstrap-icons",
++      "declared_version": "1.13.1",
++      "version_evidence": "banner in CSS; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js",
++      "size": 947702,
++      "sha256": "7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9",
++      "family": "exceljs",
++      "declared_version": "4.4.0",
++      "version_evidence": "filename and README only; main JS banner has date, not semantic version",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/html2canvas-1.4.1.min.js",
++      "size": 198689,
++      "sha256": "e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb",
++      "family": "html2canvas",
++      "declared_version": "1.4.1",
++      "version_evidence": "banner in main JS; README claim for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/LICENSE.txt",
++      "size": 1369,
++      "sha256": "bbc959aaef7488b38942e7f05cfd1244351f8bce54261951ea17dd7cf60f894b",
++      "family": "leaflet",
++      "declared_version": "1.9.4",
++      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/layers-2x.png",
++      "size": 1259,
++      "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf",
++      "family": "leaflet",
++      "declared_version": "1.9.4",
++      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/layers.png",
++      "size": 696,
++      "sha256": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6",
++      "family": "leaflet",
++      "declared_version": "1.9.4",
++      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-icon-2x.png",
++      "size": 2464,
++      "sha256": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528",
++      "family": "leaflet",
++      "declared_version": "1.9.4",
++      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-icon.png",
++      "size": 1466,
++      "sha256": "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437",
++      "family": "leaflet",
++      "declared_version": "1.9.4",
++      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-shadow.png",
++      "size": 618,
++      "sha256": "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da",
++      "family": "leaflet",
++      "declared_version": "1.9.4",
++      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.css",
++      "size": 14145,
++      "sha256": "337bfca5cabd03b39815b2700febe2b3b7edf55921c59cd49f88ecb328212303",
++      "family": "leaflet",
++      "declared_version": "1.9.4",
++      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.js",
++      "size": 147552,
++      "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a",
++      "family": "leaflet",
++      "declared_version": "1.9.4",
++      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    },
++    {
++      "path": "frontend-ssalfer/js/vendor/xlsx-0.20.3.mini.min.js",
++      "size": 279523,
++      "sha256": "0cb353f830d7288385492c83d277b058ddeac664ca51cf1393aa1fd3e2b70939",
++      "family": "sheetjs",
++      "declared_version": "0.20.3",
++      "version_evidence": "internal version literal in xlsx; README claim for auxiliary files",
++      "upstream_authenticity": "not_verified",
++      "vulnerability_review": "pending"
++    }
++  ]
++}
+diff --git a/docs/security/ss09/inventario-declarado.json b/docs/security/ss09/inventario-declarado.json
+new file mode 100644
+index 0000000..9d148fa
+--- /dev/null
++++ b/docs/security/ss09/inventario-declarado.json
+@@ -0,0 +1,2517 @@
++{
++  "assessment": "incomplete_requires_qa",
++  "contexts": {
++    "backend": {
++      "build_reconstruction": "pending_native_docker",
++      "global_copy": true,
++      "missing_required_ignore_patterns": 0,
++      "required_resources_excluded": [],
++      "root": "./backend",
++      "scan_is_not_secret_scanner": true,
++      "test_sources_excluded": true
++    },
++    "react_dockerignore_env_patterns": true,
++    "react_uses_npm_ci": true,
++    "ssalfer_ignore_file_present": false,
++    "ssalfer_selective_copy": true
++  },
++  "deployment": {
++    "additional_ssalfer_services": [
++      "frontend_ssalfer"
++    ],
++    "base_services": [
++      "backend",
++      "db",
++      "frontend",
++      "pgadmin"
++    ],
++    "combinations": [
++      {
++        "files": [
++          "docker-compose.yml",
++          "docker-compose.override.yml"
++        ],
++        "profile": "implicit_base_override",
++        "review": "development_not_production"
++      },
++      {
++        "files": [
++          "docker-compose.yml",
++          "docker-compose.prod.yml"
++        ],
++        "profile": "base_prod",
++        "review": "react_present_ssalfer_absent"
++      },
++      {
++        "files": [
++          "docker-compose.yml",
++          "docker-compose.ssalfer.yml"
++        ],
++        "profile": "base_ssalfer",
++        "review": "production_settings_not_guaranteed"
++      },
++      {
++        "files": [
++          "docker-compose.yml",
++          "docker-compose.prod.yml",
++          "docker-compose.ssalfer.yml"
++        ],
++        "profile": "base_prod_ssalfer",
++        "review": "both_frontends_declared_explicit_service_selection_required"
++      }
++    ],
++    "compose_parser": "reviewed_literal_subset_not_compose_resolution",
++    "development_reload": true,
++    "explicit_cors_required_in_prod": true,
++    "frontend_selection": "not_approved_here",
++    "production_mode_literal": true,
++    "secure_cookie_literal_in_prod": true,
++    "uvicorn_no_access_log_in_base": true,
++    "uvicorn_no_proxy_headers_in_base": true
++  },
++  "github": {
++    "dependabot_file_present": false,
++    "effective_branch_protection": "not_observed",
++    "local_workflow_count": 0,
++    "rulesets": "not_observed",
++    "secrets": "not_accessed"
++  },
++  "images": [
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "python:3.11-slim",
++      "review": "digest_pending",
++      "source": "backend/Dockerfile"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "node:22-slim",
++      "review": "digest_pending",
++      "source": "frontend/Dockerfile"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "nginx:1.27-alpine",
++      "review": "digest_pending",
++      "source": "frontend/Dockerfile"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "nginx:1.27-alpine",
++      "review": "digest_pending",
++      "source": "frontend-ssalfer/deploy/Dockerfile"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "postgis/postgis:15-3.3",
++      "review": "digest_pending",
++      "source": "docker-compose.yml"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "dpage/pgadmin4",
++      "review": "digest_pending",
++      "source": "docker-compose.yml"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "software-pa-backend",
++      "review": "digest_pending",
++      "source": "docker-compose.yml"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "postgis/postgis:15-3.3",
++      "review": "digest_pending",
++      "source": "backend/tests/convenio_report_compose.yml"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "software-pa-backend",
++      "review": "digest_pending",
++      "source": "backend/tests/convenio_report_compose.yml"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "postgis/postgis:15-3.3",
++      "review": "digest_pending",
++      "source": "backend/tests/lineage_compose.yml"
++    },
++    {
++      "actual_digest_verified": false,
++      "immutable_reference": false,
++      "platform": "not_observed",
++      "reference": "software-pa-backend",
++      "review": "digest_pending",
++      "source": "backend/tests/lineage_compose.yml"
++    }
++  ],
++  "issues": [
++    "CVE_SCA_NOT_PERFORMED",
++    "DOCKERFILE_DEFAULT_RELOAD_DECLARED",
++    "GITHUB_EFFECTIVE_POLICIES_UNOBSERVED",
++    "INSTITUTIONAL_PROFILE_PENDING_APPROVAL",
++    "MUTABLE_IMAGE_REFERENCES",
++    "NATIVE_AND_INSTALLED_ARTIFACTS_UNOBSERVED",
++    "NO_LOCAL_WORKFLOW_CONFIGURATION",
++    "PYTHON_DISTRIBUTION_HASHES_UNVERIFIED",
++    "PYTHON_GRAPH_UNVERIFIED",
++    "SSALFER_BUILD_CONTEXT_IGNORE_NOT_DECLARED"
++  ],
++  "local_integrity_ok": true,
++  "native": {
++    "apt_declared_packages": [
++      "gdal-bin",
++      "libpq-dev",
++      "gcc"
++    ],
++    "apt_versions": null,
++    "build_tools_in_backend_runtime": true,
++    "gdal_geos_proj_libpq_versions": null,
++    "postgresql_postgis_installed_versions": null
++  },
++  "node": {
++    "direct": [
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^1.18.1",
++        "kind": "dependencies",
++        "lock_version": "1.18.1",
++        "name": "axios"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^1.9.4",
++        "kind": "dependencies",
++        "lock_version": "1.9.4",
++        "name": "leaflet"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^1.21.0",
++        "kind": "dependencies",
++        "lock_version": "1.21.0",
++        "name": "lucide-react"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^19.2.7",
++        "kind": "dependencies",
++        "lock_version": "19.2.7",
++        "name": "react"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^19.2.7",
++        "kind": "dependencies",
++        "lock_version": "19.2.7",
++        "name": "react-dom"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^5.0.0",
++        "kind": "dependencies",
++        "lock_version": "5.0.0",
++        "name": "react-leaflet"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^7.18.0",
++        "kind": "dependencies",
++        "lock_version": "7.18.2",
++        "name": "react-router-dom"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^0.5.0",
++        "kind": "dependencies",
++        "lock_version": "0.5.0",
++        "name": "wellknown"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^1.62.1",
++        "kind": "devDependencies",
++        "lock_version": "1.62.1",
++        "name": "@playwright/test"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^19.2.17",
++        "kind": "devDependencies",
++        "lock_version": "19.2.17",
++        "name": "@types/react"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^19.2.3",
++        "kind": "devDependencies",
++        "lock_version": "19.2.3",
++        "name": "@types/react-dom"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^6.0.2",
++        "kind": "devDependencies",
++        "lock_version": "6.0.3",
++        "name": "@vitejs/plugin-react"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^1.69.0",
++        "kind": "devDependencies",
++        "lock_version": "1.71.0",
++        "name": "oxlint"
++      },
++      {
++        "coherence": "matches_reviewed_range",
++        "declared_range": "^8.1.0",
++        "kind": "devDependencies",
++        "lock_version": "8.1.0",
++        "name": "vite"
++      }
++    ],
++    "installed_tree": "not_observed",
++    "locked": [
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.11.1",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@emnapi/core",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.11.1",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@emnapi/runtime",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.2.2",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@emnapi/wasi-threads",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.6",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@napi-rs/wasm-runtime",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-WT+Gb24i8hmvo85AIv2oEYouEXkRlKAlT9WaCa3TfLgNCN+GhrJOGZuIlMouAh38Qe4QOx26eUOVsq70qXrywA==",
++        "integrity_format_valid": true,
++        "lock_version": "0.137.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxc-project/types",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-ImGmd1njEg4FEJH03jhRnveEegtO3czCtfptvaHivKAZQIYATbVFBrrzbaYMYv0oJioTnxZAZVSyV+oL7W8S2g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-android-arm-eabi",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-4A5BEexBrwY1YFF8Kiq/lp/wQPRG79G3BWIE1FuWaM5MvmpYSd+7ZySVcKkHdwo0UDzdQGddp6pD9mpctMqLnw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-android-arm64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-9wJA9GJulLwS2usU3CEisI/ESDO1n1z9eyTCvApMDrAkbJ1ve0mORgTMjcWWsKxkzkeZ2N/Gpra5IQE7x8tYgQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-darwin-arm64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-PlLCjS06V0PeJMAJwzjrExw1sYNW9Gch3JtNlcwwZDXGlTYDuwHNN89zYH8LTXFfgkVtsYvs2nv0FqrzyuFDzg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-darwin-x64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-Lhil7bWre0ncxbUoDoxfS0JzpTz17BRQKW7iwoAUY8GJ66+WwJEfYPCFJ1P0WgVZR5/O/b3Q2pENlHOjeXLOGQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-freebsd-x64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-Oo9/L58PYD3RC0x05d2upAPLllHytTjHQGsnC06P6Ynn7jKkp5mdImQxXdJ3+FnBaKspNpGogzgVsi6g872LiA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-arm-gnueabihf",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-mSHfyfgJrEbyIR29ejaeS50BdPk+GoNPlC1dckpDiUZbJAIel68sjSMdOt4WY0/gva+ECC7FNITQkxMJU+vSBw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-arm-musleabihf",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-n9yY4M2tiy3aij4AqtlnspzpfdpeT5JQfK2/w2d8oyp5W0FRwOb1dIeX99nORNcxGr08iD9bH8N5XFz3I2iy8w==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-arm64-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-fJZrs5sDZtTaPIOiemRQQmo82Ezy+vOGXemPc4Ok7iVVsYsFa7SlW6Z5XN819VfsqBHRm3NJ3rTdnR8+bJYJdQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-arm64-musl",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-cwl7VKGERIy9p+G+AvZdfy/06q0aHXaTt/mMRReC751iuNYJgqKjB7NydXSS30nBT9vtr2tunciOtrR4fD6FUA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-ppc64-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-eZ8ieVXvzGi8jr7+ybQGPK2STw3mldfxZlgA2738iflfB/rzA69sE6m5rDRpQaxC7dpm745Enlh1Tod0QAk9Gg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-riscv64-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-puMDbQYe6+NXwfMusojoA7CXGn2b3utukmd23PQqc1E3XhVCwyZ+FueSMzDYeNgDV2dUfIVXAAKZBcFDeCL6sA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-riscv64-musl",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-4NJLxBs1ujISCt3L/1FcywLs73PWtJuw+piD6feK2V6h6OS6P7xu9/sWt1DTRLibe6QCzmfZzmM/2HPORoV/Lg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-s390x-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-cFDaiR8L3430qp88tfZnvFlt3KotFhR/DlbIL0nHOMMYiG/9Wy4l+6f7t8G8pTa9bd8Lt8+M0y/qjRQ/xcB74g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-x64-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-orfixdt76KlpNly9z0PkWBBNfwjKz+JFVLP/7wnVchlKNU9Dpt9InU/ZggeSej6fC7qwHmHNOGlhLnQXcYoGuA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-linux-x64-musl",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-9emQu2lAp6yhPB3XuI+++vR+l/o6JR1X+EpxwcumPdQXBWXEPAsquPGL7l158EqU8SebQMXTUa/S5zN98juyHw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-openharmony-arm64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-bd5kI8spYwTm3BILDtGhi73zoup5dw8MlPQNT8YB3BD5UIsjNe3K9/4ctrzQMX4SZMoK5HgzVLkLJzacEXB7fA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-win32-arm64-msvc",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-W4HvOHGzVLHcrmFu+bMrJlho+/yrlX5ZNdJZqGe8MEldkQG+RHYhxxad9P4jvWAYFmIqUA5i9DQ8QsJqSU9GIw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-win32-ia32-msvc",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-D2kyEIPHk/G/wiZLnwTVC/sVst+T/lKldVOjAFpgTIBUAOlry72e5OiapDbDBF4LfJLkN5ypJb/8Eu6yJzkveQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@oxlint/binding-win32-x64-msvc",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-DTcUc8qii+cpHvtOwggMtBRMjKZHXYWdw8syRYu2vtzuq4Wxphqq4NfCs5Zt44L6mA8rfDfj+PHnxFc/FeK6mQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.62.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@playwright/test",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-3EWmekh4Nz+pGcr+xjf0KNyYfC3U2JjnkWsh0zcqaexYqmmB5ZhH37kz41JXGmKzpaMZCnPofBBm64i+YrEvGQ==",
++        "integrity_format_valid": true,
++        "lock_version": "3.0.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@react-leaflet/core",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-DT6Z3PhvioeHMvxo+xHc3KtqggrI7CCTXCmC2h/5zUlp5jVitv7XEy+9q5/7v8IolhlioawpMo8Kg0EEBy7J0g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-android-arm64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-0NwgwsjM7LrsuVnXMK3koTpagBNOhloc/BNjKqZjv4V5zI5r13qx69uVhRx+o5Z0yy4Hzq+lpy7TAgUG/ocvrw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-darwin-arm64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-YtiBp4disu6V560loT6PjMdiRaWmVvDNrUunAalbiFx2ggeJwxdAsgZMcoGP17uyAsTwAj5V1niksxlHnVQ1Sw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-darwin-x64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-yD3EkEdXk2LypPxnf/kSZHirarsI8gcPzc62SukhR9VJTyvV+F9Q/GxWNuCojc7sXyuVC4DxRGhdDK4X8VSsbw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-freebsd-x64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-c+8vieQbsD7HNAHKIA34w0GJ9FedFFuJGD+7E6vz7Q3uqAIugL5p45fhlsj4UaAsHpcmlqugBWMhA0/j7o0sIg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-linux-arm-gnueabihf",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-50jD0uUwLvur7Zz9LHz17kaAdTPjn5wN93hEgjvmYFRZwiR7ZJYovTd5ipyWJDAnXKvZ+wgc+/Ika6dwSF5OcA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-linux-arm64-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-BO9+oPL8K9poZJBfYPsXNtYjPE5uM3qeehT3aFcW4LITOl+iSqhp0abzjR2nWBUNjIZeKXjAEWBZ64WjNoHd6w==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-linux-arm64-musl",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-f3VpLB1vQ0Eo6ecr/6cekLnvYMFF4YBFoVGkfkvPLq1bAkbAwHYQPZKoAmG6OJyTcxxoC+AvezGx/S1obNC0Mw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-linux-ppc64-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-AmurZ26Pqx/RI9N1gzEOCklkKXl927yjfXWUUS0O7Puh8ARM/Ob8qfrD3qnWksScdw6cSrW5PSHE9DyLu7+PtA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-linux-s390x-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-JJpqs8bRGITDOdbkNKnlojzBabbOHrqjSvDr0IVsZObE1lBcPjxItUEY9eWIDbxaJ3cGrXPWGfGkIxFijg/URg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-linux-x64-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-rSJcdjPxzA/by/6/rYs+v+bXU7UjvnbUWz8MJb6kh6+knqB1dCrtHg0uu7C/4haqJvqdkYHQ5IGn+tCH9GLW/g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-linux-x64-musl",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-hQ3/PYkDJICgevvyNcVrihVeqq7k1Pp3VZ9lY+dauAYUJKO+auqApvANhvR1An9BhmqYKvW2Mu1F9u4DXSMLxQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-openharmony-arm64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-Elcv/BtML9lXrV6JuKITc/grN2kYV9gjsQpW8Jfw4ioK0TOkjBjye0nnyqQNy9STNaI20lXNaQBRrD5gSgR0Yg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-wasm32-wasi",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-2DrEfhluH9yhiaFApmsjsjwrSYbNcY1oFTzYSP1a535jDbV98zCFanA/96TBUd0iDFcxGmw9QRExwGCXz3U+/g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-win32-arm64-msvc",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-OL4OMk7UPXOeVGGd3qo5zJyPIljf4AFgk5QAkPPS+OoLuOOozhuaQGC18MxVTnw/06q93gShAJzlwnSCY9YtqA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/binding-win32-x64-msvc",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@rolldown/pluginutils",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==",
++        "integrity_format_valid": true,
++        "lock_version": "0.10.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@tybys/wasm-util",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==",
++        "integrity_format_valid": true,
++        "lock_version": "19.2.17",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@types/react",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==",
++        "integrity_format_valid": true,
++        "lock_version": "19.2.3",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@types/react-dom",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-vmFvco5/QuC2f9Oj+wTk0+9XeDFkHxSamwZKYc7MxYwKICfvUvlMhqKI0VuICPltGqh1neqBKDvO4kes1ya8vg==",
++        "integrity_format_valid": true,
++        "lock_version": "6.0.3",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/@vitejs/plugin-react",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==",
++        "integrity_format_valid": true,
++        "lock_version": "6.0.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/agent-base",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==",
++        "integrity_format_valid": true,
++        "lock_version": "0.4.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/asynckit",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-3nTvFlvpn9Zu/RkHUqtc7/+al4UpRW5az71ap5zccp6e8RAYEzhMTecX8Dz1wWDYrPpUoB1HAQEGEAEvUr7S9g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.18.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/axios",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/call-bind-apply-helpers",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.8",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/combined-stream",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-H6xsIBfQ94aESBG8jGHXQ7i5AEpy5ZeVaLDOisDICiTCKpqEfr34/KmTrspKQNoLKNu9gTkovlpQcUi630AKiQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.5.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/concat-stream",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/cookie",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.3",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/core-util-is",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
++        "integrity_format_valid": true,
++        "lock_version": "3.2.3",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/csstype",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
++        "integrity_format_valid": true,
++        "lock_version": "4.4.3",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/debug",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/delayed-stream",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==",
++        "integrity_format_valid": true,
++        "lock_version": "2.1.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/detect-libc",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/dunder-proto",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/es-define-property",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.3.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/es-errors",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-HWcBoN6NileqtSydK2FqHbS/LoDd2pqrnQHLyJzBj4kOp/ky2MWMN694xOfkK8/SnUsW2DH7EfyVlydKCsm1Zw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/es-object-atoms",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-j6vWzfrGVfyXxge+O0x5sh6cvxAog0a/4Rdd2K36zCMV5eJ+/+tOAngRO8cODMNWbVRdVlmGZQL2YS3yR8bIUA==",
++        "integrity_format_valid": true,
++        "lock_version": "2.1.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/es-set-tostringtag",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==",
++        "integrity_format_valid": true,
++        "lock_version": "6.5.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/fdir",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.16.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/follow-redirects",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==",
++        "integrity_format_valid": true,
++        "lock_version": "4.0.6",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/form-data",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": true,
++        "installed_version": null,
++        "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
++        "integrity_format_valid": true,
++        "lock_version": "2.3.3",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/fsevents",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/function-bind",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-9fSjSaos/fRIVIp+xSJlE6lfwhES7LNtKaCBIamHsjr2na1BiABJPo0mOjjz8GJDURarmCPGqaiVg5mfjb98CQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.3.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/get-intrinsic",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-sTSfBjoXBp89JvIKIefqw7U2CCebsc74kiY6awiGogKtoSGbgjYE/G/+l9sF3MWFPNc9IcoOC4ODfKHfxFmp0g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/get-proto",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.2.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/gopd",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-1cDNdwJ2Jaohmb3sg4OmKaMBwuC48sYni5HUw2DvsC8LjGTLK9h+eb1X6RyuOHe4hT0ULCW68iomhjUoKUqlPQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/has-symbols",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/has-tostringtag",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==",
++        "integrity_format_valid": true,
++        "lock_version": "2.0.4",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/hasown",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==",
++        "integrity_format_valid": true,
++        "lock_version": "5.0.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/https-proxy-agent",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==",
++        "integrity_format_valid": true,
++        "lock_version": "2.0.4",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/inherits",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/isarray",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.9.4",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/leaflet",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-YK7/ClTt4kAK0vo6w3X+Pnm0D2cf2vPHbhOXdoNti1Ga0al1P4TBZhwjATvjNwLEBCnKvjJc2jQgHXH0NEwlAg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-android-arm64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-RzeG9Ju5bag2Bv1/lwlVJvBE3q6TtXskdZLLCyfg5pt+HLz9BqlICO7LZM7VHNTTn/5PRhHFBSjk5lc4cmscPQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-darwin-arm64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-U+QsBp2m/s2wqpUYT/6wnlagdZbtZdndSmut/NJqlCcMLTWp5muCrID+K5UJ6jqD2BFshejCYXniPDbNh73V8w==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-darwin-x64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-JCTigedEksZk3tHTTthnMdVfGf61Fky8Ji2E4YjUTEQX14xiy/lTzXnu1vwiZe3bYe0q+SpsSH/CTeDXK6WHig==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-freebsd-x64",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-x6rnnpRa2GL0zQOkt6rts3YDPzduLpWvwAF6EMhXFVZXD4tPrBkEFqzGowzCsIWsPjqSK+tyNEODUBXeeVHSkw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-linux-arm-gnueabihf",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-0nnMyoyOLRJXfbMOilaSRcLH3Jw5z9HDNGfT/gwCPgaDjnx0i8w7vBzFLFR1f6CMLKF8gVbebmkUN3fa/kQJpQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-linux-arm64-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-UpQkoenr4UJEzgVIYpI80lDFvRmPVg6oqboNHfoH4CQIfNA+HOrZ7Mo7KZP02dC6LjghPQJeBsvXhJod/wnIBg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-linux-arm64-musl",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-V7Qr52IhZmdKPVr+Vtw8o+WLsQJYCTd8loIfpDaMRWGUZfBOYEJeyJIkqGIDMZPwPx24pUMfwSxxI8phr/MbOA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-linux-x64-gnu",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-bYcLp+Vb0awsiXg/80uCRezCYHNg1/l3mt0gzHnWV9XP1W5sKa5/TCdGWaR/zBM2PeF/HbsQv/j2URNOiVuxWg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-linux-x64-musl",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-8SbC8BR40pS6baCM8sbtYDSwEVQd4JlFTOlaD3gWGHfThTcABnNDBda6eTZeqbofalIJhFx0qKzgHJmcPTnGdw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-win32-arm64-msvc",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-Amq9B/SoZYdDi1kFrojnoqPLxYhQ4Wo5XiL8EVJrVsB8ARoC1PWW6VGtT0WKCemjy8aC+louJnjS7U18x3b06Q==",
++        "integrity_format_valid": true,
++        "lock_version": "1.32.0",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lightningcss-win32-x64-msvc",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-reEZMXq8Qdd5jg5XYkQ5TR1fB/GiQ7ih4vcrthYDtgjSDwh0i6/YLiGjsWsIwgN49gpAnd4J2elSNzncMEEUUQ==",
++        "integrity_format_valid": true,
++        "lock_version": "1.21.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/lucide-react",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/math-intrinsics",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.52.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/mime-db",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw==",
++        "integrity_format_valid": true,
++        "lock_version": "2.1.35",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/mime-types",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.2.8",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/minimist",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
++        "integrity_format_valid": true,
++        "lock_version": "2.1.3",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/ms",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==",
++        "integrity_format_valid": true,
++        "lock_version": "3.3.18",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/nanoid",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-U1m1X+C0vDj7DC1e13IoZULzEcPczE7UOMTs8VlZGHUEIUaSTZKo5qkPsQEfzpgnQ29Pea/w3Xntk62UCecxZw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.71.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/oxlint",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/picocolors",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==",
++        "integrity_format_valid": true,
++        "lock_version": "4.0.4",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/picomatch",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==",
++        "integrity_format_valid": true,
++        "lock_version": "1.62.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/playwright",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.62.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/playwright-core",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": true,
++        "installed_version": null,
++        "integrity": "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==",
++        "integrity_format_valid": true,
++        "lock_version": "2.3.2",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/playwright/node_modules/fsevents",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==",
++        "integrity_format_valid": true,
++        "lock_version": "8.5.26",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/postcss",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-yN0WQmuCX63LP/TMvAg31nvT6m4vDqJEiiv2CAZqWOGNWutc9DfDk1NPYYmKUFmaVM2UwDowH4u5AHWYP/jxKw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.7",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/process-nextick-args",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-cJ+oHTW1VAEa8cJslgmUZrc+sjRKgAKl3Zyse6+PV38hZe/V6Z14TbCuXcan9F9ghlz4QrFr2c92TNF82UkYHA==",
++        "integrity_format_valid": true,
++        "lock_version": "2.1.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/proxy-from-env",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==",
++        "integrity_format_valid": true,
++        "lock_version": "19.2.7",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/react",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==",
++        "integrity_format_valid": true,
++        "lock_version": "19.2.7",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/react-dom",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-CWbTpr5vcHw5bt9i4zSlPEVQdTVcML390TjeDG0cK59z1ylexpqC6M1PJFjV8jD7CF+ACBFsLIDs6DRMoLEofw==",
++        "integrity_format_valid": true,
++        "lock_version": "5.0.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/react-leaflet",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-aUVMjFm3GAPTTZL7oYr5E7ETiqfQCHRLH+B+5afnICvf0r7kkK4eR6SMuwbSTJw/7t+12khT/Kahij49fqOCIg==",
++        "integrity_format_valid": true,
++        "lock_version": "7.18.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/react-router",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-AIKJ/jgGlFb3EbfCXk5Gzshiwt+l3mqbCrNjmEWMMjqQxNJ3svBa6bgzFyCC2Sw3RA0VWF1kg3uQf2OFhxb8hw==",
++        "integrity_format_valid": true,
++        "lock_version": "7.18.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/react-router-dom",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-TXcFfb63BQe1+ySzsHZI/5v1aJPCShfqvWJ64ayNImXMsN1Cd0YGk/wm8KB7/OeessgPc9QvS9Zou8QTkFzsLw==",
++        "integrity_format_valid": true,
++        "lock_version": "2.0.6",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/readable-stream",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-1F1eEtUBtFvcGm1HQ9TiUIUHPQG7mSAODrhIzjxoUEFuo8OcbrGLiVLkevNgj84TE4lnHvnumwFjhJO5Eu135g==",
++        "integrity_format_valid": true,
++        "lock_version": "1.1.3",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/rolldown",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
++        "integrity_format_valid": true,
++        "lock_version": "0.27.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/scheduler",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-oeM1lpU/UvhTxw+g3cIfxXHyJRc/uidd3yK1P242gzHds0udQBYzs3y8j4gCCW+ZJ7ad0yctld8RYO+bdurlvw==",
++        "integrity_format_valid": true,
++        "lock_version": "2.7.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/set-cookie-parser",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==",
++        "integrity_format_valid": true,
++        "lock_version": "1.2.1",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/source-map-js",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-ev2QzSzWPYmy9GuqfIVildA4OdcGLeFZQrq5ys6RtiuF+RQQiZWr8TZNyAcuVXyQRYfEO+MsoB/1BuQVhOJuoQ==",
++        "integrity_format_valid": true,
++        "lock_version": "0.10.31",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/string_decoder",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==",
++        "integrity_format_valid": true,
++        "lock_version": "0.2.17",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/tinyglobby",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==",
++        "integrity_format_valid": true,
++        "lock_version": "2.8.1",
++        "optional": true,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/tslib",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-ueeb9YybpjhivjbHP2LdFDAjbS948fGEPj+ACAMs4xCMmh72OCOMQWBQKlaN4ZNQ04yfLSDLSx1tGRIoWimObQ==",
++        "integrity_format_valid": true,
++        "lock_version": "0.0.7",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/typedarray",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==",
++        "integrity_format_valid": true,
++        "lock_version": "1.0.2",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/util-deprecate",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": true,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-BuJcQK/56NQTWDGn4ABea3q4SSBdNPWwNZKTkkUpcMPnLoquSYH8llRtSUIgoL1KSCpHt5eghLShn50mH36y7Q==",
++        "integrity_format_valid": true,
++        "lock_version": "8.1.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/vite",
++        "vulnerability_review": "pending"
++      },
++      {
++        "dev": false,
++        "distribution_bytes_verified": false,
++        "has_install_script": false,
++        "installed_version": null,
++        "integrity": "sha512-za5vTLuPF9nmrVOovYQwNEWE/PwJCM+yHMAj4xN1WWUvtq9OElsvKiPL0CR9rO8xhrYqL7NpI7IknqR8r6eYOg==",
++        "integrity_format_valid": true,
++        "lock_version": "0.5.0",
++        "optional": false,
++        "origin": "registry.npmjs.org",
++        "path": "node_modules/wellknown",
++        "vulnerability_review": "pending"
++      }
++    ],
++    "lockfile_version": 3
++  },
++  "python": [
++    {
++      "app_import_observed": false,
++      "declared_version": "25.1.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "aiofiles",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "0.0.4",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "annotated-doc",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "0.7.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "annotated-types",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "4.14.1",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "anyio",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": true,
++      "declared_version": "5.0.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "bcrypt",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "2026.6.17",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "certifi",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "2.0.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "cffi",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "8.4.2",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "click",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "49.0.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "cryptography",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "0.19.2",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "ecdsa",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "2.0.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "et-xmlfile",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": true,
++      "declared_version": "0.138.2",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "fastapi",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": true,
++      "declared_version": "0.20.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "geoalchemy2",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "3.5.3",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "greenlet",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "0.16.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "h11",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "1.0.9",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "httpcore",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "0.28.1",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "httpx",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "3.18",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "idna",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "2.3.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "iniconfig",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "2.4.6",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "numpy",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "3.1.5",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "openpyxl",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "26.2",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "packaging",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "3.0.3",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "pandas",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "1.7.4",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "passlib",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "1.6.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "pluggy",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": true,
++      "declared_version": "2.9.12",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "psycopg2-binary",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "0.6.3",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "pyasn1",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "3.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "pycparser",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": true,
++      "declared_version": "2.13.4",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "pydantic",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "2.46.4",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "pydantic-core",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "2.20.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "pygments",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "9.1.1",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "pytest",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "2.9.0.post0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "python-dateutil",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": true,
++      "declared_version": "1.2.2",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "python-dotenv",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "0.0.32",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "python-multipart",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "4.9.1",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "rsa",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "1.17.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "six",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": true,
++      "declared_version": "2.0.51",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "sqlalchemy",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "1.3.1",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "starlette",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "4.15.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "typing-extensions",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "0.4.2",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "typing-inspection",
++      "vulnerability_review": "pending"
++    },
++    {
++      "app_import_observed": false,
++      "declared_version": "0.49.0",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "uvicorn",
++      "vulnerability_review": "pending"
++    }
++  ],
++  "qa_python": [
++    {
++      "declared_version": "4.10.3",
++      "dependency_topology": "flat_unverified",
++      "distribution_hash": null,
++      "installed_version": null,
++      "name": "jsonschema",
++      "vulnerability_review": "pending"
++    }
++  ],
++  "schema_version": 1,
++  "scope": "local_declarations_not_installed_sbom_or_deployment",
++  "vendors": {
++    "baseline_is_authenticity_proof": false,
++    "files": [
++      {
++        "declared_version": "4.4.0",
++        "family": "exceljs",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/EXCELJS-LICENSE.txt",
++        "sha256": "2ed526b7e7c7681dc2347995b5036ddf73dc27d0539cdea59b6d4a72b63a57a0",
++        "size": 1084,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.4.1",
++        "family": "html2canvas",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/HTML2CANVAS-LICENSE.txt",
++        "sha256": "86200ce4e92d9a22c41c8647a55f7a5fddff304ff89b4d36ecc699ed8c123d2c",
++        "size": 1061,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": null,
++        "family": "vendor-documentation",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/README.md",
++        "sha256": "83bdd4ab077b4c4fc4bc821a87513088f88d7cd5b2ca669b2e8d2ba50d25a879",
++        "size": 1270,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "0.20.3",
++        "family": "sheetjs",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/SheetJS-LICENSE.txt",
++        "sha256": "4d2a38ac35cda06a555c84074a819d413339cd3691b822cae50f8f322fe01f64",
++        "size": 11355,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "0.20.3",
++        "family": "sheetjs",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/SheetJS-README.md",
++        "sha256": "22e910300bc86e3517e6d6b6b1fe4e12dba3d4a72fe03141d18f927cc83c0d58",
++        "size": 498,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.13.1",
++        "family": "bootstrap-icons",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/LICENSE.txt",
++        "sha256": "0fb3e11bd57e896c5a512afd64864d28a37de45d19835016c87ca1ad19ead969",
++        "size": 1093,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.13.1",
++        "family": "bootstrap-icons",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "sha256": "004322721c8557331759bc6ddaacbb689b0f0715d688aec82bd056d2d5b5cc3b",
++        "size": 99556,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": true,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.13.1",
++        "family": "bootstrap-icons",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff",
++        "sha256": "f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15",
++        "size": 180288,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.13.1",
++        "family": "bootstrap-icons",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff2",
++        "sha256": "6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61",
++        "size": 134044,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "4.4.0",
++        "family": "exceljs",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js",
++        "sha256": "7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9",
++        "size": 947702,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": false,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.4.1",
++        "family": "html2canvas",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/html2canvas-1.4.1.min.js",
++        "sha256": "e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb",
++        "size": 198689,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": true,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.9.4",
++        "family": "leaflet",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/LICENSE.txt",
++        "sha256": "bbc959aaef7488b38942e7f05cfd1244351f8bce54261951ea17dd7cf60f894b",
++        "size": 1369,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.9.4",
++        "family": "leaflet",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/layers-2x.png",
++        "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf",
++        "size": 1259,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.9.4",
++        "family": "leaflet",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/layers.png",
++        "sha256": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6",
++        "size": 696,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.9.4",
++        "family": "leaflet",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-icon-2x.png",
++        "sha256": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528",
++        "size": 2464,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.9.4",
++        "family": "leaflet",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-icon.png",
++        "sha256": "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437",
++        "size": 1466,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.9.4",
++        "family": "leaflet",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-shadow.png",
++        "sha256": "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da",
++        "size": 618,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": null,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.9.4",
++        "family": "leaflet",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.css",
++        "sha256": "337bfca5cabd03b39815b2700febe2b3b7edf55921c59cd49f88ecb328212303",
++        "size": 14145,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": false,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "1.9.4",
++        "family": "leaflet",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.js",
++        "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a",
++        "size": 147552,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": true,
++        "vulnerability_review": "pending"
++      },
++      {
++        "declared_version": "0.20.3",
++        "family": "sheetjs",
++        "matches_local_baseline": true,
++        "path": "frontend-ssalfer/js/vendor/xlsx-0.20.3.mini.min.js",
++        "sha256": "0cb353f830d7288385492c83d277b058ddeac664ca51cf1393aa1fd3e2b70939",
++        "size": 279523,
++        "upstream_authenticity": "not_verified",
++        "version_literal_present": true,
++        "vulnerability_review": "pending"
++      }
++    ],
++    "missing_count": 0,
++    "unmanifested_count": 0
++  }
++}
+diff --git a/docs/security/ss09/perfiles-despliegue-propuestos.json b/docs/security/ss09/perfiles-despliegue-propuestos.json
+new file mode 100644
+index 0000000..de7d70d
+--- /dev/null
++++ b/docs/security/ss09/perfiles-despliegue-propuestos.json
+@@ -0,0 +1,38 @@
++{
++  "schema_version": 1,
++  "status": "design_only_not_applied",
++  "selected_profile": null,
++  "functional_approval_required": true,
++  "actual_image_digests": null,
++  "target_platform": null,
++  "profiles": {
++    "ssalfer_candidate": {
++      "compose_files_in_order": ["docker-compose.yml", "docker-compose.prod.yml", "docker-compose.ssalfer.yml"],
++      "explicit_build_services": ["backend", "frontend_ssalfer"],
++      "explicit_runtime_services": ["db", "backend", "frontend_ssalfer"],
++      "services_not_selected_by_this_profile": ["frontend", "pgadmin"],
++      "frontend_service": "frontend_ssalfer"
++    },
++    "react_candidate_if_approved": {
++      "compose_files_in_order": ["docker-compose.yml", "docker-compose.prod.yml"],
++      "explicit_build_services": ["backend", "frontend"],
++      "explicit_runtime_services": ["db", "backend", "frontend"],
++      "services_not_selected_by_this_profile": ["pgadmin"],
++      "frontend_service": "frontend"
++    }
++  },
++  "requirements": {
++    "no_implicit_development_override": true,
++    "uvicorn_no_proxy_headers": true,
++    "uvicorn_no_access_log_and_ss10_logging": true,
++    "no_reload_or_source_bind_mounts": true,
++    "app_env_production": true,
++    "secure_host_cookies": true,
++    "cors_exact_public_origin_required": true,
++    "tls_and_proxy_chain_verified_in_qa": false,
++    "ss08_native_qa_completed": false,
++    "ss07_effective_privileges_verified": false,
++    "ss05_policy_approval_unchanged": true,
++    "explicit_pgadmin_administrative_approval_if_needed": true
++  }
++}
+diff --git a/tests/security/test_supply_chain_offline.py b/tests/security/test_supply_chain_offline.py
+new file mode 100644
+index 0000000..5552e4c
+--- /dev/null
++++ b/tests/security/test_supply_chain_offline.py
+@@ -0,0 +1,202 @@
++"""SS-09 stdlib-only synthetic checks; no installs, network, Docker or app engine."""
++import ast
++from contextlib import redirect_stdout
++import copy
++import hashlib
++import importlib.util
++import io
++import json
++from pathlib import Path
++import shutil
++import tempfile
++import unittest
++
++ROOT=Path(__file__).resolve().parents[2]
++ASSETS=ROOT/'docs/security/ss09'
++spec=importlib.util.spec_from_file_location('ss09_offline',ASSETS/'verificar_cadena.py')
++chain=importlib.util.module_from_spec(spec);spec.loader.exec_module(chain)
++
++
++class SupplyChainTests(unittest.TestCase):
++    def fixture(self):
++        directory=tempfile.TemporaryDirectory();self.addCleanup(directory.cleanup);target=Path(directory.name)
++        for name in (*chain.SOURCES,'docs/security/ss09/vendors-sha256.json'):
++            dest=target/name;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,dest)
++        shutil.copytree(ROOT/'frontend-ssalfer/js/vendor',target/'frontend-ssalfer/js/vendor')
++        (target/'backend/app').mkdir(parents=True);(target/'backend/app/synthetic.py').write_text('import fastapi\nimport sqlalchemy\n')
++        return target
++
++    def test_inventory_is_deterministic_and_separates_actual_state(self):
++        one=chain.audit(ROOT);two=chain.audit(ROOT)
++        self.assertEqual(json.dumps(one,sort_keys=True),json.dumps(two,sort_keys=True))
++        self.assertEqual(one['assessment'],'incomplete_requires_qa')
++        self.assertTrue(one['local_integrity_ok'])
++        self.assertEqual(len(one['python']),42);self.assertEqual(len(one['node']['locked']),123)
++        self.assertEqual(len(one['vendors']['files']),20)
++        self.assertTrue(all(p['installed_version'] is None and p['distribution_hash'] is None for p in one['python']))
++        self.assertTrue(all(p['installed_version'] is None and not p['distribution_bytes_verified'] for p in one['node']['locked']))
++        self.assertIn('CVE_SCA_NOT_PERFORMED',one['issues'])
++
++    def test_saved_inventory_is_current_and_no_profile_is_activated(self):
++        recorded=json.loads((ASSETS/'inventario-declarado.json').read_text())
++        self.assertEqual(recorded,chain.audit(ROOT))
++        proposal=json.loads((ASSETS/'perfiles-despliegue-propuestos.json').read_text())
++        self.assertEqual(proposal['status'],'design_only_not_applied')
++        self.assertIsNone(proposal['selected_profile'])
++        self.assertIsNone(proposal['actual_image_digests'])
++
++    def test_current_vendor_hashes_match_actual_local_bytes(self):
++        report=chain.vendor_inventory(ROOT)
++        self.assertEqual(report['unmanifested_count'],0)
++        for row in report['files']:
++            self.assertEqual(row['sha256'],hashlib.sha256((ROOT/row['path']).read_bytes()).hexdigest())
++            self.assertTrue(row['matches_local_baseline'])
++            self.assertEqual(row['upstream_authenticity'],'not_verified')
++        excel=next(p for p in report['files'] if p['path'].endswith('exceljs-4.4.0.min.js'))
++        self.assertFalse(excel['version_literal_present'],'filename/README must not become an internal version assertion')
++
++    def test_synthetic_vendor_alteration_is_detected_without_accepting_new_hash(self):
++        root=self.fixture();path=root/'frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.js'
++        path.write_bytes(path.read_bytes()+b'\n/* SS09 SYNTHETIC ALTERATION */')
++        report=chain.audit(root)
++        self.assertFalse(report['local_integrity_ok'])
++        self.assertIn('VENDOR_LOCAL_INTEGRITY_FAILURE',report['issues'])
++
++    def test_new_unreviewed_file_is_not_hashed_or_echoed(self):
++        root=self.fixture();sentinel='SS09_UNREVIEWED_PRIVATE_NAME_4157'
++        (root/f'frontend-ssalfer/js/vendor/{sentinel}.js').write_text('SYNTHETIC CONTENT')
++        report=chain.audit(root);output=json.dumps(report)
++        self.assertEqual(report['vendors']['unmanifested_count'],1)
++        self.assertNotIn(sentinel,output);self.assertFalse(report['local_integrity_ok'])
++
++    def test_manifest_escape_and_symlink_are_refused(self):
++        for kind in ('escape','symlink'):
++            with self.subTest(kind=kind):
++                root=self.fixture();manifest=root/'docs/security/ss09/vendors-sha256.json'
++                obj=json.loads(manifest.read_text())
++                if kind=='escape':obj['files'][0]['path']='frontend-ssalfer/js/vendor/../../../../.env'
++                else:
++                    path=root/obj['files'][0]['path'];path.unlink();path.symlink_to(root/'backend/requirements.txt')
++                manifest.write_text(json.dumps(obj))
++                with self.assertRaises((chain.AuditError,OSError)):chain.vendor_inventory(root)
++
++    def test_sensitive_paths_and_oversize_reads_are_refused(self):
++        root=self.fixture()
++        for name in ('.env','backend/.env.production','backend/.ssh/id_rsa','backend/key.pem','../other','/tmp/private'):
++            with self.subTest(name=name),self.assertRaises(chain.AuditError):chain.read_bytes(root,name)
++        old=chain.MAX_SOURCE_BYTES
++        try:
++            chain.MAX_SOURCE_BYTES=2
++            with self.assertRaises(chain.AuditError):chain.read_bytes(root,'backend/requirements.txt')
++        finally:chain.MAX_SOURCE_BYTES=old
++
++    def test_fifo_source_is_rejected_without_waiting_for_a_writer(self):
++        root=self.fixture();path=root/'backend/requirements.txt'
++        path.unlink();chain.os.mkfifo(path,mode=0o600)
++        with self.assertRaises(chain.AuditError):chain.read_bytes(root,'backend/requirements.txt')
++
++    def test_credentialed_lock_urls_and_unknown_metadata_do_not_leak(self):
++        package=json.loads((ROOT/'frontend/package.json').read_text());lock=json.loads((ROOT/'frontend/package-lock.json').read_text())
++        sentinel='SS09_SYNTHETIC_PASSWORD_COOKIE_TOKEN_2783'
++        first=next(k for k in lock['packages'] if k)
++        lock['packages'][first]['resolved']=f'https://user:{sentinel}@registry.npmjs.org/p.tgz?token={sentinel}'
++        lock['packages'][first]['password']=sentinel;package['secret']=sentinel
++        report=chain.node_inventory(package,lock);output=json.dumps(report)
++        self.assertNotIn(sentinel,output)
++        self.assertIn('unapproved_or_credentialed',output)
++
++    def test_invalid_requirements_and_errors_do_not_echo_sensitive_values(self):
++        sentinel='SS09_REQUIREMENTS_SECRET_9824'
++        with self.assertRaises(chain.AuditError):chain.python_inventory(f'--extra-index-url https://x:{sentinel}@invalid/\n')
++        stream=io.StringIO()
++        with redirect_stdout(stream):status=chain.main(['--password',sentinel])
++        self.assertEqual(status,2);self.assertNotIn(sentinel,stream.getvalue())
++        self.assertEqual(json.loads(stream.getvalue())['status'],'inspection_failed')
++
++    def test_lock_root_and_range_coherence(self):
++        package=json.loads((ROOT/'frontend/package.json').read_text());lock=json.loads((ROOT/'frontend/package-lock.json').read_text())
++        report=chain.node_inventory(package,lock)
++        self.assertTrue(all(p['coherence']=='matches_reviewed_range' for p in report['direct']))
++        self.assertTrue(all(p['integrity_format_valid'] for p in report['locked']))
++        broken=copy.deepcopy(lock);broken['packages']['']['dependencies']['react']='^1.0.0'
++        with self.assertRaises(chain.AuditError):chain.node_inventory(package,broken)
++        broken=copy.deepcopy(lock);broken['packages']['node_modules/react']['version']='1.0.0'
++        self.assertEqual(next(p for p in chain.node_inventory(package,broken)['direct'] if p['name']=='react')['coherence'],'mismatch')
++
++    def test_bad_lock_integrity_and_production_drift_are_not_success(self):
++        root=self.fixture();lockfile=root/'frontend/package-lock.json'
++        lock=json.loads(lockfile.read_text());lock['packages']['node_modules/react']['integrity']='sha512-invalid'
++        lockfile.write_text(json.dumps(lock))
++        result=chain.audit(root)
++        self.assertFalse(result['local_integrity_ok'])
++        self.assertIn('NODE_RESOLUTION_METADATA_REQUIRES_REVIEW',result['issues'])
++        root=self.fixture();prod=root/'docker-compose.prod.yml'
++        prod.write_text(prod.read_text().replace('AUTH_COOKIE_SECURE: "true"','AUTH_COOKIE_SECURE: "false"'))
++        result=chain.audit(root)
++        self.assertFalse(result['local_integrity_ok'])
++        self.assertIn('PRODUCTION_SETTINGS_DRIFT',result['issues'])
++
++    def test_reviewed_semver_subset_has_correct_boundaries(self):
++        for spec,version,wanted in [('^1.2.3','1.9.0',True),('^1.2.3','2.0.0',False),
++             ('^0.2.3','0.3.0',False),('^0.0.3','0.0.4',False),('~1.2.3','1.3.0',False),
++             ('1.2.3','1.2.3',True),('>=1','2.0.0',None)]:
++            with self.subTest(spec=spec,version=version):self.assertEqual(chain.semver_subset(spec,version),wanted)
++
++    def test_images_distinguish_tag_digest_and_unknown_reference(self):
++        self.assertFalse(chain.image_record('nginx:1.27-alpine','synthetic')['immutable_reference'])
++        digest=chain.image_record('nginx@sha256:'+'a'*64,'synthetic')
++        self.assertTrue(digest['immutable_reference']);self.assertFalse(digest['actual_digest_verified'])
++        sentinel='SS09_REGISTRY_CREDENTIAL_6148'
++        report=chain.image_record(f'https://user:{sentinel}@registry.invalid/image','synthetic')
++        self.assertIsNone(report['reference']);self.assertNotIn(sentinel,json.dumps(report))
++
++    def test_context_exclusions_and_required_runtime_files(self):
++        source=(ROOT/'backend/.dockerignore').read_text()
++        for path in ('.env','.env.production','sub/.env.production','sub/.ssh/key','sub/.aws/credentials',
++                     'certs/private.pem','keys/private.key','a/.pgpass','tests/fake.py','db/tests/fake.sql','backups/db.dump'):
++            with self.subTest(path=path):self.assertTrue(chain.ignore_subset(path,source))
++        for path in ('requirements.txt','logging.json','app/main.py','app/safe_logging.py',
++                     'app/services/document_storage.py','db/init/001_bootstrap_roles.sh',
++                     'db/migrations/030_rbac_gis_revisiones.sql','scripts/create_admin.py','scripts/run_migrations.sh'):
++            with self.subTest(path=path):self.assertFalse(chain.ignore_subset(path,source))
++
++    def test_all_current_application_and_migration_resources_remain_in_context(self):
++        source=(ROOT/'backend/.dockerignore').read_text()
++        for folder in ('app','db/migrations','db/init','scripts'):
++            for path in (ROOT/'backend'/folder).rglob('*'):
++                if path.is_file() and path.suffix in ('.py','.sql','.sh'):
++                    self.assertFalse(chain.ignore_subset(str(path.relative_to(ROOT/'backend')),source),str(path))
++
++    def test_compose_combinations_and_ss08_selective_copy(self):
++        result=chain.audit(ROOT)
++        self.assertTrue(result['contexts']['ssalfer_selective_copy'])
++        deployment=result['deployment']
++        self.assertTrue(deployment['uvicorn_no_proxy_headers_in_base'])
++        self.assertTrue(deployment['uvicorn_no_access_log_in_base'])
++        self.assertTrue(deployment['production_mode_literal'])
++        self.assertTrue(deployment['secure_cookie_literal_in_prod'])
++        self.assertTrue(deployment['explicit_cors_required_in_prod'])
++        self.assertTrue(deployment['development_reload'])
++        self.assertEqual(len(deployment['combinations']),4)
++        profile=json.loads((ASSETS/'perfiles-despliegue-propuestos.json').read_text())
++        self.assertIsNone(profile['selected_profile']);self.assertTrue(profile['functional_approval_required'])
++        self.assertIn('frontend',profile['profiles']['ssalfer_candidate']['services_not_selected_by_this_profile'])
++        self.assertIn('react_candidate_if_approved',profile['profiles'])
++
++    def test_no_connections_installs_subprocesses_env_or_file_writes_in_verifier(self):
++        tree=ast.parse((ASSETS/'verificar_cadena.py').read_text());imports=set()
++        for node in ast.walk(tree):
++            if isinstance(node,ast.Import):imports.update(a.name for a in node.names)
++            if isinstance(node,ast.ImportFrom):imports.add(node.module)
++            if isinstance(node,ast.Attribute):self.assertNotIn(node.attr,{'environ','getenv','system','popen','connect','execv','write','write_text','write_bytes','mkdir','unlink'})
++        self.assertLessEqual(imports,{'argparse','ast','base64','fnmatch','hashlib','json','os','pathlib','re','stat','sys','urllib.parse'})
++        self.assertEqual(chain.os.O_RDONLY,0)
++
++    def test_remote_github_policies_remain_unobserved(self):
++        result=chain.audit(ROOT)['github']
++        self.assertEqual(result['effective_branch_protection'],'not_observed')
++        self.assertEqual(result['rulesets'],'not_observed')
++        self.assertEqual(result['secrets'],'not_accessed')
++
++
++if __name__=='__main__':unittest.main()
+diff --git a/docs/security/SS-09-ETAPA1-CORRECCION-2026-10-29.md b/docs/security/SS-09-ETAPA1-CORRECCION-2026-10-29.md
+new file mode 100644
+index 0000000..f78b9d1
+--- /dev/null
++++ b/docs/security/SS-09-ETAPA1-CORRECCION-2026-10-29.md
+@@ -0,0 +1,125 @@
++# SS-09 etapa 1: integridad local y trazabilidad de la cadena de suministro
++
++Fecha: 2026-10-29. Software-PA / SSALFER, rama dev, HEAD `683ff75613768de28a7127c7e33a6e2ef4fc40ff` más remediaciones locales anteriores. **Entrega parcial validada offline; SS-09 permanece abierto.**
++
++## Resultado
++
++Se amplía backend/.dockerignore para excluir secretos/env/VCS/claves/backups y fuentes QA fuera de la imagen API. Se añaden un manifiesto SHA-256 de20 vendors locales, inventario reproducible de dependencias declaradas y un verificador estándar Python de sólo lectura. Se propone un descriptor institucional con selección pendiente, sin aplicar Compose ni retirar React/Vite.
++
++No se cambian versiones, Dockerfiles, Compose, frontend, bibliotecas, código productivo API, sesiones, documentos, GIS, permisos o migraciones. SS-08 queda íntegro; SS-05 sigue en diseño y SS-07 sin verificación efectiva QA. **No se instala o descarga ningún paquete/imagen, construye artefacto o realiza conexión a servicios/DB.** Sólo se consultó documentación pública primaria sobre procesos; no se enviaron código, archivos, hashes de secretos o datos a scanners.
++
++| Control | Estado |
++|---|---|
++| Exclusiones de backend build context |Implementadas como patrones; pruebas del subconjunto revisado y recursos preservados aprobadas. Matcher/capas Docker reales pendientes QA |
++| Vendors SHA-256 |20 archivos actuales verificados localmente; prueba de alteración sintética rechazada. Autenticidad upstream pendiente |
++| Requirements Python |42 pins inventariados; grafo, hashes de distribución, origen efectivo y versiones instaladas desconocidos |
++| Node lock |14 directas y123 entradas lock de paquetes; SRI sintáctico/declared ranges simples coherentes. No tarballs ni instalación verificados |
++| Imágenes/nativos |6 referencias distintas en11 sitios, sin digests reales comprobados; GDAL/GEOS/PROJ/libpq/OS instalados pendientes |
++| Perfil institucional/pipeline |Diseños no aplicados; selected_profile=null, sin workflow nuevo o configuración administrativa |
++| Vulnerabilidades |SCA/CVE/GHSA/OSV no ejecutados. No se afirma ausencia de vulnerabilidades ni se inventan CVEs |
++
++## Inspección y preservación
++
++Se inspeccionaron requirements/Dockerfiles/.dockerignore, package.json/lock, vendors/licencias/README, cuatro Compose principales y dos variantes QA, configuración/documentación de despliegue, init/runner/migraciones como consumidores de contexto, auditoría SS-09 y corrección SS-08. No se leyeron .env ni secretos administrativos o de infraestructura. Las referencias de entorno en archivos versionados se analizan sin expandirlas y no se reproducen valores de autenticación de fixtures.
++
++Se tomó snapshot de736 archivos preexistentes excluyendo .env. El único archivo preexistente modificado es backend/.dockerignore. Las remediaciones anteriores, incluidos Dockerfiles/cabeceras/COPY de SS-08 y tests/documentos SS-05/07, se conservan byte a byte. No hubo checkout/fetch/pull/reset/commit/push/merge. El SHA de referencia no es una identificación de una imagen instalada: el árbol local incluye cambios sin integrar.
++
++## Modificación de contexto y compatibilidad
++
++Se conservan las exclusiones previas de venv/cache/uploads/fuentes_locales/seed_data/archivos auxiliares conocidos. Se añaden patrones raíz y anidados para .env y variantes, .git, .ssh, .aws, .pgpass, .npmrc, .pypirc, .netrc, .git-credentials; formatos comunes pem/key/p12/pfx/jks y backups/dumps. Se excluyen tests, db/tests y pytest.ini de la imagen API. No se excluyen app, logging.json, requirements, scripts, db/init o db/migrations, ni se retiran sus archivos del repositorio.
++
++No se observan imports de tests/db/scripts como módulos requeridos por app. Las variantes QA versionadas montan las fuentes backend, por lo que los tests permanecen accesibles en ese flujo; la imagen productiva ya no es por sí sola una distribución de pruebas. Procedimientos externos que dependan de tests horneados deberán usar un artefacto QA separado o fuentes montadas y validarlo antes de integrar. No se cambian comandos/dependencias pytest ni se dejan de ejecutar las pruebas locales.
++
++El matcher offline cubre los patrones simples revisados y comprueba casos sintéticos de exclusión y recursos; **no sustituye al matcher Docker** ni prueba que una imagen previa no contenga secretos. No bloquea secretos con nombres no cubiertos, datos insertados por RUN o bind mounts. Tampoco protege otros contextos si el operador cambia el contexto a la raíz o agrega un Dockerfile-specific ignore. Verificar contexto/capas reales en QA según [documentación Docker](https://docs.docker.com/build/concepts/context/).
++
++## Verificador offline
++
++Archivo: [verificar_cadena.py](ss09/verificar_cadena.py). Sólo biblioteca estándar; Linux/POSIX para O_NOFOLLOW/dir_fd. No importa app/database, dotenv, paquetes/scanners, sockets o drivers; no instala, ejecuta subprocess/shell, abre conexiones, llama Docker/npm/pip/apt/GitHub o escribe archivos. La salida JSON se emite en stdout; cualquier archivo de salida lo crea explícitamente quien lo invoca.
++
++Uso de sólo lectura desde la raíz:
++
++```text
++python3 -B docs/security/ss09/verificar_cadena.py
++```
++
++El argumento opcional --root selecciona otro árbol de fuentes para pruebas/revisión, no una conexión. Nunca se registra la ruta completa/argumentos erróneos. Lee una lista fija de manifiestos, AST de app y vendors enumerados; no inspecciona .env, credenciales, archivos instalados o secretos de CI. Lectura por descriptores, sin seguir symlinks en las fuentes relativas y sin bloquear al abrir FIFO, sólo archivos regulares y máximo8MiB por archivo, también al observar crecimiento. Paths absolutos, escapes, material sensible y paths vendor de tipo no permitido se rechazan antes de leer. No ejecuta código de archivos inspeccionados.
++
++La salida es determinista para el mismo árbol, sin timestamp, variables de entorno, hostname, datos personales o URL con userinfo/query. Versiones/rangos/SRI se validan con un subconjunto explícito; referencias nuevas no revisadas se omiten o marcan sin imprimir su contenido. Excepciones/errores de parser/CLI producen un código genérico, sin traceback ni valores crudos. No se promete detectar secretos camuflados como metadatos legítimos: no es secret scanner.
++
++- Código0: inspección completada y controles de integridad/coherencia local satisfechos. **No significa seguro, SCA aprobado o despliegue listo**; assessment sigue incomplete_requires_qa con advertencias.
++- Código2: alteración vendor, desajuste/coherencia no soportada, contexto incompleto, drift de contrato SS-04/08/10/prod, o error de entrada/lectura que requiere revisión. No se corrige ni regenera un hash automáticamente.
++
++El verificador reconoce el subconjunto literal Compose del repositorio sin interpolar, aplicar merges completos o llamar compose config. Detecta etiquetas/nombres sin digest, gcc/apt declarados, COPY global y patrones requeridos, las combinaciones de entorno y ausencia de configuración local de workflows. No resuelve el ambiente combinado o una receta Docker arbitraria; no sustituye npm/pip/Docker en QA ni inspección administrativa GitHub.
++
++El manifiesto vendor es una referencia de bytes ya presentes; si se altera junto al vendor o verificador puede requerir otra raíz de confianza. Se necesita revisión Git/atestación para autenticar la referencia. No se añade lógica a SSALFER para descargar o sustituir bibliotecas al abrir la app.
++
++## Hallazgos comprobados y límites
++
++1. Pins Python sin hashes y sin grafo acreditado. El comentario de freeze no demuestra distribución/entorno reproducible; no se activa --require-hashes incompleto.
++2. Lock Node con123 SRI y URLs declaradas de registry, sin verificación de tarballs o árbol efectivo. npm ci sigue en Dockerfile, sin ejecución ni actualización; flags/scripts/plataforma se prueban después.
++3. Vendors locales con versiones heterogéneamente declaradas: ExcelJS sólo nombre/README, las otras familias con literal/banner en principal. README documenta verificaciones anteriores, no una prueba nueva de autenticidad. Los SHA de README de ExcelJS/SheetJS coinciden con bytes locales.
++4. Tags de base/servicios mutables y pgAdmin sin tag explícito; software-pa-backend es nombre mutable de build/imagen local. No se conoce digest o arquitectura; no se inventa ni modifica.
++5. apt no congelado y toolchain gcc/libpq-dev dentro de runtime. GDAL/GEOS/PROJ/libpq de imagen no observados; ninguna versión del host auditor se presenta como evidencia de lo instalado en producción.
++6. SSALFER carece de ignore de contexto: COPY selectiva no evita transmitir todo el contexto al builder. Backend COPY global puede incorporar archivos no excluidos; se reduce superficie mediante ignore, sin afirmar ausencia total de secretos o limpiado de capas existentes.
++7. Variantes Compose pueden añadir desarrollo o ambos frontends. CMD Dockerfile backend aún tiene reload y Compose base lo reemplaza; se informa, no se altera una corrección previa. La selección institucional requiere decisión.
++8. Workflows/Dependabot no presentes en el árbol inspeccionado; protecciones/rulesets/organización/secretos/atestaciones efectivas GitHub **no observados**, no se declaran ausentes. No se usa el dato histórico protected:false como estado vigente.
++
++Son riesgos de cadena/configuración y evidencia incompleta, no CVEs nuevas confirmadas. Consultar [inventario detallado](SS-09-INVENTARIO-DEPENDENCIAS-2026-10-29.md) y [plan](SS-09-PLAN-CADENA-SUMINISTRO.md) para los datos faltantes y las puertas QA.
++
++## Archivos de esta intervención
++
++Preexistente modificado:
++
++- backend/.dockerignore, sin modificar Dockerfile/dependencias.
++
++Nuevos:
++
++- docs/security/ss09/verificar_cadena.py.
++- docs/security/ss09/vendors-sha256.json.
++- docs/security/ss09/inventario-declarado.json.
++- docs/security/ss09/perfiles-despliegue-propuestos.json.
++- tests/security/test_supply_chain_offline.py.
++- Este informe, SS-09-INVENTARIO-DEPENDENCIAS-2026-10-29.md y SS-09-PLAN-CADENA-SUMINISTRO.md.
++- [SS-09-ETAPA1-CORRECCION-2026-10-29.patch](SS-09-ETAPA1-CORRECCION-2026-10-29.patch).
++
++El parche es exclusivo: compara backend/.dockerignore con su snapshot inicial y añade sólo estos nuevos archivos; no contiene cambios SS-08 u otras remediaciones y excluye el parche a sí mismo. Se valida con aplicación inversa en modo check, sin aplicarlo ni escribir Git.
++
++## Pruebas y evidencia
++
++```text
++python3 -B -m unittest discover -s tests/security -p 'test_supply_chain_offline.py' -q
++Ran 19 tests — OK
++
++python3 -B -m unittest discover -s tests/security -p 'test_*.py' -q
++Ran 237 tests — OK (skipped=6)
++```
++
++Resultado:231 pruebas Python aprobadas y6 omitidas; las19 nuevas aprobaron. Omisiones previas:3 nativas SQLAlchemy/psycopg2 SS-10,2 Starlette SS-12 y1 parser PostgreSQL SS-07. El token fijo document_storage puede aparecer en una rama de fallo sintético esperado; no contiene datos sensibles. No se reejecuta Node/navegador porque no cambia código frontend o vendor: sus bytes y la copia SS-08 se verifican íntegros por hash y regresión estática.
++
++Cobertura nueva: inventario determinista e igual al guardado;42/123/20 entradas; instalados desconocidos; hashes locales correctos y ExcelJS sin literal de versión; vendor alterado/nuevo no revisado/escape/symlink rechazados; lecturas sensibles/excesivas denegadas; sentinelas de credenciales en URL/metadata/argumentos no impresas; pins y lock raíz/rangos/SRI; imágenes tag vs digest sin inventar verificación; exclusiones/código/migraciones preservados; combinaciones Compose y SS-04/08/10; ausencia de conexiones/procesos/escrituras/env del verificador; políticas GitHub no observadas.
++
++Las pruebas usan dobles/archivos sintéticos en directorios temporales propios; no leen .env real ni ejecutan scanner, Docker, pip/npm/apt, subprocess o conexiones desde el verificador. Se inspeccionaron las suites previas antes de reejecutarlas: no conftest backend/DB; hijos SS-12 sólo escriben archivos sintéticos propios. No se ejecutó pytest integrado o collect-only.
++
++También se ejecuta el verificador real en lectura, que produce el [inventario guardado](ss09/inventario-declarado.json) con local_integrity_ok=true **e incomplete_requires_qa**. El código0 no elimina advertencias: CVE/SCA/grafo/distribuciones/nativos/GitHub/perfil siguen pendientes. Se verifican git diff --check, enlaces, preservación de736 archivos previos salvo el único ignore autorizado y parche exclusivo.
++
++## Pruebas omitidas y requisitos de QA
++
++- Resolución/descarga/instalación de paquetes, apt snapshots, tarballs upstream y contraste de dist/metadata/firmas: necesitan conectividad y autorización específicas. No se realizó ni se inventaron hashes.
++- Docker context/build/inspect, hashes de capas/digests/plataforma y SBOM/SCA real: no ejecutados; herramientas aprobadas deben operar sobre el artefacto QA, no sólo este inventario declarado.
++- Versiones/enlaces nativos de GDAL/GEOS/PROJ/libpq y PostgreSQL/PostGIS: requieren imagen QA y, para server/extensión, conexión QA aparte autorizada; no tocar infraestructura institucional.
++- GitHub policies/workflows/secrets administrativos/procedencia: no consultados o modificados. Ausencia local no demuestra ausencia efectiva. Nueva revisión debe registrar alcance/fecha sin valores secretos.
++- Pruebas de compatibilidad de imagen, GIS formatos/CRS/Z/M, documentos/bytes/SHA/locks, HTTP/cookies/CSP/descarga, roles y reportes: pendientes de reconstrucción nativa autorizada. Los tests aislados no las sustituyen.
++
++## Riesgos residuales y aceptación
++
++No se acredita autenticidad upstream, ausencia de malware/CVEs, reproducibilidad bit a bit o correspondencia con producción. Los controles GitHub, datos instalados, secretos con otros nombres/binds/capas, defaults de imagen, scripts de instalación, apt/toolchain y selección de perfil siguen siendo riesgos. El manifiesto vendor necesita revisión/procedencia protegida; no basta regenerarlo tras un fallo.
++
++Antes de autorizar despliegue: aprobar perfil institucional/servicios, resolver y verificar distribuciones/digests/plataforma, reconstruir contexto real sin secretos, obtener SBOM/SCA/atestación del artefacto final, pasar QA de remediaciones y acreditar controles GitHub. Mantener pendientes SS-02/03/04/05/07/08/12 según sus propios informes; SS-09 no los cierra.
++
++**Detenerse para revisión técnica. No publicar, integrar, activar workflows o desplegar a partir de esta entrega.**
++
++## Trazabilidad del cambio de contexto
++
++| Archivo | SHA-256 al inicio de SS-09 | SHA-256 tras SS-09 |
++|---|---|---|
++| `backend/.dockerignore` | `223071357c9f018eef7d3582af9d89d3ba9ac3fe5b72a96e6c3f81c81bc58de3` | `eec6ba694e1b109285adf9802d8aa3e1a5c33dac9e1df90bd0643e5279f9978b` |
+diff --git a/docs/security/SS-09-INVENTARIO-DEPENDENCIAS-2026-10-29.md b/docs/security/SS-09-INVENTARIO-DEPENDENCIAS-2026-10-29.md
+new file mode 100644
+index 0000000..4d110d3
+--- /dev/null
++++ b/docs/security/SS-09-INVENTARIO-DEPENDENCIAS-2026-10-29.md
+@@ -0,0 +1,154 @@
++# SS-09 etapa 1: inventario de dependencias y artefactos declarados
++
++Fecha: 2026-10-29. Software-PA, rama dev, HEAD `683ff75613768de28a7127c7e33a6e2ef4fc40ff` más remediaciones locales. **No es SBOM del entorno instalado, ni inventario del artefacto desplegado.** [Informe](SS-09-ETAPA1-CORRECCION-2026-10-29.md), [plan](SS-09-PLAN-CADENA-SUMINISTRO.md).
++
++## Niveles de evidencia
++
++| Fuente/componente | Versión declarada | Resolución conocida | Hash/digest | Procedencia acreditada | Vulnerabilidades | Pendiente |
++|---|---|---|---|---|---|---|
++| Python requirements |42 pins exactos |No se resolvió el grafo ni se consultó METADATA instalado |Sin hashes de wheels/sdists |Comentario dice extraído de contenedor funcional; no se acredita esa instancia |SCA no realizado en esta etapa |Grafo completo, índices, archivos seleccionados, hashes, plataforma, paquetes realmente instalados |
++| React package.json/lock |14 dependencias raíz, rangos npm |Lockfile v3:123 entradas de paquetes además de raíz, con versión exacta |123 SRI con formato válido, mayormente sha512; no se verificaron tarballs |Todas las referencias resolved actuales apuntan a registry.npmjs.org sin credenciales/query; no se descargó/verificó upstream |Pendiente |npm ci nativo/peer/optional/plataforma, bytes de distribuciones y árbol instalado |
++| SSALFER vendors |Leaflet1.9.4, SheetJS0.20.3, ExcelJS4.4.0, html2canvas1.4.1, Bootstrap Icons1.13.1 por nombres/banners/README |20 archivos locales actuales: recursos, licencias y documentación de vendor |SHA-256 local calculado por archivo y tamaño |README afirma fuentes/verificaciones previas; no se revalidan autenticidad ni tarballs upstream aquí |Pendiente |Comparación upstream autorizada, licencia/transformaciones y cadena de revisión |
++| apt backend |gdal-bin, libpq-dev, gcc |No resuelto |No hashes/versiones Debian fijados en Dockerfile |Índice apt de la base, configuración/fecha efectiva desconocidas |Pendiente |dpkg, origen/snapshot, repositorio/firmas y dependencias transitivas |
++| GDAL/GEOS/PROJ/libpq |GDAL vía apt, libpq-dev; GEOS/PROJ transitivos esperables, no versionados |Instalación/enlace real no observado |Desconocido |No se inspecciona imagen o sistema institucional |Pendiente |ABI, librerías cargadas, formatos/CRS, versiones nativas reales |
++| PostgreSQL/PostGIS |Etiqueta15-3.3 del servicio |No equivale a versiones exactas aplicadas |Sin digest conocido |Referencia de imagen, no imagen descargada/comprobada |Pendiente |Digest/plataforma, versión server/extensión y privilegios SS-07 en QA autorizado |
++| Imágenes base y servicios |6 referencias distintas en11 sitios Dockerfile/Compose |Etiquetas/nombre, no contenido resuelto |Ningún digest real verificado |Referencias declaradas a repositorios conocidos; no se consultó registry |Pendiente |Manifiestos multiarch, digest de plataforma, imagen construida y artefacto desplegado |
++| Build/CI |pip/npm/apt y gcc; herramientas heredadas de base |Versiones exactas de pip/npm/compilador/OS desconocidas |No atestación del build ni SBOM encontrado en el flujo inspeccionado |No workflows locales; controles efectivos GitHub no observados |Pendiente |Toolchain, build de QA, procedencia firmada y revisión antes de publicar |
++
++Los campos `installed_version`, `distribution_hash`, `actual_image_digests` y versiones nativas no observadas se dejan null/desconocidos, no se rellenan a partir de etiquetas o del Python local del auditor.
++
++## Python:42 entradas del archivo runtime
++
++El comentario de requirements.txt afirma un bloqueo obtenido del contenedor de desarrollo. Un freeze plano puede mezclar directas, transitivas, pruebas y paquetes ya instalados; **no acredita cierre reproducible ni topología**. El AST de app muestra imports de siete distribuciones mapeadas; eso es evidencia de uso directo en código, no una afirmación de que las otras35 sean todas transitivas o innecesarias. Scripts/auxiliares y extras pueden requerirlas.
++
++| Paquete normalizado | Pin declarado | Evidencia de relación con app | Estado de artefacto |
++|---|---|---|---|
++| `aiofiles` | `25.1.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `annotated-doc` | `0.0.4` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `annotated-types` | `0.7.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `anyio` | `4.14.1` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `bcrypt` | `5.0.0` | Sí, candidato a dependencia directa | Sin hash de distribución ni versión instalada acreditada |
++| `certifi` | `2026.6.17` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `cffi` | `2.0.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `click` | `8.4.2` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `cryptography` | `49.0.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `ecdsa` | `0.19.2` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `et-xmlfile` | `2.0.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `fastapi` | `0.138.2` | Sí, candidato a dependencia directa | Sin hash de distribución ni versión instalada acreditada |
++| `geoalchemy2` | `0.20.0` | Sí, candidato a dependencia directa | Sin hash de distribución ni versión instalada acreditada |
++| `greenlet` | `3.5.3` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `h11` | `0.16.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `httpcore` | `1.0.9` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `httpx` | `0.28.1` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `idna` | `3.18` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `iniconfig` | `2.3.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `numpy` | `2.4.6` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `openpyxl` | `3.1.5` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `packaging` | `26.2` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `pandas` | `3.0.3` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `passlib` | `1.7.4` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `pluggy` | `1.6.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `psycopg2-binary` | `2.9.12` | Sí, candidato a dependencia directa | Sin hash de distribución ni versión instalada acreditada |
++| `pyasn1` | `0.6.3` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `pycparser` | `3.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `pydantic` | `2.13.4` | Sí, candidato a dependencia directa | Sin hash de distribución ni versión instalada acreditada |
++| `pydantic-core` | `2.46.4` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `pygments` | `2.20.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `pytest` | `9.1.1` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `python-dateutil` | `2.9.0.post0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `python-dotenv` | `1.2.2` | Sí, candidato a dependencia directa | Sin hash de distribución ni versión instalada acreditada |
++| `python-multipart` | `0.0.32` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `rsa` | `4.9.1` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `six` | `1.17.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `sqlalchemy` | `2.0.51` | Sí, candidato a dependencia directa | Sin hash de distribución ni versión instalada acreditada |
++| `starlette` | `1.3.1` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `typing-extensions` | `4.15.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `typing-inspection` | `0.4.2` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++| `uvicorn` | `0.49.0` | No observado en app; función directa/transitiva pendiente | Sin hash de distribución ni versión instalada acreditada |
++
++También `backend/tests/requirements-convenio-report.txt` declara jsonschema4.10.3 como dependencia de pruebas. No se instala ni se trata como paquete efectivo del runtime. pytest/pluggy/iniconfig/Pygments están en el archivo principal; separar runtime/QA es propuesta, **no se eliminan ni cambian versiones ahora**.
++
++Python3.11 aparece en el tag de base, pero su parche/OS/pip/arquitectura no están fijados por digest. No se activa --require-hashes: faltan distribuciones elegidas por plataforma y hashes verificables del grafo completo. No se comparó con lo instalado en un contenedor ni con PyPI; no hay conclusión de compatibilidad o ausencia de CVEs.
++
++## Node.js React/Vite
++
++package-lock.json tiene124 entradas incluyendo la raíz vacía. Las123 de paquetes pueden contener duplicados por posición, dependencias opcionales/dev y resoluciones anidadas; no son123 paquetes únicos necesariamente ni123 paquetes instalados en toda plataforma.109 posiciones adicionales a las14 directas no deben clasificarse automáticamente como presentes en runtime del navegador. La imagen final copia dist, no node_modules, pero el build usa devDependencies.
++
++| Dependencia raíz | Tipo declarado | Rango package.json | Versión lock | Comprobación offline |
++|---|---|---|---|---|
++| `axios` | dependencies | `^1.18.1` | `1.18.1` | matches_reviewed_range |
++| `leaflet` | dependencies | `^1.9.4` | `1.9.4` | matches_reviewed_range |
++| `lucide-react` | dependencies | `^1.21.0` | `1.21.0` | matches_reviewed_range |
++| `react` | dependencies | `^19.2.7` | `19.2.7` | matches_reviewed_range |
++| `react-dom` | dependencies | `^19.2.7` | `19.2.7` | matches_reviewed_range |
++| `react-leaflet` | dependencies | `^5.0.0` | `5.0.0` | matches_reviewed_range |
++| `react-router-dom` | dependencies | `^7.18.0` | `7.18.2` | matches_reviewed_range |
++| `wellknown` | dependencies | `^0.5.0` | `0.5.0` | matches_reviewed_range |
++| `@playwright/test` | devDependencies | `^1.62.1` | `1.62.1` | matches_reviewed_range |
++| `@types/react` | devDependencies | `^19.2.17` | `19.2.17` | matches_reviewed_range |
++| `@types/react-dom` | devDependencies | `^19.2.3` | `19.2.3` | matches_reviewed_range |
++| `@vitejs/plugin-react` | devDependencies | `^6.0.2` | `6.0.3` | matches_reviewed_range |
++| `oxlint` | devDependencies | `^1.69.0` | `1.71.0` | matches_reviewed_range |
++| `vite` | devDependencies | `^8.1.0` | `8.1.0` | matches_reviewed_range |
++
++Las123 entradas actuales contienen SRI sintácticamente válido y resolved HTTPS a registry.npmjs.org. Se conserva ese SRI declarado en [inventario JSON](ss09/inventario-declarado.json), sin afirmar que un tarball se descargó o coincidió. El verificador nunca muestra userinfo/query de un resolved inseguro, ni URL de registry nueva no revisada.
++
++El Dockerfile usa npm ci, que es una base útil para instalar desde lock sin reescribirlo, pero no elimina riesgos del registry, scripts o toolchain. El lock marca hasInstallScript en dos posiciones de fsevents (una anidada en playwright); su ejecución efectiva depende de selección/plataforma y no se observó. No se ejecutaron npm, Vite, Playwright o scripts package.json. [Referencia npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/).
++
++El verificador compara dependencias raíz JSON/lock y aplica un subconjunto explícito de semver a los rangos simples exactos/^/~ actuales. No resuelve peerDependencies, overrides, workspaces, integridad de tarballs, enlaces o todo semver npm. Una sintaxis nueva no compatible queda pendiente/rechazada para revisión, no se “resuelve” de forma inventada.
++
++## Vendors: manifiesto SHA-256 local
++
++[Manifiesto revisable](ss09/vendors-sha256.json). Contiene los20 archivos actuales, incluidos licencias/README para mantener trazabilidad. Integridad local significa igualdad de bytes contra esta referencia; **no prueba que el archivo original fuera auténtico ni resistente a una modificación conjunta de vendor y manifiesto**. La referencia debe revisarse/fijarse mediante Git/procedencia antes de usarla como control de publicación.
++
++| Archivo relativo a js/vendor | Versión declarada de familia | Bytes | SHA-256 local actual |
++|---|---|---|---|
++| `EXCELJS-LICENSE.txt` | 4.4.0 | 1084 | `2ed526b7e7c7681dc2347995b5036ddf73dc27d0539cdea59b6d4a72b63a57a0` |
++| `HTML2CANVAS-LICENSE.txt` | 1.4.1 | 1061 | `86200ce4e92d9a22c41c8647a55f7a5fddff304ff89b4d36ecc699ed8c123d2c` |
++| `README.md` | No aplica | 1270 | `83bdd4ab077b4c4fc4bc821a87513088f88d7cd5b2ca669b2e8d2ba50d25a879` |
++| `SheetJS-LICENSE.txt` | 0.20.3 | 11355 | `4d2a38ac35cda06a555c84074a819d413339cd3691b822cae50f8f322fe01f64` |
++| `SheetJS-README.md` | 0.20.3 | 498 | `22e910300bc86e3517e6d6b6b1fe4e12dba3d4a72fe03141d18f927cc83c0d58` |
++| `bootstrap-icons-1.13.1/LICENSE.txt` | 1.13.1 | 1093 | `0fb3e11bd57e896c5a512afd64864d28a37de45d19835016c87ca1ad19ead969` |
++| `bootstrap-icons-1.13.1/bootstrap-icons.css` | 1.13.1 | 99556 | `004322721c8557331759bc6ddaacbb689b0f0715d688aec82bd056d2d5b5cc3b` |
++| `bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff` | 1.13.1 | 180288 | `f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15` |
++| `bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff2` | 1.13.1 | 134044 | `6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61` |
++| `exceljs-4.4.0.min.js` | 4.4.0 | 947702 | `7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9` |
++| `html2canvas-1.4.1.min.js` | 1.4.1 | 198689 | `e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb` |
++| `leaflet-1.9.4/LICENSE.txt` | 1.9.4 | 1369 | `bbc959aaef7488b38942e7f05cfd1244351f8bce54261951ea17dd7cf60f894b` |
++| `leaflet-1.9.4/images/layers-2x.png` | 1.9.4 | 1259 | `066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf` |
++| `leaflet-1.9.4/images/layers.png` | 1.9.4 | 696 | `1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6` |
++| `leaflet-1.9.4/images/marker-icon-2x.png` | 1.9.4 | 2464 | `00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528` |
++| `leaflet-1.9.4/images/marker-icon.png` | 1.9.4 | 1466 | `574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437` |
++| `leaflet-1.9.4/images/marker-shadow.png` | 1.9.4 | 618 | `264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da` |
++| `leaflet-1.9.4/leaflet.css` | 1.9.4 | 14145 | `337bfca5cabd03b39815b2700febe2b3b7edf55921c59cd49f88ecb328212303` |
++| `leaflet-1.9.4/leaflet.js` | 1.9.4 | 147552 | `db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a` |
++| `xlsx-0.20.3.mini.min.js` | 0.20.3 | 279523 | `0cb353f830d7288385492c83d277b058ddeac664ca51cf1393aa1fd3e2b70939` |
++
++ExcelJS es un caso importante: su banner tiene fecha, no aparece la cadena4.4.0 en el JS. Esa versión procede del nombre/README, no de una declaración interna acreditada. Leaflet, SheetJS, html2canvas y Bootstrap Icons sí contienen literales/banners coincidentes en su archivo principal; eso sigue sin autenticar los bytes.
++
++Las afirmaciones SHA previas de README para ExcelJS y SheetJS coinciden con los hashes locales actuales. Se comprueba únicamente consistencia local entre textos/bytes; no se reejecuta la verificación de tarball/dist.shasum que el README afirma. Licencias presentes no demuestran autenticidad o exhaustividad de dependencias embebidas; revisar la distribución upstream completa con autorización.
++
++Código propio HTML/JS/CSS queda separado de js/vendor; las dependencias npm de React son otro árbol. No se reemplazan librerías, no se cambia el frontend seleccionado ni se envían los archivos/hashes a scanners externos. No se añade una comprobación en navegador que altere cargas de SSALFER; es un control offline para revisión/build futuro.
++
++## Imágenes, nativos y herramientas
++
++| Referencia declarada | Ubicación | Estado / riesgo |
++|---|---|---|
++| python:3.11-slim |backend/Dockerfile |Tag mutable; SO/patch/digest/arquitectura desconocidos. pip heredado, apt y compilación permanecen en runtime |
++| node:22-slim |frontend/Dockerfile |Tag mutable; versión exacta Node/npm desconocida. Etapa npm ci y etapas dev/build, no selección probada del artefacto final |
++| nginx:1.27-alpine |Dockerfiles SSALFER y React production |Tag mutable; bytes/digest no comprobados. SS-08 añade headers/COPY selectiva sólo a SSALFER, preservados |
++| postgis/postgis:15-3.3 |Compose base y QA |Tag mutable; ni versión exacta server/extensión ni GEOS/PROJ acreditados |
++| dpage/pgadmin4 |Compose base |Sin tag explícito; no fijación por digest. No se actualiza ni retira sin decisión administrativa |
++| software-pa-backend |Compose base/QA |Nombre mutable de imagen local/build; no se conoce ID/digest/procedencia de la instancia existente. No asumir descarga pública o correspondencia con HEAD |
++
++GDAL está fuera de requirements como ejecutable de gdal-bin. GEOS/PROJ, librerías libgdal, cliente PostgreSQL/libpq y su enlace real requieren inventario apt/ldd/paquetes en la imagen QA. psycopg2-binary puede llevar librerías propias: no deducir su libpq cargada de libpq-dev o de la versión del servidor. PostGIS y btree_gist se declaran como extensiones en migraciones, no como paquetes Python.
++
++No se fijan digests inventados ni se cambia plataforma/base. Para aprobar un pin futuro se necesitan metadatos del registry y plataforma y una reconstrucción compatible con todos los flujos GIS/documentales; no basta elegir el digest “latest” o una arquitectura del equipo auditor.
++
++## Contextos y despliegue
++
++Backend conserva COPY . ., pero se amplía .dockerignore con secretos/env/VCS/claves/backups y fuentes de tests fuera de imagen runtime. Mantiene app, requirements, logging.json, scripts y migraciones/init. El modelo de patrones es parcial y no sustituye al matcher Docker real. Cualquier secreto con otro nombre, generado durante RUN, capa previa o bind mount queda fuera de esta garantía.
++
++SSALFER conserva íntegra la copia selectiva SS-08, pero no tiene .dockerignore propio: el contexto puede transmitir documentación/QA al builder aunque no se copie a la imagen. Esa exposición del contexto sigue pendiente y se marca en el verificador. React conserva .dockerignore con .env/.env.* y npm ci; no se retira. Los cuatro Compose principales y variantes QA se inspeccionan sin interpolar env, ni publicar valores de autenticación de fixtures. El detalle de producción/selección está en el plan y en [perfiles propuestos](ss09/perfiles-despliegue-propuestos.json), que **no son Compose ejecutable y no seleccionan un frontend**.
++
++La evidencia del inventario se puede regenerar con el verificador offline; no representa una instalación o un despliegue institucional.
+diff --git a/docs/security/SS-09-PLAN-CADENA-SUMINISTRO.md b/docs/security/SS-09-PLAN-CADENA-SUMINISTRO.md
+new file mode 100644
+index 0000000..ec584c7
+--- /dev/null
++++ b/docs/security/SS-09-PLAN-CADENA-SUMINISTRO.md
+@@ -0,0 +1,119 @@
++# SS-09 etapa 1: plan de cadena de suministro y validación QA
++
++Fecha: 2026-10-29. Estado: diseño para aprobación; **no ejecutar instalaciones, builds, publicación o cambios GitHub en esta etapa**. Referencia `dev`/`683ff75613768de28a7127c7e33a6e2ef4fc40ff` más remediaciones locales. [Informe](SS-09-ETAPA1-CORRECCION-2026-10-29.md), [inventario](SS-09-INVENTARIO-DEPENDENCIAS-2026-10-29.md).
++
++## Separación de evidencias y puertas
++
++| Etapa futura | Datos/controles necesarios | Estado actual y autorización |
++|---|---|---|
++| Fuentes revisadas |Commit aprobado o snapshot con diff local completo y origen; manifiestos/vendor SHA revisados |Árbol local sucio preservado; parche SS-09 revisable, no commit. Un SHA de referencia no identifica todos los cambios locales |
++| Resolución Python/Node |Grafo y selección de paquetes para plataforma, metadatos y hashes de distribuciones |Sólo pins/lock locales. Descarga/resolución requiere autorización conectada separada |
++| Base/nativos |Digest de índice multiarch y de plataforma, OS/repositorio/paquetes/ABI/toolchain |Sólo tags/apt no congelados. No se consultó registry ni se descargaron imágenes |
++| Build de QA |Contexto revisado sin secretos, builder/receta controlados, entorno y salidas registradas |No construido aquí; no Docker ni npm/pip/apt ejecutados |
++| SBOM/SCA/pruebas |Inventario realmente instalado/estático servido y bases de vulnerabilidades actualizadas verificables |Pendiente; no usar inventario declarado como SBOM final |
++| Procedencia/publicación |Atestación revisada, firma/identidad de build, digest del artefacto y gate humano |Diseño, sin crear claves, activar workflows o publicar |
++| Despliegue |Perfil institucional aprobado y referencia al mismo artefacto probado por digest |Frontend y manifiesto finales requieren decisión; no despliegue en esta autorización |
++
++## Python: resolución e integridad propuestas
++
++1. Clasificar dependencias de aplicación, auxiliares y QA desde código y METADATA del entorno conocido. El freeze actual no prueba qué paquetes son transitivos ni prescindibles. Diseñar archivos fuente/locks separados sólo tras pruebas; no eliminar pytest/passlib/otras bibliotecas por falta de import directo en app.
++2. Fijar plataforma objetivo: arquitectura, OS/base por digest, CPython3.11 exacto y herramienta de resolución/pip. Resolver grafo completo con markers/extras/Requires-Python/Requires-Dist; registrar índices autorizados y restricciones, sin credenciales en URL, logs o lock público.
++3. Seleccionar wheels/sdists concretos por plataforma y obtener metadatos de procedencia y hashes verificables. Para cada distribución faltan actualmente nombre de archivo, tamaño, SHA-256 autenticado, origen y selección de tags. Si hay sdist, también controlar build-system/build dependencies/compilador/ABI y el wheel resultante; un hash de sdist no fija todo el build.
++4. Preparar wheelhouse o repositorio interno aprobado con retención y control de cambios. La resolución/descarga es una actividad conectada futura autorizada, no se obtiene reutilizando un entorno institucional o transmitiendo código al scanner.
++5. Sólo después de cerrar y verificar todos los hashes habilitar un modo de instalación con hash checking. No pegar hashes calculados de nombres de versión o de archivos ajenos. Evaluar wheels-only cuando sean compatibles, sin asumir disponibilidad de ruedas para todos los nativos. [Instalaciones seguras pip](https://pip.pypa.io/en/stable/topics/secure-installs/).
++6. Instalar/reconstruir únicamente en QA autorizado y registrar el resultado con inventario de METADATA, pip inspect/list/check u herramientas aprobadas, sin imprimir configuración/credenciales pip. Guardar wheels y salida de build según política; no ejecutar esos comandos en esta intervención.
++7. Ejecutar regresiones y SCA de las distribuciones realmente seleccionadas/instaladas y sus transitivas, con base de advisories fechada y procedencia registrada. Cambios de versiones se evalúan de forma específica, con corpus GIS/documental/contratos; no actualizar todo por ser reciente.
++
++Hash checking no autentica por sí solo quién aprobó el hash ni elimina malware válido dentro de la distribución. El archivo de hashes y la receta deben estar revisados y vinculados al build. Las bibliotecas nativas obtenidas por apt y las base images requieren controles separados.
++
++## Node y vendors
++
++Preservar package-lock y npm ci; fijar versión Node/npm, flags relevantes y plataforma del builder antes de reconstruir. Capturar árbol efectivo con versiones, dependencias opcionales/dev/peer y scripts de instalación ejecutados; el lock no acredita que cada entrada se instaló ni que todo devDependency termina en dist. El bundler necesita revisar lo realmente emitido; la imagen final React es distinta de la imagen Node builder.
++
++Para vendors, revisar cada familia y ruta del manifiesto. En actividad futura autorizada, obtener distribución upstream indicada por el proveedor, su metadata/firmas cuando existan, verificar hash de tarball y extraer únicamente recursos esperados en un entorno aislado. Comparar bytes locales y documentar cualquier minificación/parche/transformación, licencia y transitive code embebido. No sustituir vendors automáticamente para hacer coincidir un hash.
++
++Un manifiesto vendor alterado junto al archivo puede superar una verificación local: proteger su revisión y procedencia. No exponer SBOM/informes operativos dentro del document root para “demostrar” integridad. Conservar la copia selectiva SS-08 y verificar los hashes de assets de la imagen construida/servida, no sólo los de la carpeta fuente.
++
++## Docker y dependencias nativas
++
++Antes de fijar un digest: resolver la referencia correcta y comprobar plataforma, manifiesto de índice y digest específico. Identificar soporte de GDAL/GEOS/PROJ/libpq, formatos, drivers, CRS y geometrías Z/M. No inventar un digest o aplicar el de otra arquitectura. Tras prueba QA, actualizar referencias con aprobación y registrar origen del pin; conservar un plan de actualización porque inmutabilidad no elimina vulnerabilidades.
++
++Para apt, registrar OS/codename, sources sin secretos, repositorios y firmas/snapshot, versiones de gdal-bin/libgdal/GEOS/PROJ/libpq/gcc y transitivas, más los paquetes realmente instalados. No suponer que la etiqueta slim o15-3.3 determina todos ellos. Congelar paquetes requiere disponibilidad de repositorio y compatibilidad; decidir entre snapshot interno/archivo y pin de paquetes mediante revisión.
++
++Backend conserva gcc/libpq-dev y dependencias de build en runtime. Evaluar después una etapa builder separada y runtime mínimo que copie wheels/librerías necesarios, probando enlaces nativos. No retirar gcc/libpq-dev a ciegas: puede cambiar cómo se construyen cffi/cryptography u otros paquetes y romper distribución de GDAL/libpq.
++
++SSALFER no tiene ignore de contexto propio: la copia selectiva protege el document root, pero no evita transmitir QA/documentación al builder. Diseñar exclusiones conservando deploy/nginx.conf, Dockerfile, recursos y licencias y ensayarlas después; no se alteran esas entradas en esta fase.
++
++La exclusión .dockerignore de backend se comprueba localmente con casos simples. Docker real y posibles Dockerfile-specific ignore tienen precedencias/semántica propia que deben verificarse en QA. Revisar el contexto exacto y capas/artefacto resultante sin copiar secretos o datasets reales. [Contextos e ignore Docker](https://docs.docker.com/build/concepts/context/).
++
++Tests ya no se copian a la imagen API mediante el contexto backend. Los Compose QA versionados montan fuentes backend (incluyendo tests), y el desarrollo usa bind: esa ruta sigue intacta. Si un procedimiento ajeno requiere tests dentro de una imagen sin mounts, crear un artefacto QA separado con autorización; no ampliar la imagen productiva otra vez ni omitir pruebas por ese cambio. .dockerignore no filtra bind mounts ni borra archivos de imágenes anteriores.
++
++## Propuesta de manifiesto institucional único
++
++[Perfiles propuestos](ss09/perfiles-despliegue-propuestos.json) es un descriptor de decisión, **no se ejecuta, no es un nuevo Compose y selected_profile=null**. Incluye dos candidatos para que el dueño funcional elija sin retirar React:
++
++| Candidato | Lista de Compose explícita y ordenada | Servicios explícitos a construir / iniciar | Condiciones |
++|---|---|---|---|
++| SSALFER, si se aprueba |base, prod, ssalfer |Build backend/frontend_ssalfer; iniciar db/backend/frontend_ssalfer |Frontend React y pgAdmin no seleccionados por ese perfil, pero no eliminados del repositorio. Todo servicio administrativo adicional requiere decisión |
++| React/Vite, si se confirma necesario |base, prod |Build backend/frontend; iniciar db/backend/frontend |No se declara obsoleto. Mantener QA propia de React; no atribuirle los headers SSALFER de SS-08 |
++
++La selección explícita de servicios es necesaria tanto para build como para inicio: cargar base+prod+ssalfer declara ambos frontends; ejecutar sin seleccionar puede iniciarlos/construirlos a ambos. No cambiarlo mediante suposiciones del operador o inferencia del nombre del archivo. Un manifiesto final aprobado debería tener un único perfil activo, sus servicios/imágenes por digest, plataforma, receta y versión de configuración exactas, además de parámetros no secretos validados.
++
++Requisitos del perfil final: APP_ENV production, cookies Secure/__Host-/Path correctas, CORS del origen HTTPS público exacto, comando Uvicorn sin reload y con --no-proxy-headers/SS-10 logging, archivos Compose explícitos sin override automático dev, ausencia de binds de código, puertos/volúmenes/red revisados, TLS/Host/redirecciones y cadena de confianza acreditados por QA. No incluir .env o credenciales en el descriptor, imagen o informe.
++
++| Combinación actual | Riesgo/consecuencia que debe distinguirse |
++|---|---|
++| Compose implícito base+override |Desarrollo, reload/binds/Vite; no convertir en producción por sólo cambiar una variable |
++| base+prod |React disponible, SSALFER no añadido; sin constancia del TLS externo |
++| base+ssalfer |Añade SSALFER, no fuerza modo production/cookies seguras de backend ni retira frontend base |
++| base+prod+ssalfer |Dos frontends declarados; requiere servicios explícitos y aprobación del perfil/administración |
++| Dockerfile backend usado solo |CMD aún tiene reload; Compose base lo reemplaza por comando seguro de SS-04/10. No se cambia ese contrato previo en SS-09 |
++| Composes QA |Destinos sintéticos/tareas de prueba, no manifiesto institucional; revisar identidad/red/binds y autorización antes de usarlos |
++
++No se ejecuta docker compose config: puede interpolar credenciales. Una futura comprobación de configuración deberá tener una salida selectiva protegida y sin secretos, preparada por operación, con aprobación. El reconocimiento textual del verificador no calcula el modelo combinado, aliases completos, interpolación, perfiles o estado del daemon.
++
++## GitHub: controles no observados y pipeline propuesto
++
++No hay workflows/Dependabot versionados en el árbol inspeccionado. **Eso no acredita ausencia de protecciones, rulesets o políticas efectivas de organización/GitHub.** No se consultó una sesión/API administrativa ni se accedió a secretos. El dato histórico protected:false no demuestra el estado actual; reglas alternativas podrían aplicar. No afirmar falta de acceso por la cuenta sin haberlo consultado: aquí el control queda no observado.
++
++Inspección futura autorizada: protección de dev y otras ramas de integración, rulesets y bypasses heredados, revisiones obligatorias/CODEOWNERS si procede, checks requeridos y permisos de merge, entornos con aprobación, políticas de acciones/runners, permisos reales de GITHUB_TOKEN, integraciones/secretos por alcance y evidencia de publicación/procedencia. No mostrar valores de secretos, sólo nombres/capacidades estrictamente necesarios bajo acceso autorizado.
++
++Propuesta de pipeline, no workflow activado:
++
++1. **Revisión de fuentes/manifiestos.** Verificador offline, integridad vendors y consistencia lock, análisis de cambios de Dockerfiles/migraciones/contextos. Base de ejecución fijada y datos sintéticos; sin token de publicación ni secretos de despliegue.
++2. **Pruebas aisladas.** Suites de seguridad locales y regresiones SS-01/02/03/04/06/08/10/11/12; las integradas sólo en QA desechable autorizada. No importar conftest institucional ni ejecutar código de PR no confiable con secretos.
++3. **Resolución y SCA autorizadas.** Bases de advisories con fecha/firma/origen; análisis local de requisitos/lock/vendors/OS/imagen final. Scanners y datos aprobados y fijados por versión/digest; no enviar código/datos/secretos a servicios externos. Documentar alcance, falsos positivos/excepciones y fecha; no igualar ausencia de resultados con seguridad.
++4. **Build de QA trazable.** Receta y fuentes aprobadas, dependencias/base/apt fijadas tras validar plataforma; SBOM y evidencia del build. Bloquear red adicional/credentials innecesarias según diseño, sin imponer cambios no probados a GDAL.
++5. **Verificación del artefacto.** Pruebas nativas y comparación de manifiesto/vendor assets dentro de la imagen; escaneo de imagen/ABI y QA HTTP/SS-08, credenciales sintéticas y privilegios SS-07 verificados por procedimiento independiente.
++6. **Revisión antes de publicar.** Entorno/gate humano que aprueba resultado, SBOM/procedencia y digest. Job separado con permisos mínimos de escritura/publicación/atestación sólo cuando se autorice; no compartir token con jobs que ejecutan código no confiable.
++7. **Promoción por digest.** Publicar únicamente tras aprobación y desplegar el mismo artefacto QA aprobado, sin reconstruir con tags mutables en el servidor. Despliegue requiere autorización separada, queda fuera de esta etapa.
++
++Usar permisos de lectura por defecto y elevar por job cuando haga falta; pin completo de acciones externas por SHA verificado y actualización revisada; no inventar esos SHA ni habilitar actions ahora. Proteger caches/artefactos contra contaminación y rutas de checkout de código no confiable. [Guía de uso seguro GitHub Actions](https://docs.github.com/en/actions/reference/security/secure-use). Dependabot puede proponerse para PR revisadas, no como actualización/merge/despliegue automático autorizado.
++
++## Evidencia de reconstrucción/SBOM requerida en QA
++
++| Artefacto/evidencia | Datos mínimos seguros |
++|---|---|
++| Fuente/receta |Commit aprobado más identidad del árbol/diff si aplica; hashes de manifiestos no secretos, Dockerfiles/contexto relevante, versión de receta y perfil elegido |
++| Python resuelto |Grafo Requires-Dist/markers/extras, tags de wheels/sdists, distribución/URL aprobada sin userinfo, hash verificado, build deps, METADATA instalado y toolchain |
++| Node/dist |Lock e instalación efectivos, Node/npm, flags, scripts y selección de plataforma; SBOM de build y bundles dist, no sólo package.json |
++| Vendors |Manifiesto local aprobado, bytes upstream comparados y transformaciones documentadas, licencias; hashes coincidentes dentro de imagen y recursos servidos |
++| Base/OS/nativos |Digest índice/plataforma, OS/paquetes repositorio, GDAL/GEOS/PROJ/libpq y librerías cargadas; no usar versiones del host auditor |
++| PostgreSQL/PostGIS |Digest/versión imagen y extensión real mediante QA autorizada y sin datos de negocio. No se conecta en esta fase ni se presume igualdad con tag |
++| SBOM |SPDX/CycloneDX u otro formato aprobado, herramienta/version fijadas, alcance explícito (OS/Python/Node/vendors), fecha y sujeto por digest. No publicar secretos/env/expedientes |
++| Procedencia |Identidad autorizada del builder, materiales, receta, plataforma y artefactos/digests, firma/atestación verificable con clave/identidad protegida. No crear o imprimir claves aquí |
++| SCA |Base de advisories/version/fecha y alcance, componentes coincidentes, justificación de impacto, excepciones y pruebas. No inventar CVEs por paquete obsoleto o ausencia de hash |
++| Aceptación nativa |Auth/cookies/RBAC, documentos SS-06/12, GIS formatos/CRS/Z/M y SS-03 presupuestos, proxy/cargas/caché/CSP SS-08, reportes SS-11, logging SS-10 y rollback de imagen/configuración |
++
++Las herramientas para SBOM/SCA o inspección de binarios sólo se instalan/ejecutan en esa fase si se aprueban. La verificación de datos nativos puede incluir versiones de GDAL/paquetes/librerías dentro de la imagen de QA; no ejecutar comandos contra el host institucional ni copiar sus secretos a un inventario. La conectividad requerida para paquetes/registries/advisories debe delimitarse por destinos y datos enviados; esta etapa no la habilita.
++
++## Criterios de aceptación
++
++- Perfiles/frontend y servicios elegidos con aprobación funcional; no inicio accidental de override dev, React o pgAdmin fuera del perfil.
++- Digests/plataforma y dependencias/hashes verificados, sin inventarlos ni activar hash mode incompleto.
++- Contexto Docker real excluye secretos/datos/QA ajenos, preserva recursos necesarios y SS-08; capas finales inspeccionadas y procedimiento de pruebas no degradado.
++- SBOM y SCA de artefactos realmente construidos/instalados, evidencia nativa GIS/HTTP/DB QA autorizada y riesgos documentados.
++- Controles GitHub efectivos acreditados, workflow revisado con permisos mínimos y publicación separada aprobada.
++- Atestación/procedencia y digest de promoción verificables; no declarar preparado para despliegue a partir de exit0 del verificador offline.
++
++**No se implementa pipeline, pinning, actualización de dependencias, cambio de roles/SS-05/SS-07, publicación o despliegue en esta entrega.**

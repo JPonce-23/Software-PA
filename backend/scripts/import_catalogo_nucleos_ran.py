@@ -12,6 +12,7 @@ import sys
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
+from uuid import uuid4
 
 import psycopg2
 from psycopg2 import sql
@@ -222,8 +223,8 @@ def audit_crosswalk(path: Path = DEFAULT_CROSSWALK_PATH) -> CrosswalkAudit:
                     reason=values["motivo"],
                     line_number=line_number,
                 )
-    except UnicodeError as exc:
-        audit.errors.append(f"No fue posible leer el crosswalk como UTF-8: {exc}")
+    except UnicodeError:
+        audit.errors.append("No fue posible leer el crosswalk como UTF-8 [RAN_DECODE_ERROR]")
     return audit
 
 
@@ -309,8 +310,8 @@ def audit_file(path: Path) -> FileAudit:
                         source_type=source_type,
                     )
                 )
-    except UnicodeError as exc:
-        audit.errors.append(f"No fue posible leer el archivo como {ENCODING}: {exc}")
+    except UnicodeError:
+        audit.errors.append(f"No fue posible leer el archivo como {ENCODING} [RAN_DECODE_ERROR]")
         return audit
 
     duplicates = sorted(key for key, count in seen.items() if count > 1)
@@ -757,13 +758,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         audit = audit_file(args.csv_path)
         crosswalk = audit_crosswalk(args.crosswalk_path)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError):
         if args.report_json:
             print_json_report(FileAudit(args.csv_path, ""), CrosswalkAudit(args.crosswalk_path),
                               None, None, "apply" if args.apply else "dry-run", False,
                               ["No se pudieron leer los artefactos"])
         else:
-            print(f"ERROR: {exc}", file=sys.stderr)
+            print(f"ERROR [RAN_IMPORT_INPUT_ERROR] correlacion={uuid4().hex}", file=sys.stderr)
         return 1
 
     connection = None
@@ -818,14 +819,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"actualizados: {updated}")
             print("Resultado: APPLY confirmado")
         return 0
-    except Exception as exc:
+    except Exception:
         if connection is not None:
             connection.rollback()
         if args.report_json:
             # No incluir DSN/credenciales en un reporte de error de conexión.
-            report_json(False, [f"Importación abortada: {type(exc).__name__}"])
+            report_json(False, ["Importación abortada [RAN_IMPORT_FAILED]"])
         else:
-            print(f"ERROR: {exc}", file=sys.stderr)
+            print(f"ERROR [RAN_IMPORT_FAILED] correlacion={uuid4().hex}", file=sys.stderr)
             print("Resultado: ABORTADO; transacción revertida")
         return 1
     finally:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unicodedata
+from contextlib import closing
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
@@ -263,66 +264,68 @@ async def stage(db, project_id, source, source_date, upload, user, *, target, ma
             administrative_context = current_context(db,record,universe=universe,nuclei=nucleus_universe)
             register_context(cycle,administrative_context)
         by_layer={l.name:l for l in dataset.layers}
-        for index,(layer_name,item) in enumerate(iter_features(dataset_path,dataset,preserve_source_geometry=True)):
-            layer=by_layer[layer_name]; raw=item.get('properties') or {}; geometry=item.get('geometry')
-            source_fid=raw.pop('__pa_source_fid',item.get('id'))
-            source_wkb=raw.pop('__pa_source_wkb',None)
-            source_is_valid=None
-            original_geometry=None
-            dimension='XY'
-            if source_wkb:
-                inspected=db.execute(text("""WITH source AS (SELECT ST_GeomFromWKB(:g,:s) AS geom)
+        with closing(iter_features(dataset_path,dataset,preserve_source_geometry=True)) as features:
+            for index,(layer_name,item) in enumerate(features):
+                layer=by_layer[layer_name]; raw=item.get('properties') or {}; geometry=item.get('geometry')
+                source_fid=raw.pop('__pa_source_fid',item.get('id'))
+                source_wkb=raw.pop('__pa_source_wkb',None)
+                source_is_valid=None
+                original_geometry=None
+                dimension='XY'
+                if source_wkb:
+                    inspected=db.execute(text("""WITH source AS (SELECT ST_GeomFromWKB(:g,:s) AS geom)
                     SELECT ST_Zmflag(geom) AS flags,ST_AsEWKB(geom) AS ewkb,
                            ST_IsValid(ST_Force2D(geom)) AS valid FROM source"""),
-                    {'g':bytes.fromhex(source_wkb),'s':layer.srid or 0}).mappings().one()
-                original_geometry=WKBElement(bytes(inspected['ewkb']),extended=True)
-                source_is_valid=inspected['valid']
-                dimension={0:'XY',1:'XYM',2:'XYZ',3:'XYZM'}[inspected['flags']]
-            elif geometry:
-                # GeoJSON input has no M representation.
-                def coordinates_have_z(coords):
-                    return bool(coords and (len(coords)>2 if isinstance(coords[0],(float,int)) else any(coordinates_have_z(c) for c in coords)))
-                dimension='XYZ' if coordinates_have_z(geometry.get('coordinates',[])) else 'XY'
-            wkt,errors,warnings,transformations=legacy._normalize_ddv_geometry(db,geometry,source_is_valid=source_is_valid)
-            if dimension!='XY':
-                transformations.append({'codigo':'DIMENSION_A_2D','origen':dimension,'destino':'XY'})
-            if not layer.is_wgs84:
-                transformations.insert(0,{'codigo':'CRS_REPROYECTADO','origen':layer.crs,'destino':'EPSG:4326'})
-            working_geom=None
-            if wkt:
-                if srid != 4326 and srid == layer.srid and source_is_valid:
-                    # Preserve native coordinates when source already uses the
-                    # project's CRS. No 4326 -> source round-trip is necessary.
-                    working_wkt=db.execute(text('SELECT ST_AsText(ST_Multi(ST_Force2D(ST_GeomFromEWKB(:g))),17)'),
-                        {'g':bytes(inspected['ewkb'])}).scalar_one()
-                    transformations.append({'codigo':'CRS_TRABAJO_SIN_REPROYECCION','crs':layer.crs})
-                else:
-                    working_wkt=db.execute(text('SELECT ST_AsText(ST_Transform(ST_GeomFromText(:g,4326),:s),17)'),{'g':wkt,'s':srid}).scalar_one()
-                    if srid!=4326: transformations.append({'codigo':'CRS_TRABAJO','origen':'EPSG:4326','destino':f'EPSG:{srid}'})
-                work_validation=db.execute(text('SELECT ST_IsValid(g),ST_IsEmpty(g),ST_IsValidReason(g) FROM (SELECT ST_GeomFromText(:g,:s) g) q'),{'g':working_wkt,'s':srid}).one()
-                if work_validation[0] and not work_validation[1]:
-                    working_geom=WKTElement(working_wkt,srid=srid)
-                else:
-                    errors.append({'codigo':'CRS_TRABAJO_ALTERO_TOPOLOGIA','razon':work_validation[2]})
-            attrs=sanitize_attributes(raw)
-            feature=models.ImportacionFeature(id_importacion=record.id_importacion,indice_feature=index,capa_origen=layer_name,
-                id_externo=str(source_fid) if source_fid is not None else None,tipo_geometria=(geometry or {}).get('type'),
-                atributos_originales=attrs,atributos_normalizados={},geometria_original=original_geometry,
-                geometria_normalizada=WKTElement(wkt,srid=4326) if wkt else None,geometria_trabajo=working_geom,
-                crs_fuente=layer.crs,dimension_fuente=dimension,
-                estado='error' if errors else 'advertencia' if warnings else 'valido',errores=errors,advertencias=warnings,transformaciones=transformations)
-            db.add(feature); db.flush()
-            if target in RECONCILIATION_TARGETS:
-                direct_id=None
-                if mapping.get('id_destino'):
-                    try: direct_id=int(raw[mapping['id_destino']])
-                    except (ValueError,TypeError,KeyError): direct_id=-1
-                if direct_id is not None: feature.atributos_normalizados={'id_destino':direct_id}
-                build_candidates(db,record,feature,attrs,universe,user,direct_id=direct_id,cycle=cycle,nucleus_universe=nucleus_universe)
+                        {'g':bytes.fromhex(source_wkb),'s':layer.srid or 0}).mappings().one()
+                    original_geometry=WKBElement(bytes(inspected['ewkb']),extended=True)
+                    source_is_valid=inspected['valid']
+                    dimension={0:'XY',1:'XYM',2:'XYZ',3:'XYZM'}[inspected['flags']]
+                elif geometry:
+                    # GeoJSON input has no M representation.
+                    def coordinates_have_z(coords):
+                        return bool(coords and (len(coords)>2 if isinstance(coords[0],(float,int)) else any(coordinates_have_z(c) for c in coords)))
+                    dimension='XYZ' if coordinates_have_z(geometry.get('coordinates',[])) else 'XY'
+                wkt,errors,warnings,transformations=legacy._normalize_ddv_geometry(db,geometry,source_is_valid=source_is_valid)
+                if dimension!='XY':
+                    transformations.append({'codigo':'DIMENSION_A_2D','origen':dimension,'destino':'XY'})
+                if not layer.is_wgs84:
+                    transformations.insert(0,{'codigo':'CRS_REPROYECTADO','origen':layer.crs,'destino':'EPSG:4326'})
+                working_geom=None
+                if wkt:
+                    if srid != 4326 and srid == layer.srid and source_is_valid:
+                        # Preserve native coordinates when source already uses the
+                        # project's CRS. No 4326 -> source round-trip is necessary.
+                        working_wkt=db.execute(text('SELECT ST_AsText(ST_Multi(ST_Force2D(ST_GeomFromEWKB(:g))),17)'),
+                            {'g':bytes(inspected['ewkb'])}).scalar_one()
+                        transformations.append({'codigo':'CRS_TRABAJO_SIN_REPROYECCION','crs':layer.crs})
+                    else:
+                        working_wkt=db.execute(text('SELECT ST_AsText(ST_Transform(ST_GeomFromText(:g,4326),:s),17)'),{'g':wkt,'s':srid}).scalar_one()
+                        if srid!=4326: transformations.append({'codigo':'CRS_TRABAJO','origen':'EPSG:4326','destino':f'EPSG:{srid}'})
+                    work_validation=db.execute(text('SELECT ST_IsValid(g),ST_IsEmpty(g),ST_IsValidReason(g) FROM (SELECT ST_GeomFromText(:g,:s) g) q'),{'g':working_wkt,'s':srid}).one()
+                    if work_validation[0] and not work_validation[1]:
+                        working_geom=WKTElement(working_wkt,srid=srid)
+                    else:
+                        errors.append({'codigo':'CRS_TRABAJO_ALTERO_TOPOLOGIA','razon':work_validation[2]})
+                attrs=sanitize_attributes(raw)
+                feature=models.ImportacionFeature(id_importacion=record.id_importacion,indice_feature=index,capa_origen=layer_name,
+                    id_externo=str(source_fid) if source_fid is not None else None,tipo_geometria=(geometry or {}).get('type'),
+                    atributos_originales=attrs,atributos_normalizados={},geometria_original=original_geometry,
+                    geometria_normalizada=WKTElement(wkt,srid=4326) if wkt else None,geometria_trabajo=working_geom,
+                    crs_fuente=layer.crs,dimension_fuente=dimension,
+                    estado='error' if errors else 'advertencia' if warnings else 'valido',errores=errors,advertencias=warnings,transformaciones=transformations)
+                db.add(feature); db.flush()
+                if target in RECONCILIATION_TARGETS:
+                    direct_id=None
+                    if mapping.get('id_destino'):
+                        try: direct_id=int(raw[mapping['id_destino']])
+                        except (ValueError,TypeError,KeyError): direct_id=-1
+                    if direct_id is not None: feature.atributos_normalizados={'id_destino':direct_id}
+                    build_candidates(db,record,feature,attrs,universe,user,direct_id=direct_id,cycle=cycle,nucleus_universe=nucleus_universe)
         counts=dict(db.query(models.ImportacionFeature.estado,func.count()).filter_by(id_importacion=record.id_importacion).group_by(models.ImportacionFeature.estado).all())
         record.validos=counts.get('valido',0); record.advertencias=counts.get('advertencia',0); record.errores=counts.get('error',0)
         record.features_procesados=sum(counts.values())
-        if record.features_procesados!=dataset.total_features: raise IngestionError('CONTEO_FEATURES_INCONSISTENTE','Conteo inconsistente')
+        if dataset.counts_known and record.features_procesados!=dataset.total_features: raise IngestionError('CONTEO_FEATURES_INCONSISTENTE','Conteo inconsistente')
+        record.total_features=record.features_procesados
         record.estado='previsualizado'; record.fecha_procesamiento_fin=datetime.now(timezone.utc)
         record.reporte={'capas':[l.name for l in dataset.layers],'procesados':record.features_procesados,
             'validos':record.validos,'advertencias':record.advertencias,'errores':record.errores,

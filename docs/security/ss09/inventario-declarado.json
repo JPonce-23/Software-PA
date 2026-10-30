@@ -1,0 +1,823 @@
+{
+  "assessment": "incomplete_requires_qa",
+  "contexts": {
+    "backend": {
+      "build_reconstruction": "pending_native_docker",
+      "global_copy": true,
+      "missing_required_ignore_patterns": 0,
+      "required_resources_excluded": [],
+      "root": "./backend",
+      "scan_is_not_secret_scanner": true,
+      "test_sources_excluded": true
+    },
+    "react_dockerignore_env_patterns": null,
+    "react_source_status": "absent_retired",
+    "react_uses_npm_ci": null,
+    "ssalfer_ignore_file_present": true,
+    "ssalfer_selective_copy": true
+  },
+  "deployment": {
+    "additional_ssalfer_services": [
+      "frontend_ssalfer"
+    ],
+    "base_services": [
+      "backend",
+      "db",
+      "pgadmin"
+    ],
+    "combinations": [
+      {
+        "files": [
+          "docker-compose.yml",
+          "docker-compose.override.yml"
+        ],
+        "profile": "implicit_base_override",
+        "review": "development_not_production"
+      },
+      {
+        "files": [
+          "docker-compose.yml",
+          "docker-compose.prod.yml"
+        ],
+        "profile": "base_prod",
+        "review": "ssalfer_overlay_required"
+      },
+      {
+        "files": [
+          "docker-compose.yml",
+          "docker-compose.ssalfer.yml"
+        ],
+        "profile": "base_ssalfer",
+        "review": "production_settings_not_guaranteed"
+      },
+      {
+        "files": [
+          "docker-compose.yml",
+          "docker-compose.prod.yml",
+          "docker-compose.ssalfer.yml"
+        ],
+        "profile": "base_prod_ssalfer",
+        "review": "ssalfer_official_explicit_services_and_qa_required"
+      }
+    ],
+    "compose_parser": "reviewed_literal_subset_not_compose_resolution",
+    "development_reload": true,
+    "explicit_cors_required_in_prod": true,
+    "frontend_selection": "ssalfer_official",
+    "legacy_service_declared": false,
+    "production_mode_literal": true,
+    "secure_cookie_literal_in_prod": true,
+    "ssalfer_service_declared": true,
+    "uvicorn_no_access_log_in_base": true,
+    "uvicorn_no_proxy_headers_in_base": true
+  },
+  "github": {
+    "dependabot_file_present": false,
+    "effective_branch_protection": "not_observed",
+    "local_workflow_count": 0,
+    "rulesets": "not_observed",
+    "secrets": "not_accessed"
+  },
+  "images": [
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "python:3.11-slim",
+      "review": "digest_pending",
+      "source": "backend/Dockerfile"
+    },
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "nginx:1.27-alpine",
+      "review": "digest_pending",
+      "source": "frontend-ssalfer/deploy/Dockerfile"
+    },
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "postgis/postgis:15-3.3",
+      "review": "digest_pending",
+      "source": "docker-compose.yml"
+    },
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "dpage/pgadmin4",
+      "review": "digest_pending",
+      "source": "docker-compose.yml"
+    },
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "software-pa-backend",
+      "review": "digest_pending",
+      "source": "docker-compose.yml"
+    },
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "postgis/postgis:15-3.3",
+      "review": "digest_pending",
+      "source": "backend/tests/convenio_report_compose.yml"
+    },
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "software-pa-backend",
+      "review": "digest_pending",
+      "source": "backend/tests/convenio_report_compose.yml"
+    },
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "postgis/postgis:15-3.3",
+      "review": "digest_pending",
+      "source": "backend/tests/lineage_compose.yml"
+    },
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "software-pa-backend",
+      "review": "digest_pending",
+      "source": "backend/tests/lineage_compose.yml"
+    }
+  ],
+  "issues": [
+    "CVE_SCA_NOT_PERFORMED",
+    "DOCKERFILE_DEFAULT_RELOAD_DECLARED",
+    "GITHUB_EFFECTIVE_POLICIES_UNOBSERVED",
+    "INSTITUTIONAL_PROFILE_PENDING_APPROVAL",
+    "MUTABLE_IMAGE_REFERENCES",
+    "NATIVE_AND_INSTALLED_ARTIFACTS_UNOBSERVED",
+    "NO_LOCAL_WORKFLOW_CONFIGURATION",
+    "PYTHON_DISTRIBUTION_HASHES_UNVERIFIED",
+    "PYTHON_GRAPH_UNVERIFIED"
+  ],
+  "local_integrity_ok": true,
+  "native": {
+    "apt_declared_packages": [
+      "gdal-bin",
+      "libpq-dev",
+      "gcc"
+    ],
+    "apt_versions": null,
+    "build_tools_in_backend_runtime": true,
+    "gdal_geos_proj_libpq_versions": null,
+    "postgresql_postgis_installed_versions": null
+  },
+  "node": {
+    "direct": [],
+    "functional_qa_required_for_ssalfer": false,
+    "installed_tree": "not_observed",
+    "locked": [],
+    "role": "legacy_not_official_frontend",
+    "source_status": "absent_retired"
+  },
+  "python": [
+    {
+      "app_import_observed": false,
+      "declared_version": "25.1.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "aiofiles",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "0.0.4",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "annotated-doc",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "0.7.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "annotated-types",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "4.14.1",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "anyio",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "5.0.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "bcrypt",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "2026.6.17",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "certifi",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "2.0.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "cffi",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "8.4.2",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "click",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "49.0.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "cryptography",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "0.19.2",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "ecdsa",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "2.0.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "et-xmlfile",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "0.138.2",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "fastapi",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "0.20.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "geoalchemy2",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "3.5.3",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "greenlet",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "0.16.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "h11",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "1.0.9",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "httpcore",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "0.28.1",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "httpx",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "3.18",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "idna",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "2.3.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "iniconfig",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "2.4.6",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "numpy",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "3.1.5",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "openpyxl",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "26.2",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "packaging",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "3.0.3",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pandas",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "1.7.4",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "passlib",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "13.0.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pillow",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "1.6.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pluggy",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "2.9.12",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "psycopg2-binary",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "0.6.3",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pyasn1",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "3.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pycparser",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "2.13.4",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pydantic",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "2.46.4",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pydantic-core",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "2.20.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pygments",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "6.21.4",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pypdf",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "9.1.1",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "pytest",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "2.9.0.post0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "python-dateutil",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "1.2.2",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "python-dotenv",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "0.0.32",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "python-multipart",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "4.9.1",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "rsa",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "1.17.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "six",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "2.0.51",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "sqlalchemy",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": true,
+      "declared_version": "1.3.1",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "starlette",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "4.15.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "typing-extensions",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "0.4.2",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "typing-inspection",
+      "vulnerability_review": "pending"
+    },
+    {
+      "app_import_observed": false,
+      "declared_version": "0.49.0",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "uvicorn",
+      "vulnerability_review": "pending"
+    }
+  ],
+  "qa_python": [
+    {
+      "declared_version": "4.10.3",
+      "dependency_topology": "flat_unverified",
+      "distribution_hash": null,
+      "installed_version": null,
+      "name": "jsonschema",
+      "vulnerability_review": "pending"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "local_declarations_not_installed_sbom_or_deployment",
+  "vendors": {
+    "baseline_is_authenticity_proof": false,
+    "files": [
+      {
+        "declared_version": "4.4.0",
+        "family": "exceljs",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/EXCELJS-LICENSE.txt",
+        "sha256": "2ed526b7e7c7681dc2347995b5036ddf73dc27d0539cdea59b6d4a72b63a57a0",
+        "size": 1084,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.4.1",
+        "family": "html2canvas",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/HTML2CANVAS-LICENSE.txt",
+        "sha256": "86200ce4e92d9a22c41c8647a55f7a5fddff304ff89b4d36ecc699ed8c123d2c",
+        "size": 1061,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": null,
+        "family": "vendor-documentation",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/README.md",
+        "sha256": "83bdd4ab077b4c4fc4bc821a87513088f88d7cd5b2ca669b2e8d2ba50d25a879",
+        "size": 1270,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "0.20.3",
+        "family": "sheetjs",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/SheetJS-LICENSE.txt",
+        "sha256": "4d2a38ac35cda06a555c84074a819d413339cd3691b822cae50f8f322fe01f64",
+        "size": 11355,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "0.20.3",
+        "family": "sheetjs",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/SheetJS-README.md",
+        "sha256": "22e910300bc86e3517e6d6b6b1fe4e12dba3d4a72fe03141d18f927cc83c0d58",
+        "size": 498,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.13.1",
+        "family": "bootstrap-icons",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/LICENSE.txt",
+        "sha256": "0fb3e11bd57e896c5a512afd64864d28a37de45d19835016c87ca1ad19ead969",
+        "size": 1093,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.13.1",
+        "family": "bootstrap-icons",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+        "sha256": "004322721c8557331759bc6ddaacbb689b0f0715d688aec82bd056d2d5b5cc3b",
+        "size": 99556,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": true,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.13.1",
+        "family": "bootstrap-icons",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff",
+        "sha256": "f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15",
+        "size": 180288,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.13.1",
+        "family": "bootstrap-icons",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff2",
+        "sha256": "6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61",
+        "size": 134044,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "4.4.0",
+        "family": "exceljs",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js",
+        "sha256": "7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9",
+        "size": 947702,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": false,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.4.1",
+        "family": "html2canvas",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/html2canvas-1.4.1.min.js",
+        "sha256": "e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb",
+        "size": 198689,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": true,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.9.4",
+        "family": "leaflet",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/LICENSE.txt",
+        "sha256": "bbc959aaef7488b38942e7f05cfd1244351f8bce54261951ea17dd7cf60f894b",
+        "size": 1369,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.9.4",
+        "family": "leaflet",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/layers-2x.png",
+        "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf",
+        "size": 1259,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.9.4",
+        "family": "leaflet",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/layers.png",
+        "sha256": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6",
+        "size": 696,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.9.4",
+        "family": "leaflet",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-icon-2x.png",
+        "sha256": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528",
+        "size": 2464,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.9.4",
+        "family": "leaflet",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-icon.png",
+        "sha256": "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437",
+        "size": 1466,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.9.4",
+        "family": "leaflet",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-shadow.png",
+        "sha256": "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da",
+        "size": 618,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": null,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.9.4",
+        "family": "leaflet",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.css",
+        "sha256": "337bfca5cabd03b39815b2700febe2b3b7edf55921c59cd49f88ecb328212303",
+        "size": 14145,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": false,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "1.9.4",
+        "family": "leaflet",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.js",
+        "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a",
+        "size": 147552,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": true,
+        "vulnerability_review": "pending"
+      },
+      {
+        "declared_version": "0.20.3",
+        "family": "sheetjs",
+        "matches_local_baseline": true,
+        "path": "frontend-ssalfer/js/vendor/xlsx-0.20.3.mini.min.js",
+        "sha256": "0cb353f830d7288385492c83d277b058ddeac664ca51cf1393aa1fd3e2b70939",
+        "size": 279523,
+        "upstream_authenticity": "not_verified",
+        "version_literal_present": true,
+        "vulnerability_review": "pending"
+      }
+    ],
+    "missing_count": 0,
+    "unmanifested_count": 0
+  }
+}

@@ -468,7 +468,8 @@ def test_target_activity_existing_link_and_versions(api, target_domain, activity
     assert any(row["id_documento"] == doc["id_documento"] for row in
                api("GET", f"/api/documentos/objetivos/actividad_campo/{activity_id}").json())
     api("POST", path, expected=409)
-    content = b"%PDF-1.4\nContrato B-04\n%%EOF\n"
+    from tests._document_samples import minimal_pdf
+    content = minimal_pdf("Contrato B-04")
     version = api("POST", f"/api/documentos/{doc['id_documento']}/versiones", expected=201,
                   files={"archivo": ("actividad.pdf", content, "application/pdf")}).json()
     api("POST", f"/api/documentos/{doc['id_documento']}/versiones", expected=409,
