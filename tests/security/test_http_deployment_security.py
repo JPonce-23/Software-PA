@@ -246,8 +246,10 @@ class HttpDeploymentTests(unittest.TestCase):
         self.assertEqual(record,dict(component='ssalfer_proxy',request_id='a'*32,status=403,bytes=29,duration=0.012))
         self.assertEqual(values(self.server,'access_log'),[['/var/log/nginx/access.log','ssalfer_safe']])
 
-    def test_upload_limits_are_not_silently_raised_for_login_or_claimed_fixed(self):
-        self.assertNotIn('client_max_body_size',self.text)
+    def test_upload_limits_are_scoped_to_document_and_gis_routes(self):
+        self.assertEqual(values(self.server,'client_max_body_size'),[['1m']])
+        self.assertIn('client_max_body_size 26m;',self.text)
+        self.assertIn('client_max_body_size 101m;',self.text)
         self.assertFalse(values(self.api,'proxy_read_timeout'))
         environment=self.compose['docker-compose.yml']['services']['backend']['environment']
         self.assertEqual(environment['MAX_UPLOAD_BYTES'],'${MAX_UPLOAD_BYTES:-26214400}')
