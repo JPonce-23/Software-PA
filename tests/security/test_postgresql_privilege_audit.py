@@ -12,6 +12,12 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[2]
 ASSETS=ROOT/'docs/security/ss07'
+# Preserve the published 001-030 evidence. Verify the immutable SS-12 expansion
+# separately, without rewriting historical reports or omitting current sources.
+SS12_EXPANSION = {
+    'file': 'backend/db/migrations/031_operaciones_documentales.sql',
+    'sha256': 'ca02cb3c6298e2fe5cef9ff80800414c56ce1684a0fe27c5c9fb12d1ec149d35',
+}
 spec=importlib.util.spec_from_file_location('ss07_offline',ASSETS/'preparar_verificador.py')
 audit=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit)
@@ -164,11 +170,13 @@ class PrivilegeAuditTests(unittest.TestCase):
 
     def test_migration_manifest_matches_all_current_sources(self):
         inventory=json.loads((ASSETS/'inventario-estatico.json').read_text())
-        expected={m['file'] for m in inventory['migrations']}
+        migrations=[*inventory['migrations'], SS12_EXPANSION]
+        expected={m['file'] for m in migrations}
         actual={str(p.relative_to(ROOT)) for p in (ROOT/'backend/db/migrations').glob('[0-9][0-9][0-9]_*.sql') if p.is_file()}
         self.assertEqual(expected,actual)
-        self.assertEqual(len(expected),30)
-        for migration in inventory['migrations']:
+        self.assertEqual(len(inventory['migrations']),30)
+        self.assertEqual(len(expected),31)
+        for migration in migrations:
             self.assertEqual(hashlib.sha256((ROOT/migration['file']).read_bytes()).hexdigest(),migration['sha256'])
 
     def test_all_declared_models_and_object_kinds_are_inventoried(self):
@@ -179,12 +187,46 @@ class PrivilegeAuditTests(unittest.TestCase):
             if isinstance(cls,ast.ClassDef):
                 for item in cls.body:
                     if isinstance(item,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='__tablename__' for t in item.targets):model_tables.add(ast.literal_eval(item.value))
-        self.assertEqual(model_tables,{m['relation'] for m in inventory['models']})
-        names={o['name'] for o in inventory['objects']}
+        self.assertEqual(model_tables,{m['relation'] for m in inventory['models']} | {'documento_operacion'})
+        names={o['name'] for o in inventory['objects']} | {'documento_operacion', 'fn_documento_operacion_integridad'}
         self.assertLessEqual(model_tables,names)
         self.assertEqual({o['kind'] for o in inventory['objects']},{'TABLE','VIEW','FUNCTION','SEQUENCE'})
         self.assertIn('fn_audit_log',names)
         self.assertIn('schema_migrations',names)
+
+    @unittest.skipUnless(importlib.util.find_spec('pglast'), 'Parser PostgreSQL no instalado; gramática 031 pendiente QA')
+    def test_ss12_expansion_declares_model_objects_and_restricted_runtime_acl(self):
+        from pglast import ast as pg, enums, parse_sql
+        statements=[item.stmt for item in parse_sql((ROOT/SS12_EXPANSION['file']).read_text())]
+        tables=[item for item in statements if isinstance(item,pg.CreateStmt)]
+        self.assertEqual([item.relation.relname for item in tables],['documento_operacion'])
+        model=next(item for item in ast.parse((ROOT/'backend/app/models.py').read_text()).body
+                   if isinstance(item,ast.ClassDef) and item.name=='DocumentoOperacion')
+        columns={item.targets[0].id for item in model.body if isinstance(item,ast.Assign)
+                 and isinstance(item.value,ast.Call) and isinstance(item.value.func,ast.Name)
+                 and item.value.func.id=='Column'}
+        self.assertEqual(columns,{item.colname for item in tables[0].tableElts if isinstance(item,pg.ColumnDef)})
+        self.assertEqual({item.funcname[-1].sval for item in statements if isinstance(item,pg.CreateFunctionStmt)},
+                         {'fn_documento_operacion_integridad'})
+        self.assertEqual({item.trigname for item in statements if isinstance(item,pg.CreateTrigStmt)},
+                         {'trg_documento_operacion_integridad','trg_documento_operacion_no_delete'})
+        self.assertEqual({item.idxname for item in statements if isinstance(item,pg.IndexStmt)},
+                         {'idx_documento_operacion_pendiente','idx_documento_operacion_documento'})
+        acl=[item for item in statements if isinstance(item,pg.GrantStmt)]
+        self.assertEqual(len(acl),3)
+        for item in acl:
+            self.assertEqual([obj.relname for obj in item.objects],['documento_operacion'])
+        grants=[item for item in acl if item.is_grant]
+        self.assertEqual(len(grants),1)
+        self.assertEqual([role.rolename for role in grants[0].grantees],['software_pa_app'])
+        self.assertEqual({priv.priv_name for priv in grants[0].privileges},{'select','insert','update'})
+        public_revoke=[item for item in acl if not item.is_grant and item.privileges is None]
+        self.assertEqual(len(public_revoke),1)
+        self.assertEqual([role.roletype for role in public_revoke[0].grantees],[enums.RoleSpecType.ROLESPEC_PUBLIC])
+        runtime_revoke=[item for item in acl if not item.is_grant and item.privileges is not None]
+        self.assertEqual(len(runtime_revoke),1)
+        self.assertEqual([role.rolename for role in runtime_revoke[0].grantees],['software_pa_app'])
+        self.assertEqual({priv.priv_name for priv in runtime_revoke[0].privileges},{'delete','truncate'})
 
     def test_safe_example_cannot_enable_qa(self):
         data=json.loads((ASSETS/'config-ejemplo.json').read_text())
