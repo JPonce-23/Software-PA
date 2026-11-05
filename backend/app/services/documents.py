@@ -20,6 +20,7 @@ from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_c
 from .document_validation import DocumentValidationError, validate_document
 from .document_storage import DocumentStorageError, stage_document, storage_event
 from . import document_operations as operations
+from .document_operations import authorization_fence
 from .document_errors import (document_error, error_code, DOCUMENT_DUPLICATE,
     DOCUMENT_RECONCILIATION_REQUIRED, DOCUMENT_OPERATION_PENDING,
     DOCUMENT_INTEGRITY_CONFLICT, DOCUMENT_REQUEST_CONFLICT)
@@ -217,6 +218,7 @@ def _confirm_version(sessions, document_id, actor_id, staged, values, ticket):
             ).with_for_update(of=models.Documento)).scalar_one_or_none()
             if parent is None:
                 raise HTTPException(status_code=404, detail="Documento no encontrado")
+            authorization_fence(db)
             actor = _upload_actor(db, actor_id)
             # Fresh Session, after the lock: recheck active document, links,
             # project scope and current role. Keep existing estado semantics.
@@ -330,7 +332,8 @@ def _store_version_worker(db, document_id, upload, actor_id, request_key, client
         root = upload_root()
         with stage_document(root, document_id, content, digest, operation_id=ticket.id) as staged:
             checkpoint_uncertain = True
-            operations.staged(sessions, ticket, staged.file_identity, authorize)
+            operations.staged(sessions, ticket, staged.file_identity, authorize,
+                coordination_identity=staged.coordination.identity)
             checkpoint_uncertain = False
             # _confirm_version owns failure recording after the parent lock.
             confirmation_started = True

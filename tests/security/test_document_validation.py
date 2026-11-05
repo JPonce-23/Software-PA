@@ -256,7 +256,7 @@ def service_functions():
         models=SimpleNamespace(DocumentoVersion=Version, Documento=SimpleNamespace(id_documento=MagicMock())), require_document_access=MagicMock(),
         set_audit_context=MagicMock(), HTTPException=HTTPError,
         DocumentStorageError=storage.DocumentStorageError, stage_document=storage.stage_document,
-        storage_event=MagicMock(),
+        storage_event=MagicMock(), authorization_fence=MagicMock(),
         DocumentValidationError=validator.DocumentValidationError, validate_document=validator.validate_document)
     ns.update({name: value for name, value in locals().items()
         if name in {'document_error', 'error_code', 'DOCUMENT_DUPLICATE', 'DOCUMENT_RECONCILIATION_REQUIRED',

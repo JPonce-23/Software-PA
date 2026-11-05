@@ -56,7 +56,8 @@ def _open_root(root):
     try:
         for part in root.parts[1:]:
             child = os.open(part, _directory_flags(), dir_fd=fd)
-            os.close(fd); fd = child
+            parent, fd = fd, child
+            os.close(parent)
         return fd
     except BaseException:
         os.close(fd)
@@ -77,9 +78,18 @@ class StagedDocument:
         self.stage_identity = self.file_identity = None
         self.created_stage = False
         self.published_name = None
+        self.coordination = None
+        self.coordinated = operation_id is not None
 
     def __enter__(self):
         try:
+            if self.coordinated:
+                from .document_coordination import WriterLease, CoordinationError
+                try:
+                    self.coordination = WriterLease(self.root, int(self.document_name),
+                        uuid.UUID(hex=self.operation_id), create=True).__enter__()
+                except CoordinationError as exc:
+                    raise DocumentStorageError(exc.code, status=425 if exc.code=='ACTIVE_WRITER' else 409) from None
             self.root_fd = _open_root(self.root)
             if os.fstat(self.root_fd).st_mode & stat.S_IWOTH:
                 raise DocumentStorageError('DOCUMENT_STORAGE_PUBLIC_ROOT')
@@ -133,13 +143,18 @@ class StagedDocument:
             raise
 
     def publish(self, name):
+        from .document_coordination import CoordinationError
         try:
             self._publish(name)
+        except CoordinationError as exc:
+            raise DocumentStorageError(exc.code, status=409) from None
         except OSError as exc:
             storage_event(_io_code(exc), self.operation_id)
             raise DocumentStorageError('DOCUMENT_STORAGE_IO', status=507) from exc
 
     def _publish(self, name):
+        if self.coordination is not None:
+            self.coordination.check()
         if self.published_name is not None:
             raise DocumentStorageError('DOCUMENT_STORAGE_ALREADY_PUBLISHED')
         match = re.fullmatch(r'([0-9]{4,})-[0-9a-f]{32}\.(?:pdf|docx|xlsx|jpe?g|png)', name)
@@ -164,6 +179,15 @@ class StagedDocument:
             raise DocumentStorageError('DOCUMENT_STORAGE_PUBLISHED_CHANGED')
         os.fsync(self.document_fd)
         os.fsync(self.root_fd)  # Persist a newly created document directory too.
+        if self.coordination is not None:
+            # Retain the published inode, remove only our verified staging alias
+            # before SQL COMMIT. A crash after publish() returns leaves nlink=1.
+            source = os.stat('payload', dir_fd=self.stage_fd, follow_symlinks=False)
+            if _identity(source) != self.file_identity:
+                raise DocumentStorageError('DOCUMENT_STORAGE_SOURCE_CHANGED')
+            os.unlink('payload', dir_fd=self.stage_fd)
+            os.fsync(self.stage_fd)
+            self.coordination.check()
 
     def close(self):
         failure = self.created_stage and self.stage_identity is None
@@ -204,6 +228,10 @@ class StagedDocument:
                 setattr(self, attribute, None)
                 try: os.close(fd)
                 except OSError: failure = True
+        if self.coordination is not None:
+            coordination, self.coordination = self.coordination, None
+            try: coordination.close()
+            except OSError: failure = True
         if failure:
             storage_event('DOCUMENT_STAGING_CLEANUP_INCOMPLETE', self.operation_id)
 

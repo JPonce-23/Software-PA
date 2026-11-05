@@ -52,7 +52,7 @@ class MemoryJournal(JournalDouble):
                 id_documento_version=record.version.id_documento_version if record.version else None)
             db=MagicMock();db.get.return_value=record.version
             return operations._result(db,op,fp)
-    def stage(self,sessions,ticket,identity,authorize):
+    def stage(self,sessions,ticket,identity,authorize,**kwargs):
         self.records[(ticket.actor_id,ticket.document_id,ticket.key)].identity=identity
     def prepare_commit(self,db,ticket,version):self.candidate=(ticket,version)
     def commit(self):

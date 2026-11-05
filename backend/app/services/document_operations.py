@@ -16,6 +16,26 @@ from .document_errors import (document_error, REJECTED_CODES,
     DOCUMENT_OPERATION_PENDING, DOCUMENT_OPERATION_REJECTED)
 
 
+# Coarse, bounded authorization fence. SHARE conflicts with every INSERT/UPDATE/
+# DELETE, including revocation paths that do not know this recovery protocol.
+# NOWAIT avoids lock cycles with business writers; contention blocks recovery.
+# This exact set covers all model relations read by canonical access.py.
+AUTHORIZATION_TABLES = (
+    'actividad_campo', 'afectacion', 'afectacion_unidad_agraria', 'asamblea',
+    'asamblea_convocatoria', 'convenio', 'convenio_compareciente', 'documento',
+    'documento_vinculo', 'expediente_requisito', 'indemnizacion', 'nucleo_agrario',
+    'orv', 'orv_integrante', 'padron_historial', 'pago', 'parcela', 'parcela_titular',
+    'persona', 'proyecto', 'proyecto_nucleo', 'tramite_fifonafe',
+    'tramite_fifonafe_evento', 'tramite_fifonafe_interviniente', 'tramite_ran',
+    'tramite_ran_evento', 'unidad_agraria', 'unidad_agraria_titular', 'usuario',
+    'usuario_proyecto',
+)
+
+def authorization_fence(db):
+    # Constants only; fail immediately rather than wait in a business lock cycle.
+    db.execute(text('LOCK TABLE ' + ','.join('public.' + n for n in AUTHORIZATION_TABLES) + ' IN SHARE MODE NOWAIT'))
+
+
 @dataclass(frozen=True)
 class Ticket:
     id: uuid.UUID
@@ -144,9 +164,14 @@ def reserve(sessions, document_id, actor_id, request_key, metadata, authorize, *
     return Ticket(operation_id, request_key, document_id, actor_id, expected, path)
 
 
-def staged(sessions, ticket, identity, authorize):
+def staged(sessions, ticket, identity, authorize, *, coordination_identity=None):
+    if coordination_identity is None:
+        raise HTTPException(503, "La carga requiere coordinación verificable")
     with sessions() as db:
         _connection(db); authorize(db); set_audit_context(db, ticket.actor_id)
+        db.execute(text("INSERT INTO documento_coordinacion(id_operacion,protocolo,identidad) "
+                        "VALUES (:operation,1,CAST(:identity AS jsonb))"),
+            {"operation": ticket.id, "identity": json.dumps(coordination_identity)})
         count = db.execute(update(models.DocumentoOperacion).where(
             models.DocumentoOperacion.id_operacion == ticket.id,
             models.DocumentoOperacion.estado == "pendiente",
