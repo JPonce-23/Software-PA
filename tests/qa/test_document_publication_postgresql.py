@@ -119,7 +119,7 @@ class PostgreSQLContracts(unittest.TestCase):
     def test_actual_unique_constraints_exist_and_are_immediate(self):
         with self.engine.connect() as connection:
             rows = connection.execute(self.text("SELECT conname, condeferrable FROM pg_constraint WHERE conrelid='public.documento_version'::regclass AND contype='u'"))
-            constraints = dict(rows)
+            constraints = dict(rows.all())
         for name in ['uq_documento_version', 'uq_documento_hash', 'uq_documento_ruta']:
             self.assertIn(name, constraints); self.assertIs(constraints[name], False)
 
