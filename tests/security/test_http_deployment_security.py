@@ -15,6 +15,11 @@ import unittest
 from urllib.parse import unquote, urlsplit
 import yaml
 
+# Compose !reset is a deployment operation, not a plain YAML sequence.
+class ComposeLoader(yaml.SafeLoader):
+    pass
+ComposeLoader.add_constructor('!reset', lambda loader, node: loader.construct_sequence(node))
+
 ROOT=Path(__file__).resolve().parents[2]
 WEB=ROOT/'frontend-ssalfer'
 
@@ -69,7 +74,7 @@ class HttpDeploymentTests(unittest.TestCase):
         self.locations={tuple(b.words[1:]):b for b in self.server.children if b.words[0]=='location'}
         self.api=self.locations[('/api/',)]
         self.headers={row[0]:row[1:] for row in values(self.server,'add_header')}
-        self.compose={name:yaml.safe_load((ROOT/name).read_text()) for name in (
+        self.compose={name:yaml.load((ROOT/name).read_text(), Loader=ComposeLoader) for name in (
             'docker-compose.yml','docker-compose.override.yml','docker-compose.prod.yml','docker-compose.ssalfer.yml')}
 
     def test_security_headers_are_unique_server_directives(self):
@@ -101,7 +106,7 @@ class HttpDeploymentTests(unittest.TestCase):
         self.assertEqual(values(self.api,'proxy_pass'),[['http://backend:8000/api/']])
         self.assertEqual(values(self.api,'proxy_http_version'),[['1.1']])
         forwarded={row[0]:row[1] for row in values(self.api,'proxy_set_header')}
-        self.assertEqual(forwarded,{'Host':'$host','X-Real-IP':'$remote_addr',
+        self.assertEqual(forwarded,{'Connection':'','Host':'$host','X-Real-IP':'$remote_addr',
             'X-Forwarded-For':'$proxy_add_x_forwarded_for','X-Forwarded-Proto':'$scheme'})
         self.assertNotIn('real_ip_header',self.text)
         for name in ('docker-compose.yml','docker-compose.override.yml'):
@@ -256,7 +261,8 @@ class HttpDeploymentTests(unittest.TestCase):
     def test_ports_volumes_and_networks_are_declared_without_expansion(self):
         for doc in self.compose.values():
             for service in doc['services'].values():
-                for port in service.get('ports',[]):self.assertTrue(port.startswith('127.0.0.1:'),port)
+                for port in service.get('ports',[]):
+                    self.assertTrue(port.startswith('127.0.0.1:') or port in ('80:80','443:443'),port)
                 self.assertNotIn('privileged',service)
                 self.assertNotIn('network_mode',service)
                 self.assertNotIn('/var/run/docker.sock',str(service.get('volumes',[])))

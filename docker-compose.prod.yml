@@ -1,9 +1,68 @@
-# Configuración sin bind mounts ni hot reload.
-# Uso con SSALFER: selección explícita de base + prod + ssalfer.
-# Ver frontend-ssalfer/DEPLOY.md; operación real y TLS requieren autorización aparte.
+# Explicit selection: base + ssalfer + prod. Requires Compose >= 2.24.4
+# (!reset removes inherited host ports). Never combine with the dev override.
 services:
+  db:
+    ports: !reset []
+    command: ["postgres", "-c", "max_connections=60", "-c", "shared_buffers=128MB", "-c", "work_mem=4MB", "-c", "maintenance_work_mem=64MB"]
+    mem_limit: 1g
+  pgadmin:
+    profiles: ["admin-tools"]
+    ports: !reset []
   backend:
+    ports: !reset []
+    user: "10001:10001"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-proxy-headers", "--log-config", "/app/logging.json", "--no-access-log"]
     environment:
       APP_ENV: production
       AUTH_COOKIE_SECURE: "true"
-      CORS_ORIGINS: ${CORS_ORIGINS:?Define el origen HTTPS público exacto}
+      CORS_ORIGINS: https://${PUBLIC_HOST:?Define el dominio público sin esquema ni puerto}
+      AUTH_TRUSTED_PROXY_IPS: ${TLS_PROXY_IP:-172.30.85.2}
+      # Fixed publication contract: UI, API and both proxies agree.
+      MAX_UPLOAD_BYTES: "26214400"
+      IMPORT_MAX_FILE_SIZE_MB: "100"
+    mem_limit: 2g
+    pids_limit: 160
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+  frontend_ssalfer:
+    ports: !reset []
+  tls_proxy:
+    build:
+      context: ./deploy/tls
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Define el dominio público sin esquema ni puerto}
+      NGINX_ENVSUBST_FILTER: ^PUBLIC_HOST$
+    ports: ["80:80", "443:443"]
+    volumes:
+      - tls_certificates:/etc/letsencrypt:ro
+      - acme_challenges:/var/www/certbot:ro
+    networks:
+      default:
+        ipv4_address: ${TLS_PROXY_IP:-172.30.85.2}
+      ingress:
+    depends_on:
+      frontend_ssalfer:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options:
+        max-size: ${DOCKER_LOG_MAX_SIZE:-10m}
+        max-file: ${DOCKER_LOG_MAX_FILES:-3}
+
+networks:
+  default:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${PROD_INTERNAL_SUBNET:-172.30.85.0/24}
+          # Dynamic service addresses must exclude the trusted edge address.
+          ip_range: ${PROD_INTERNAL_DYNAMIC_RANGE:-172.30.85.128/25}
+  ingress:
+
+volumes:
+  tls_certificates:
+  acme_challenges:

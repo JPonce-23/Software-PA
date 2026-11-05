@@ -99,7 +99,7 @@
                             await g().descargar(`/documentos/versiones/${version.id_documento_version}/descarga`, version.nombre_original);
                         } else if (b.dataset.gestion === "subir") {
                             let archivoCarga = null, claveCarga = null;
-                            const nuevo = await formulario({ titulo: "Subir nueva versión", campos: [campo("archivo", "Archivo", { tipo: "file", requerido: true, ayuda: "PDF, DOCX, XLSX, JPG, JPEG o PNG. Máximo 20 MB." })], preparar: form => { form.elements.archivo.accept = ".pdf,.docx,.xlsx,.jpg,.jpeg,.png"; }, guardar: datos => {
+                            const nuevo = await formulario({ titulo: "Subir nueva versión", campos: [campo("archivo", "Archivo", { tipo: "file", requerido: true, ayuda: "PDF, DOCX, XLSX, JPG, JPEG o PNG. Máximo 25 MiB (26 214 400 bytes)." })], preparar: form => { form.elements.archivo.accept = ".pdf,.docx,.xlsx,.jpg,.jpeg,.png"; }, guardar: datos => {
                                 // La misma selección conserva su clave si Guardar falla o pierde la respuesta.
                                 if (datos.archivo !== archivoCarga) {
                                     const nuevaClave = api().nuevaClaveCarga();

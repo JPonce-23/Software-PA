@@ -24,6 +24,9 @@ COPY js /usr/share/nginx/html/js/
 COPY styles /usr/share/nginx/html/styles/
 COPY img /usr/share/nginx/html/img/
 
+# Private source checkouts must still yield readable packaged static assets.
+RUN chmod -R a+rX /usr/share/nginx/html && chmod 644 /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]

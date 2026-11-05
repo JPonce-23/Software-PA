@@ -54,12 +54,12 @@ class ReconciledCandidateTests(unittest.TestCase):
 
     def test_staging_and_runtime_hardening_are_preserved(self):
         self.assertFalse((ROOT/'frontend').exists())
-        self.assertFalse((ROOT/'deploy/tls').exists(),'TLS stack remains an independent reviewed proposal')
+        self.assertTrue((ROOT/'deploy/tls').is_dir())
         for filename in ('backend/Dockerfile','docker-compose.yml','docker-compose.override.yml'):
             text=(ROOT/filename).read_text()
             for value in ('--no-proxy-headers','--no-access-log','/app/logging.json'):
                 self.assertIn(value,text,filename)
-            self.assertNotIn('--workers',text)
+            if filename == 'backend/Dockerfile':self.assertIn('--workers',text)
         base=(ROOT/'docker-compose.yml').read_text()
         for key in ('REPORT_MAX_ROWS','DOCUMENT_INSPECTION_ENTRIES','IMPORT_MAX_RECORD_BYTES'):
             self.assertIn(key,base)

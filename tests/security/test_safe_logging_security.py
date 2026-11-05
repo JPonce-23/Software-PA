@@ -324,7 +324,8 @@ class StaticConfigurationTests(unittest.TestCase):
             calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
                 and isinstance(n.func, ast.Name) and n.func.id == 'create_engine']
             self.assertEqual(len(calls), 1)
-            kwargs = {k.arg: ast.literal_eval(k.value) for k in calls[0].keywords}
+            kwargs = {k.arg: ast.literal_eval(k.value) for k in calls[0].keywords
+                if k.arg in {"hide_parameters", "echo", "echo_pool"}}
             self.assertIs(kwargs['hide_parameters'], True)
             self.assertIs(kwargs['echo'], False)
             self.assertIs(kwargs['echo_pool'], False)

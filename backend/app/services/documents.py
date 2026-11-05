@@ -27,7 +27,7 @@ from .document_errors import (document_error, error_code, DOCUMENT_DUPLICATE,
 
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png"}
-MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(20 * 1024 * 1024)))
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 
 
 def upload_root() -> Path:
@@ -308,7 +308,7 @@ def _store_version_worker(db, document_id, upload, actor_id, request_key, client
         raise HTTPException(status_code=422, detail="Tipo de archivo no permitido")
     content = upload.file.read(MAX_UPLOAD_BYTES + 1)
     if not content or len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="Archivo vacío o demasiado grande")
+        raise HTTPException(status_code=413, detail=f"Archivo vacío o demasiado grande. Máximo {MAX_UPLOAD_BYTES} bytes ({MAX_UPLOAD_BYTES / 1024**2:g} MiB).")
     try:
         canonical_mime = validate_document(content, extension, upload.content_type,
             max_file_bytes=MAX_UPLOAD_BYTES)

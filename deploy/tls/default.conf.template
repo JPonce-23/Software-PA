@@ -1,0 +1,61 @@
+# Shared across nginx workers, for POST login only. No trust in incoming XFF.
+map $request_method $login_limit_key {
+    default "";
+    POST $binary_remote_addr;
+}
+limit_req_zone $login_limit_key zone=login:10m rate=5r/m;
+log_format ssalfer_edge escape=json
+    '{"component":"ssalfer_edge","request_id":"$request_id",'
+    '"status":$status,"bytes":$body_bytes_sent,"duration":$request_time}';
+server {
+    listen 80 default_server;
+    server_name ${PUBLIC_HOST};
+    server_tokens off;
+    access_log /var/log/nginx/access.log ssalfer_edge;
+    # A separate certificate manager may provision HTTP-01 challenge files.
+    location ^~ /.well-known/acme-challenge/ { root /var/www/certbot; try_files $uri =404; }
+    location / { return 308 https://${PUBLIC_HOST}$request_uri; }
+}
+server {
+    listen 443 ssl default_server;
+    server_name ${PUBLIC_HOST};
+    server_tokens off;
+    ssl_certificate /etc/letsencrypt/live/ssalfer/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ssalfer/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_tickets off;
+    access_log /var/log/nginx/access.log ssalfer_edge;
+    include /etc/nginx/security-headers.conf;
+    client_max_body_size 1m;
+    if ($host != "${PUBLIC_HOST}") { return 421; }
+
+    location ~ ^/api/auth/sesiones/?$ {
+        # Six immediate requests (one + burst five), five/min sustained per IP.
+        limit_req zone=login burst=5 nodelay;
+        limit_req_status 429;
+        client_max_body_size 16k;
+        include /etc/nginx/proxy-settings.conf;
+        proxy_pass http://backend:8000;
+    }
+    location ~ ^/api/documentos/[0-9]+/versiones/?$ {
+        client_max_body_size 26m;
+        include /etc/nginx/proxy-settings.conf;
+        proxy_pass http://backend:8000;
+    }
+    location ~ ^/api/proyectos/[0-9]+/(geoespacial/(ddv|nucleos|parcelas)/)?importaciones/?$ {
+        client_max_body_size 101m;
+        include /etc/nginx/proxy-settings.conf;
+        proxy_pass http://backend:8000;
+    }
+    location ~ ^/(api/)?(docs|redoc|openapi[.]json)(/|$) { return 404; }
+    location ~* ^/(deploy|outputs|tests|[.]git)(/|$) { return 404; }
+    location ~ (^|/)[.] { return 404; }
+    location /api/ {
+        include /etc/nginx/proxy-settings.conf;
+        proxy_pass http://backend:8000;
+    }
+    location / {
+        include /etc/nginx/proxy-settings.conf;
+        proxy_pass http://frontend_ssalfer:80;
+    }
+}
