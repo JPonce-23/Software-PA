@@ -32,7 +32,7 @@ def synthetic_node():
 class SupplyChainTests(unittest.TestCase):
     def fixture(self):
         directory=tempfile.TemporaryDirectory();self.addCleanup(directory.cleanup);target=Path(directory.name)
-        for name in (*chain.SOURCES,'docs/security/ss09/vendors-sha256.json'):
+        for name in (*chain.SOURCES,'docs/security/ss09/vendors-sha256.json','docs/security/ss09/tls-build-sha256.json'):
             dest=target/name;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,dest)
         shutil.copytree(ROOT/'frontend-ssalfer/js/vendor',target/'frontend-ssalfer/js/vendor')
         (target/'backend/app').mkdir(parents=True);(target/'backend/app/synthetic.py').write_text('import fastapi\nimport sqlalchemy\n')
@@ -258,6 +258,49 @@ class SupplyChainTests(unittest.TestCase):
             if isinstance(node,ast.Attribute):self.assertNotIn(node.attr,{'environ','getenv','system','popen','connect','execv','write','write_text','write_bytes','mkdir','unlink'})
         self.assertLessEqual(imports,{'argparse','ast','base64','fnmatch','hashlib','json','os','pathlib','re','stat','sys','urllib.parse'})
         self.assertEqual(chain.os.O_RDONLY,0)
+
+    def test_tls_build_inputs_image_and_canonical_compose_order(self):
+        result=chain.audit(ROOT);tls=result['tls_proxy']
+        self.assertTrue(result['local_integrity_ok'])
+        self.assertEqual(len(tls['files']),6)
+        self.assertTrue(all(row['matches_reviewed_baseline'] for row in tls['files']))
+        self.assertTrue(tls['selective_copy'] and tls['deny_all_context'] and tls['compose_build_context_matches'])
+        self.assertFalse(tls['extra_package_install_declared'])
+        self.assertEqual(tls['base_images'][0]['reference'],'nginx:1.27-alpine')
+        self.assertFalse(tls['base_images'][0]['actual_digest_verified'])
+        self.assertEqual(result['deployment']['combinations'][-1]['files'],
+            ['docker-compose.yml','docker-compose.ssalfer.yml','docker-compose.prod.yml'])
+        self.assertIn('tls_proxy',result['deployment']['production_services'])
+
+    def test_unknown_services_remain_rejected_without_echoing_names(self):
+        root=self.fixture();p=root/'docker-compose.prod.yml';sentinel='unreviewed_private_service'
+        p.write_text(p.read_text().replace('  tls_proxy:',f'  {sentinel}:'))
+        with self.assertRaises(chain.AuditError) as error:chain.audit(root)
+        self.assertEqual(error.exception.code,'COMPOSE_SERVICE_UNREVIEWED')
+        self.assertNotIn(sentinel,str(error.exception))
+
+    def test_every_tls_input_is_integrity_checked(self):
+        for name in chain.TLS_FILES:
+            with self.subTest(name=name):
+                root=self.fixture();p=root/'deploy/tls'/name;p.write_bytes(p.read_bytes()+b'\n# synthetic alteration\n')
+                report=chain.audit(root)
+                self.assertFalse(report['local_integrity_ok'])
+                self.assertIn('TLS_LOCAL_INTEGRITY_FAILURE',report['issues'])
+
+    def test_tls_copy_context_or_ignore_drift_fails_closed(self):
+        for filename,old,new,issue in [
+            ('deploy/tls/Dockerfile','COPY headers.conf','COPY .','TLS_BUILD_POLICY_DRIFT'),
+            ('deploy/tls/.dockerignore','!headers.conf','!*','TLS_BUILD_POLICY_DRIFT'),
+            ('docker-compose.prod.yml','context: ./deploy/tls','context: .','TLS_SERVICE_OR_CONTEXT_DRIFT')]:
+            with self.subTest(filename=filename):
+                root=self.fixture();p=root/filename;p.write_text(p.read_text().replace(old,new))
+                report=chain.audit(root);self.assertFalse(report['local_integrity_ok']);self.assertIn(issue,report['issues'])
+
+    def test_tls_manifest_cannot_authorize_private_or_missing_inputs(self):
+        root=self.fixture();p=root/'docs/security/ss09/tls-build-sha256.json'
+        obj=json.loads(p.read_text());obj['files'][0]['path']='deploy/tls/private.pem';p.write_text(json.dumps(obj))
+        with self.assertRaises(chain.AuditError) as error:chain.audit(root)
+        self.assertEqual(error.exception.code,'TLS_MANIFEST_INVALID')
 
     def test_remote_github_policies_remain_unobserved(self):
         result=chain.audit(ROOT)['github']

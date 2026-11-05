@@ -3,7 +3,7 @@
   "contexts": {
     "backend": {
       "build_reconstruction": "pending_native_docker",
-      "global_copy": true,
+      "global_copy": false,
       "missing_required_ignore_patterns": 0,
       "required_resources_excluded": [],
       "root": "./backend",
@@ -53,11 +53,11 @@
       {
         "files": [
           "docker-compose.yml",
-          "docker-compose.prod.yml",
-          "docker-compose.ssalfer.yml"
+          "docker-compose.ssalfer.yml",
+          "docker-compose.prod.yml"
         ],
-        "profile": "base_prod_ssalfer",
-        "review": "ssalfer_official_explicit_services_and_qa_required"
+        "profile": "base_ssalfer_prod",
+        "review": "tls_edge_only_publication_native_qa_required"
       }
     ],
     "compose_parser": "reviewed_literal_subset_not_compose_resolution",
@@ -66,6 +66,13 @@
     "frontend_selection": "ssalfer_official",
     "legacy_service_declared": false,
     "production_mode_literal": true,
+    "production_services": [
+      "backend",
+      "db",
+      "frontend_ssalfer",
+      "pgadmin",
+      "tls_proxy"
+    ],
     "secure_cookie_literal_in_prod": true,
     "ssalfer_service_declared": true,
     "uvicorn_no_access_log_in_base": true,
@@ -150,11 +157,18 @@
       "reference": "software-pa-backend",
       "review": "digest_pending",
       "source": "backend/tests/lineage_compose.yml"
+    },
+    {
+      "actual_digest_verified": false,
+      "immutable_reference": false,
+      "platform": "not_observed",
+      "reference": "nginx:1.27-alpine",
+      "review": "digest_pending",
+      "source": "deploy/tls/Dockerfile"
     }
   ],
   "issues": [
     "CVE_SCA_NOT_PERFORMED",
-    "DOCKERFILE_DEFAULT_RELOAD_DECLARED",
     "GITHUB_EFFECTIVE_POLICIES_UNOBSERVED",
     "INSTITUTIONAL_PROFILE_PENDING_APPROVAL",
     "MUTABLE_IMAGE_REFERENCES",
@@ -593,6 +607,63 @@
   ],
   "schema_version": 1,
   "scope": "local_declarations_not_installed_sbom_or_deployment",
+  "tls_proxy": {
+    "base_images": [
+      {
+        "actual_digest_verified": false,
+        "immutable_reference": false,
+        "platform": "not_observed",
+        "reference": "nginx:1.27-alpine",
+        "review": "digest_pending",
+        "source": "deploy/tls/Dockerfile"
+      }
+    ],
+    "compose_build_context_matches": true,
+    "deny_all_context": true,
+    "extra_package_install_declared": false,
+    "files": [
+      {
+        "matches_reviewed_baseline": true,
+        "path": "deploy/tls/.dockerignore",
+        "sha256": "61fd5865996bc0c09debc28ef39ae01a18077e84e685bba9cc39248d140e27aa",
+        "size": 81
+      },
+      {
+        "matches_reviewed_baseline": true,
+        "path": "deploy/tls/Dockerfile",
+        "sha256": "f44765fd2cb17e2c1f83b03e63835cb02b0cc53c01d180fc3da8dc6e51de9e08",
+        "size": 457
+      },
+      {
+        "matches_reviewed_baseline": true,
+        "path": "deploy/tls/default.conf.template",
+        "sha256": "115d5b46a003d36175226cc49c34f0e0ce1bb3d7c4bb151ec47eb0ea1771f62a",
+        "size": 2406
+      },
+      {
+        "matches_reviewed_baseline": true,
+        "path": "deploy/tls/headers.conf",
+        "sha256": "634889e5ad8564963a1e002b65f598b091d7ffb3dceb52743453d05b9680402b",
+        "size": 783
+      },
+      {
+        "matches_reviewed_baseline": true,
+        "path": "deploy/tls/proxy.conf",
+        "sha256": "e2c30a5d602ad4fb46b1754ed35864cf8b2f58fab8d702284f719ad619fa9ff0",
+        "size": 881
+      },
+      {
+        "matches_reviewed_baseline": true,
+        "path": "deploy/tls/validate-host.sh",
+        "sha256": "7d59825b8a19c682addb9cc332076261c605b1cf4d4c92cd25ecd9fb8dc74297",
+        "size": 248
+      }
+    ],
+    "inherited_nginx_openssl_packages": "native_image_inventory_required",
+    "selective_copy": true,
+    "service_declared": true,
+    "upstream_authenticity": "not_verified"
+  },
   "vendors": {
     "baseline_is_authenticity_proof": false,
     "files": [

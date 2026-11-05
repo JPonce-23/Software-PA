@@ -22,14 +22,17 @@ VENDOR_PREFIX='frontend-ssalfer/js/vendor/'
 SOURCES=('backend/requirements.txt','backend/tests/requirements-convenio-report.txt','backend/Dockerfile','backend/.dockerignore',
  'frontend-ssalfer/.dockerignore','frontend-ssalfer/deploy/Dockerfile','docker-compose.yml','docker-compose.override.yml',
  'docker-compose.prod.yml','docker-compose.ssalfer.yml',
- 'backend/tests/convenio_report_compose.yml','backend/tests/lineage_compose.yml')
+ 'backend/tests/convenio_report_compose.yml','backend/tests/lineage_compose.yml',
+ 'deploy/tls/Dockerfile','deploy/tls/.dockerignore','deploy/tls/default.conf.template',
+ 'deploy/tls/headers.conf','deploy/tls/proxy.conf','deploy/tls/validate-host.sh')
+TLS_FILES=('Dockerfile','.dockerignore','default.conf.template','headers.conf','proxy.conf','validate-host.sh')
 LEGACY_SOURCES=('frontend/package.json','frontend/package-lock.json','frontend/Dockerfile','frontend/.dockerignore')
 APP_IMPORTS={'PIL':'pillow','pypdf':'pypdf','fastapi':'fastapi','sqlalchemy':'sqlalchemy','pydantic':'pydantic',
  'geoalchemy2':'geoalchemy2','psycopg2':'psycopg2-binary','bcrypt':'bcrypt',
  'dotenv':'python-dotenv','pandas':'pandas','numpy':'numpy','openpyxl':'openpyxl',
  'httpx':'httpx','aiofiles':'aiofiles','starlette':'starlette','passlib':'passlib'}
 IMAGE_ROOTS={'python','node','nginx','postgis/postgis','dpage/pgadmin4','software-pa-backend'}
-ALLOWED_SERVICES={'backend','frontend','frontend_ssalfer','db','pgadmin','worker'}
+ALLOWED_SERVICES={'backend','frontend','frontend_ssalfer','db','pgadmin','worker','tls_proxy'}
 REQUIRED_IGNORE={'.env','.env.*','**/.env','**/.env.*','.git','**/.git','.ssh','**/.ssh',
  '.aws','**/.aws','.pgpass','**/.pgpass','.npmrc','**/.npmrc','.pypirc','**/.pypirc',
  '.netrc','**/.netrc','.git-credentials','**/.git-credentials',
@@ -245,16 +248,54 @@ def ignore_subset(path,source):
     return False
 
 
+def tls_inventory(root,sources):
+    """Only the reviewed edge build inputs; no certificate/private-key reads.
+
+    The manifest records reviewed local bytes, not upstream image authenticity.
+    Unknown service names still fail in service_blocks; context additions are
+    excluded by the exact deny-all Docker ignore policy checked below.
+    """
+    manifest=json.loads(read_text(root,'docs/security/ss09/tls-build-sha256.json'))
+    expected={'deploy/tls/'+name for name in TLS_FILES}
+    entries=manifest.get('files',[])
+    if manifest.get('schema_version')!=1 or len(entries)!=len(expected) or {e.get('path') for e in entries}!=expected:
+        raise AuditError('TLS_MANIFEST_INVALID')
+    files=[]
+    for entry in entries:
+        digest=entry.get('sha256');size=entry.get('size')
+        if not isinstance(digest,str) or not re.fullmatch(r'[0-9a-f]{64}',digest) or type(size)is not int or size<0:
+            raise AuditError('TLS_MANIFEST_INVALID')
+        content=read_bytes(root,entry['path'])
+        files.append(dict(path=entry['path'],sha256=hashlib.sha256(content).hexdigest(),size=len(content),
+            matches_reviewed_baseline=(len(content)==size and hashlib.sha256(content).hexdigest()==digest)))
+    docker=sources['deploy/tls/Dockerfile']
+    copies=[line for line in docker.splitlines() if line.startswith('COPY ')]
+    wanted=[
+        'COPY default.conf.template /etc/nginx/templates/default.conf.template',
+        'COPY headers.conf /etc/nginx/security-headers.conf',
+        'COPY proxy.conf /etc/nginx/proxy-settings.conf',
+        'COPY validate-host.sh /docker-entrypoint.d/19-validate-host.sh']
+    ignore=[line.strip() for line in sources['deploy/tls/.dockerignore'].splitlines() if line.strip() and not line.startswith('#')]
+    prod=service_blocks(sources['docker-compose.prod.yml']).get('tls_proxy','')
+    context=bool(re.search(r'^      context: [.]\/deploy/tls$',prod,re.M))
+    return dict(files=sorted(files,key=lambda r:r['path']),base_images=inspect_images({'deploy/tls/Dockerfile':docker}),
+        selective_copy=copies==wanted,deny_all_context=ignore==['*',*["!"+name for name in TLS_FILES if name!='.dockerignore']],
+        compose_build_context_matches=context,service_declared=bool(prod),
+        extra_package_install_declared=bool(re.search(r'^RUN .*\b(apk|apt-get|pip|npm|curl|wget)\b',docker,re.M)),
+        inherited_nginx_openssl_packages='native_image_inventory_required',
+        upstream_authenticity='not_verified')
+
+
 def deployment_inventory(sources):
     base=service_blocks(sources['docker-compose.yml']);prod=service_blocks(sources['docker-compose.prod.yml'])
     dev=service_blocks(sources['docker-compose.override.yml']);ssalfer=service_blocks(sources['docker-compose.ssalfer.yml'])
     return dict(compose_parser='reviewed_literal_subset_not_compose_resolution',
-        base_services=sorted(base),additional_ssalfer_services=sorted(ssalfer),
+        base_services=sorted(base),production_services=sorted(prod),additional_ssalfer_services=sorted(ssalfer),
         uvicorn_no_proxy_headers_in_base='--no-proxy-headers' in base.get('backend',''),
         uvicorn_no_access_log_in_base='--no-access-log' in base.get('backend',''),
         secure_cookie_literal_in_prod=bool(re.search(r'AUTH_COOKIE_SECURE:\s*"true"',prod.get('backend',''))),
         production_mode_literal='APP_ENV: production' in prod.get('backend',''),
-        explicit_cors_required_in_prod='CORS_ORIGINS: ${CORS_ORIGINS:?' in prod.get('backend',''),
+        explicit_cors_required_in_prod=bool(re.search(r'^      CORS_ORIGINS: https://\$\{PUBLIC_HOST:\?[^}]+\}$',prod.get('backend',''),re.M)),
         development_reload='--reload' in dev.get('backend',''),
         frontend_selection='ssalfer_official',
         legacy_service_declared=any('frontend' in doc for doc in (base,prod,dev,ssalfer)),
@@ -262,7 +303,7 @@ def deployment_inventory(sources):
           dict(profile='implicit_base_override',files=['docker-compose.yml','docker-compose.override.yml'],review='development_not_production'),
           dict(profile='base_prod',files=['docker-compose.yml','docker-compose.prod.yml'],review='ssalfer_overlay_required'),
           dict(profile='base_ssalfer',files=['docker-compose.yml','docker-compose.ssalfer.yml'],review='production_settings_not_guaranteed'),
-          dict(profile='base_prod_ssalfer',files=['docker-compose.yml','docker-compose.prod.yml','docker-compose.ssalfer.yml'],review='ssalfer_official_explicit_services_and_qa_required')])
+          dict(profile='base_ssalfer_prod',files=['docker-compose.yml','docker-compose.ssalfer.yml','docker-compose.prod.yml'],review='tls_edge_only_publication_native_qa_required')])
 
 
 def audit(root):
@@ -306,6 +347,10 @@ def audit(root):
     if any(r['coherence']!='matches_reviewed_range' for r in node['direct']):issues.append('NODE_DIRECT_RANGE_MISMATCH_OR_UNSUPPORTED')
     if vendors['unmanifested_count'] or vendors['missing_count'] or any(not r['matches_local_baseline'] for r in vendors['files']):issues.append('VENDOR_LOCAL_INTEGRITY_FAILURE')
     deployment=deployment_inventory(sources)
+    tls=tls_inventory(root,sources)
+    if not tls['service_declared'] or not tls['compose_build_context_matches']:issues.append('TLS_SERVICE_OR_CONTEXT_DRIFT')
+    if not tls['selective_copy'] or not tls['deny_all_context'] or tls['extra_package_install_declared']:issues.append('TLS_BUILD_POLICY_DRIFT')
+    if any(not row['matches_reviewed_baseline'] for row in tls['files']):issues.append('TLS_LOCAL_INTEGRITY_FAILURE')
     if not deployment['ssalfer_service_declared']:issues.append('SSALFER_SERVICE_MISSING')
     if deployment['legacy_service_declared']:issues.append('LEGACY_SERVICE_DECLARED_REVIEW_SELECTION')
     if not deployment['uvicorn_no_proxy_headers_in_base'] or not deployment['uvicorn_no_access_log_in_base']:
@@ -321,7 +366,8 @@ def audit(root):
         'NODE_DIRECT_RANGE_MISMATCH_OR_UNSUPPORTED','NODE_RESOLUTION_METADATA_REQUIRES_REVIEW',
         'BACKEND_REQUIRED_RESOURCE_EXCLUDED','BACKEND_IGNORE_POLICY_INCOMPLETE',
         'UNAPPROVED_IMAGE_REFERENCE','SS04_SS10_RUNTIME_COMMAND_DRIFT',
-        'PRODUCTION_SETTINGS_DRIFT','SS08_SELECTIVE_COPY_DRIFT','SSALFER_SERVICE_MISSING'))
+        'PRODUCTION_SETTINGS_DRIFT','SS08_SELECTIVE_COPY_DRIFT','SSALFER_SERVICE_MISSING',
+        'TLS_SERVICE_OR_CONTEXT_DRIFT','TLS_BUILD_POLICY_DRIFT','TLS_LOCAL_INTEGRITY_FAILURE'))
     return dict(schema_version=1,scope='local_declarations_not_installed_sbom_or_deployment',
         assessment='incomplete_requires_qa',local_integrity_ok=not integrity_failure,
         python=py,qa_python=python_inventory(sources['backend/tests/requirements-convenio-report.txt']),
@@ -335,7 +381,7 @@ def audit(root):
             react_uses_npm_ci=('RUN npm ci' in legacy['frontend/Dockerfile']) if legacy else None,
             react_dockerignore_env_patterns=(all(p in legacy['frontend/.dockerignore'].splitlines() for p in ('.env','.env.*'))
                                              if legacy else None)),
-        deployment=deployment,github=dict(local_workflow_count=workflows,
+        deployment=deployment,tls_proxy=tls,github=dict(local_workflow_count=workflows,
             dependabot_file_present=(root/'.github/dependabot.yml').is_file() or (root/'.github/dependabot.yaml').is_file(),
             effective_branch_protection='not_observed',rulesets='not_observed',secrets='not_accessed'),
         issues=sorted(issues))
