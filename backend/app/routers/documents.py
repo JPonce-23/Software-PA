@@ -2,14 +2,13 @@
 
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile
-from fastapi.responses import FileResponse
+from ..services.document_download import DescriptorDownloadResponse
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services import documents as service
 from ..services.document_read_models import consolidated_documents
-from ..services.document_validation import download_media_type
 from ..services.access import (
     require_document_access,
     require_document_target_access,
@@ -191,7 +190,7 @@ async def upload_version(
     return version
 
 
-@router.get("/documentos/versiones/{id_version}/descarga")
+@router.api_route("/documentos/versiones/{id_version}/descarga", methods=["GET", "HEAD"])
 def download_version(
     id_version: int,
     db: Session = Depends(get_db),
@@ -201,12 +200,12 @@ def download_version(
     if version is None:
         raise HTTPException(status_code=404, detail="Versión no encontrada")
     require_document_access(db, user, version.id_documento)
-    return FileResponse(
-        service.safe_version_path(version),
+    return DescriptorDownloadResponse(
+        relative=version.ruta_almacenamiento,
+        document_id=version.id_documento,
+        size=version.tamano_bytes,
+        sha256=version.hash_sha256,
         filename=version.nombre_original,
-        media_type=download_media_type(),
-        content_disposition_type="attachment",
-        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"},
     )
 
 

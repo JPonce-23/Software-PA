@@ -135,14 +135,60 @@ class HttpDeploymentTests(unittest.TestCase):
         node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='download_version')
         code=ast.unparse(node)
         self.assertIn('require_document_access(db, user, version.id_documento)',code)
-        self.assertIn('service.safe_version_path(version)',code)
-        response=next(n for n in ast.walk(node) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=='FileResponse')
-        kwargs={kw.arg:kw.value for kw in response.keywords}
-        self.assertEqual(ast.literal_eval(kwargs['content_disposition_type']),'attachment')
-        self.assertEqual(ast.literal_eval(kwargs['headers']),{'X-Content-Type-Options':'nosniff','Cache-Control':'private, no-store'})
-        source=(ROOT/'backend/app/services/document_validation.py').read_text()
-        tree=ast.parse(source);media=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='download_media_type')
-        self.assertIn('application/octet-stream',ast.unparse(media))
+        # Authorize before constructing the descriptor response. Never restore
+        # resolve/is_file + a later FileResponse open to satisfy this contract.
+        authorization=next(i for i,n in enumerate(node.body)
+            if isinstance(n,ast.Expr) and isinstance(n.value,ast.Call)
+            and isinstance(n.value.func,ast.Name) and n.value.func.id=='require_document_access')
+        response_index=next(i for i,n in enumerate(node.body) if isinstance(n,ast.Return))
+        self.assertLess(authorization,response_index)
+        response=node.body[response_index].value
+        self.assertIsInstance(response,ast.Call)
+        self.assertEqual(ast.unparse(response.func),'DescriptorDownloadResponse')
+        self.assertFalse(response.args)
+        self.assertEqual({kw.arg:ast.unparse(kw.value) for kw in response.keywords},{
+            'relative':'version.ruta_almacenamiento','document_id':'version.id_documento',
+            'size':'version.tamano_bytes','sha256':'version.hash_sha256',
+            'filename':'version.nombre_original'})
+        self.assertNotIn('safe_version_path',code)
+        self.assertNotIn('FileResponse',code)
+        self.assertIn("methods=['GET', 'HEAD']",code)
+        self.assertIn('status_code=404',code)
+
+        download_tree=ast.parse((ROOT/'backend/app/services/document_download.py').read_text())
+        response_class=next(n for n in download_tree.body if isinstance(n,ast.ClassDef)
+            and n.name=='DescriptorDownloadResponse')
+        methods={n.name:n for n in response_class.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}
+        init=methods['__init__']
+        initialize=next(n for n in ast.walk(init) if isinstance(n,ast.Call)
+            and ast.unparse(n.func)=='super().__init__')
+        kwargs={kw.arg:kw.value for kw in initialize.keywords}
+        self.assertEqual(ast.literal_eval(kwargs['media_type']),'application/octet-stream')
+        headers={ast.literal_eval(k):v for k,v in zip(kwargs['headers'].keys,kwargs['headers'].values)}
+        self.assertEqual(ast.literal_eval(headers['X-Content-Type-Options']),'nosniff')
+        self.assertEqual(ast.literal_eval(headers['Cache-Control']),'private, no-store')
+        self.assertEqual(ast.unparse(headers['Content-Disposition']),'disposition')
+        disposition=next(n.value for n in init.body if isinstance(n,ast.Assign)
+            and any(isinstance(t,ast.Name) and t.id=='disposition' for t in n.targets))
+        for branch in (disposition.body,disposition.orelse):
+            self.assertIsInstance(branch,ast.JoinedStr)
+            self.assertTrue(branch.values[0].value.startswith('attachment;'))
+
+        # Static wiring only; descriptor races, confinement, SHA/size failures,
+        # binary bytes and closure are exercised by test_document_starlette_pending.
+        serve=ast.unparse(methods['_serve'])
+        self.assertLess(serve.index('_worker(open_verified'),serve.index("await transmit({'type': 'http.response.start'"))
+        self.assertIn('_worker(owned.read_at',serve)
+        self.assertIn('_worker(owned.close)',serve)
+        opener=next(n for n in download_tree.body if isinstance(n,ast.FunctionDef) and n.name=='open_verified')
+        opener_code=ast.unparse(opener)
+        for contract in ('_open_root(root)','dir_fd=root_fd','dir_fd=document_fd',
+                         'os.O_NOFOLLOW','os.O_NONBLOCK','os.fstat(leaf_fd)',
+                         'info.st_size != expected_size','hmac.compare_digest(checksum.hexdigest(), expected_sha)'):
+            self.assertIn(contract,opener_code)
+        for method in methods.values():
+            for call in (n for n in ast.walk(method) if isinstance(n,ast.Call)):
+                self.assertNotIn(ast.unparse(call.func),('FileResponse','open','os.open','anyio.open_file'))
         self.assertNotIn('uploads',self.text)
         self.assertNotIn('alias ',self.text)
 

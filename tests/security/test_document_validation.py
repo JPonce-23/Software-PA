@@ -334,9 +334,10 @@ class IntegrationBoundaryTests(unittest.TestCase):
         tree = ast.parse((ROOT / 'backend/app/routers/documents.py').read_text())
         node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'download_version')
         node.decorator_list = []
+        from app.services.document_download import DescriptorDownloadResponse
         ns = dict(Depends=lambda *args: None, get_db=None, auth=SimpleNamespace(RoleChecker=lambda roles: None),
             READ_ROLES=['admin', 'operador', 'visualizador', 'geografo'], HTTPException=HTTPError,
-            models=SimpleNamespace(DocumentoVersion=Version), FileResponse=lambda *a, **kw: SimpleNamespace(args=a, kwargs=kw),
+            models=SimpleNamespace(DocumentoVersion=Version), DescriptorDownloadResponse=DescriptorDownloadResponse,
             service=SimpleNamespace(safe_version_path=MagicMock(return_value=Path('/tmp/synthetic-only'))),
             require_document_access=MagicMock(side_effect=HTTPError(403, 'denied') if denied else None),
             download_media_type=validator.download_media_type)
@@ -350,13 +351,15 @@ class IntegrationBoundaryTests(unittest.TestCase):
 
     def test_new_and_legacy_downloads_never_use_unverified_mime_or_mutate_history(self):
         for mime in ['text/html', 'application/pdf', None, 'image/svg+xml', 'bad\r\nInjected: value']:
-            version = Version(id_documento=7, nombre_original='original.pdf', tipo_mime=mime)
+            version = Version(id_documento=7, nombre_original='original.pdf', tipo_mime=mime,
+                              ruta_almacenamiento='7/legacy.pdf', tamano_bytes=5, hash_sha256='a'*64)
             before = vars(version).copy()
             response = self.download(version)
-            self.assertEqual(response.kwargs['media_type'], 'application/octet-stream')
-            self.assertEqual(response.kwargs['filename'], 'original.pdf')
-            self.assertEqual(response.kwargs['content_disposition_type'], 'attachment')
-            self.assertEqual(response.kwargs['headers'], {'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-store'})
+            self.assertEqual(response.media_type, 'application/octet-stream')
+            self.assertEqual(response.filename, 'original.pdf')
+            self.assertEqual(response.headers['content-disposition'], 'attachment; filename="original.pdf"')
+            self.assertEqual(response.headers['x-content-type-options'], 'nosniff')
+            self.assertEqual(response.headers['cache-control'], 'private, no-store')
             self.assertEqual(vars(version), before)
 
     def test_download_missing_and_denied_versions_keep_access_control(self):
