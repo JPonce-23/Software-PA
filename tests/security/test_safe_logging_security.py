@@ -69,7 +69,8 @@ def handlers():
     ns = dict(StatementError=StatementError, DBAPIError=DBAPIError,
         IntegrityError=IntegrityError, InternalError=InternalError, PostgreSQLError=PostgreSQLError,
         log_request_error=safe.log_request_error,
-        JSONResponse=lambda **kwargs: SimpleNamespace(**kwargs))
+        JSONResponse=lambda **kwargs: SimpleNamespace(**kwargs),
+        ErrorJSONResponse=lambda **kwargs: SimpleNamespace(**kwargs))
     exec(compile(ast.fix_missing_locations(ast.Module(body=definitions, type_ignores=[])),
         'isolated_main_handlers', 'exec'), ns)
     return ns

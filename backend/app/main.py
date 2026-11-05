@@ -20,6 +20,7 @@ from .routers import (
 )
 from .services import authentication as authentication_service
 from .safe_logging import SafeDiagnosticsMiddleware, log_request_error
+from .http_security import ErrorHeadersMiddleware, ErrorJSONResponse
 
 app = FastAPI(
     title="SOFTWARE-PA",
@@ -28,15 +29,6 @@ app = FastAPI(
     docs_url=None if AUTH_SETTINGS.environment == "production" else "/docs",
     redoc_url=None if AUTH_SETTINGS.environment == "production" else "/redoc",
     openapi_url=None if AUTH_SETTINGS.environment == "production" else "/openapi.json",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=list(AUTH_SETTINGS.allowed_origins),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-CSRF-Token"],
-    expose_headers=["X-Total-Count"],
 )
 
 
@@ -76,6 +68,19 @@ async def csrf_cookie_guard(request, call_next):
     return await call_next(request)
 
 
+# CORS must also cover responses returned directly by the CSRF guard.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(AUTH_SETTINGS.allowed_origins),
+    allow_credentials=True,
+    allow_methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-CSRF-Token", "Idempotency-Key", "Range", "If-Range"],
+    expose_headers=["X-Total-Count", "Idempotency-Key", "Idempotency-Replayed",
+                    "X-Document-Operation-Id", "X-Document-Operation-State", "Retry-After",
+                    "X-Document-Error-Code", "Content-Disposition", "Content-Range",
+                    "Accept-Ranges", "ETag", "Last-Modified"],
+)
+
 @app.exception_handler(IntegrityError)
 @app.exception_handler(InternalError)
 @app.exception_handler(DBAPIError)
@@ -94,7 +99,7 @@ def global_exception_handler(request, exc):
     category = ("database_statement" if isinstance(exc, StatementError) else
                 "database_driver" if isinstance(exc, PostgreSQLError) else "internal_error")
     log_request_error(request.scope, category, 500)
-    return JSONResponse(status_code=500, content={"detail": "Error interno del servidor"})
+    return ErrorJSONResponse(status_code=500, content={"detail": "Error interno del servidor"})
 
 
 app.include_router(authentication.router, prefix="/api")
@@ -122,6 +127,8 @@ def health():
         db.close()
     return {"status": "ok", "schema": version}
 
+
+app.add_middleware(ErrorHeadersMiddleware)
 
 # Registered last: observe CSRF/CORS and routing, retaining route templates only.
 app.add_middleware(SafeDiagnosticsMiddleware, routes=app.routes)
