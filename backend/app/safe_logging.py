@@ -17,6 +17,7 @@ _ERRORS = {
     "database_integrity": ("DB_INTEGRITY_ERROR", "database"),
     "database_internal": ("DB_INTERNAL_ERROR", "database"),
     "database_error": ("DB_API_ERROR", "database"),
+    "database_pool_timeout": ("DB_POOL_TIMEOUT", "database"),
     "database_statement": ("DB_STATEMENT_ERROR", "database"),
     "database_driver": ("DB_DRIVER_ERROR", "database"),
     "internal_error": ("API_INTERNAL_ERROR", "api"),

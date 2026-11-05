@@ -57,16 +57,17 @@ class DBAPIError(StatementError): pass
 class IntegrityError(DBAPIError): pass
 class InternalError(DBAPIError): pass
 class PostgreSQLError(SensitiveError): pass
+class SQLTimeoutError(SensitiveError): pass
 
 
 def handlers():
     """Only extract handler functions; imports/decorators/engine never execute."""
     tree = ast.parse((ROOT / 'backend/app/main.py').read_text())
     definitions = [n for n in tree.body if isinstance(n, ast.FunctionDef)
-        and n.name in ('database_error_handler', 'global_exception_handler')]
-    assert len(definitions) == 2
+        and n.name in ('database_error_handler', 'global_exception_handler', 'connection_pool_timeout_handler')]
+    assert len(definitions) == 3
     for node in definitions: node.decorator_list = []
-    ns = dict(StatementError=StatementError, DBAPIError=DBAPIError,
+    ns = dict(SQLTimeoutError=SQLTimeoutError, StatementError=StatementError, DBAPIError=DBAPIError,
         IntegrityError=IntegrityError, InternalError=InternalError, PostgreSQLError=PostgreSQLError,
         log_request_error=safe.log_request_error,
         JSONResponse=lambda **kwargs: SimpleNamespace(**kwargs),
@@ -118,6 +119,14 @@ class FormattedLoggingTests(unittest.TestCase):
             self.assertEqual((record['code'], record['component'], record['status']), (code, 'database', 409))
             self.assertEqual(record['route'], '<unmatched>')
             self.assertRegex(record['correlation_id'], r'^[0-9a-f]{32}$')
+
+    def test_pool_timeout_has_fixed_503_and_safe_diagnostic(self):
+        for name in ('connection_pool_timeout_handler','global_exception_handler'):
+            result=self.handlers[name](SimpleNamespace(scope=scope()),SQLTimeoutError())
+            self.assertEqual((result.status_code,result.content),
+                (503,{'detail':'Servicio temporalmente no disponible'}))
+            record=self.records()[-1]
+            self.assertEqual((record['code'],record['component'],record['status']),('DB_POOL_TIMEOUT','database',503))
 
     def test_statement_driver_and_third_party_errors_preserve_generic_500(self):
         for cls, code in [(StatementError, 'DB_STATEMENT_ERROR'), (PostgreSQLError, 'DB_DRIVER_ERROR'),

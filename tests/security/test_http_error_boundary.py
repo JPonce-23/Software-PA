@@ -19,6 +19,9 @@ CASES = (
     'error_500_allowed_origin', 'error_500_foreign_origin', 'error_500_no_origin',
     'document_codes_and_details', 'cache_more_restrictive', 'cache_public_removed',
     'cache_multiple_lines', 'get_head_ranges_multipart', 'success_headers_unchanged',
+    'pool_timeout_allowed', 'pool_timeout_foreign', 'pool_timeout_no_origin',
+    'pool_timeout_post_not_replayed', 'pool_timeout_csrf_middleware',
+    'builtin_timeout_stays_500', 'integrity_error_stays_409',
     'session_cookie_flags', 'stream_error_not_replaced', 'non_http_passthrough',
 )
 
@@ -54,6 +57,9 @@ def worker():
     from app.main import app
     from app import database
     from sqlalchemy import event
+    from sqlalchemy.exc import TimeoutError as SQLTimeoutError, IntegrityError
+    from unittest.mock import patch
+    from types import SimpleNamespace
 
     @event.listens_for(database.engine, 'do_connect')
     def deny_database(*args):
@@ -103,6 +109,19 @@ def worker():
         response = Response()
         _set_auth_cookies(response, session_token='SS12_SYNTHETIC_SESSION', csrf_token='SS12_SYNTHETIC_CSRF')
         return response
+
+    pool_calls=[]
+
+    @app.api_route('/__ss12/pool-timeout', methods=['GET','POST'])
+    def pool_timeout():
+        pool_calls.append(1)
+        raise SQLTimeoutError(sentinel+' SELECT synthetic secret')
+
+    @app.get('/__ss12/builtin-timeout')
+    def builtin_timeout():raise TimeoutError(sentinel)
+
+    @app.get('/__ss12/integrity')
+    def integrity():raise IntegrityError('SELECT '+sentinel,{'secret':sentinel},RuntimeError(sentinel))
 
     client = TestClient(app, base_url='https://qa.invalid', raise_server_exceptions=False)
     results = {}
@@ -190,6 +209,36 @@ def worker():
     check('error_500_allowed_origin', lambda: internal_error(origin))
     check('error_500_foreign_origin', lambda: internal_error({'Origin': 'https://foreign.invalid'}))
     check('error_500_no_origin', lambda: internal_error({}))
+
+    def pool_error(headers,method='GET'):
+        before=len(pool_calls)
+        r=client.request(method,'/__ss12/pool-timeout',headers=headers)
+        assert len(pool_calls)==before+1
+        assert r.status_code==503 and r.json()=={'detail':'Servicio temporalmente no disponible'}
+        assert sentinel not in r.text and 'SELECT' not in r.text
+        assert r.headers['x-content-type-options']=='nosniff'
+        assert r.headers['cache-control']=='private, no-store'
+        if headers==origin:security(r,503)
+        else:assert 'access-control-allow-origin' not in r.headers
+
+    check('pool_timeout_allowed',lambda:pool_error(origin))
+    check('pool_timeout_foreign',lambda:pool_error({'Origin':'https://foreign.invalid'}))
+    check('pool_timeout_no_origin',lambda:pool_error({}))
+    check('pool_timeout_post_not_replayed',lambda:pool_error(origin,'POST'))
+
+    def middleware_timeout():
+        import app.main as main
+        closed=[]
+        with patch.object(main,'SessionLocal',return_value=SimpleNamespace(close=lambda:closed.append(1))), \
+             patch.object(main.authentication_service,'validate_csrf',side_effect=SQLTimeoutError(sentinel)):
+            r=client.post('/api/proyectos',headers={**origin,'X-CSRF-Token':'SYNTHETIC',
+                'Cookie':f'{AUTH_SETTINGS.session_cookie_name}=SYNTHETIC; {AUTH_SETTINGS.csrf_cookie_name}=SYNTHETIC'},json={})
+        security(r,503)
+        assert r.json()=={'detail':'Servicio temporalmente no disponible'} and closed==[1]
+
+    check('pool_timeout_csrf_middleware',middleware_timeout)
+    check('builtin_timeout_stays_500',lambda:security(client.get('/__ss12/builtin-timeout',headers=origin),500))
+    check('integrity_error_stays_409',lambda:security(client.get('/__ss12/integrity',headers=origin),409))
 
     def details():
         for status, code in [(409, 'DOCUMENT_DUPLICATE'), (425, 'DOCUMENT_OPERATION_PENDING')]:

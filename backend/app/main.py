@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError, IntegrityError, InternalError, StatementError
+from sqlalchemy.exc import DBAPIError, IntegrityError, InternalError, StatementError, TimeoutError as SQLTimeoutError
 from psycopg2 import Error as PostgreSQLError
 
 from .config import AUTH_SETTINGS
@@ -94,8 +94,18 @@ def database_error_handler(request, exc):
     )
 
 
+@app.exception_handler(SQLTimeoutError)
+def connection_pool_timeout_handler(request, exc):
+    # No exception text/SQL, retry loop, or automatic replay of the operation.
+    log_request_error(request.scope, "database_pool_timeout", 503)
+    return ErrorJSONResponse(status_code=503, content={"detail": "Servicio temporalmente no disponible"})
+
+
 @app.exception_handler(Exception)
 def global_exception_handler(request, exc):
+    # Exceptions in user middleware (including CSRF) bypass ExceptionMiddleware.
+    if isinstance(exc, SQLTimeoutError):
+        return connection_pool_timeout_handler(request, exc)
     category = ("database_statement" if isinstance(exc, StatementError) else
                 "database_driver" if isinstance(exc, PostgreSQLError) else "internal_error")
     log_request_error(request.scope, category, 500)
