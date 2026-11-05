@@ -1,6 +1,7 @@
 """Document metadata, controlled links and immutable versions."""
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from uuid import UUID
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -175,11 +176,19 @@ def list_versions(
 )
 async def upload_version(
     id_documento: int,
+    response: Response,
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+    idempotency_key: UUID | None = Header(default=None, alias="Idempotency-Key"),
 ):
-    return await service.store_version(db, id_documento, archivo, user)
+    version = await service.store_version(db, id_documento, archivo, user,
+        idempotency_key=idempotency_key)
+    response.status_code = 200 if version._idempotency_replayed else 201
+    response.headers["Idempotency-Key"] = version._idempotency_key
+    response.headers["Idempotency-Replayed"] = str(version._idempotency_replayed).lower()
+    response.headers["X-Document-Operation-Id"] = version._upload_operation_id
+    return version
 
 
 @router.get("/documentos/versiones/{id_version}/descarga")

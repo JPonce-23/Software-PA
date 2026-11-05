@@ -64,12 +64,14 @@ def _open_root(root):
 
 
 class StagedDocument:
-    def __init__(self, root, document_id, content, digest):
+    def __init__(self, root, document_id, content, digest, operation_id=None):
         if type(document_id) is not int or document_id <= 0:
             raise DocumentStorageError('DOCUMENT_STORAGE_ID_INVALID')
         self.root, self.document_name = Path(root), str(document_id)
         self.content, self.digest = content, digest
-        self.operation_id = uuid.uuid4().hex
+        if operation_id is not None and not isinstance(operation_id, uuid.UUID):
+            raise DocumentStorageError('DOCUMENT_STORAGE_ID_INVALID')
+        self.operation_id = operation_id.hex if operation_id is not None else uuid.uuid4().hex
         self.stage_name = '.pending-' + self.operation_id
         self.root_fd = self.document_fd = self.stage_fd = self.file_fd = None
         self.stage_identity = self.file_identity = None
@@ -141,7 +143,9 @@ class StagedDocument:
         if self.published_name is not None:
             raise DocumentStorageError('DOCUMENT_STORAGE_ALREADY_PUBLISHED')
         match = re.fullmatch(r'([0-9]{4,})-[0-9a-f]{32}\.(?:pdf|docx|xlsx|jpe?g|png)', name)
-        if not match or int(match.group(1)) <= 0:
+        operation_name = re.fullmatch(r'op-([0-9a-f]{32})\.(?:pdf|docx|xlsx|jpe?g|png)', name)
+        valid_operation = operation_name is not None and operation_name.group(1) == self.operation_id
+        if not valid_operation and (not match or int(match.group(1)) <= 0):
             raise DocumentStorageError('DOCUMENT_STORAGE_NAME_INVALID')
         current = os.stat(self.document_name, dir_fd=self.root_fd, follow_symlinks=False)
         if not stat.S_ISDIR(current.st_mode) or _identity(current) != _identity(os.fstat(self.document_fd)):
@@ -207,5 +211,5 @@ class StagedDocument:
         self.close()
 
 
-def stage_document(root, document_id, content, digest):
-    return StagedDocument(root, document_id, content, digest)
+def stage_document(root, document_id, content, digest, *, operation_id=None):
+    return StagedDocument(root, document_id, content, digest, operation_id=operation_id)

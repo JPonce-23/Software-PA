@@ -80,7 +80,7 @@ function obtenerTokenCSRF() {
  */
 class ErrorAPI extends Error {
 
-    constructor(status, detail, mensaje) {
+    constructor(status, detail, mensaje, documentErrorCode = null) {
 
         super(mensaje);
 
@@ -89,6 +89,8 @@ class ErrorAPI extends Error {
         this.status = status;
 
         this.detail = detail;
+        this.documentErrorCode = typeof documentErrorCode === "string" && /^[A-Z0-9_]{1,64}$/.test(documentErrorCode)
+            ? documentErrorCode : null;
 
     }
 
@@ -170,7 +172,8 @@ async function request(
         carga,
         signal,
         tipoRespuesta = "json",
-        conMetadatos = false
+        conMetadatos = false,
+        idempotencyKey = null
     } = {}
 ) {
 
@@ -188,6 +191,7 @@ async function request(
         const metodosConCSRF = ["POST", "PATCH", "DELETE", "PUT"];
 
         const encabezados = {};
+        if (idempotencyKey !== null) encabezados["Idempotency-Key"] = idempotencyKey;
 
         let cuerpoFinal = undefined;
 
@@ -296,7 +300,8 @@ async function request(
                     503: "El servicio no está disponible en este momento. Intenta de nuevo más tarde.",
                     504: "La consulta tardó demasiado. Reduce los filtros y vuelve a intentarlo.",
                     507: "No se pudo almacenar el archivo. Solicita ayuda al administrador."
-                }[respuesta.status] || formatearDetalle(detail))
+                }[respuesta.status] || formatearDetalle(detail)),
+                respuesta.headers.get("X-Document-Error-Code")
             );
 
         }

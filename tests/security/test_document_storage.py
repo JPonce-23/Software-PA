@@ -297,13 +297,13 @@ class ServiceFailureTests(unittest.TestCase):
         self.env = patch.dict(os.environ, {'UPLOAD_ROOT': str(self.root)}, clear=True)
         self.env.start(); self.addCleanup(self.env.stop)
         self.ns = service_functions(); self.user = type('User', (), {'id_usuario': 3})()
+        self.ns['_upload_actor'].return_value = self.user
         self.db = MagicMock(); query = self.db.query.return_value
         query.filter.return_value = query; query.first.return_value = None; query.scalar.return_value = 0
 
     def upload(self):
-        async def read(size): return minimal_pdf()
-        upload = type('Upload', (), {'filename': 'synthetic.pdf', 'content_type': 'application/pdf'})()
-        upload.read = read
+        upload = type('Upload', (), {'filename': 'synthetic.pdf', 'content_type': 'application/pdf',
+            'file': io.BytesIO(minimal_pdf())})()
         return asyncio.run(self.ns['store_version'](self.db, 7, upload, self.user))
 
     def test_lost_commit_ack_never_deletes_potentially_committed_bytes(self):
@@ -328,27 +328,29 @@ class ServiceFailureTests(unittest.TestCase):
         self.assertEqual(len(list(self.root.rglob('*.pdf'))), 1)
         self.assertEqual(list(self.root.rglob('.pending-*')), []); self.db.rollback.assert_called_once()
 
-    def test_refresh_failure_after_commit_and_rollback_failure_do_not_delete_file(self):
-        self.db.refresh.side_effect = RuntimeError('synthetic HTTP failure after commit')
+    def test_refresh_before_publication_and_failed_rollback_after_commit(self):
+        self.db.refresh.side_effect = RuntimeError('synthetic refresh before publication')
         with self.assertRaises(RuntimeError): self.upload()
-        self.assertEqual(len(list(self.root.rglob('*.pdf'))), 1)
+        self.assertEqual(len(list(self.root.rglob('*.pdf'))), 0)
+        self.db.commit.assert_not_called()
         self.assertEqual(list(self.root.rglob('.pending-*')), [])
         self.db.refresh.side_effect = None
         self.db.commit.side_effect = RuntimeError('synthetic commit')
         self.db.rollback.side_effect = RuntimeError('synthetic rollback')
-        with self.assertRaises(RuntimeError): self.upload()
-        self.assertEqual(len(list(self.root.rglob('*.pdf'))), 2)
+        with self.assertRaises(Exception) as caught: self.upload()
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(len(list(self.root.rglob('*.pdf'))), 1)
         self.assertEqual(list(self.root.rglob('.pending-*')), [])
 
     def test_storage_error_rejects_before_record_commit(self):
         # Inject failure only during storage, not the validation worker's stdin.
         original_stage = self.ns['stage_document']
-        def failing_stage(*args):
+        def failing_stage(*args, **kwargs):
             from contextlib import contextmanager
             @contextmanager
             def context():
                 with patch.object(storage.os, 'write', side_effect=OSError(errno.ENOSPC, 'synthetic')):
-                    with original_stage(*args) as staged:
+                    with original_stage(*args, **kwargs) as staged:
                         yield staged
             return context()
         self.ns['stage_document'] = failing_stage

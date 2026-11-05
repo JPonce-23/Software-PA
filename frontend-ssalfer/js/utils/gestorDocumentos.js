@@ -98,7 +98,16 @@
                             const version = lista.find(v => v.id_documento_version === Number(b.dataset.registro));
                             await g().descargar(`/documentos/versiones/${version.id_documento_version}/descarga`, version.nombre_original);
                         } else if (b.dataset.gestion === "subir") {
-                            const nuevo = await formulario({ titulo: "Subir nueva versión", campos: [campo("archivo", "Archivo", { tipo: "file", requerido: true, ayuda: "PDF, DOCX, XLSX, JPG, JPEG o PNG. Máximo 20 MB." })], preparar: form => { form.elements.archivo.accept = ".pdf,.docx,.xlsx,.jpg,.jpeg,.png"; }, guardar: datos => { const payload = new FormData(); payload.append("archivo", datos.archivo); return api().subirVersion(documento.id_documento, payload); } });
+                            let archivoCarga = null, claveCarga = null;
+                            const nuevo = await formulario({ titulo: "Subir nueva versión", campos: [campo("archivo", "Archivo", { tipo: "file", requerido: true, ayuda: "PDF, DOCX, XLSX, JPG, JPEG o PNG. Máximo 20 MB." })], preparar: form => { form.elements.archivo.accept = ".pdf,.docx,.xlsx,.jpg,.jpeg,.png"; }, guardar: datos => {
+                                // La misma selección conserva su clave si Guardar falla o pierde la respuesta.
+                                if (datos.archivo !== archivoCarga) {
+                                    const nuevaClave = api().nuevaClaveCarga();
+                                    archivoCarga = datos.archivo; claveCarga = nuevaClave;
+                                }
+                                const payload = new FormData(); payload.append("archivo", datos.archivo);
+                                return api().subirVersion(documento.id_documento, payload, claveCarga);
+                            } });
                             if (nuevo) { await notificar(objetivo()); modal.querySelector("[data-modal-cerrar]").click(); await versiones(documento); }
                         }
                     } catch (error) { window.ClienteAPI.mostrarErrorAPI(error); }

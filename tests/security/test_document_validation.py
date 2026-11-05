@@ -221,8 +221,7 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(self.validate(package(parts), '.docx'), validator.MIME_BY_EXTENSION['.docx'])
 
 
-class HTTPError(Exception):
-    def __init__(self, status_code, detail): self.status_code, self.detail = status_code, detail
+from fastapi import HTTPException as HTTPError
 
 
 class Version:
@@ -232,16 +231,36 @@ class Version:
 
 def service_functions():
     tree = ast.parse((ROOT / 'backend/app/services/documents.py').read_text())
-    names = {'store_version', '_safe_original_name', 'upload_root', 'safe_version_path'}
+    names = {'store_version', '_store_version_worker', '_confirm_version', '_authorize_upload',
+        '_rollback_upload', '_safe_original_name', 'upload_root', 'safe_version_path'}
     nodes = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in names]
     from starlette.concurrency import run_in_threadpool
-    ns = dict(run_in_threadpool=run_in_threadpool, Path=Path, os=os, re=re, uuid=uuid, hashlib=hashlib, func=MagicMock(),
+    from anyio import CancelScope
+    from sqlalchemy.exc import DBAPIError, IntegrityError, TimeoutError as SQLTimeoutError
+    from _document_journal_doubles import JournalDouble
+    from app.services.document_errors import (document_error, error_code, DOCUMENT_DUPLICATE,
+        DOCUMENT_RECONCILIATION_REQUIRED, DOCUMENT_OPERATION_PENDING,
+        DOCUMENT_INTEGRITY_CONFLICT, DOCUMENT_REQUEST_CONFLICT)
+    def sessions(db):
+        db.__enter__.return_value = db
+        db.__exit__.return_value = False
+        db.connection.return_value.get_isolation_level.return_value = 'READ COMMITTED'
+        db.execute.return_value.scalar_one_or_none.return_value = 7
+        return lambda: db
+    ns = dict(run_in_threadpool=run_in_threadpool, asyncio=asyncio, CancelScope=CancelScope, operations=JournalDouble(),
+        DBAPIError=DBAPIError, IntegrityError=IntegrityError, SQLTimeoutError=SQLTimeoutError,
+        inspect=lambda user: SimpleNamespace(identity=(user.id_usuario,)),
+        _upload_sessions=sessions, _upload_actor=MagicMock(), select=MagicMock(), text=MagicMock(),
+        Path=Path, os=os, re=re, uuid=uuid, hashlib=hashlib, func=MagicMock(),
         ALLOWED_EXTENSIONS={'.pdf', '.docx', '.xlsx', '.jpg', '.jpeg', '.png'}, MAX_UPLOAD_BYTES=65536,
-        models=SimpleNamespace(DocumentoVersion=Version), require_document_access=MagicMock(),
+        models=SimpleNamespace(DocumentoVersion=Version, Documento=SimpleNamespace(id_documento=MagicMock())), require_document_access=MagicMock(),
         set_audit_context=MagicMock(), HTTPException=HTTPError,
         DocumentStorageError=storage.DocumentStorageError, stage_document=storage.stage_document,
         storage_event=MagicMock(),
         DocumentValidationError=validator.DocumentValidationError, validate_document=validator.validate_document)
+    ns.update({name: value for name, value in locals().items()
+        if name in {'document_error', 'error_code', 'DOCUMENT_DUPLICATE', 'DOCUMENT_RECONCILIATION_REQUIRED',
+                    'DOCUMENT_OPERATION_PENDING', 'DOCUMENT_INTEGRITY_CONFLICT', 'DOCUMENT_REQUEST_CONFLICT'}})
     future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
     exec(compile(ast.fix_missing_locations(ast.Module(body=[future, *nodes], type_ignores=[])), 'isolated_documents', 'exec'), ns)
     return ns
@@ -253,14 +272,16 @@ class IntegrationBoundaryTests(unittest.TestCase):
         self.env = patch.dict(os.environ, {'UPLOAD_ROOT': self.directory.name}, clear=True)
         self.env.start(); self.addCleanup(self.env.stop)
         self.ns = service_functions(); self.user = SimpleNamespace(id_usuario=3)
+        self.ns['_upload_actor'].return_value = self.user
         self.db = MagicMock(); q = self.db.query.return_value
         q.filter.return_value = q; q.first.return_value = None; q.scalar.return_value = 0
 
     def upload(self, data, name='document.pdf', mime='application/pdf'):
         calls = []
-        async def read(maximum): calls.append(maximum); return data[:maximum]
+        class File(io.BytesIO):
+            def read(self, maximum): calls.append(maximum); return super().read(maximum)
         result = asyncio.run(self.ns['store_version'](self.db, 7,
-            SimpleNamespace(filename=name, content_type=mime, read=read), self.user))
+            SimpleNamespace(filename=name, content_type=mime, file=File(data)), self.user))
         self.assertEqual(calls, [65537]); return result
 
     def test_canonical_mime_persisted_raw_bytes_sha_name_and_version_unchanged(self):
@@ -271,7 +292,8 @@ class IntegrationBoundaryTests(unittest.TestCase):
         self.assertEqual(result.nombre_original, 'synthetic.pdf')
         self.assertEqual((result.numero_version, result.tamano_bytes), (1, len(data)))
         self.assertEqual((Path(self.directory.name) / result.ruta_almacenamiento).read_bytes(), data)
-        self.ns['require_document_access'].assert_called_once_with(self.db, self.user, 7, mode='capture')
+        self.assertEqual(self.ns['require_document_access'].call_count, 2)  # Before read and again after parent lock.
+        self.ns['require_document_access'].assert_called_with(self.db, self.user, 7, mode='capture')
         self.db.commit.assert_called_once()
 
     def test_invalid_content_or_mime_rejected_before_version_lookup_or_file_write(self):
@@ -296,6 +318,7 @@ class IntegrationBoundaryTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as caught: self.upload(minimal_pdf())
         self.assertEqual(caught.exception.status_code, 409)
         self.db.query.return_value.first.return_value = None
+        self.db.rollback.reset_mock()
         self.db.commit.side_effect = RuntimeError('SS06 SYNTH DRIVER DETAIL')
         with self.assertRaises(HTTPError) as caught: self.upload(minimal_pdf())
         self.assertEqual(caught.exception.status_code, 409)
