@@ -17,6 +17,7 @@ from app.services import gis_ingestion as ing
 FIXED_KEYS = {
     'PATH', 'LANG', 'LC_ALL', 'TZ', 'HOME', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME',
     'TMPDIR', 'CPL_TMPDIR', 'GDAL_CONFIG_FILE', 'PROJ_NETWORK',
+    'GDAL_DRIVER_PATH', 'OGR_DRIVER_PATH', 'GDAL_SKIP',
     'GDAL_DISABLE_READDIR_ON_OPEN', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS',
     'CPL_CURL_VERBOSE', 'OGR_GEOJSON_MAX_OBJ_SIZE',
 }
@@ -40,6 +41,9 @@ class EnvironmentTests(unittest.TestCase):
         self.assertNotIn('SYNTHETIC-SECRET-ONLY', env.values())
         self.assertEqual(env['PROJ_NETWORK'], 'OFF')
         self.assertEqual(env['GDAL_CONFIG_FILE'], '/dev/null')
+        self.assertEqual(env['GDAL_SKIP'], 'netCDF')
+        self.assertEqual(env['GDAL_DRIVER_PATH'], 'disable')
+        self.assertEqual(env['OGR_DRIVER_PATH'], 'disable')
 
     def test_all_credentials_and_unknown_institutional_settings_excluded(self):
         with patch.dict(os.environ, {key: 'SYNTHETIC-SECRET-ONLY' for key in SECRET_NAMES}):
@@ -101,7 +105,8 @@ class EnvironmentTests(unittest.TestCase):
                     result = ing.inspect_dataset(source)
                 command = popen.call_args.args[0]
                 self.assertIsInstance(command, list)
-                self.assertEqual(command, ['ogrinfo', '-ro', '-so', '-al', '-json', str(source)])
+                self.assertEqual(command, ['ogrinfo', *[arg for driver in ing.INPUT_DRIVERS for arg in ('-if', driver)],
+                    '-ro', '-so', '-al', '-json', str(source)])
                 self.assertEqual(result.format, fmt)
                 self.assertFalse(popen.call_args.kwargs['shell'])
                 self.assert_restricted(popen.call_args.kwargs['env'])
@@ -116,6 +121,7 @@ class EnvironmentTests(unittest.TestCase):
                 command = popen.call_args.args[0]
                 self.assertEqual(result, [('layer0', row())])
                 self.assertEqual(command[0], 'ogr2ogr')
+                self.assertEqual(command[1:11], [arg for driver in ing.INPUT_DRIVERS for arg in ('-if', driver)])
                 self.assertIn('GeoJSONSeq', command)
                 self.assertIn('EPSG:4326', command)
                 self.assertIn('COORDINATE_PRECISION=15', command)
@@ -163,6 +169,20 @@ class EnvironmentTests(unittest.TestCase):
                 self.assert_restricted(popen.call_args.kwargs['env'])
             proc.kill.assert_called_once();proc.wait.assert_called_once()
             self.assertTrue(proc.stdout.closed)
+
+    def test_driver_metadata_must_match_exact_allowlist(self):
+        for driver in ['netCDF', 'OGR_VRT', 'CSV', 'GeoJSONSeq', 'FakeKML', 'GeoJSONevil']:
+            with self.subTest(driver=driver), process_output([json.dumps(metadata(driver=driver)).encode()]):
+                with self.assertRaises(ing.IngestionError) as error:
+                    ing.inspect_dataset(Path('/tmp/staging/disguised.gpkg'))
+                self.assertEqual(error.exception.code, 'FORMATO_NO_SOPORTADO')
+
+    def test_unknown_utility_is_rejected_without_launch(self):
+        with process_output([]) as (_, popen):
+            with self.assertRaises(ing.IngestionError) as error:
+                list(ing._process_chunks(['gdal_translate', 'synthetic'], 1024))
+            self.assertEqual(error.exception.code, 'GDAL_COMANDO_INVALIDO')
+            popen.assert_not_called()
 
     def test_missing_binary_returns_controlled_error(self):
         with patch.object(ing.subprocess, 'Popen', side_effect=FileNotFoundError()):

@@ -15,6 +15,13 @@ from typing import Iterator
 from .gis_limits import load_limits
 
 
+# Passed to GDALOpenEx by both utilities, before Identify/Open is attempted.
+# Never derive this policy from filename, detected metadata or environment.
+INPUT_DRIVERS = ("GeoJSON", "KML", "LIBKML", "GPKG", "ESRI Shapefile")
+DRIVER_FORMATS = {"GeoJSON": "geojson", "KML": "kml", "LIBKML": "kml",
+                  "GPKG": "gpkg", "ESRI Shapefile": "shp"}
+
+
 class IngestionError(RuntimeError):
     def __init__(self, code: str, public_detail: str):
         super().__init__(public_detail)
@@ -77,6 +84,10 @@ def _gdal_environment() -> dict[str, str]:
         "TMPDIR": "/tmp",
         "CPL_TMPDIR": "/tmp",
         "GDAL_CONFIG_FILE": "/dev/null",
+        "GDAL_DRIVER_PATH": "disable",
+        "OGR_DRIVER_PATH": "disable",
+        # Defense in depth for CVE-2026-49014, including indirect opens.
+        "GDAL_SKIP": "netCDF",
         "PROJ_NETWORK": "OFF",
         "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
         "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": "",
@@ -99,6 +110,12 @@ def _gdal_environment() -> dict[str, str]:
 
 def _process_chunks(command: list[str], max_bytes: int) -> Iterator[bytes]:
     """Bound stdout before accumulation; always reap the direct GDAL child."""
+    if not command or command[0] not in {"ogrinfo", "ogr2ogr"}:
+        raise IngestionError("GDAL_COMANDO_INVALIDO", "Comando GIS no autorizado.")
+    # One launch boundary enforces the input allowlist even for new callers.
+    # GeoJSONSeq is an output driver only and is deliberately absent here.
+    command = [command[0], *[arg for driver in INPUT_DRIVERS for arg in ("-if", driver)],
+               *command[1:]]
     timeout = int(os.getenv("IMPORT_GDAL_TIMEOUT_SECONDS", "300"))
     try:
         process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
@@ -197,16 +214,8 @@ def _feature_count(value) -> int:
 def inspect_dataset(path: Path) -> DatasetInfo:
     metadata = _run_json(["ogrinfo", "-ro", "-so", "-al", "-json", str(path)])
     driver = str(metadata.get("driverShortName") or metadata.get("driverLongName") or "")
-    driver_normalized = driver.lower()
-    if "kml" in driver_normalized:
-        detected_format = "kml"
-    elif "geojson" in driver_normalized:
-        detected_format = "geojson"
-    elif "esri shapefile" in driver_normalized or driver_normalized == "shapefile":
-        detected_format = "shp"
-    elif "gpkg" in driver_normalized or "geopackage" in driver_normalized:
-        detected_format = "gpkg"
-    else:
+    detected_format = DRIVER_FORMATS.get(driver)
+    if detected_format is None:
         raise IngestionError(
             "FORMATO_NO_SOPORTADO",
             "El contenido detectado no es KML, GeoJSON, GeoPackage ni Shapefile.",
