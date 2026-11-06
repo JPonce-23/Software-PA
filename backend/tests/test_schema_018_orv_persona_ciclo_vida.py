@@ -5,6 +5,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from pathlib import Path
 
 import pytest
 from sqlalchemy import text
@@ -543,34 +544,21 @@ def test_018_backfill_specific_record_from_017_transition(transactional_api):
     connection = transactional_api["connection"]
     savepoint = connection.begin_nested()
     try:
-        # 1. Comprueba los registros históricos específicos migrados en la base
-        rows = connection.execute(
-            text(
-                """
-                SELECT oi.id_orv_integrante, oi.fecha_inicio, oi.fecha_fin,
-                       c.codigo AS tipo_fin_codigo
-                  FROM orv_integrante oi
-                  JOIN catalogo_operativo c ON c.id_catalogo_opcion = oi.id_tipo_fin
-                 WHERE oi.fecha_fin IS NOT NULL
-                 ORDER BY oi.id_orv_integrante
-                 LIMIT 5
-                """
-            )
-        ).mappings().all()
-        assert len(rows) > 0, "Debe existir al menos un registro histórico migrado"
-        for r in rows:
-            assert r["fecha_fin"] is not None
-            assert r["tipo_fin_codigo"] == "sin_clasificar"
-            assert r["tipo_fin_codigo"] not in {
-                "termino_periodo",
-                "remocion_asamblea",
-                "sustitucion",
-                "fallecimiento",
-                "correccion",
-                "otro",
-            }
-
-        # 2. Prueba aislada de transición que recrea la estructura de schema 017
+        # Una fecha_fin no demuestra origen pre-018: otras pruebas y las APIs
+        # crean finalizaciones con causas explícitas válidas. La muestra 017 y
+        # su catálogo son propios de este savepoint, incluso sin historia real.
+        connection.execute(text("""
+            CREATE TEMP TABLE catalogo_fin_018_sample ON COMMIT DROP AS
+            SELECT id_catalogo_opcion, tipo_catalogo, codigo, activo
+            FROM public.catalogo_operativo
+            WHERE tipo_catalogo = 'tipo_fin_orv_integrante'
+              AND codigo <> 'sin_clasificar'
+        """))
+        connection.execute(text("""
+            INSERT INTO catalogo_fin_018_sample
+                (id_catalogo_opcion, tipo_catalogo, codigo, activo)
+            VALUES (-1, 'tipo_fin_orv_integrante', 'sin_clasificar', true)
+        """))
         connection.execute(
             text(
                 """
@@ -601,7 +589,7 @@ def test_018_backfill_specific_record_from_017_transition(transactional_api):
             text(
                 """
                 SELECT id_catalogo_opcion
-                  FROM catalogo_operativo
+                  FROM catalogo_fin_018_sample
                  WHERE tipo_catalogo = 'tipo_fin_orv_integrante'
                    AND codigo = 'sin_clasificar'
                    AND activo
@@ -609,16 +597,17 @@ def test_018_backfill_specific_record_from_017_transition(transactional_api):
             )
         ).scalar_one()
 
-        connection.execute(
-            text(
-                """
-                UPDATE orv_integrante_017_sample
-                   SET id_tipo_fin = :sin_clasificar_id
-                 WHERE fecha_fin IS NOT NULL
-                """
-            ),
-            {"sin_clasificar_id": sin_clasificar_id},
-        )
+        # Ejecutar el backfill versionado sobre las dos tablas temporales;
+        # no duplicar su lógica ni volver a migrar las relaciones públicas.
+        migration = (Path(__file__).resolve().parents[1] / "db" / "migrations"
+                     / "018_orv_persona_ciclo_vida.sql").read_text()
+        backfill = "UPDATE orv_integrante\n" + migration.split(
+            "UPDATE orv_integrante\n", 1)[1].split(";", 1)[0]
+        backfill = backfill.replace("UPDATE orv_integrante\n",
+                                    "UPDATE orv_integrante_017_sample\n", 1)
+        backfill = backfill.replace("FROM catalogo_operativo\n",
+                                    "FROM catalogo_fin_018_sample\n", 1)
+        connection.execute(text(backfill))
 
         samples = {
             r["identificador"]: r["id_tipo_fin"]
@@ -635,7 +624,7 @@ def test_018_backfill_specific_record_from_017_transition(transactional_api):
                 text(
                     """
                     SELECT id_catalogo_opcion
-                      FROM catalogo_operativo
+                      FROM catalogo_fin_018_sample
                      WHERE tipo_catalogo = 'tipo_fin_orv_integrante'
                        AND codigo IN ('termino_periodo', 'remocion_asamblea', 'sustitucion', 'fallecimiento')
                     """
