@@ -109,10 +109,16 @@ def router_functions():
     for model in ['DashboardKpi', 'ReporteAvancePeriodo', 'ReporteSnapshotActual',
                   'ProyectoNucleo', 'NucleoAgrario', 'Municipio', 'Afectacion']:
         setattr(models, model, SimpleNamespace(**{name: Field(name) for name in fields}))
-    def require(db, user, project):
+    def require(db, user, project, **kwargs):
         if project not in user.projects: raise HTTPError(403, 'Proyecto fuera de alcance')
     func = SimpleNamespace(count=lambda *args: Field('cantidad'), distinct=lambda f: f)
-    ns = dict(report_limits=limits, models=models, func=func, literal=lambda v: Field('literal'),
+    def csv_query(db, projects, year):
+        query = db.query(models.DashboardKpi).filter(models.DashboardKpi.id_proyecto.in_(projects))
+        if year is not None:
+            query = query.filter(models.DashboardKpi.anio == year)
+        return query.with_entities(*(getattr(models.DashboardKpi, n) for n in limits.CSV_COLUMNS)).order_by(
+            models.DashboardKpi.id_proyecto, models.DashboardKpi.anio, models.DashboardKpi.indicador)
+    ns = dict(report_limits=limits, dashboard_csv=SimpleNamespace(query=csv_query), models=models, func=func, literal=lambda v: Field('literal'),
         time=__import__('time'), Query=lambda *args, **kwargs: kwargs.get('default', args[0] if args else None),
         Depends=lambda *args: None, get_db=None, auth=SimpleNamespace(RoleChecker=lambda roles: None),
         READ_ROLES=['admin', 'operador', 'visualizador', 'geografo'],

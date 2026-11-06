@@ -51,7 +51,10 @@ _SHEET_TYPES = {'application/vnd.openxmlformats-officedocument.spreadsheetml.wor
 
 
 class DocumentValidationError(Exception):
-    def __init__(self, code, detail='El contenido no corresponde a un formato documental permitido.', status=422):
+    def __init__(self, code, detail=None, status=422):
+        if detail is None:
+            detail = ("La inspección documental no está disponible temporalmente; vuelva a intentarlo."
+                if status == 503 else "El contenido no corresponde a un formato documental permitido.")
         self.code, self.detail, self.status = code, detail, status
         super().__init__(detail)
 
@@ -612,7 +615,10 @@ def _inspect_in_process(data, extension, limits):
             process.communicate(input=data, timeout=limits.worker_seconds)
         except subprocess.TimeoutExpired:
             _stop_worker(process)
-            _reject('DOCUMENT_PROCESS_LIMIT')
+            # Wall time includes scheduling and pipe transfer under contention.
+            # It does not prove malformed content or a consumed CPU budget.
+            # CPU/address-space/content limits below remain content rejections.
+            raise DocumentValidationError('DOCUMENT_INSPECTION_TIMEOUT', status=503)
         except BaseException:
             _stop_worker(process)
             raise

@@ -26,6 +26,26 @@ class HTTPErrorCodeTests(unittest.TestCase):
         self.assertEqual(response.headers[errors.HEADER],expected)
         self.assertIsInstance(response.json()['detail'],str)
         self.assertFalse(any(name in response.headers for name in ['X-Document-Operation-Id','X-Document-Path','X-Document-Hash']))
+    def test_inspection_failures_are_classified_before_any_idempotent_reservation(self):
+        from app.services.document_validation import DocumentValidationError
+        c = self.fixture()
+        for code, status in [('DOCUMENT_INSPECTION_TIMEOUT', 503),
+                             ('DOCUMENT_INSPECTION_BUSY', 503),
+                             ('DOCUMENT_INSPECTION_UNAVAILABLE', 503),
+                             ('DOCUMENT_FORMAT_INVALID', 422),
+                             ('DOCUMENT_PROCESS_LIMIT', 422)]:
+            with self.subTest(code=code), patch.object(service, 'validate_document',
+                    side_effect=DocumentValidationError(code, status=status)):
+                response = c.post(c.key)
+            self.code(response, code, status)
+            if status == 503:
+                self.assertNotIn('formato', response.json()['detail'])
+            self.assertEqual(c.fake.records, {})
+            self.assertFalse(c.files())
+        # The same key remains usable after a pre-reservation failure.
+        self.assertEqual(c.post(c.key).status_code, 201)
+        self.assertEqual(c.post(c.key).status_code, 200)
+
     def test_duplicate_first_response_and_rejected_retry_keep_code_without_publishing(self):
         c=self.fixture();first=c.post(c.key);self.assertEqual(first.status_code,201)
         c.query.first.return_value=SimpleNamespace(id_documento_version=1)

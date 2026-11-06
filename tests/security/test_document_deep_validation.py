@@ -214,9 +214,24 @@ class ProcessIsolationTests(unittest.TestCase):
             with self.assertRaises(validator.DocumentValidationError) as caught:
                 validator.validate_document(minimal_pdf(), '.pdf', None, max_file_bytes=65536,
                     limits=replace(validator.InspectionLimits(), worker_seconds=1))
-        self.assertEqual(caught.exception.code, 'DOCUMENT_PROCESS_LIMIT')
+        self.assertEqual((caught.exception.code, caught.exception.status), ('DOCUMENT_INSPECTION_TIMEOUT', 503))
+        self.assertNotIn('formato', caught.exception.detail)
         self.assertEqual(children[0].returncode, -signal.SIGKILL)
         self.assertIsNotNone(children[0].poll())
+
+    def test_content_and_hard_resource_rejections_stay_422(self):
+        for returncode in (20, 20 + validator._WORKER_CODES.index('DOCUMENT_PROCESS_LIMIT'), -signal.SIGKILL):
+            process = MagicMock(returncode=returncode)
+            with self.subTest(returncode=returncode), patch.object(validator.subprocess, 'Popen', return_value=process):
+                with self.assertRaises(validator.DocumentValidationError) as caught:
+                    validator.validate_document(minimal_pdf(), '.pdf', None, max_file_bytes=65536)
+                self.assertEqual(caught.exception.status, 422)
+
+    def test_unavailable_inspection_never_claims_invalid_format(self):
+        for code in ('DOCUMENT_INSPECTION_BUSY', 'DOCUMENT_INSPECTION_UNAVAILABLE', 'DOCUMENT_INSPECTION_TIMEOUT'):
+            exc = validator.DocumentValidationError(code, status=503)
+            self.assertNotIn('formato', exc.detail)
+            self.assertIn('temporalmente', exc.detail)
 
     def resource_probe(self, body):
         limits = replace(validator.InspectionLimits(), worker_cpu_seconds=1, worker_memory_bytes=128*1024**2)

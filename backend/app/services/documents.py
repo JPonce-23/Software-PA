@@ -1,6 +1,7 @@
 """Controlled document links and immutable file versions."""
 
 import asyncio
+import logging
 import hashlib
 import os
 import re
@@ -313,7 +314,11 @@ def _store_version_worker(db, document_id, upload, actor_id, request_key, client
         canonical_mime = validate_document(content, extension, upload.content_type,
             max_file_bytes=MAX_UPLOAD_BYTES)
     except DocumentValidationError as exc:
-        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+        logging.getLogger(__name__).warning(
+            "document_validation_rejected code=%s status=%s correlation=%s",
+            exc.code, exc.status, request_key)
+        raise HTTPException(status_code=exc.status, detail=exc.detail,
+            headers={"X-Document-Error-Code": exc.code}) from exc
     digest = hashlib.sha256(content).hexdigest()
     metadata = dict(id_documento=document_id, id_usuario=actor_id, hash_sha256=digest,
         tamano_bytes=len(content), nombre_original=original, tipo_mime=canonical_mime, extension=extension)

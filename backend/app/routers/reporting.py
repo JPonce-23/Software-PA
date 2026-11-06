@@ -14,7 +14,7 @@ from ..database import get_db
 from ..services.access import authorized_project_ids, require_project_access, require_project_nucleus_access
 from ..services import convenio_reports, dashboard_summary, map_summary
 from ..services import report_references as report_references_service
-from ..services import report_limits
+from ..services import report_limits, dashboard_csv
 
 
 router = APIRouter(tags=["Dashboard y mapa"])
@@ -737,10 +737,12 @@ def export_dashboard(
         try:
             limits = report_limits.load_limits()
             deadline = time.monotonic() + limits.build_seconds if limits.build_seconds is not None else None
-            query = _dashboard_query(db, user, id_proyecto, anio).with_entities(
-                *(getattr(models.DashboardKpi, name) for name in report_limits.CSV_COLUMNS)
-            ).order_by(models.DashboardKpi.id_proyecto, models.DashboardKpi.anio,
-                       models.DashboardKpi.indicador).limit(limits.rows + 1)
+            if id_proyecto is not None:
+                require_project_access(db, user, id_proyecto, load_details=False)
+                scope = [id_proyecto]
+            else:
+                scope = authorized_project_ids(db, user)
+            query = dashboard_csv.query(db, scope, anio).limit(limits.rows + 1)
             result = db.execute(query.statement, execution_options={"yield_per": limits.batch_rows,
                 "stream_results": True, "max_row_buffer": limits.batch_rows})
             try:
@@ -768,7 +770,7 @@ def project_map(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(READ_ROLES)),
 ):
-    require_project_access(db, user, id_proyecto)
+    require_project_access(db, user, id_proyecto, load_details=False)
     traces = db.query(
         models.TrazoProyecto.id_trazo.label("id"),
         models.TrazoProyecto.version.label("nombre"),

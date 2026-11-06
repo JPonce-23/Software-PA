@@ -247,7 +247,7 @@ def service_functions():
         db.connection.return_value.get_isolation_level.return_value = 'READ COMMITTED'
         db.execute.return_value.scalar_one_or_none.return_value = 7
         return lambda: db
-    ns = dict(run_in_threadpool=run_in_threadpool, asyncio=asyncio, CancelScope=CancelScope, operations=JournalDouble(),
+    ns = dict(logging=__import__('logging'), run_in_threadpool=run_in_threadpool, asyncio=asyncio, CancelScope=CancelScope, operations=JournalDouble(),
         DBAPIError=DBAPIError, IntegrityError=IntegrityError, SQLTimeoutError=SQLTimeoutError,
         inspect=lambda user: SimpleNamespace(identity=(user.id_usuario,)),
         _upload_sessions=sessions, _upload_actor=MagicMock(), select=MagicMock(), text=MagicMock(),
