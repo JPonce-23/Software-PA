@@ -26,6 +26,21 @@ class HTTPErrorCodeTests(unittest.TestCase):
         self.assertEqual(response.headers[errors.HEADER],expected)
         self.assertIsInstance(response.json()['detail'],str)
         self.assertFalse(any(name in response.headers for name in ['X-Document-Operation-Id','X-Document-Path','X-Document-Hash']))
+    def test_memory_admission_refusal_is_retryable_without_an_intent(self):
+        c = self.fixture()
+        gate = service._UPLOAD_MEMORY_SLOTS
+        gate.acquire(); gate.acquire()
+        try:
+            with patch.object(service, 'validate_document', side_effect=AssertionError('must not read/inspect')):
+                response = c.post(c.key)
+            self.code(response, 'DOCUMENT_INSPECTION_BUSY', 503)
+            self.assertEqual(c.fake.records, {})
+            self.assertFalse(c.files())
+        finally:
+            gate.release(); gate.release()
+        self.assertEqual(c.post(c.key).status_code, 201)
+        self.assertEqual(c.post(c.key).status_code, 200)
+
     def test_inspection_failures_are_classified_before_any_idempotent_reservation(self):
         from app.services.document_validation import DocumentValidationError
         c = self.fixture()

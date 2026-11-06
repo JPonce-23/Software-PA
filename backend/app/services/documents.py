@@ -5,6 +5,7 @@ import logging
 import hashlib
 import os
 import re
+import threading
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
@@ -29,6 +30,11 @@ from .document_errors import (document_error, error_code, DOCUMENT_DUPLICATE,
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png"}
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
+# Match the inspector's two slots per worker, but cover the full input lifetime.
+# Reject before reading the spooled upload into RAM; do not queue full files
+# while inspection, SS-12 registration or publication is busy.
+_UPLOAD_MEMORY_SLOTS = threading.BoundedSemaphore(2)
+
 
 
 def upload_root() -> Path:
@@ -307,65 +313,78 @@ def _store_version_worker(db, document_id, upload, actor_id, request_key, client
     extension = Path(original).suffix.lower()
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=422, detail="Tipo de archivo no permitido")
-    content = upload.file.read(MAX_UPLOAD_BYTES + 1)
-    if not content or len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail=f"Archivo vacío o demasiado grande. Máximo {MAX_UPLOAD_BYTES} bytes ({MAX_UPLOAD_BYTES / 1024**2:g} MiB).")
-    try:
-        canonical_mime = validate_document(content, extension, upload.content_type,
-            max_file_bytes=MAX_UPLOAD_BYTES)
-    except DocumentValidationError as exc:
+    if not _UPLOAD_MEMORY_SLOTS.acquire(blocking=False):
+        error = DocumentValidationError('DOCUMENT_INSPECTION_BUSY', status=503)
         logging.getLogger(__name__).warning(
             "document_validation_rejected code=%s status=%s correlation=%s",
-            exc.code, exc.status, request_key)
-        raise HTTPException(status_code=exc.status, detail=exc.detail,
-            headers={"X-Document-Error-Code": exc.code}) from exc
-    digest = hashlib.sha256(content).hexdigest()
-    metadata = dict(id_documento=document_id, id_usuario=actor_id, hash_sha256=digest,
-        tamano_bytes=len(content), nombre_original=original, tipo_mime=canonical_mime, extension=extension)
-    authorize = lambda session: _authorize_upload(session, document_id, actor_id)
+            error.code, error.status, request_key)
+        raise HTTPException(status_code=error.status, detail=error.detail,
+            headers={"X-Document-Error-Code": error.code})
+    content = None
     try:
-        reservation = operations.reserve(sessions, document_id, actor_id, request_key,
-            metadata, authorize, client_key=client_key)
-    except (DBAPIError, SQLTimeoutError) as exc:
-        raise HTTPException(503, "La bitácora de cargas no está disponible; no se inició una publicación") from exc
-    if isinstance(reservation, models.DocumentoVersion):
-        return reservation
-    ticket = reservation
-    checkpoint_uncertain = False
-    confirmation_started = False
-    try:
-        root = upload_root()
-        with stage_document(root, document_id, content, digest, operation_id=ticket.id) as staged:
-            checkpoint_uncertain = True
-            operations.staged(sessions, ticket, staged.file_identity, authorize,
-                coordination_identity=staged.coordination.identity)
-            checkpoint_uncertain = False
-            # _confirm_version owns failure recording after the parent lock.
-            confirmation_started = True
-            return _confirm_version(sessions, document_id, actor_id, staged, dict(
-                id_documento=document_id, hash_sha256=digest, tamano_bytes=len(content),
-                nombre_original=original, tipo_mime=canonical_mime,
-                id_usuario_carga=actor_id, extension=extension,
-            ), ticket)
-    except BaseException as exc:
-        # A second recording is conditional and cannot downgrade a committed or
-        # rejected result. No state transition ever republishes a pending intent.
-        status = (exc.status_code if isinstance(exc, HTTPException) else exc.status
-            if isinstance(exc, DocumentStorageError) else 507 if isinstance(exc, OSError) else 503)
-        recovered = operations.failed(sessions, ticket, authorize,
-            uncertain=checkpoint_uncertain or confirmation_started, status=status,
-            code="CONFIRMATION_UNCONFIRMED" if confirmation_started else "STAGING_UNCONFIRMED" if checkpoint_uncertain else "STAGING_REJECTED")
-        if not isinstance(exc, Exception):
+        content = upload.file.read(MAX_UPLOAD_BYTES + 1)
+        if not content or len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"Archivo vacío o demasiado grande. Máximo {MAX_UPLOAD_BYTES} bytes ({MAX_UPLOAD_BYTES / 1024**2:g} MiB).")
+        try:
+            canonical_mime = validate_document(content, extension, upload.content_type,
+                max_file_bytes=MAX_UPLOAD_BYTES)
+        except DocumentValidationError as exc:
+            logging.getLogger(__name__).warning(
+                "document_validation_rejected code=%s status=%s correlation=%s",
+                exc.code, exc.status, request_key)
+            raise HTTPException(status_code=exc.status, detail=exc.detail,
+                headers={"X-Document-Error-Code": exc.code}) from exc
+        digest = hashlib.sha256(content).hexdigest()
+        metadata = dict(id_documento=document_id, id_usuario=actor_id, hash_sha256=digest,
+            tamano_bytes=len(content), nombre_original=original, tipo_mime=canonical_mime, extension=extension)
+        authorize = lambda session: _authorize_upload(session, document_id, actor_id)
+        try:
+            reservation = operations.reserve(sessions, document_id, actor_id, request_key,
+                metadata, authorize, client_key=client_key)
+        except (DBAPIError, SQLTimeoutError) as exc:
+            raise HTTPException(503, "La bitácora de cargas no está disponible; no se inició una publicación") from exc
+        if isinstance(reservation, models.DocumentoVersion):
+            return reservation
+        ticket = reservation
+        checkpoint_uncertain = False
+        confirmation_started = False
+        try:
+            root = upload_root()
+            with stage_document(root, document_id, content, digest, operation_id=ticket.id) as staged:
+                checkpoint_uncertain = True
+                operations.staged(sessions, ticket, staged.file_identity, authorize,
+                    coordination_identity=staged.coordination.identity)
+                checkpoint_uncertain = False
+                # _confirm_version owns failure recording after the parent lock.
+                confirmation_started = True
+                return _confirm_version(sessions, document_id, actor_id, staged, dict(
+                    id_documento=document_id, hash_sha256=digest, tamano_bytes=len(content),
+                    nombre_original=original, tipo_mime=canonical_mime,
+                    id_usuario_carga=actor_id, extension=extension,
+                ), ticket)
+        except BaseException as exc:
+            # A second recording is conditional and cannot downgrade a committed or
+            # rejected result. No state transition ever republishes a pending intent.
+            status = (exc.status_code if isinstance(exc, HTTPException) else exc.status
+                if isinstance(exc, DocumentStorageError) else 507 if isinstance(exc, OSError) else 503)
+            recovered = operations.failed(sessions, ticket, authorize,
+                uncertain=checkpoint_uncertain or confirmation_started, status=status,
+                code="CONFIRMATION_UNCONFIRMED" if confirmation_started else "STAGING_UNCONFIRMED" if checkpoint_uncertain else "STAGING_REJECTED")
+            if not isinstance(exc, Exception):
+                raise
+            if recovered is not None:
+                return recovered
+            if isinstance(exc, DocumentStorageError):
+                raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+            if isinstance(exc, OSError):
+                raise HTTPException(507, "No fue posible completar el almacenamiento documental") from exc
+            if isinstance(exc, (DBAPIError, SQLTimeoutError)):
+                raise HTTPException(503, "No fue posible confirmar la preparación de la carga; conserve la clave") from exc
             raise
-        if recovered is not None:
-            return recovered
-        if isinstance(exc, DocumentStorageError):
-            raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
-        if isinstance(exc, OSError):
-            raise HTTPException(507, "No fue posible completar el almacenamiento documental") from exc
-        if isinstance(exc, (DBAPIError, SQLTimeoutError)):
-            raise HTTPException(503, "No fue posible confirmar la preparación de la carga; conserve la clave") from exc
-        raise
+    finally:
+        # Release references even if an HTTP exception retains this frame.
+        content = None
+        _UPLOAD_MEMORY_SLOTS.release()
 
 
 async def store_version(

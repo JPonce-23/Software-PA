@@ -123,6 +123,17 @@ class ReadProjections(unittest.TestCase):
             login=client.post('/api/auth/sesiones',headers={'Origin':base},data={'username':os.environ['QA_USERNAME'],'password':os.environ['QA_PASSWORD']})
             self.assertEqual(login.status_code,200)
             headers={'Origin':base,'X-CSRF-Token':client.cookies['__Host-pa_csrf'],'Idempotency-Key':key}
+            gate = documents._UPLOAD_MEMORY_SLOTS
+            gate.acquire(); gate.acquire()
+            try:
+                with patch.object(documents, 'validate_document', side_effect=AssertionError('must not inspect')):
+                    refused=client.post(f'/api/documentos/{doc}/versiones',headers=headers,files={'archivo':('synthetic.pdf',content,'application/pdf')})
+                self.assertEqual(refused.status_code,503)
+                self.assertEqual(refused.headers['X-Document-Error-Code'],'DOCUMENT_INSPECTION_BUSY')
+                with self.engine.connect() as db:
+                    self.assertEqual(db.execute(text('SELECT count(*) FROM documento_operacion WHERE id_documento=:d'),{'d':doc}).scalar_one(),0)
+            finally:
+                gate.release(); gate.release()
             for code,status in [('DOCUMENT_INSPECTION_TIMEOUT',503),('DOCUMENT_INSPECTION_BUSY',503),('DOCUMENT_FORMAT_INVALID',422),('DOCUMENT_PROCESS_LIMIT',422)]:
                 with patch.object(documents,'validate_document',side_effect=DocumentValidationError(code,status=status)):
                     r=client.post(f'/api/documentos/{doc}/versiones',headers=headers,files={'archivo':('synthetic.pdf',content,'application/pdf')})

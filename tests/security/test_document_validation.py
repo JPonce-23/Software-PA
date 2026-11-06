@@ -247,7 +247,7 @@ def service_functions():
         db.connection.return_value.get_isolation_level.return_value = 'READ COMMITTED'
         db.execute.return_value.scalar_one_or_none.return_value = 7
         return lambda: db
-    ns = dict(logging=__import__('logging'), run_in_threadpool=run_in_threadpool, asyncio=asyncio, CancelScope=CancelScope, operations=JournalDouble(),
+    ns = dict(_UPLOAD_MEMORY_SLOTS=__import__('threading').BoundedSemaphore(2), logging=__import__('logging'), run_in_threadpool=run_in_threadpool, asyncio=asyncio, CancelScope=CancelScope, operations=JournalDouble(),
         DBAPIError=DBAPIError, IntegrityError=IntegrityError, SQLTimeoutError=SQLTimeoutError,
         inspect=lambda user: SimpleNamespace(identity=(user.id_usuario,)),
         _upload_sessions=sessions, _upload_actor=MagicMock(), select=MagicMock(), text=MagicMock(),
@@ -371,6 +371,47 @@ class IntegrationBoundaryTests(unittest.TestCase):
     def test_safe_path_and_allowed_extension_set_are_preserved(self):
         with self.assertRaises(HTTPError): self.ns['safe_version_path'](Version(ruta_almacenamiento='../outside.pdf'))
         self.assertNotIn('app.database', sys.modules); self.assertNotIn('app.main', sys.modules)
+
+
+class UploadAdmissionTests(unittest.TestCase):
+    setUp = IntegrationBoundaryTests.setUp
+    upload = IntegrationBoundaryTests.upload
+    def test_busy_upload_never_reads_or_reserves_a_full_input(self):
+        gate = self.ns['_UPLOAD_MEMORY_SLOTS']
+        gate.acquire(); gate.acquire()
+        stream = MagicMock()
+        upload = SimpleNamespace(filename='synthetic.pdf', content_type='application/pdf', file=stream)
+        try:
+            with self.assertRaises(HTTPError) as caught:
+                self.ns['_store_version_worker'](self.db, 7, upload, 3, uuid.uuid4(), True)
+            self.assertEqual(caught.exception.status_code, 503)
+            self.assertEqual(caught.exception.headers['X-Document-Error-Code'], 'DOCUMENT_INSPECTION_BUSY')
+            stream.read.assert_not_called()
+            self.ns['operations'].reserve.assert_not_called()
+        finally:
+            gate.release(); gate.release()
+
+    def test_slot_is_held_until_publication_and_released_after_validation_error(self):
+        gate = self.ns['_UPLOAD_MEMORY_SLOTS']
+        original = self.ns['validate_document']
+        def observed(*args, **kwargs):
+            self.assertTrue(gate.acquire(blocking=False))
+            try:self.assertFalse(gate.acquire(blocking=False))
+            finally:gate.release()
+            return original(*args, **kwargs)
+        self.ns['validate_document'] = observed
+        stage = self.ns['stage_document']
+        def observed_stage(*args, **kwargs):
+            self.assertTrue(gate.acquire(blocking=False))
+            try:self.assertFalse(gate.acquire(blocking=False))
+            finally:gate.release()
+            return stage(*args, **kwargs)
+        self.ns['stage_document'] = observed_stage
+        self.upload(minimal_pdf())
+        for payload in (b'not a PDF', b''):
+            with self.assertRaises(HTTPError):self.upload(payload)
+            self.assertTrue(gate.acquire(blocking=False)); self.assertTrue(gate.acquire(blocking=False))
+            gate.release(); gate.release()
 
 
 if __name__ == '__main__': unittest.main()
