@@ -81,7 +81,7 @@
   "github": {
     "dependabot_file_present": false,
     "effective_branch_protection": "not_observed",
-    "local_workflow_count": 0,
+    "local_workflow_count": 1,
     "rulesets": "not_observed",
     "secrets": "not_accessed"
   },
@@ -173,7 +173,6 @@
     "INSTITUTIONAL_PROFILE_PENDING_APPROVAL",
     "MUTABLE_IMAGE_REFERENCES",
     "NATIVE_AND_INSTALLED_ARTIFACTS_UNOBSERVED",
-    "NO_LOCAL_WORKFLOW_CONFIGURATION",
     "PYTHON_DISTRIBUTION_HASHES_UNVERIFIED",
     "PYTHON_GRAPH_UNVERIFIED"
   ],
