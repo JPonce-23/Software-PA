@@ -98,3 +98,5 @@ jobs:
           done
           # Local declarations/integrity only; not an installed SBOM or SCA.
           python -B docs/security/ss09/verificar_cadena.py
+      - name: Verify SheetJS against pinned official distribution
+        run: python -B frontend-ssalfer/tools/verificar_sheetjs.py
