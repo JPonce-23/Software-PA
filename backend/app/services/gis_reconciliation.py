@@ -47,8 +47,11 @@ def configure_project(db, project_id, srid, user):
         db.query(models.Proyecto).filter_by(id_proyecto=project_id).with_for_update().one()
         if not db.execute(text('SELECT EXISTS(SELECT 1 FROM spatial_ref_sys WHERE srid=:s)'), {'s':srid}).scalar_one():
             raise HTTPException(422, 'CRS de trabajo no registrado en PostGIS')
-        # Validate the registered CRS has a usable transformation, not just an ID.
-        db.execute(text('SELECT ST_Transform(ST_SetSRID(ST_Point(0,0),4326),:s)'), {'s':srid})
+        # Resolve the coordinate operation without probing an arbitrary location.
+        # (0,0) is outside UTM 14N's domain with newer PROJ releases. PostGIS
+        # initializes the transformation even for an empty geometry; actual
+        # feature coordinates are validated during import.
+        db.execute(text("SELECT ST_Transform(ST_GeomFromText('POINT EMPTY',4326),:s)"), {'s':srid})
         current = working_srid(db, project_id)
         if srid != current and db.query(models.ImportacionArchivo).filter(
             models.ImportacionArchivo.id_proyecto == project_id,

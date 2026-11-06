@@ -52,7 +52,7 @@ class SupplyChainTests(unittest.TestCase):
         self.assertEqual(json.dumps(one,sort_keys=True),json.dumps(two,sort_keys=True))
         self.assertEqual(one['assessment'],'incomplete_requires_qa')
         self.assertTrue(one['local_integrity_ok'])
-        self.assertEqual(len(one['python']),44);self.assertEqual(len(one['node']['locked']),0)
+        self.assertEqual(len(one['python']),38);self.assertEqual(len(one['node']['locked']),0)
         self.assertEqual(one['node']['source_status'],'absent_retired')
         self.assertEqual(len(one['vendors']['files']),20)
         parsers = {row['name']: row for row in one['python'] if row['name'] in ('pypdf', 'pillow')}
@@ -266,7 +266,7 @@ class SupplyChainTests(unittest.TestCase):
         self.assertTrue(all(row['matches_reviewed_baseline'] for row in tls['files']))
         self.assertTrue(tls['selective_copy'] and tls['deny_all_context'] and tls['compose_build_context_matches'])
         self.assertFalse(tls['extra_package_install_declared'])
-        self.assertEqual(tls['base_images'][0]['reference'],'nginx:1.27-alpine')
+        self.assertEqual(tls['base_images'][0]['reference'],'nginx:stable-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311')
         self.assertFalse(tls['base_images'][0]['actual_digest_verified'])
         self.assertEqual(result['deployment']['combinations'][-1]['files'],
             ['docker-compose.yml','docker-compose.ssalfer.yml','docker-compose.prod.yml'])

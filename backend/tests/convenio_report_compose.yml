@@ -1,7 +1,7 @@
 # Dedicated local test project: no host ports, host database, or persistent data.
 services:
   db:
-    image: postgis/postgis:15-3.3
+    image: postgis/postgis:15-3.6@sha256:91098df530c92202d69193ded45dd47e6d0b6a3117a6398b0abe2be365f23550
     pull_policy: never
     command: [postgres, -c, cluster_name=convenio-report-disposable]
     environment:

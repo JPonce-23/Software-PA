@@ -88,34 +88,34 @@
   "images": [
     {
       "actual_digest_verified": false,
-      "immutable_reference": false,
+      "immutable_reference": true,
       "platform": "not_observed",
-      "reference": "python:3.11-slim",
-      "review": "digest_pending",
+      "reference": "python:3.11-slim-trixie@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79",
+      "review": "digest_reference_only",
       "source": "backend/Dockerfile"
     },
     {
       "actual_digest_verified": false,
-      "immutable_reference": false,
+      "immutable_reference": true,
       "platform": "not_observed",
-      "reference": "nginx:1.27-alpine",
-      "review": "digest_pending",
+      "reference": "nginx:stable-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311",
+      "review": "digest_reference_only",
       "source": "frontend-ssalfer/deploy/Dockerfile"
     },
     {
       "actual_digest_verified": false,
-      "immutable_reference": false,
+      "immutable_reference": true,
       "platform": "not_observed",
-      "reference": "postgis/postgis:15-3.3",
-      "review": "digest_pending",
+      "reference": "postgis/postgis:15-3.6@sha256:91098df530c92202d69193ded45dd47e6d0b6a3117a6398b0abe2be365f23550",
+      "review": "digest_reference_only",
       "source": "docker-compose.yml"
     },
     {
       "actual_digest_verified": false,
-      "immutable_reference": false,
+      "immutable_reference": true,
       "platform": "not_observed",
-      "reference": "dpage/pgadmin4",
-      "review": "digest_pending",
+      "reference": "dpage/pgadmin4@sha256:40fa840c5bb7c8463957f1255b01283732c2d8c9396a956d180f8e6c296753b3",
+      "review": "digest_reference_only",
       "source": "docker-compose.yml"
     },
     {
@@ -128,10 +128,10 @@
     },
     {
       "actual_digest_verified": false,
-      "immutable_reference": false,
+      "immutable_reference": true,
       "platform": "not_observed",
-      "reference": "postgis/postgis:15-3.3",
-      "review": "digest_pending",
+      "reference": "postgis/postgis:15-3.6@sha256:91098df530c92202d69193ded45dd47e6d0b6a3117a6398b0abe2be365f23550",
+      "review": "digest_reference_only",
       "source": "backend/tests/convenio_report_compose.yml"
     },
     {
@@ -144,10 +144,10 @@
     },
     {
       "actual_digest_verified": false,
-      "immutable_reference": false,
+      "immutable_reference": true,
       "platform": "not_observed",
-      "reference": "postgis/postgis:15-3.3",
-      "review": "digest_pending",
+      "reference": "postgis/postgis:15-3.6@sha256:91098df530c92202d69193ded45dd47e6d0b6a3117a6398b0abe2be365f23550",
+      "review": "digest_reference_only",
       "source": "backend/tests/lineage_compose.yml"
     },
     {
@@ -160,10 +160,10 @@
     },
     {
       "actual_digest_verified": false,
-      "immutable_reference": false,
+      "immutable_reference": true,
       "platform": "not_observed",
-      "reference": "nginx:1.27-alpine",
-      "review": "digest_pending",
+      "reference": "nginx:stable-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311",
+      "review": "digest_reference_only",
       "source": "deploy/tls/Dockerfile"
     }
   ],
@@ -179,12 +179,10 @@
   "local_integrity_ok": true,
   "native": {
     "apt_declared_packages": [
-      "gdal-bin",
-      "libpq-dev",
-      "gcc"
+      "gdal-bin"
     ],
     "apt_versions": null,
-    "build_tools_in_backend_runtime": true,
+    "build_tools_in_backend_runtime": false,
     "gdal_geos_proj_libpq_versions": null,
     "postgresql_postgis_installed_versions": null
   },
@@ -226,7 +224,7 @@
     },
     {
       "app_import_observed": false,
-      "declared_version": "4.14.1",
+      "declared_version": "4.14.2",
       "dependency_topology": "flat_unverified",
       "distribution_hash": null,
       "installed_version": null,
@@ -244,20 +242,11 @@
     },
     {
       "app_import_observed": false,
-      "declared_version": "2026.6.17",
+      "declared_version": "2026.10.19",
       "dependency_topology": "flat_unverified",
       "distribution_hash": null,
       "installed_version": null,
       "name": "certifi",
-      "vulnerability_review": "pending"
-    },
-    {
-      "app_import_observed": false,
-      "declared_version": "2.0.0",
-      "dependency_topology": "flat_unverified",
-      "distribution_hash": null,
-      "installed_version": null,
-      "name": "cffi",
       "vulnerability_review": "pending"
     },
     {
@@ -267,24 +256,6 @@
       "distribution_hash": null,
       "installed_version": null,
       "name": "click",
-      "vulnerability_review": "pending"
-    },
-    {
-      "app_import_observed": false,
-      "declared_version": "49.0.0",
-      "dependency_topology": "flat_unverified",
-      "distribution_hash": null,
-      "installed_version": null,
-      "name": "cryptography",
-      "vulnerability_review": "pending"
-    },
-    {
-      "app_import_observed": false,
-      "declared_version": "0.19.2",
-      "dependency_topology": "flat_unverified",
-      "distribution_hash": null,
-      "installed_version": null,
-      "name": "ecdsa",
       "vulnerability_review": "pending"
     },
     {
@@ -441,24 +412,6 @@
       "vulnerability_review": "pending"
     },
     {
-      "app_import_observed": false,
-      "declared_version": "0.6.3",
-      "dependency_topology": "flat_unverified",
-      "distribution_hash": null,
-      "installed_version": null,
-      "name": "pyasn1",
-      "vulnerability_review": "pending"
-    },
-    {
-      "app_import_observed": false,
-      "declared_version": "3.0",
-      "dependency_topology": "flat_unverified",
-      "distribution_hash": null,
-      "installed_version": null,
-      "name": "pycparser",
-      "vulnerability_review": "pending"
-    },
-    {
       "app_import_observed": true,
       "declared_version": "2.13.4",
       "dependency_topology": "flat_unverified",
@@ -532,15 +485,6 @@
     },
     {
       "app_import_observed": false,
-      "declared_version": "4.9.1",
-      "dependency_topology": "flat_unverified",
-      "distribution_hash": null,
-      "installed_version": null,
-      "name": "rsa",
-      "vulnerability_review": "pending"
-    },
-    {
-      "app_import_observed": false,
       "declared_version": "1.17.0",
       "dependency_topology": "flat_unverified",
       "distribution_hash": null,
@@ -610,10 +554,10 @@
     "base_images": [
       {
         "actual_digest_verified": false,
-        "immutable_reference": false,
+        "immutable_reference": true,
         "platform": "not_observed",
-        "reference": "nginx:1.27-alpine",
-        "review": "digest_pending",
+        "reference": "nginx:stable-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311",
+        "review": "digest_reference_only",
         "source": "deploy/tls/Dockerfile"
       }
     ],
@@ -630,8 +574,8 @@
       {
         "matches_reviewed_baseline": true,
         "path": "deploy/tls/Dockerfile",
-        "sha256": "f44765fd2cb17e2c1f83b03e63835cb02b0cc53c01d180fc3da8dc6e51de9e08",
-        "size": 457
+        "sha256": "3db8848d30a883f0e785518ba4f8b72b00e567b1092375f658f3e86768223848",
+        "size": 531
       },
       {
         "matches_reviewed_baseline": true,

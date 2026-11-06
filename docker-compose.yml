@@ -52,7 +52,7 @@ x-default-logging: &default-logging
 
 services:
   db:
-    image: postgis/postgis:15-3.3
+    image: postgis/postgis:15-3.6@sha256:91098df530c92202d69193ded45dd47e6d0b6a3117a6398b0abe2be365f23550
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Define POSTGRES_ADMIN_USER en el archivo .env}
@@ -77,7 +77,7 @@ services:
     logging: *default-logging
 
   pgadmin:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4@sha256:40fa840c5bb7c8463957f1255b01283732c2d8c9396a956d180f8e6c296753b3
     restart: always
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Define PGADMIN_DEFAULT_EMAIL en el archivo .env}
