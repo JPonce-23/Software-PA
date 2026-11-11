@@ -130,7 +130,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function formatoSuperficie(valor) {
-        return `${Number(valor || 0).toFixed(2)} ha`;
+        return `${Number(valor || 0).toLocaleString("es-MX", {maximumFractionDigits: 7})} ha`;
     }
 
     function mostrarMensajeError(contenedor, mensaje) {
@@ -364,15 +364,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                 0
             );
 
-        const superficieAfectada =
-            lista.reduce(
-                (acumulado, nucleo) =>
-                    acumulado +
-                    Number(
-                        nucleo.superficie_afectada_ha || 0
-                    ),
-                0
-            );
+        const resumenDisponible = lista.every(n => n.afectaciones_superficie_incompleta != null);
+        const conSuperficie = lista.filter(n => Number(n.total_afectaciones) > 0 && n.superficie_resumen_ha != null);
+        const superficieAfectada = conSuperficie.reduce((total, n) => total + Number(n.superficie_resumen_ha), 0);
+        const incompletas = lista.reduce((total, n) => total + Number(n.afectaciones_superficie_incompleta || 0), 0);
 
         if (elementos.kpiNucleos) {
             elementos.kpiNucleos.textContent =
@@ -385,10 +380,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (elementos.kpiSuperficie) {
-            elementos.kpiSuperficie.textContent =
-                formatoSuperficie(
-                    superficieAfectada
-                );
+            elementos.kpiSuperficie.textContent = !resumenDisponible ? "No disponible" :
+                !conSuperficie.length && totalAfectaciones ? "Sin superficie registrada" : formatoSuperficie(superficieAfectada);
+            document.getElementById("notaSuperficie").textContent = !resumenDisponible
+                ? "Actualiza el servicio para consultar la superficie completa."
+                : incompletas ? `Superficie registrada; ${incompletas} afectaciones con datos de superficie pendientes.`
+                : "Superficie registrada de las afectaciones (ha)";
         }
 
         if (!elementos.nucleosGrid) {

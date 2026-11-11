@@ -357,6 +357,8 @@ class ProyectoNucleoResponse(ProyectoNucleoUpdate, AuditRead):
     afectaciones_individuales: int = 0
     superficie_preliminar_ha: Decimal = Decimal("0")
     superficie_afectada_ha: Decimal = Decimal("0")
+    superficie_resumen_ha: Decimal | None = None
+    afectaciones_superficie_incompleta: int | None = None
     total_asambleas: int = 0
     total_convenios: int = 0
     total_unidades_afectadas: int = 0

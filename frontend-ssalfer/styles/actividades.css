@@ -915,3 +915,5 @@
     }
 
 }
+/* Las acciones con texto necesitan ancho propio. */
+.btn-tabla[data-documentos-actividad] { width:auto; min-width:max-content; height:auto; min-height:34px; padding:7px 12px; white-space:nowrap; }

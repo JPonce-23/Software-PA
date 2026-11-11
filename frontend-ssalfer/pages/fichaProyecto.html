@@ -367,163 +367,26 @@
 <div class="proyecto-vistas" role="tablist" aria-label="Contenido del proyecto">
     <button id="tabResumenProyecto" type="button" role="tab" aria-selected="true" aria-controls="resumenProyecto" data-vista-proyecto="resumenProyecto">Resumen del proyecto</button>
     <button id="tabNucleosProyecto" type="button" role="tab" aria-selected="false" aria-controls="nucleosAgrarios" tabindex="-1" data-vista-proyecto="nucleosAgrarios">Núcleos vinculados</button>
+    <button id="tabDatosFinancieros" type="button" role="tab" aria-selected="false" aria-controls="datosFinancieros" tabindex="-1" data-vista-proyecto="datosFinancieros">Datos financieros</button>
 </div>
-<div class="tarjetas-proyecto" id="resumenProyecto" role="tabpanel" aria-labelledby="tabResumenProyecto">
-
-
-
-    <div class="tarjeta">
-
-
-        <h3>
-            Núcleos vinculados
-        </h3>
-
-
-        <p id="kpiNucleos">
-            —
-        </p>
-
-
-        <small>
-            Núcleos agrarios en el proyecto
-        </small>
-
-
-    </div>
-
-
-
-
-    <div class="tarjeta">
-
-        <a href="#nucleosAgrarios">
-
-            <h3>
-                Parcelas / Afectaciones
-            </h3>
-
-            <p id="kpiParcelasAfectaciones">
-                —
-            </p>
-
-            <small>
-                Total de parcelas y afectaciones registradas
-            </small>
-
-        </a>
-
-    </div>
-
-
-
-
-    <div class="tarjeta">
-
-
-        <h3>
-            Superficie afectada
-        </h3>
-
-
-        <p id="kpiSuperficie">
-            —
-        </p>
-
-
-        <small>
-            Suma de superficie afectada real (ha)
-        </small>
-
-
-    </div>
-
-
-
-
-    <div class="tarjeta">
-        <a id="enlaceEstadoFinanciero" href="/pages/estadoFinanciero.html">
-
-
-        <h3>
-            Estado financiero
-        </h3>
-
-
-        <p>
-            Ver reportes
-        </p>
-
-
-        <small>
-            Convenios, avances e indicadores del proyecto
-        </small>
-
-        </a>
-    </div>
-
-
-    <div class="tarjeta tarjeta-reportes">
-
-        <div class="tarjeta-icono">
-            <i class="bi bi-bar-chart-line"></i>
-        </div>
-
-        <div>
-            <h3>Reportes</h3>
-            <p>Consulta reportes operativos del proyecto.</p>
-
-            <div class="reportes-accesos">
-<a id="enlaceReporteColectivos" class="ssalfer-link" href="/pages/reportesColectivos.html"><i class="bi bi-pie-chart" aria-hidden="true"></i>Destinos colectivos</a>
-                <a id="enlaceReporteConvenios" class="ssalfer-link" href="/pages/reportesConvenios.html">
-                    <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
-                    <strong>Convenios</strong>
-                    <span>Consulta valores, impactos y cobertura.</span>
-                </a>
-                <a id="enlaceReporteFifonafe" class="ssalfer-link" href="/pages/reportesFifonafe.html">
-                    <i class="bi bi-bank" aria-hidden="true"></i>
-                    <strong>FIFONAFE</strong>
-                    <span>Revisa cobertura y solicitudes resueltas.</span>
-                </a>
-                <a id="enlaceReporteAvance" class="ssalfer-link" href="/pages/reporteActividadesPeriodo.html">
-                    <i class="bi bi-calendar3" aria-hidden="true"></i>
-                    <strong>Avance por periodo</strong>
-                    <span>Consulta los hitos de cada periodo.</span>
-                </a>
-            </div>
-        </div>
-
-    </div>
-
-
-    <div class="tarjeta">
-        <a id="enlacePersonas"
-        href="/pages/persona.html">
-
-            <div class="tarjeta-icono">
-                <i class="bi bi-people"></i>
-            </div>
-
-            <div>
-                <h3>
-                    Personas
-                </h3>
-
-                <p>
-                    Registro de personas participantes
-                    en el expediente del proyecto.
-                </p>
-            </div>
-
-        </a>
-    </div>
-
-
-
+<div class="proyecto-resumen" id="resumenProyecto" role="tabpanel" aria-labelledby="tabResumenProyecto">
+    <section class="proyecto-datos" aria-label="Datos del proyecto">
+        <div class="tarjeta"><a href="#nucleosAgrarios"><h3>Núcleos vinculados</h3><p id="kpiNucleos">—</p><small>Consultar núcleos del proyecto</small></a></div>
+        <div class="tarjeta"><a href="#nucleosAgrarios"><h3>Parcelas / Afectaciones</h3><p id="kpiParcelasAfectaciones">—</p><small>Registros del proyecto</small></a></div>
+        <div class="tarjeta"><h3>Superficie afectada</h3><p id="kpiSuperficie">—</p><small id="notaSuperficie">Superficie registrada (ha)</small></div>
+        <div class="tarjeta"><a id="enlacePersonas" href="/pages/persona.html"><h3>Personas</h3><p>Consultar personas participantes</p></a></div>
+    </section>
+    <section class="proyecto-reportes" aria-labelledby="tituloReportesProyecto">
+        <h2 id="tituloReportesProyecto">Reportes</h2>
+        <a class="tarjeta" id="enlaceReporteColectivos" href="/pages/reportesColectivos.html"><h3>Destinos colectivos</h3><p>Consultar superficies por destino</p></a>
+        <a class="tarjeta" id="enlaceReporteConvenios" href="/pages/reportesConvenios.html"><h3>Convenios</h3><p>Consultar valores, impactos y cobertura</p></a>
+        <a class="tarjeta" id="enlaceReporteFifonafe" href="/pages/reportesFifonafe.html"><h3>FIFONAFE</h3><p>Consultar cobertura y solicitudes</p></a>
+        <a class="tarjeta" id="enlaceReporteAvance" href="/pages/reporteActividadesPeriodo.html"><h3>Avance por periodo</h3><p>Consultar actividades realizadas</p></a>
+    </section>
 </div>
-
-
-
+<section id="datosFinancieros" role="tabpanel" aria-labelledby="tabDatosFinancieros" hidden>
+    <div class="tarjeta"><a id="enlaceEstadoFinanciero" href="/pages/estadoFinanciero.html"><h3>Estado financiero</h3><p>Consultar convenios, avances e indicadores del proyecto</p></a></div>
+</section>
 
 <!-- =====================================================
                 NÚCLEOS AGRARIOS

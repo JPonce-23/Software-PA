@@ -19,3 +19,17 @@
 #nucleosAgrarios .proyectos-lista-vacia { grid-column:1/-1; }
 @media(max-width:1100px) { #nucleosAgrarios .nucleos-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:600px) { #nucleosAgrarios .nucleos-grid { grid-template-columns:1fr; } }
+
+#datosFinancieros[hidden] { display:none !important; }
+.proyecto-resumen { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.proyecto-datos, .proyecto-reportes { display:grid; grid-template-rows:repeat(4, minmax(115px,auto)); gap:14px; min-width:0; }
+.proyecto-datos { padding-top:52px; }
+.proyecto-reportes { position:relative; padding:52px 0 0 24px; border-left:1px solid #bdd1c4; }
+.proyecto-reportes > h2 { position:absolute; top:0; left:24px; right:0; margin:0; color:var(--verde); font-size:2rem; line-height:1.2; text-align:center; }
+.proyecto-resumen .tarjeta { margin:0; padding:18px; min-width:0; text-align:center; }
+.proyecto-resumen a, #datosFinancieros a { display:block; color:inherit; text-decoration:none; }
+.proyecto-resumen h3 { color:var(--verde); margin:0 0 8px; }
+.proyecto-resumen p { margin:6px 0; }
+.proyecto-datos #kpiNucleos, .proyecto-datos #kpiParcelasAfectaciones, .proyecto-datos #kpiSuperficie { font-size:clamp(1.6rem, 2.5vw, 2.5rem); font-weight:800; line-height:1.2; color:var(--verde); font-variant-numeric:tabular-nums; overflow-wrap:anywhere; margin:12px 0; }
+.proyecto-resumen a:focus-visible, #datosFinancieros a:focus-visible { outline:3px solid #2b6fac; outline-offset:3px; }
+@media(max-width:700px) { .proyecto-resumen { grid-template-columns:1fr; } .proyecto-datos { padding-top:0; } .proyecto-reportes { border-left:0; border-top:1px solid #bdd1c4; padding:68px 0 0; } .proyecto-reportes > h2 { top:16px; left:0; } }
