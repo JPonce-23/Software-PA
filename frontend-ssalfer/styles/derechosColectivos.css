@@ -9,3 +9,6 @@
 #respaldoColectivo h3 { font-size:1rem; margin:0 0 8px; }
 .pagina-header { align-items:flex-start; }
 .pagina-header .ssalfer-volver { align-self:flex-start; }
+
+#respaldoColectivo > div { display:flex; flex-direction:column; }
+#respaldoColectivo > div > a { align-self:center; margin-top:auto; }

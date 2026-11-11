@@ -377,7 +377,7 @@
 }
 
 .convenios-reportes-numero {
-    text-align: right !important;
+    text-align: center !important;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
@@ -472,3 +472,7 @@
         flex-wrap: wrap;
     }
 }
+
+.convenios-reportes-tabla th, .convenios-reportes-tabla td { text-align:center; vertical-align:middle; }
+.convenios-reportes-tabla tbody td + td { border-left:1px solid rgba(66,138,85,.35); }
+.convenios-reportes-tabla tbody td:nth-child(even) { background:rgba(66,138,85,.07); }

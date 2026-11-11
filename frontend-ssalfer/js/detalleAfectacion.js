@@ -1341,7 +1341,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             <th>Unidad agraria</th>
                             <th>Superficie preliminar</th>
                             <th>Superficie afectada</th>
-                            <th>Fuente</th><th>Acciones</th>
+                            <th>Origen de la información/datos</th><th>Acciones</th>
                         </tr>
                     </thead>
 

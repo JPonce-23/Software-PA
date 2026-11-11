@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, raiseload
 from .. import auth, models, schemas
 from ..database import get_db
 from ..services import domain as service
+from ..services.project_surface import summarize_surfaces
 from ..services.access import (
     authorized_project_ids,
     filter_projects_by_user,
@@ -288,11 +289,18 @@ def list_project_nuclei(
         query = query.filter(
             models.ProyectoNucleoResumen.id_municipio == id_municipio
         )
-    return query.order_by(
+    nuclei = query.order_by(
         models.ProyectoNucleoResumen.entidad,
         models.ProyectoNucleoResumen.municipio,
         models.ProyectoNucleoResumen.nombre_nucleo,
+        models.ProyectoNucleoResumen.id_proyecto_nucleo,
     ).offset(skip).limit(limit).all()
+    surfaces = summarize_surfaces(db, [n.id_proyecto_nucleo for n in nuclei])
+    return [schemas.ProyectoNucleoResponse.model_validate(n).model_copy(update=
+            surfaces.get(n.id_proyecto_nucleo, {
+                "superficie_resumen_ha": 0,
+                "afectaciones_superficie_incompleta": 0,
+            })) for n in nuclei]
 
 
 @router.post(

@@ -155,6 +155,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             .replaceAll("'", "&#039;");
     }
 
+    function observacionesTramite() {
+        const lineas = String(tramite.observaciones || "").split(/\r?\n/);
+        const esImportacion = linea => /^Importado desde mq_colectivos\.xlsx;\s*hoja [^;]+;\s*filas [\d, ]+;\s*COP=\w+;\s*flujo histórico [A-Z:]+\.?$/i.test(linea.trim());
+        return { usuario: lineas.filter(l => !esImportacion(l)).join("\n").trim(), origen: lineas.filter(esImportacion).join("\n") };
+    }
+
     function texto(valor) {
         return (
             valor === null ||
@@ -342,9 +348,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (elementos.observaciones) {
             elementos.observaciones.textContent =
-                tramite.observaciones?.trim()
-                    ? tramite.observaciones
-                    : "No hay observaciones registradas.";
+                observacionesTramite().usuario || "No hay observaciones registradas.";
+            const origen = document.getElementById("origenObservacionesFifonafe");
+            if (origen) {
+                origen.hidden = !observacionesTramite().origen;
+                origen.querySelector("p").textContent = observacionesTramite().origen;
+            }
         }
     }
 
@@ -707,6 +716,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     </label>
 
                     <label class="fifonafe-campo fifonafe-campo--ancho">
+                        <span>Observaciones del trámite</span>
+                        <textarea name="observaciones" rows="4">${escaparHTML(observacionesTramite().usuario)}</textarea>
+                    </label>
+                    <label class="fifonafe-campo fifonafe-campo--ancho">
                         <span>Referencia de expediente</span>
                         <input type="text" name="referencia_expediente" maxlength="200" value="${escaparHTML(tramite.referencia_expediente || "")}">
                     </label>
@@ -714,6 +727,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             `,
             onSubmit: async datos => {
                 await window.FifonafeAPI.actualizar(idFifonafe, {
+                    observaciones: [observacionesTramite().origen, String(datos.get("observaciones") || "").trim()].filter(Boolean).join("\n") || null,
                     estatus: datos.get("estatus"),
                     acuse_fifonafe_fecha: datos.get("acuse_fifonafe_fecha") || null,
                     hay_conflictos: valorBooleanoFormulario(datos.get("hay_conflictos")),

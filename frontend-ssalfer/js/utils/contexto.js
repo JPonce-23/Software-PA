@@ -19,7 +19,7 @@
         const fecha = valor => valor ? window.SSALFER_FORMAT.formatearFecha(valor) : "";
         const texto = partes => partes.filter(v => v !== null && v !== undefined && v !== "").join(" · ");
         async function etiqueta(tipo, item) {
-            if (tipo === "actividad_campo") return texto([window.SSALFER_FORMAT.etiquetaCodigo(item.tipo_actividad),fecha(item.fecha_realizada||item.fecha_programada),item.resultado,item.observaciones]);
+            if (tipo === "actividad_campo") return texto([window.SSALFER_FORMAT.etiquetaCodigo(item.tipo_actividad, {sensibilizacion: "Sensibilización", caminamiento: "Caminamiento"}),fecha(item.fecha_realizada||item.fecha_programada),`Actividad ${item.id_actividad}`]);
             if (tipo === "afectacion") return texto([window.SSALFER_FORMAT.etiquetaCodigo(item.tipo_afectacion), item.superficie_afectada_ha == null ? "" : `${Number(item.superficie_afectada_ha).toLocaleString("es-MX")} ha`, item.situacion]);
             if (tipo === "convenio") return texto([window.SSALFER_FORMAT.etiquetaCodigo(item.tipo_convenio), `Consecutivo ${item.consecutivo}`, fecha(item.fecha_firma)]);
             if (item.id_persona) return texto([nombrePersona(await persona(item.id_persona)), item.rol, item.tipo_derecho]);
