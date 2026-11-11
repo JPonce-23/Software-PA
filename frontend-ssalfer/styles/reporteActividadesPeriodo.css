@@ -386,11 +386,7 @@
 
     color: #243029;
 
-    font-size: clamp(
-        1.25rem,
-        2vw,
-        1.7rem
-    );
+    font-size: clamp(1rem, 2vw, 1rem);
 
     overflow-wrap: anywhere;
 }
