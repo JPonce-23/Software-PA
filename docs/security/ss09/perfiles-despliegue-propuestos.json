@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "status": "design_only_not_applied",
+  "selected_profile": null,
+  "functional_approval_required": false,
+  "actual_image_digests": null,
+  "target_platform": null,
+  "profiles": {
+    "ssalfer_candidate": {
+      "compose_files_in_order": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker-compose.ssalfer.yml"
+      ],
+      "explicit_build_services": [
+        "backend",
+        "frontend_ssalfer"
+      ],
+      "explicit_runtime_services": [
+        "db",
+        "backend",
+        "frontend_ssalfer"
+      ],
+      "services_not_selected_by_this_profile": [
+        "pgadmin"
+      ],
+      "frontend_service": "frontend_ssalfer"
+    }
+  },
+  "requirements": {
+    "no_implicit_development_override": true,
+    "uvicorn_no_proxy_headers": true,
+    "uvicorn_no_access_log_and_ss10_logging": true,
+    "no_reload_or_source_bind_mounts": true,
+    "app_env_production": true,
+    "secure_host_cookies": true,
+    "cors_exact_public_origin_required": true,
+    "tls_and_proxy_chain_verified_in_qa": false,
+    "ss08_native_qa_completed": false,
+    "ss07_effective_privileges_verified": false,
+    "ss05_policy_approval_unchanged": true,
+    "explicit_pgadmin_administrative_approval_if_needed": true
+  },
+  "official_frontend": "frontend-ssalfer",
+  "legacy_frontend_status": "retired_from_dev_optional_historical_sources",
+  "deployment_approval_required": true
+}

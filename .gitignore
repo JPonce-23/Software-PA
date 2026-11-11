@@ -46,3 +46,12 @@ backend/excel.xlsx
 backend/check_schema.py
 backend/extract.py
 ssalfer-deploy.bundle
+
+# Selected PR #5 exclusions; QA sources remain trackable.
+outputs/
+.qa-backups/
+*.env.local
+*.pem
+*.key
+*.dump
+*.backup

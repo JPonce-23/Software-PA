@@ -13,7 +13,7 @@ preexistentes sin su dataset nacional/histórico.** F01 continúa funcionando.
 
 ## Entorno y preparación
 
-- Computadora local: `Cooper`; no es `patrenes` ni `172.16.1.215`.
+- Computadora local: `Cooper`; no es `patrenes` ni `SERVIDOR_INTERNO`.
 - Rama: `perf/ssalfer-optimizacion-fase1`.
 - Base verificada: `f98586eb4633e07b2481a7a67ee62ee81aa7d938`, con F01 presente.
 - Worktree persistente recuperado, limpio antes de comenzar:

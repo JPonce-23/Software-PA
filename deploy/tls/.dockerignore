@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!default.conf.template
+!headers.conf
+!proxy.conf
+!validate-host.sh

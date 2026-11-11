@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
+from .config import _read_positive_int
 
 load_dotenv()
 
@@ -40,9 +41,14 @@ SQLALCHEMY_DATABASE_URL = URL.create(
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    pool_size=20,
-    max_overflow=10,
-    pool_pre_ping=True
+    # Per process: with two workers the default ceiling is 14 connections.
+    pool_size=_read_positive_int("DB_POOL_SIZE", 5),
+    max_overflow=_read_positive_int("DB_POOL_MAX_OVERFLOW", 2),
+    pool_timeout=_read_positive_int("DB_POOL_TIMEOUT_SECONDS", 10),
+    pool_pre_ping=True,
+    hide_parameters=True,
+    echo=False,
+    echo_pool=False,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

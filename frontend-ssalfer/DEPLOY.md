@@ -1,5 +1,11 @@
 # SSALFER — instalación y QA aislado
 
+La integración de despliegue de PR6 añade un edge HTTPS en la selección
+base + ssalfer + prod. Ver [contrato y prerrequisitos](../deploy/tls/README.md)
+para certificados, puertos, UID 10001, SS-12 y capacidad. Los ejemplos HTTP de
+desarrollo de este documento conservan su selección base/override/ssalfer.
+La selección productiva requiere Compose >= 2.24.4 y nunca carga override.
+
 El frontend oficial vive en `frontend-ssalfer/` y contiene HTML, CSS y JavaScript
 estáticos. Nginx sirve `Index.html`, páginas y recursos locales, y reenvía
 `/api/` a `http://backend:8000/api/`. No necesita React ni Vite.
@@ -72,7 +78,7 @@ Usar todos los archivos explícitamente evita cargar un override accidental:
 | base + override | Los tres | Reload / bind `./backend/uploads` |
 | base + ssalfer | Los tres + frontend_ssalfer | Sin reload / volumen nombrado |
 | base + override + ssalfer | Los cuatro | Reload / bind `./backend/uploads` |
-| base + prod + ssalfer | Los cuatro | Producción, Secure / volumen nombrado |
+| base + ssalfer + prod | DB, backend, SSALFER y edge TLS | Secure, UID 10001, dos workers / volumen nombrado; pgAdmin sólo perfil admin-tools |
 
 `base`, `override`, `prod` y `ssalfer` corresponden a `docker-compose.yml`,
 `docker-compose.override.yml`, `docker-compose.prod.yml` y
@@ -153,7 +159,7 @@ integral ni los tests Node con dobles como certificación de navegador/API.
 
 ## Operación real y producción fuera de esta fase
 
-La selección base + prod + ssalfer conserva `APP_ENV=production`,
+La selección base + ssalfer + prod (producción al final) conserva `APP_ENV=production`,
 `AUTH_COOKIE_SECURE=true` y un origen HTTPS explícito obligatorio. Su validación
 estática no autoriza arrancarla: requiere QA HTTPS real compatible con cookies
 Secure y revisión de la cadena de proxies. TLS y despliegue productivo requieren

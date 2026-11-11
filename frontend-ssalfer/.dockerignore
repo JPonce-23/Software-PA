@@ -1,0 +1,12 @@
+.env
+.env.*
+**/.env*
+*.md
+**/*.md
+deploy/*
+!deploy/Dockerfile
+!deploy/nginx.conf
+outputs/
+tests/
+**/*.cjs
+**/*.map

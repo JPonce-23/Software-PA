@@ -960,6 +960,38 @@ class DocumentoVersion(Base):
     documento = relationship("Documento", back_populates="versiones")
 
 
+class DocumentoOperacion(Base):
+    """Durable upload intent. No file bytes, credentials or automatic recovery."""
+    __tablename__ = "documento_operacion"
+    __table_args__ = (
+        UniqueConstraint("id_usuario", "id_documento", "clave_idempotencia",
+                         name="uq_documento_operacion_clave"),
+        UniqueConstraint("id_documento_version", name="uq_documento_operacion_version"),
+    )
+    id_operacion = Column(UUID(as_uuid=True), primary_key=True)
+    clave_idempotencia = Column(UUID(as_uuid=True), nullable=False)
+    cliente_con_clave = Column(Boolean, nullable=False)
+    id_documento = Column(Integer, ForeignKey("documento.id_documento"), nullable=False)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    huella_solicitud = Column(CHAR(64), nullable=False)
+    hash_sha256 = Column(CHAR(64), nullable=False)
+    tamano_bytes = Column(BigInteger, nullable=False)
+    nombre_original = Column(String(255), nullable=False)
+    extension = Column(String(10), nullable=False)
+    tipo_mime = Column(String(150), nullable=False)
+    ruta_staging = Column(Text, nullable=False)
+    ruta_prevista = Column(Text, nullable=False)
+    estado = Column(String(32), nullable=False)
+    identidad_archivo = Column(JSONB)
+    id_documento_version = Column(BigInteger, ForeignKey("documento_version.id_documento_version"))
+    codigo_error = Column(String(64))
+    http_error = Column(Integer)
+    creado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    actualizado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    staging_preparado_en = Column(DateTime(timezone=True))
+    confirmado_en = Column(DateTime(timezone=True))
+
+
 class DocumentoVinculo(Base, AuditableMixin):
     __tablename__ = "documento_vinculo"
 

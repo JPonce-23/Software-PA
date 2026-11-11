@@ -217,9 +217,12 @@ a FastAPI; Live Server sin ese proxy no reproduce esta instalación.
 
 ## Selección sin bind mounts
 
-La combinación declarativa de `docker-compose.yml`, `docker-compose.prod.yml`
-y `docker-compose.ssalfer.yml` incluye SSALFER y conserva backend sin reload,
-con `APP_ENV=production`, cookies `Secure` y `CORS_ORIGINS` HTTPS obligatorio.
+La selección explícita, en orden, es `docker-compose.yml`,
+`docker-compose.ssalfer.yml` y `docker-compose.prod.yml`. Incluye SSALFER y un
+proxy HTTPS; ejecuta backend con UID 10001, dos workers y sin reload, con
+`APP_ENV=production`, cookies `Secure` y origen `https://PUBLIC_HOST`. Requiere
+Compose >= 2.24.4. Sólo el proxy publica puertos; backend, DB y pgAdmin no los
+publican. Revisar [certificados, almacenamiento y capacidad](deploy/tls/README.md).
 No combinar `override` con `prod`. Validar esta selección con `config` no arranca
 servicios. Su ejecución requiere QA HTTPS real compatible con cookies Secure;
 el despliegue productivo y TLS quedan fuera de esta fase. Ver
@@ -255,7 +258,9 @@ docker compose exec -T db sh -lc \
   < backend/db/fixtures/001_catalogo_territorial_inegi.sql
 backend/scripts/utils/set_runtime_credentials.sh
 docker compose up -d backend
-curl --fail http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/health
+# El backend productivo no publica un puerto local.
+docker compose -f docker-compose.yml -f docker-compose.ssalfer.yml -f docker-compose.prod.yml \
+  exec -T backend python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health').read().decode())"
 ```
 
 `schema_migrations` registra `001`, el nombre `baseline_v1` y el SHA-256
@@ -284,24 +289,26 @@ git pull --ff-only
 # Valores reales propios de este servidor; DB_NAME en .env debe apuntar al destino.
 TARGET_DATABASE="nombre_real_de_la_base"
 IMPORT_ACTOR_EMAIL="correo_del_administrador_activo"
-docker compose -f docker-compose.yml -f docker-compose.prod.yml build backend
+docker compose -f docker-compose.yml -f docker-compose.ssalfer.yml -f docker-compose.prod.yml build backend
 
 # Siempre revisar el plan primero. No escribe en PostgreSQL.
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm --no-deps \
+docker compose -f docker-compose.yml -f docker-compose.ssalfer.yml -f docker-compose.prod.yml run --rm --no-deps \
   backend bash scripts/sync_catalogo_ran.sh \
   --expected-database "$TARGET_DATABASE"
 
 # Autorización explícita de la carga; resuelve el ID del actor en esta misma DB.
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm --no-deps \
+docker compose -f docker-compose.yml -f docker-compose.ssalfer.yml -f docker-compose.prod.yml run --rm --no-deps \
   backend bash scripts/sync_catalogo_ran.sh \
   --expected-database "$TARGET_DATABASE" \
   --actor-email "$IMPORT_ACTOR_EMAIL" --apply
 
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps backend
-curl --fail http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/health
+docker compose -f docker-compose.yml -f docker-compose.ssalfer.yml -f docker-compose.prod.yml up -d --no-deps backend
+# El backend productivo no publica un puerto local.
+docker compose -f docker-compose.yml -f docker-compose.ssalfer.yml -f docker-compose.prod.yml \
+  exec -T backend python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health').read().decode())"
 ```
 
-`/health` debe reportar schema 28. Después comprobar autenticado
+`/health` debe reportar las migraciones aplicadas (schema 32 en esta rama). Después comprobar autenticado
 `GET /api/catalogos/nucleos?limit=20` y un filtro territorial conocido; comparar
 con SQL si es necesario. El endpoint conserva su autenticación y sus cuatro roles.
 En desarrollo usar consistentemente la configuración Compose de desarrollo.

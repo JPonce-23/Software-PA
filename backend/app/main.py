@@ -1,12 +1,11 @@
 """FastAPI application for the ProyectoNucleo target architecture."""
 
-import logging
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError, IntegrityError, InternalError
+from sqlalchemy.exc import DBAPIError, IntegrityError, InternalError, StatementError, TimeoutError as SQLTimeoutError
+from psycopg2 import Error as PostgreSQLError
 
 from .config import AUTH_SETTINGS
 from .database import SessionLocal
@@ -20,23 +19,16 @@ from .routers import (
     users,
 )
 from .services import authentication as authentication_service
-
-
-logger = logging.getLogger(__name__)
+from .safe_logging import SafeDiagnosticsMiddleware, log_request_error
+from .http_security import ErrorHeadersMiddleware, ErrorJSONResponse
 
 app = FastAPI(
     title="SOFTWARE-PA",
     description="Seguimiento administrativo por ProyectoNucleo",
     version="2.0.0",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=list(AUTH_SETTINGS.allowed_origins),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-CSRF-Token"],
-    expose_headers=["X-Total-Count"],
+    docs_url=None if AUTH_SETTINGS.environment == "production" else "/docs",
+    redoc_url=None if AUTH_SETTINGS.environment == "production" else "/redoc",
+    openapi_url=None if AUTH_SETTINGS.environment == "production" else "/openapi.json",
 )
 
 
@@ -76,31 +68,48 @@ async def csrf_cookie_guard(request, call_next):
     return await call_next(request)
 
 
+# CORS must also cover responses returned directly by the CSRF guard.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(AUTH_SETTINGS.allowed_origins),
+    allow_credentials=True,
+    allow_methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-CSRF-Token", "Idempotency-Key", "Range", "If-Range"],
+    expose_headers=["X-Total-Count", "Idempotency-Key", "Idempotency-Replayed",
+                    "X-Document-Operation-Id", "X-Document-Operation-State", "Retry-After",
+                    "X-Document-Error-Code", "Content-Disposition", "Content-Range",
+                    "Accept-Ranges", "ETag", "Last-Modified"],
+)
+
 @app.exception_handler(IntegrityError)
 @app.exception_handler(InternalError)
 @app.exception_handler(DBAPIError)
 def database_error_handler(request, exc):
-    logger.error(
-        "Database error in %s %s",
-        request.method,
-        request.url.path,
-        exc_info=(type(exc), exc, exc.__traceback__),
-    )
+    category = ("database_integrity" if isinstance(exc, IntegrityError) else
+                "database_internal" if isinstance(exc, InternalError) else "database_error")
+    log_request_error(request.scope, category, 409)
     return JSONResponse(
         status_code=409,
         content={"detail": "La operación entra en conflicto con la integridad de los datos."},
     )
 
 
+@app.exception_handler(SQLTimeoutError)
+def connection_pool_timeout_handler(request, exc):
+    # No exception text/SQL, retry loop, or automatic replay of the operation.
+    log_request_error(request.scope, "database_pool_timeout", 503)
+    return ErrorJSONResponse(status_code=503, content={"detail": "Servicio temporalmente no disponible"})
+
+
 @app.exception_handler(Exception)
 def global_exception_handler(request, exc):
-    logger.error(
-        "Unhandled error in %s %s",
-        request.method,
-        request.url.path,
-        exc_info=(type(exc), exc, exc.__traceback__),
-    )
-    return JSONResponse(status_code=500, content={"detail": "Error interno del servidor"})
+    # Exceptions in user middleware (including CSRF) bypass ExceptionMiddleware.
+    if isinstance(exc, SQLTimeoutError):
+        return connection_pool_timeout_handler(request, exc)
+    category = ("database_statement" if isinstance(exc, StatementError) else
+                "database_driver" if isinstance(exc, PostgreSQLError) else "internal_error")
+    log_request_error(request.scope, category, 500)
+    return ErrorJSONResponse(status_code=500, content={"detail": "Error interno del servidor"})
 
 
 app.include_router(authentication.router, prefix="/api")
@@ -127,3 +136,9 @@ def health():
     finally:
         db.close()
     return {"status": "ok", "schema": version}
+
+
+app.add_middleware(ErrorHeadersMiddleware)
+
+# Registered last: observe CSRF/CORS and routing, retaining route templates only.
+app.add_middleware(SafeDiagnosticsMiddleware, routes=app.routes)

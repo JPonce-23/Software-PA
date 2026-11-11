@@ -1,0 +1,102 @@
+name: PR essential regressions
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONNOUSERSITE: '1'
+  PYTHON_DOTENV_DISABLED: '1'
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+  PIP_NO_INPUT: '1'
+
+jobs:
+  python-security:
+    name: Python offline security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: backend:backend/tests:tests/security
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11.17'
+          pip-version: '26.3'
+      - name: Install pinned offline-test dependencies
+        run: |
+          python -m pip install --only-binary=:all: -r backend/requirements.txt -r tests/ci/requirements.txt
+          python -m pip check
+      - name: Run isolated security suites
+        run: |
+          shopt -s failglob
+          # Fresh interpreters isolate service doubles. The three static suites
+          # below belong to the separate SS-09/configuration job.
+          for suite in tests/security/test_*.py; do
+            case "${suite##*/}" in
+              test_supply_chain_offline.py|test_http_deployment_security.py|test_deployment_integration_contract.py) ;;
+              *) python -B -m unittest discover -s tests/security -p "${suite##*/}" -v ;;
+            esac
+          done
+
+  ssalfer-node:
+    name: SSALFER Node regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # VM comparisons use immutable historical commits, not live services.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.23.2'
+          package-manager-cache: false
+      - name: Run SSALFER suites using built-in Node tools
+        run: |
+          shopt -s failglob
+          node --test --test-concurrency=2 tests/frontend-ssalfer/*.cjs
+
+  supply-chain-config:
+    name: SS-09 and configuration integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: backend:backend/tests:tests/security
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11.17'
+          pip-version: '26.3'
+      - name: Install pinned static-test tools
+        run: |
+          python -m pip install --only-binary=:all: -r tests/ci/requirements.txt
+      - name: Verify SS-09 and deployment configuration contracts
+        run: |
+          for suite in test_supply_chain_offline.py test_http_deployment_security.py test_deployment_integration_contract.py; do
+            test -f "tests/security/$suite"
+            python -B -m unittest discover -s tests/security -p "$suite" -v
+          done
+          # Local declarations/integrity only; not an installed SBOM or SCA.
+          python -B docs/security/ss09/verificar_cadena.py
+      - name: Verify SheetJS against pinned official distribution
+        run: python -B frontend-ssalfer/tools/verificar_sheetjs.py

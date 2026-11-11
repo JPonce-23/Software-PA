@@ -12,15 +12,20 @@
 # práctica no hace falta correr este comando a mano: ver
 # ENTREGA.md / DEPLOY.md para el flujo completo con Docker Desktop.
 
-FROM nginx:1.27-alpine
+FROM nginx:stable-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311
 
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copia todo el sitio estático (HTML, /js, /styles, /img, /pages)
-# excepto esta misma carpeta "deploy/", que solo contiene archivos
-# de construcción y no debe quedar publicada.
-COPY . /usr/share/nginx/html
-RUN rm -rf /usr/share/nginx/html/deploy
+# Sólo recursos de la aplicación. Documentación, QA y configuración operativa
+# quedan fuera del document root; no se depende de borrarlos tras COPY global.
+COPY Index.html dashboard.html /usr/share/nginx/html/
+COPY pages /usr/share/nginx/html/pages/
+COPY js /usr/share/nginx/html/js/
+COPY styles /usr/share/nginx/html/styles/
+COPY img /usr/share/nginx/html/img/
+
+# Private source checkouts must still yield readable packaged static assets.
+RUN chmod -R a+rX /usr/share/nginx/html && chmod 644 /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

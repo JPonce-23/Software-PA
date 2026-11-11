@@ -1,0 +1,2879 @@
+diff --git a/frontend-ssalfer/deploy/nginx.conf b/frontend-ssalfer/deploy/nginx.conf
+--- a/frontend-ssalfer/deploy/nginx.conf
++++ b/frontend-ssalfer/deploy/nginx.conf
+@@ -1,13 +1,32 @@
++# Included by nginx.conf inside http {}. Keep request/user data out of access logs.
++# Error logs still require protected collection/review; they cannot use log_format.
++log_format ssalfer_safe escape=json
++    '{"component":"ssalfer_proxy","request_id":"$request_id",'
++    '"status":$status,"bytes":$body_bytes_sent,"duration":$request_time}';
++
+ server {
+     listen 80;
+     server_name _;
++    server_tokens off;
++    access_log /var/log/nginx/access.log ssalfer_safe;
++
++    # Keep these at server scope: a child add_header would replace inheritance
++    # on nginx 1.27. "always" also covers proxy/application error responses.
++    add_header X-Content-Type-Options "nosniff" always;
++    add_header Referrer-Policy "no-referrer" always;
++    add_header X-Frame-Options "SAMEORIGIN" always;
++    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
++    add_header Cache-Control "private, no-store" always;
++    # Candidate only: inline scripts and library behavior need browser QA.
++    # No external report collector and no premature CSP enforcement/TLS policy.
++    add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'" always;
+ 
+     root /usr/share/nginx/html;
+     index Index.html;
+ 
+     location = /health {
+         access_log off;
+-        add_header Content-Type text/plain;
++        default_type text/plain;
+         return 200 "ok\n";
+     }
+ 
+@@ -26,6 +45,14 @@
+         proxy_set_header X-Real-IP $remote_addr;
+         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+         proxy_set_header X-Forwarded-Proto $scheme;
++        # Canonical browser headers above preserve SS-06 downloads without
++        # duplicate upstream Cache-Control/nosniff values. Attachment/MIME and
++        # Set-Cookie pass through unchanged; errors retain their upstream status.
++        proxy_hide_header Cache-Control;
++        proxy_hide_header X-Content-Type-Options;
++        proxy_cache off;
++        proxy_store off;
++        proxy_intercept_errors off;
+     }
+ 
+     # Archivos estáticos del frontend SSALFER.
+diff --git a/frontend-ssalfer/deploy/Dockerfile b/frontend-ssalfer/deploy/Dockerfile
+--- a/frontend-ssalfer/deploy/Dockerfile
++++ b/frontend-ssalfer/deploy/Dockerfile
+@@ -16,11 +16,13 @@
+ 
+ COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
+ 
+-# Copia todo el sitio estático (HTML, /js, /styles, /img, /pages)
+-# excepto esta misma carpeta "deploy/", que solo contiene archivos
+-# de construcción y no debe quedar publicada.
+-COPY . /usr/share/nginx/html
+-RUN rm -rf /usr/share/nginx/html/deploy
++# Sólo recursos de la aplicación. Documentación, QA y configuración operativa
++# quedan fuera del document root; no se depende de borrarlos tras COPY global.
++COPY Index.html dashboard.html /usr/share/nginx/html/
++COPY pages /usr/share/nginx/html/pages/
++COPY js /usr/share/nginx/html/js/
++COPY styles /usr/share/nginx/html/styles/
++COPY img /usr/share/nginx/html/img/
+ 
+ EXPOSE 80
+ 
+diff --git a/tests/security/test_http_deployment_security.py b/tests/security/test_http_deployment_security.py
+new file mode 100644
+index 0000000..64a4dad
+--- /dev/null
++++ b/tests/security/test_http_deployment_security.py
+@@ -0,0 +1,264 @@
++"""SS-08 configuration/source checks, not nginx/Docker/browser execution.
++
++Reads checked-in text only; no dotenv, interpolation, sockets or app startup.
++"""
++import ast
++from dataclasses import dataclass, field
++import hashlib
++from html.parser import HTMLParser
++import importlib.util
++import json
++from pathlib import Path
++import re
++import shlex
++import unittest
++from urllib.parse import unquote, urlsplit
++import yaml
++
++ROOT=Path(__file__).resolve().parents[2]
++WEB=ROOT/'frontend-ssalfer'
++
++
++@dataclass
++class Block:
++    words:list
++    directives:list=field(default_factory=list)
++    children:list=field(default_factory=list)
++
++
++def parse_config(source):
++    """Small lexer for this config's blocks/directives; NOT nginx -t."""
++    lexer=shlex.shlex(source,posix=True,punctuation_chars='{};')
++    lexer.whitespace_split=True;lexer.commenters='#'
++    root=Block([]);stack=[root];pending=[]
++    for token in lexer:
++        if token==';':
++            if not pending:raise AssertionError('empty directive')
++            stack[-1].directives.append(pending);pending=[]
++        elif token=='{':
++            if not pending:raise AssertionError('unnamed block')
++            block=Block(pending);stack[-1].children.append(block);stack.append(block);pending=[]
++        elif token=='}':
++            if pending or len(stack)==1:raise AssertionError('invalid closure')
++            stack.pop()
++        else:pending.append(token)
++    if pending or len(stack)!=1:raise AssertionError('incomplete configuration')
++    return root
++
++
++def values(block,directive):return [row[1:] for row in block.directives if row[0]==directive]
++
++
++class Resources(HTMLParser):
++    def __init__(self):super().__init__();self.resources=[];self.inline=0;self.frames=[]
++    def handle_starttag(self,tag,attrs):
++        data=dict(attrs)
++        if tag=='script':
++            if data.get('src'):self.resources.append(('script',data['src']))
++            else:self.inline+=1
++        if tag=='link' and 'stylesheet' in data.get('rel',''):self.resources.append(('style',data.get('href','')))
++        if tag=='img' and data.get('src'):self.resources.append(('image',data['src']))
++        if tag in ('iframe','object','embed'):self.frames.append(tag)
++
++
++class HttpDeploymentTests(unittest.TestCase):
++    def setUp(self):
++        self.text=(WEB/'deploy/nginx.conf').read_text()
++        self.conf=parse_config(self.text)
++        self.server=next(b for b in self.conf.children if b.words==['server'])
++        self.locations={tuple(b.words[1:]):b for b in self.server.children if b.words[0]=='location'}
++        self.api=self.locations[('/api/',)]
++        self.headers={row[0]:row[1:] for row in values(self.server,'add_header')}
++        self.compose={name:yaml.safe_load((ROOT/name).read_text()) for name in (
++            'docker-compose.yml','docker-compose.override.yml','docker-compose.prod.yml','docker-compose.ssalfer.yml')}
++
++    def test_security_headers_are_unique_server_directives(self):
++        rows=values(self.server,'add_header')
++        self.assertEqual(len(rows),len(self.headers))
++        self.assertEqual(self.headers['X-Content-Type-Options'],['nosniff','always'])
++        self.assertEqual(self.headers['Cache-Control'],['private, no-store','always'])
++        self.assertEqual(self.headers['Referrer-Policy'],['no-referrer','always'])
++        self.assertEqual(self.headers['X-Frame-Options'],['SAMEORIGIN','always'])
++        self.assertEqual(self.headers['Permissions-Policy'],['camera=(), microphone=(), geolocation=()','always'])
++
++    def test_header_inheritance_model_covers_success_and_error_statuses(self):
++        for location in self.locations.values():
++            self.assertFalse(values(location,'add_header'),'child would replace server headers on nginx1.27')
++            for status in (200,401,403,404,413,500,502):
++                with self.subTest(location=location.words,status=status):
++                    modeled={name:row[0] for name,row in self.headers.items() if row[-1]=='always'}
++                    self.assertEqual(modeled['Cache-Control'],'private, no-store')
++                    self.assertEqual(modeled['X-Content-Type-Options'],'nosniff')
++                    self.assertIn('Content-Security-Policy-Report-Only',modeled)
++
++    def test_health_uses_content_type_without_losing_headers(self):
++        health=self.locations[('=','/health')]
++        self.assertEqual(values(health,'default_type'),[['text/plain']])
++        self.assertEqual(values(health,'access_log'),[['off']])
++        self.assertFalse(values(health,'add_header'))
++
++    def test_proxy_pass_and_peer_headers_preserve_ss04(self):
++        self.assertEqual(values(self.api,'proxy_pass'),[['http://backend:8000/api/']])
++        self.assertEqual(values(self.api,'proxy_http_version'),[['1.1']])
++        forwarded={row[0]:row[1] for row in values(self.api,'proxy_set_header')}
++        self.assertEqual(forwarded,{'Host':'$host','X-Real-IP':'$remote_addr',
++            'X-Forwarded-For':'$proxy_add_x_forwarded_for','X-Forwarded-Proto':'$scheme'})
++        self.assertNotIn('real_ip_header',self.text)
++        for name in ('docker-compose.yml','docker-compose.override.yml'):
++            command=self.compose[name]['services']['backend']['command']
++            self.assertIn('--no-proxy-headers',command)
++            self.assertIn('--no-access-log',command)
++            self.assertIn('/app/logging.json',command)
++        self.assertIn('"--no-proxy-headers"',(ROOT/'backend/Dockerfile').read_text())
++
++    def test_forwarded_spoof_is_not_restored_as_client_identity(self):
++        spec=importlib.util.spec_from_file_location('ss08_peer',ROOT/'backend/app/services/request_origin.py')
++        origin=importlib.util.module_from_spec(spec);spec.loader.exec_module(origin)
++        spoof='192.0.2.199';actual='198.51.100.7';peer='10.0.0.2'
++        appended=f'{spoof}, {actual}'
++        self.assertEqual(origin.resolve_client_ip(peer,[appended],[peer]),actual)
++        self.assertEqual(origin.resolve_client_ip(peer,[appended],[]),peer)
++
++    def test_private_api_is_not_cached_or_stored_and_has_canonical_headers(self):
++        self.assertEqual(values(self.api,'proxy_cache'),[['off']])
++        self.assertEqual(values(self.api,'proxy_store'),[['off']])
++        self.assertEqual(values(self.api,'proxy_intercept_errors'),[['off']])
++        hidden={r[0].lower() for r in values(self.api,'proxy_hide_header')}
++        self.assertEqual(hidden,{'cache-control','x-content-type-options'})
++        self.assertNotIn('proxy_ignore_headers',self.text)
++        self.assertNotIn('expires ',self.text)
++        for protected in ('content-disposition','content-type','set-cookie','x-total-count'):
++            self.assertNotIn(protected,hidden)
++
++    def test_document_download_contract_and_authorization_are_preserved(self):
++        tree=ast.parse((ROOT/'backend/app/routers/documents.py').read_text())
++        node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='download_version')
++        code=ast.unparse(node)
++        self.assertIn('require_document_access(db, user, version.id_documento)',code)
++        self.assertIn('service.safe_version_path(version)',code)
++        response=next(n for n in ast.walk(node) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=='FileResponse')
++        kwargs={kw.arg:kw.value for kw in response.keywords}
++        self.assertEqual(ast.literal_eval(kwargs['content_disposition_type']),'attachment')
++        self.assertEqual(ast.literal_eval(kwargs['headers']),{'X-Content-Type-Options':'nosniff','Cache-Control':'private, no-store'})
++        source=(ROOT/'backend/app/services/document_validation.py').read_text()
++        tree=ast.parse(source);media=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='download_media_type')
++        self.assertIn('application/octet-stream',ast.unparse(media))
++        self.assertNotIn('uploads',self.text)
++        self.assertNotIn('alias ',self.text)
++
++    def test_no_unverified_tls_redirect_or_enforced_csp(self):
++        self.assertEqual(values(self.server,'listen'),[['80']])
++        self.assertNotIn('Strict-Transport-Security',self.headers)
++        self.assertNotIn('Content-Security-Policy',self.headers)
++        self.assertNotIn('ssl_certificate',self.text)
++        self.assertNotIn('return 301 https',self.text)
++        self.assertEqual(values(self.server,'server_tokens'),[['off']])
++
++    def test_csp_candidate_covers_observed_resource_classes_without_blocking(self):
++        policy=self.headers['Content-Security-Policy-Report-Only'][0]
++        directives={part.split()[0]:part.split()[1:] for part in policy.split(';') if part.strip()}
++        for key in ('script-src','style-src','img-src','font-src','connect-src','worker-src','frame-src'):
++            self.assertIn("'self'",directives[key])
++        self.assertIn("'unsafe-inline'",directives['style-src'])
++        self.assertNotIn("'unsafe-inline'",directives['script-src'])
++        self.assertIn('https://*.tile.openstreetmap.org',directives['img-src'])
++        for token in ('data:','blob:'):self.assertIn(token,directives['img-src'])
++        self.assertIn('blob:',directives['frame-src'])
++        self.assertNotIn('report-uri',directives)
++        self.assertNotIn('report-to',directives)
++        self.assertNotIn('upgrade-insecure-requests',directives)
++
++    def test_html_inventory_matches_pages_inline_scripts_and_hashes(self):
++        inventory=json.loads((ROOT/'docs/security/ss08/inventario-recursos.json').read_text())
++        actual={str(p.relative_to(WEB)) for p in [*WEB.glob('*.html'),*(WEB/'pages').rglob('*.html')]}
++        self.assertEqual(actual,{p['path'] for p in inventory['pages']})
++        total=0
++        for page in inventory['pages']:
++            path=WEB/page['path'];self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),page['sha256'])
++            parser=Resources();parser.feed(path.read_text());total+=parser.inline
++            self.assertFalse(parser.frames,'review frame policy before changing this assertion')
++            for kind,url in parser.resources:
++                self.assertFalse(urlsplit(url).scheme,'external source requires CSP review')
++        self.assertEqual(total,inventory['summary']['inline_script_blocks'])
++        self.assertGreater(total,0,'RO must not be mistaken for inline-compatible enforcement')
++
++    def test_image_contains_all_existing_html_resources_but_not_operational_docs(self):
++        docker=(WEB/'deploy/Dockerfile').read_text()
++        copies=[shlex.split(line)[1:] for line in docker.splitlines() if line.startswith('COPY ')]
++        published=set()
++        for words in copies:
++            *sources,destination=words
++            if not destination.startswith('/usr/share/nginx/html'):continue
++            for source in sources:
++                path=WEB/source
++                if path.is_dir():published.update(str(p.relative_to(WEB)) for p in path.rglob('*') if p.is_file())
++                else:published.add(source)
++        self.assertNotIn('.', {word for row in copies for word in row[:-1]})
++        for denied in ('DEPLOY.md','ENTREGA.md','TESTING.md','deploy/nginx.conf','deploy/Dockerfile'):
++            self.assertNotIn(denied,published)
++        for page in [*WEB.glob('*.html'),*(WEB/'pages').rglob('*.html')]:
++            self.assertIn(str(page.relative_to(WEB)),published)
++            parser=Resources();parser.feed(page.read_text())
++            for kind,url in parser.resources:
++                parsed=urlsplit(url)
++                if parsed.scheme or not parsed.path:continue
++                target=(WEB/unquote(parsed.path).lstrip('/')) if parsed.path.startswith('/') else page.parent/unquote(parsed.path)
++                if target.is_file():self.assertIn(str(target.resolve().relative_to(WEB.resolve())),published)
++        self.assertIn('Index.html',published)
++        self.assertIn('js/vendor/leaflet-1.9.4/leaflet.js',published)
++
++    def test_ports_volumes_and_networks_are_declared_without_expansion(self):
++        for doc in self.compose.values():
++            for service in doc['services'].values():
++                for port in service.get('ports',[]):self.assertTrue(port.startswith('127.0.0.1:'),port)
++                self.assertNotIn('privileged',service)
++                self.assertNotIn('network_mode',service)
++                self.assertNotIn('/var/run/docker.sock',str(service.get('volumes',[])))
++        base=self.compose['docker-compose.yml']['services']
++        self.assertIn('uploads_data:/app/uploads',base['backend']['volumes'])
++        self.assertIn('postgres_data:/var/lib/postgresql/data',base['db']['volumes'])
++        self.assertFalse(self.compose['docker-compose.ssalfer.yml']['services']['frontend_ssalfer'].get('volumes'))
++        self.assertNotIn('networks',self.compose['docker-compose.yml'])
++
++    def test_ss10_logging_and_compose_environment_remain_separate(self):
++        config=json.loads((ROOT/'backend/logging.json').read_text())
++        self.assertEqual(config['formatters']['safe']['()'],'app.safe_logging.SafeJSONFormatter')
++        base=self.compose['docker-compose.yml']
++        self.assertEqual(base['x-default-logging']['options']['max-size'],'${DOCKER_LOG_MAX_SIZE:-10m}')
++        self.assertEqual(base['x-default-logging']['options']['max-file'],'${DOCKER_LOG_MAX_FILES:-3}')
++        environment=base['services']['backend']['environment']
++        self.assertNotIn('POSTGRES_ADMIN_PASSWORD',environment)
++        for key in ('AUTH_TRUSTED_PROXY_IPS','IMPORT_MAX_RECORD_BYTES','DOCUMENT_INSPECTION_ENTRIES','REPORT_MAX_ROWS'):
++            self.assertIn(key,environment)
++
++    def test_access_log_template_uses_only_generated_safe_metadata(self):
++        row=values(self.conf,'log_format')[0]
++        self.assertEqual(row[:2],['ssalfer_safe','escape=json'])
++        template=''.join(row[2:]);variables=set(re.findall(r'\$\w+',template))
++        self.assertEqual(variables,{'$request_id','$status','$body_bytes_sent','$request_time'})
++        sentinel='SS08_QUERY_COOKIE_PERSON_SENTINEL_7842'
++        replacements={'$request_id':'a'*32,'$status':'403','$body_bytes_sent':'29','$request_time':'0.012',
++                      '$request':sentinel,'$args':sentinel,'$http_cookie':sentinel,'$remote_addr':sentinel}
++        rendered=template
++        for key,value in replacements.items():rendered=rendered.replace(key,value)
++        self.assertNotIn(sentinel,rendered)
++        record=json.loads(rendered)
++        self.assertEqual(record,dict(component='ssalfer_proxy',request_id='a'*32,status=403,bytes=29,duration=0.012))
++        self.assertEqual(values(self.server,'access_log'),[['/var/log/nginx/access.log','ssalfer_safe']])
++
++    def test_upload_limits_are_not_silently_raised_for_login_or_claimed_fixed(self):
++        self.assertNotIn('client_max_body_size',self.text)
++        self.assertFalse(values(self.api,'proxy_read_timeout'))
++        environment=self.compose['docker-compose.yml']['services']['backend']['environment']
++        self.assertEqual(environment['MAX_UPLOAD_BYTES'],'${MAX_UPLOAD_BYTES:-26214400}')
++        self.assertEqual(environment['IMPORT_MAX_FILE_SIZE_MB'],'${IMPORT_MAX_FILE_SIZE_MB:-100}')
++        # Candidate arithmetic, not real upload: largest documented default +
++        # bounded multipart fixture overhead. Actual overrides need QA review.
++        for file_bytes,outer_bytes in ((25*1024**2,26*1024**2),(100*1024**2,101*1024**2)):
++            boundary=b'--SS08-SYNTHETIC-BOUNDARY\r\nContent-Disposition: form-data; name="archivo"; filename="sintetico.bin"\r\n\r\n'
++            overhead=len(boundary)+len(b'\r\n--SS08-SYNTHETIC-BOUNDARY--\r\n')+65536
++            self.assertLess(file_bytes+overhead,outer_bytes)
++            self.assertGreater(file_bytes+overhead,1024**2)
++
++
++if __name__=='__main__':unittest.main()
+diff --git a/docs/security/ss08/inventario-recursos.json b/docs/security/ss08/inventario-recursos.json
+new file mode 100644
+index 0000000..aa37656
+--- /dev/null
++++ b/docs/security/ss08/inventario-recursos.json
+@@ -0,0 +1,2203 @@
++{
++  "scope": "Static HTML/CSS inventory; no page execution or network requests. Inline constructs retained; Report-Only candidate is not validated enforcement.",
++  "summary": {
++    "pages": 36,
++    "inline_script_blocks": 29,
++    "inline_style_blocks": 0,
++    "style_attributes": 2,
++    "html_event_attributes": 0,
++    "external_script_sources": [],
++    "external_stylesheets": [],
++    "embedded_frame_tags": 0
++  },
++  "pages": [
++    {
++      "path": "Index.html",
++      "sha256": "4b7bb306d09372011cd9754f4a757e562a90419817ced4475fc1eeef2acab6b4",
++      "scripts": [
++        "/js/env.js",
++        "/js/config.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/utils/permisos.js"
++      ],
++      "styles": [
++        "/styles/login.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/palogo-2.png",
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "dashboard.html",
++      "sha256": "b94a0b853cd282ca21829e5997a3d915f1b4869bd7e6390e8d9384ada47a5703",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/marco.js",
++        "/js/vendor/exceljs-4.4.0.min.js",
++        "/js/vendor/html2canvas-1.4.1.min.js",
++        "/js/utils/dashboardExcel.js",
++        "/js/dashboard.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/usuarios.html",
++      "sha256": "79b7ecf9092631b5ad3f71f276aeef5ef7699bc3fa7a42a52b4992bda8c26f41",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/proyectos.js",
++        "/js/api/usuarios.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/usuarios.js",
++        "/js/utils/gestion.js",
++        "/js/asignacionesUsuarios.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/usuarios.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 0,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/documentos.html",
++      "sha256": "966fbced71a4dd4db2759fee5bf15e66c08aa59ba609f03f0a5176d3ab3451c8",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/documentos.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/listadoDocumentos.js",
++        "/js/documentos.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/paginaGestion.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/expedienteDocumental.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/actividades.html",
++      "sha256": "8bf2b158416b7a02d024a40bc8284909eb7a11f1ce80c00e8f4658f1a28a0069",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/actividades.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/actividades.css",
++        "/styles/gestion.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/cambiarContrasena.html",
++      "sha256": "b5a54dcff228bddc2d3c4894aec71e170a5964121baa9ea1286717d31d09f358",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/proyectos.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/cambiarContrasena.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/cambiarContrasena.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 0,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/derechosColectivos.html",
++      "sha256": "c855114c4ed5a3ef24e31472d64330a5dfe74b960bcb5a6d3df6081c33486e56",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/documentos.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/periodos.js",
++        "/js/utils/reporteColectivo.js",
++        "/js/derechosColectivos.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/paginaGestion.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/expedienteDocumental.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/gestion.css",
++        "/styles/derechosColectivos.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/reportesFifonafe.html",
++      "sha256": "44211b5e8e5b3236be3c0df2e453481c5a809858a4b3d7b2059d5a2fa4914b9f",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/proyectos.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/reportesFifonafe.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/reportesFifonafe.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 0,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/fifonafe.html",
++      "sha256": "be61dfd13e4b1c94d5f390c7e98f49eb45905b79794e3d68dd167743d6fd2efc",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/fifonafe.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/gestorDocumentos.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/fifonafe.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/marco.css",
++        "/styles/gestion.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/mapa.html",
++      "sha256": "1e000bfff1187ad168592831ec96ec489ea4234ca168fd89a98c0a926637dda5",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/proyectos.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/vendor/leaflet-1.9.4/leaflet.js",
++        "/js/api/geoespacial.js",
++        "/js/utils/mapaConciliacion.js",
++        "/js/mapa.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/mapa.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/js/vendor/leaflet-1.9.4/leaflet.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/fichaConvenio.html",
++      "sha256": "8df625e879bbd3bbd2814c629550268fb6d13f467410902157624131b71c1b26",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/directorioPersonas.js",
++        "/js/utils/ediciones.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/fichaConvenio.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/fichaConvenio.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 2,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/seguimiento.html",
++      "sha256": "e66e4de5dd58271f5ce92684a545016b0c9bd69c9154ca929cf99c4aef02a3bc",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/documentos.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/seguimiento.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/seguimiento.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/tramiteRan.html",
++      "sha256": "11c3040ea18d0b94151f09aa73b3f62852700bf6497d1c567539013df57bf1e9",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/tramiteRan.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/tramiteRan.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/asamblea.html",
++      "sha256": "7be4a6d25cd00d76e96c9c6f517482cc24f3c10af2083bf5a4d47578a5be5259",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/asamblea.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/gestorDocumentos.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/asamblea.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/marco.css",
++        "/styles/gestion.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/fichaProyecto.html",
++      "sha256": "9c0561c7dd257b9e1fa3238dbb387eef121fe40d7656930df24250e0a3bf0f1d",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/usuarios.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/gestion.js",
++        "/js/utils/usuariosProyecto.js",
++        "/js/fichaProyecto.js",
++        "/js/asignacionesUsuarios.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/nuevoProyecto.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/marco.css",
++        "/styles/gestion.css",
++        "/styles/fichaProyecto.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/orv.html",
++      "sha256": "fba193b1141c277fd679bdd5b4bc801eb499c78b49beaaca5460ba44c69b7959",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/directorioPersonas.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/orv.js",
++        "/js/utils/gestorDocumentos.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/orv.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/reporteActividadesPeriodo.html",
++      "sha256": "1d1f84748e7aec518ddc2e4edf4d6fb99c32049cc6bd03742485638ce5688658",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/proyectos.js",
++        "/js/api/catalogos.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/reporteAvancePeriodo.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/reporteActividadesPeriodo.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 0,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/nuevoProyecto.html",
++      "sha256": "4ba8d8f983c36efb93405badd8695be7fd661ee369e57c8908c2e81c38c1064b",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/usuarios.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/gestion.js",
++        "/js/utils/usuariosProyecto.js",
++        "/js/nuevoProyecto.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/nuevoProyecto.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/gestion.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/reportesConvenios.html",
++      "sha256": "5527a9d2f9934b9702f79ea2cfe34959a2d8317439ee258d8a7d82643cc771a2",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/proyectos.js",
++        "/js/api/catalogos.js",
++        "/js/api/reportes.js",
++        "/js/api/nucleos.js",
++        "/js/api/afectaciones.js",
++        "/js/api/convenios.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/vendor/xlsx-0.20.3.mini.min.js",
++        "/js/reporteGeneralConvenios.js",
++        "/js/reportesConvenios.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/reportesConvenios.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 0,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/nucleoAgrario.html",
++      "sha256": "b3dfd56bbcfe9e9b0f699070555386607291b88afde20baa9b665ffc1f5aeb1f",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/usuarios.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/gestion.js",
++        "/js/gestionNucleo.js",
++        "/js/utils/usuariosProyecto.js",
++        "/js/nucleoAgrario.js"
++      ],
++      "styles": [
++        "/styles/nucleoAgrario.css",
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/unidadAgraria.html",
++      "sha256": "f002a710ea67c8d7b34a68dde04067b7b499095ad9209c618331dea72564d863",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/directorioPersonas.js",
++        "/js/utils/ediciones.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/unidadAgraria.js",
++        "/js/utils/gestorDocumentos.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/unidadAgraria.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/afectacion.html",
++      "sha256": "851177a42c6e2bee83b6d78be7e7a0d5a3b708158fbcadb4266e4d40fc563bd5",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/afectacion.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/utils/contexto.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/gestion.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/afectacion.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/gestion.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/gestionGeoespacial.html",
++      "sha256": "3ad272fcba66a752c9a0fc2d056c825840022dda9df03b5acc762aef1864aebd",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/proyectos.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/api/geoespacial.js",
++        "/js/utils/formatters.js",
++        "/js/utils/gestion.js",
++        "/js/vendor/leaflet-1.9.4/leaflet.js",
++        "/js/conciliacionGeoespacial.js",
++        "/js/gestionGeoespacial.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/gestionGeoespacial.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/gestion.css",
++        "/js/vendor/leaflet-1.9.4/leaflet.css",
++        "/styles/conciliacionGeoespacial.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/catalogosOperativos.html",
++      "sha256": "69a4d820346f322b7ca8e614b47ac76f2cfd8bd07acee32b4598d8a58735da82",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/proyectos.js",
++        "/js/api/catalogosOperativos.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/catalogosOperativos.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/catalogosOperativos.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 0,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/nuevoConvenio.html",
++      "sha256": "3b617ee15ca2aa58da094715538c35e7a9cd179cd3dc236839d7c28520297957",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/directorioPersonas.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/nuevoConvenio.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/nuevoConvenio.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/expedienteDocumental.html",
++      "sha256": "3bcdc026518fbce5ae5c55513df567210cb6ff459c44f578bae8dc1d782ea9fc",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/documentos.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/expedienteDocumental.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/expedienteDocumental.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/fichaFifonafe.html",
++      "sha256": "e986b78459c3140b7379abf6b273da9fbed0d50054e2a10a3acf2c8241707e21",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/directorioPersonas.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/documentos.js",
++        "/js/fichaFifonafe.js",
++        "/js/intervinientesFifonafe.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/fichaFifonafe.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/indemnizacion.html",
++      "sha256": "7d6d20e451540b975b34e3b9c5b8d6c9abbca13094a26c6e473bebaa61a8063d",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/directorioPersonas.js",
++        "/js/utils/ediciones.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/indemnizacion.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/indemnizacion.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/estadoFinanciero.html",
++      "sha256": "b384e937ba088a7a3bf147393bd677d73c36d2df71a3960a9af4cc11e099a456",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/estadoFinanciero.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/estadoFinanciero.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/parcela.html",
++      "sha256": "fe9b449fc0a06768552c9264ebf4d28e3be91eb092ecb5f84f8a361e410298b5",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/directorioPersonas.js",
++        "/js/utils/ediciones.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/parcela.js",
++        "/js/utils/gestorDocumentos.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/parcela.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/padrones.html",
++      "sha256": "04b984f75d91d85e52744967e5caca4e51a903c0a75d041876edc7caf13d505e",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/documentos.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/padrones.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/padrones.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/detalleAfectacion.html",
++      "sha256": "3d2286c16fa1871cabc0ad87f269f61bf8d80fd02094df4e54265cb66eee8f32",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/ediciones.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/detalleAfectacion.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/detalleAfectacion.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/auditoria.html",
++      "sha256": "e56e134ea5c8754877257ad6c03159770477f67b0ad5792a8ab6991977a12a40",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/auditoria.js",
++        "/js/api/usuarios.js",
++        "/js/api/nucleos.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/etiquetasAuditoria.js",
++        "/js/auditoria.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/auditoria.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 0,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/reportesColectivos.html",
++      "sha256": "80244e40f29337010e5a56791bc1e3a43d832196bdc3b973462f475a8160d0f3",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/documentos.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/periodos.js",
++        "/js/utils/reporteColectivo.js",
++        "/js/reportesColectivos.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/paginaGestion.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/expedienteDocumental.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/shared.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/persona.html",
++      "sha256": "c9b00b5a4d08833c4f17d67c6b12d37b63249cc35a03e064139b1ff144c852b1",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/navegacion.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/directorioPersonas.js",
++        "/js/persona.js",
++        "/js/utils/gestorDocumentos.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/persona.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    },
++    {
++      "path": "pages/fichaRan.html",
++      "sha256": "7d5a6b8cd236bef3d699b0897d949253e5ca8102bc91505da22d5ebb42043f62",
++      "scripts": [
++        "/js/utils/permisos.js",
++        "/js/utils/proteccion.js",
++        "/js/utils/tablasScroll.js",
++        "/js/env.js",
++        "/js/config.js",
++        "/js/api/cliente.js",
++        "/js/api/auth.js",
++        "/js/api/catalogos.js",
++        "/js/api/proyectos.js",
++        "/js/api/nucleos.js",
++        "/js/api/personas.js",
++        "/js/api/orv.js",
++        "/js/api/padrones.js",
++        "/js/api/actividades.js",
++        "/js/api/parcelas.js",
++        "/js/api/unidadesAgrarias.js",
++        "/js/api/afectaciones.js",
++        "/js/api/seguimiento.js",
++        "/js/api/asambleas.js",
++        "/js/api/tramitesRan.js",
++        "/js/api/convenios.js",
++        "/js/api/fifonafe.js",
++        "/js/api/documentos.js",
++        "/js/api/indemnizacion.js",
++        "/js/api/reportes.js",
++        "/js/utils/formatters.js",
++        "/js/utils/ui.js",
++        "/js/utils/experiencia.js",
++        "/js/utils/documentos.js",
++        "/js/utils/gestion.js",
++        "/js/utils/contexto.js",
++        "/js/utils/gestorDocumentos.js",
++        "/js/utils/ediciones.js",
++        "/js/utils/marco.js",
++        "/js/dashboard.js",
++        "/js/fichaRan.js"
++      ],
++      "styles": [
++        "/styles/dashboard.css",
++        "/styles/shared.css",
++        "/styles/fichaRan.css",
++        "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++        "/styles/gestion.css",
++        "/styles/marco.css",
++        "/styles/tablasScroll.css"
++      ],
++      "images": [
++        "/img/LOGOS VERDE/IMAGOTIPO.png",
++        "/img/LOGOS VERDE/SSALFER.png",
++        "/img/LOGOS VERDE/NOMBRE_LOGO.png",
++        "/img/PA_LOGO_VERDE.png"
++      ],
++      "inline_scripts": 1,
++      "inline_styles": 0,
++      "style_attributes": 0,
++      "events": [],
++      "frames": []
++    }
++  ],
++  "css": [
++    {
++      "path": "styles/gestion.css",
++      "urls": []
++    },
++    {
++      "path": "styles/reporteActividadesPeriodo.css",
++      "urls": []
++    },
++    {
++      "path": "styles/nucleoAgrario.css",
++      "urls": []
++    },
++    {
++      "path": "styles/asamblea.css",
++      "urls": []
++    },
++    {
++      "path": "styles/unidadAgraria.css",
++      "urls": []
++    },
++    {
++      "path": "styles/fichaConvenio.css",
++      "urls": []
++    },
++    {
++      "path": "styles/catalogosOperativos.css",
++      "urls": []
++    },
++    {
++      "path": "styles/fichaProyecto.css",
++      "urls": []
++    },
++    {
++      "path": "styles/orv.css",
++      "urls": []
++    },
++    {
++      "path": "styles/marco.css",
++      "urls": []
++    },
++    {
++      "path": "styles/fichaFifonafe.css",
++      "urls": []
++    },
++    {
++      "path": "styles/padrones.css",
++      "urls": []
++    },
++    {
++      "path": "styles/login.css",
++      "urls": [
++        "/img/FONDO.png"
++      ]
++    },
++    {
++      "path": "styles/parcela.css",
++      "urls": []
++    },
++    {
++      "path": "styles/tramiteRan.css",
++      "urls": []
++    },
++    {
++      "path": "styles/actividades.css",
++      "urls": []
++    },
++    {
++      "path": "styles/seguimiento.css",
++      "urls": []
++    },
++    {
++      "path": "styles/nuevoProyecto.css",
++      "urls": []
++    },
++    {
++      "path": "styles/shared.css",
++      "urls": []
++    },
++    {
++      "path": "styles/derechosColectivos.css",
++      "urls": []
++    },
++    {
++      "path": "styles/cambiarContrasena.css",
++      "urls": []
++    },
++    {
++      "path": "styles/dashboard.css",
++      "urls": []
++    },
++    {
++      "path": "styles/indemnizacion.css",
++      "urls": []
++    },
++    {
++      "path": "styles/usuarios.css",
++      "urls": []
++    },
++    {
++      "path": "styles/gestionGeoespacial.css",
++      "urls": []
++    },
++    {
++      "path": "styles/auditoria.css",
++      "urls": []
++    },
++    {
++      "path": "styles/reportesFifonafe.css",
++      "urls": []
++    },
++    {
++      "path": "styles/estadoFinanciero.css",
++      "urls": []
++    },
++    {
++      "path": "styles/detalleAfectacion.css",
++      "urls": []
++    },
++    {
++      "path": "styles/expedienteDocumental.css",
++      "urls": []
++    },
++    {
++      "path": "styles/reportesConvenios.css",
++      "urls": []
++    },
++    {
++      "path": "styles/nuevoConvenio.css",
++      "urls": []
++    },
++    {
++      "path": "styles/mapa.css",
++      "urls": []
++    },
++    {
++      "path": "styles/conciliacionGeoespacial.css",
++      "urls": []
++    },
++    {
++      "path": "styles/afectacion.css",
++      "urls": []
++    },
++    {
++      "path": "styles/fichaRan.css",
++      "urls": []
++    },
++    {
++      "path": "styles/tablasScroll.css",
++      "urls": []
++    },
++    {
++      "path": "styles/persona.css",
++      "urls": []
++    },
++    {
++      "path": "styles/fifonafe.css",
++      "urls": []
++    },
++    {
++      "path": "js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
++      "urls": [
++        "./fonts/bootstrap-icons.woff2?e34853135f9e39acf64315236852cd5a",
++        "./fonts/bootstrap-icons.woff?e34853135f9e39acf64315236852cd5a"
++      ]
++    },
++    {
++      "path": "js/vendor/leaflet-1.9.4/leaflet.css",
++      "urls": [
++        "#default#VML",
++        "images/layers-2x.png",
++        "images/layers.png",
++        "images/marker-icon.png"
++      ]
++    }
++  ],
++  "runtime_resource_notes": {
++    "api": "/api in js/env.js; localhost fallback in config/client remains unchanged",
++    "tile_images": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png, mapa.js",
++    "blob_usage": "downloads/preview/XLSX/CSV use URL.createObjectURL; not equivalent to external script loading",
++    "vendor_notes": "Leaflet 1.9.4, SheetJS, ExcelJS and html2canvas are local; vendor eval/worker behavior still requires browser QA"
++  }
++}
+diff --git a/docs/security/SS-08-MATRIZ-CABECERAS-RUTAS-2026-10-29.md b/docs/security/SS-08-MATRIZ-CABECERAS-RUTAS-2026-10-29.md
+new file mode 100644
+index 0000000..5819888
+--- /dev/null
++++ b/docs/security/SS-08-MATRIZ-CABECERAS-RUTAS-2026-10-29.md
+@@ -0,0 +1,81 @@
++# SS-08 etapa 1: matriz de cabeceras y rutas
++
++Fecha: 2026-10-29. Rama `dev`, HEAD `683ff75613768de28a7127c7e33a6e2ef4fc40ff` más remediaciones locales preservadas. **Estado: diseño/configuración comprobados estáticamente; respuestas HTTP reales pendientes QA.** Ver [informe](SS-08-ETAPA1-CORRECCION-2026-10-29.md) e [inventario de despliegue](SS-08-INVENTARIO-DESPLIEGUE-2026-10-29.md).
++
++## Cabeceras del Nginx SSALFER
++
++Todas las add_header nuevas están en server y llevan always. Ningún location declara add_header: /health usa default_type text/plain para conservar la herencia, en lugar de añadir Content-Type como segunda cabecera. Nginx1.27 hereda add_header del padre sólo si el hijo no tiene las suyas; no se usa add_header_inherit de versiones posteriores. [Documentación Nginx](https://nginx.org/en/docs/http/ngx_http_headers_module.html).
++
++| Cabecera/control | Antes en SSALFER | Configuración local de esta etapa | Compatibilidad, ubicación y límite |
++|---|---|---|---|
++| X-Content-Type-Options | Ausente en Nginx; descarga API ya nosniff por SS-06 | nosniff, always | Valor canónico en Nginx; se oculta la copia upstream API para no duplicar. MIME de JS/CSS depende de mime.types de la imagen y necesita nginx/navegador QA |
++| Referrer-Policy | No declarada | no-referrer, always | Evita enviar Referer incluso a tiles externos; Origin/CSRF no se elimina ni modifica. Analítica basada en Referer puede variar; no cambia URLs de recursos |
++| X-Frame-Options | No declarada | SAMEORIGIN, always | Impide enmarcado externo en navegadores compatibles. No se detectaron iframe/object/embed de aplicación; embedding institucional externo no acreditado y requiere decisión/QA |
++| Permissions-Policy | No declarada | camera=(), microphone=(), geolocation=(), always | No se detectó uso de esas APIs en código propio; no restringe clipboard, fullscreen o descargas. Leaflet no equivale a geolocalización del dispositivo |
++| Cache-Control | Sin política Nginx; documentos ya private,no-store | private, no-store, always, también HTML/JS/CSS/health | API oculta sólo la cabecera upstream y emite el mismo valor canónico. Más transferencias por recarga; no borra cachés anteriores, DOM/memoria, BFCache o copias ya descargadas por sí solo |
++| Content-Security-Policy-Report-Only | Ausente | Candidata, always | No bloquea recursos ni corrige XSS por sí sola. Hay29 scripts inline que generarían violaciones de script-src self; se conservan y no se activa enforcement |
++| Content-Security-Policy (bloqueante) | Ausente | No implementada | No cambiar a enforcement antes de resolver inline, vendors, styles, blobs y conexiones en navegador QA |
++| Strict-Transport-Security | Ausente; sólo HTTP80 | No implementada | Emitir en terminador TLS verificado del origen público, después de validar certificado/dominio/redirecciones y políticas. No imponer includeSubDomains/preload o HSTS a HTTP local |
++| Server | Versión no restringida en este server | server_tokens off | Oculta versión de Nginx en cabecera/páginas generadas, no el nombre nginx ni otros indicadores del stack. Edge/backend directo pueden emitir información propia |
++| Content-Type | Proveedor estático o API; health tenía add_header | Se preserva proveedor; health default_type text/plain | Documentos siguen application/octet-stream; no hay header global que convierta respuestas API a HTML o texto |
++| Content-Disposition | Attachment backend en documentos | No se oculta ni reemplaza | Nombre saneado/attachment siguen dependiendo de SS-06 y autorización/ruta de backend |
++| Set-Cookie | Backend | No se oculta, reescribe ni fabrica | HttpOnly, Secure, SameSite, Path y nombres __Host- siguen siendo de configuración backend. No se fuerza Secure desde un proxy HTTP local para compensar TLS desconocido |
++| Access-Control-* y X-Total-Count | CORS/contratos backend | Se dejan pasar | No se añade wildcard CORS, no se cambia Origin o X-CSRF-Token |
++
++## CSP candidata, sin bloqueo
++
++```text
++default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
++img-src 'self' data: blob: https://*.tile.openstreetmap.org;
++font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:;
++frame-src 'self' blob:; object-src 'none'; base-uri 'self';
++form-action 'self'; frame-ancestors 'self'
++```
++
++La cadena anterior se configura en una sola línea de Content-Security-Policy-Report-Only. No se declaran report-uri/report-to ni colectores externos: la observación se prepara para consola/instrumentación QA. No hay telemetría automática de expedientes. Report-Only permite estudiar la política sin imponerla; algunas directivas pueden tener soporte o tratamiento distinto en navegadores. [Referencia de Report-Only](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy-Report-Only).
++
++| Recurso observado | Fuente | Tratamiento candidato / verificación pendiente |
++|---|---|---|
++| Scripts propios y vendors | /js, incluidos Leaflet1.9.4, SheetJS/ExcelJS/html2canvas locales | self; no se detectan scripts CDN en36 HTML. Eval/dynamic Function/worker de vendors no se certifican por inventario textual |
++| Scripts inline |29 bloques, sin modificar | Producen violaciones candidatas de script-src self. Antes de enforcement externalizar con revisión o diseñar nonces/hashes por respuesta; no añadir unsafe-inline sólo para silenciar resultados sin evaluar |
++| CSS local, atributos y estilos generados | styles, vendor CSS,2 atributos style HTML y CSSOM/Leaflet | style-src self unsafe-inline inicialmente candidata. No asegura compatibilidad con todas las inserciones dinámicas; requiere navegador |
++| Fuentes | CSS/vendor local; referencias data posibles | font-src self data; no se detecta stylesheet remoto en HTML |
++| Tiles | mapa.js usa https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png | img-src permite subdominios de tile.openstreetmap.org. Peticiones salen del navegador al proveedor; no pasan por backend y siguen sujetas a política institucional de egress/privacidad |
++| API | env.js fija /api | connect-src self. Si un despliegue autorizado modifica API_BASE_URL/origen, revisar CSP/CORS en conjunto; el fallback localhost permanece pero no se presume seguro en producción |
++| Exportaciones/preview | URL.createObjectURL en documentos/reportes | blob en img/frame/worker candidata; top-level blob/download/PDF viewer requiere QA. No se altera MIME, bytes o archivo guardado |
++| Enlaces externos | Navegación a sitio institucional público, no script externo | No convertir cada href o URL de comentario/vendor en dependencia de ejecución. no-referrer limita datos enviados al navegar |
++
++No usar frame-ancestors Report-Only como prueba de clickjacking bloqueado: el control bloqueante implementado es X-Frame-Options SAMEORIGIN. No se activa sandbox ni upgrade-insecure-requests, que podrían alterar login, descargas, HTTP local o navegación.
++
++## Rutas y estados: emisión esperada, no tráfico capturado
++
++| Ruta/contexto | Proveedor de respuesta | Cabeceras nuevas previstas | Estado y límites |
++|---|---|---|---|
++| `/`, `/Index.html`, `/dashboard.html`, `/pages/*.html` | Nginx SSALFER | Las seis add_header de server |200/304/404 y errores del server seleccionado; UI propia intacta, CSP sólo RO |
++| `/js/`, `/styles/`, `/img/` | Nginx SSALFER | Mismas; Content-Type de mime.types | MIME correcto debe comprobarse con nosniff en imagen real; no-store reduce cache de assets |
++| `/health` | return Nginx | Hereda las seis; Content-Type único text/plain |200; access_log off como antes. No acredita salud de API/BD |
++| `/api/auth/*` | FastAPI vía proxy | Heredadas; Set-Cookie/CSRF/CORS backend intactos |401/403/200/201, según caso. No se implementa rate limiter SS-04 |
++| `/api/documentos/versiones/{id}/descarga` | FileResponse autorizado | nosniff y private,no-store canónicos; attachment/octet-stream upstream preservados |200/206/403/404/409/500 según backend; sin mount/alias de uploads en Nginx |
++| `/api/exportaciones/dashboard.csv` | Respuesta CSV SS-11 | private,no-store y demás headers; tipo/archivo upstream | No cambia límites de filas/bytes ni ciclo de recursos de SS-11 |
++| `/api/proyectos/{id}/...importaciones` y carga documental | Nginx + FastAPI/GDAL | Heredadas incluso rechazo413 | Límite HTTP sigue sin alineación; el valor por defecto Nginx puede rechazar antes de API. No se presenta como resuelto |
++| `/api/*` no encontrado o sin permiso | FastAPI, con intercept_errors off | Heredadas |401/403/404/500: cuerpo/código backend no se convierten en página de login ni200 |
++| API caída/no resoluble en operación | Nginx | Headers del server con always |502/504, si la petición alcanza ese server; resolución de backend al arrancar puede impedir iniciar Nginx: necesita QA |
++| Documentación raíz/`deploy/` de SSALFER | No copiada al document root por Dockerfile nuevo | Respuesta404 esperada con headers si no hay otro archivo de imagen/mount | No se construyó/inspeccionó una imagen real; verificar con solicitudes QA |
++| `/docs`, `/openapi.json`, `/health` de FastAPI directo | Backend/edge externo, fuera de /api proxy SSALFER | No reciben automáticamente esta política | FastAPI conserva docs/OpenAPI por defecto; exposición real pendiente, no se bloquean APIs sin conocer consumidores |
++| Frontend React/Vite del servicio `frontend` | Otra configuración Nginx/Vite | Sin cambios en esta intervención | Sigue construible y presente en Compose. No se declara retirado ni protegido por el Nginx SSALFER |
++
++Las pruebas modelan herencia y always para200/401/403/404/413/500/502. No sustituyen `nginx -t`, una respuesta real, subrequests/error_page no inventariados o errores que ocurran antes de seleccionar este server. Un edge puede duplicar/quitar cabeceras: verificar cada salto y el resultado público.
++
++## Cargas y tiempos: diseño pendiente, no configuración activa
++
++| Presupuesto | Declarado actualmente | Propuesta para QA, no aplicada |
++|---|---|---|
++| Documento por archivo | Código20MiB por defecto; Compose MAX_UPLOAD_BYTES=25MiB | HTTP específico de carga mayor que límite efectivo de archivo + presupuesto explícito de metadatos/multipart;26MiB candidato para default25MiB |
++| GIS comprimido/subido | IMPORT_MAX_FILE_SIZE_MB=100 por defecto (MiB en código) |101MiB candidato por ruta de upload GIS para100MiB +1MiB de overhead; no asignarlo al login ni a toda la API |
++| Multipart | DDV/núcleos/parcelas controlan campos repetidos/desconocidos; legacy tiene mapeo/fuente | Acotar y aprobar campos/tamaños reales, filename/boundary, parser y temporales;1MiB de margen es hipótesis candidata, no capacidad institucional ni garantía para cualquier metadata |
++| HTTP Nginx | client_max_body_size no declarado; default del módulo1m salvo configuración superior efectiva | Verificar nginx -T en QA y overrides; este problema conocido sigue abierto. No poner0/ilimitado ni relajar login para permitir GIS |
++| Reporte CSV | SS-11 REPORT_MAX_ROWS=10000 y REPORT_EXPORT_MAX_BYTES=16MiB, lote250 por defaults | Mantener; un límite de entrada HTTP no limita respuesta CSV, memoria de mapa o almacenamiento temporal |
++| Tiempos proxy | Sin valores específicos en default.conf; dependen de defaults/edge | Revisar connect/read/send/client_body_timeouts contra operaciones reales, sin elegir valores de infraestructura ficticios |
++| GDAL / SQL / HTTP | GDAL timeout default300s; no deadline integral garantizado | Un timeout proxy puede terminar HTTP sin cancelar SQL/GDAL o limpiar transacciones. Probar cancelación real y fallos con SS-02/03/11/12, no equiparar ambos controles |
++
++La prueba sintética sólo suma bytes de encabezados multipart +64KiB de metadata y verifica que un archivo de25/100MiB cabe en26/101MiB; no crea esos archivos, no envía tráfico y no valida los valores efectivos del despliegue. Si MAX_UPLOAD_BYTES/IMPORT_MAX_FILE_SIZE_MB se cambian, recalcular y aprobar los límites del proxy/edge antes de desplegar. No introducir regex de uploads sin probar normalización, slash, todos los flujos legacy/DDV/núcleos/parcelas y ausencia de rutas de escape.
+diff --git a/docs/security/SS-08-INVENTARIO-DESPLIEGUE-2026-10-29.md b/docs/security/SS-08-INVENTARIO-DESPLIEGUE-2026-10-29.md
+new file mode 100644
+index 0000000..c05319c
+--- /dev/null
++++ b/docs/security/SS-08-INVENTARIO-DESPLIEGUE-2026-10-29.md
+@@ -0,0 +1,83 @@
++# SS-08 etapa 1: inventario de despliegue y límites de confianza
++
++Fecha: 2026-10-29. Fuente: archivos versionados y cambios locales sobre `dev`/`683ff75613768de28a7127c7e33a6e2ef4fc40ff`. **No se ejecutaron Compose, Docker, Nginx, conexiones o comandos de inspección institucional.** Los valores `${...}` son referencias/defaults del archivo, no valores de .env leídos.
++
++## Recorridos conocidos y pendientes
++
++```mermaid
++flowchart LR
++    B[Navegador SSALFER] --> E[Terminador TLS / proxy de entrada no acreditado]
++    E --> N[Nginx SSALFER HTTP 80]
++    B -. HTTP local en desarrollo .-> N
++    N -->|/api/ HTTP interno| A[FastAPI / Uvicorn 8000]
++    A -->|login runtime configurado| P[PostgreSQL / PostGIS 5432]
++    A --> U[Volumen documental y staging GIS]
++    A --> G[Subprocesos GDAL mismo contenedor / UID]
++    B -->|tiles HTTPS directos| O[OpenStreetMap]
++```
++
++No hay listener443/certificado/terminación HTTPS en ninguno de los Nginx revisados. El origen HTTPS público, edge y red hasta el host no están acreditados. Frontend/API comparten origen si el navegador usa env.js=/api y se entra por el Nginx correcto. Acceso directo al backend y entrada React/Vite son recorridos distintos.
++
++## Servicios Compose principales
++
++Todos carecen de USER/cap_drop/no-new-privileges/read_only/recursos explícitos de endurecimiento en los archivos revisados, salvo los mecanismos internos que pueda aplicar la imagen. Esto no prueba el UID/privilegios efectivos del contenedor existente. No se activan restricciones genéricas en esta etapa.
++
++| Servicio | Imagen/build y comando declarado | Publicación de host | Persistencia/temporales | Salud/reinicio/logs declarados |
++|---|---|---|---|---|
++| db | postgis/postgis:15-3.3; inicialización/migraciones montadas read-only |127.0.0.1:${DB_HOST_PORT:-5433} →5432 |postgres_data; init/migraciones/runner :ro. PGDATA debe permitir escritura |pg_isready; restart always; json-file default10m ×3 heredado. No acredita autenticación/privilegios/backup |
++| pgadmin |dpage/pgadmin4 sin tag explícito |127.0.0.1:${PGADMIN_HOST_PORT:-5050} →80 |pgadmin_data; configuración/sesiones escribibles |HTTP healthcheck; restart always; logs rotados por configuración común. Identidad web no equivale a usuario PostgreSQL |
++| backend |python:3.11-slim con GDAL/libpq/gcc; imagen software-pa-backend |127.0.0.1:${BACKEND_HOST_PORT:-8000} →8000 |uploads_data:/app/uploads; GIS bajo uploads/importaciones; staging SS-12 privado; /tmp para multipart/reportes/otros temporales |health consulta BD/schema_migrations; restart always; logs SS-10 y json-file acotado. Compose base ejecuta sin reload y con --no-proxy-headers |
++| frontend |React/Vite: node:22-slim para dev/build; nginx:1.27-alpine en producción |Base no publica puerto; override/prod lo añaden |Dev: bind ./frontend y volumen anónimo node_modules; prod sirve dist |restart always; logs comunes; health depende de variante. No se presume retirado |
++| frontend_ssalfer |nginx:1.27-alpine, build ./frontend-ssalfer/deploy/Dockerfile |127.0.0.1:${SSALFER_HOST_PORT:-5174} →80 |Sin mount de uploads ni de BD; sólo assets seleccionados. Nginx requiere sus directorios de cache/body-temp/proxy-temp/PID y quizá escrituras de entrypoint |restart always y espera backend saludable; **sin healthcheck propio ni logging rotado explícito** en ssalfer.yml. Access log nuevo mínimo; rotación/collector efectivo pendientes |
++
++El prefijo127.0.0.1 reduce exposición directa de los puertos publicados al host local, según Compose; no demuestra firewall, túneles, proxy del host o daemon efectivos. No se ejecutó compose config: resolver/interpolar podría revelar secretos. No hay docker.sock, modo privilegiado o host networking declarados en los servicios principales; tampoco prueba de aislamiento efectivo por host.
++
++## Variantes y combinaciones
++
++| Combinación declarada | Consecuencia conocida / pendiente |
++|---|---|
++| Uso de Compose sin -f explícitos | Puede combinar automáticamente docker-compose.override.yml de desarrollo: backend --reload, binds y frontend Vite5173; no apropiarlo como manifiesto de producción |
++| Base + prod |APP_ENV=production, Secure=true, CORS explícito; React frontend target production y puerto5173→80. Sigue sin describir TLS externo ni añadir por sí solo SSALFER |
++| Base + ssalfer |Añade otro servicio, no reemplaza frontend React. Backend queda con defaults de entorno development salvo overrides externos; cookie Secure no queda garantizada |
++| Base + prod + ssalfer explícitos |Candidato a desplegar ambos frontends con backend production, sin override automático de dev. Requiere renderizado seguro autorizado, CORS/origen, TLS/puertos y manifiesto exacto revisados; no ejecutado |
++| backend/Dockerfile usado sin comando Compose |CMD conserva --reload. No cambiarlo silenciosamente como parte del proxy; exigir comando/imagen efectiva QA y revisión antes de producción |
++| Composes bajo backend/tests |Instancias declaradas para QA desechable con workers/datos sintéticos, no despliegue principal; uno declara red internal y otro depende de su entorno. No se ejecutaron ni se reproducen sus valores de autenticación |
++
++No hay redes explícitas en los cuatro Compose principales: usan la red default del proyecto, compartida por API, DB, pgAdmin y frontends. No está marcada internal y no hay separación egress ni worker GIS independiente. Un frontend sin credenciales DB puede tener conectividad de red al servicio db; no atribuir a la ausencia de credenciales una barrera de red.
++
++Tags de imágenes mutables/no fijados por digest, paquetes apt no congelados y toolchain de compilación en backend son riesgos de construcción/huella a revisar con SS-09; no se cambian dependencias o versiones en SS-08. No hay límites de memoria/CPU/PIDs/ulimits/concurrencia explícitos. No se inventa el dimensionamiento del host para introducirlos.
++
++## Proxies y autenticación SS-04
++
++Nginx SSALFER preserva exactamente los cuatro proxy_set_header originales:
++
++- Host `$host`.
++- X-Real-IP `$remote_addr`.
++- X-Forwarded-For `$proxy_add_x_forwarded_for`.
++- X-Forwarded-Proto `$scheme`.
++
++Uvicorn conserva --no-proxy-headers en Dockerfile y comandos Compose. FastAPI recibe el peer TCP real del salto que le conecta; `resolve_client_ip` sólo usa una cadena XFF válida si ese peer está en AUTH_TRUSTED_PROXY_IPS exactas, recorriendo de derecha a izquierda hasta el primer salto no confiable. No se confía en la primera IP recibida del usuario ni en subred Docker completa. La lista por defecto es vacía, no evidencia de proxy confiable.
++
++En varios saltos, cada proxy administrado debe añadir su peer real o sobrescribir con una cadena previamente verificada; el edge no debe convertir el XFF del cliente en una identidad validada. Determinar direcciones reales/estables del Nginx y de cada edge con QA, no inferirlas de nombres DNS Docker o de una variable. Si el peer de API no es confiable, se conserva como identidad observada y no se inventa la IP externa.
++
++Forwarded y otros X-Forwarded-* del cliente no se convierten aquí en autoridad. --no-proxy-headers impide también confiar automáticamente en X-Forwarded-Proto; la cookie Secure viene de configuración backend, no del esquema ASGI. Nginx sólo ve http cuando TLS terminó antes de él y sobrescribe XFP con ese valor. `$host` no conserva necesariamente el puerto de Host, y las redirecciones automáticas de slash/URLs absolutas pueden observar http/host sin puerto. **Riesgo conocido de SS-04 no corregido ni ocultado**.
++
++Diseño pendiente: fijar host/esquema/origen público en el edge administrado, rechazar Host no autorizado, normalizar cabeceras y redirecciones de forma explícita. Si se modifica cómo FastAPI conoce HTTPS, debe ser un diseño separado de confianza de esquema, revisado con SS-04, sin reactivar --proxy-headers indiscriminadamente. Probar tanto rutas canónicas como slash/Location y URL generada.
++
++Cookies __Host- requieren Secure, Path=/ y ausencia de Domain; session HttpOnly y cookie CSRF legible se mantienen. SameSite lax/strict, expiración/revocación, Origin y X-CSRF-Token permanecen en backend. CORS tiene allow_credentials y orígenes explícitos; el defaultlocalhost5173 no incluye automáticamente SSALFER5174 ni HTTPS institucional: comprobar configuración de origen antes de ensayar login. No cambiar autenticación para compensar una entrada HTTP mal configurada.
++
++## Contenedores: propuesta por compatibilidad, no aplicada
++
++| Control | Evidencia local / razón para no imponerlo ahora | QA y dependencia |
++|---|---|---|
++| Usuario no privilegiado |No USER propio en Dockerfiles; Nginx suele separar master/workers y Postgres tiene entrypoint propio. UID efectivo desconocido |Inventariar proceso/UID/GID/umask; probar permisos de SS-12, uploads/GIS y backup. No hacer chmod/chown masivo |
++| cap_drop / no-new-privileges |No declarados; entrypoints/master pueden necesitar transiciones/permisos de puerto o directorios |Probar por servicio e imagen, con las capacidades estrictas necesarias, no drop ALL ciego |
++| read_only |DB, pgAdmin, API/GDAL/Nginx necesitan rutas escribibles concretas |Definir volúmenes/tmpfs/propietarios/tamaño y crash recovery; evitar convertir uploads en tmpfs sin persistencia |
++| Aislamiento red |Default compartida; tiles cliente a proveedor externo |Diseñar redes/egress y worker con SS-02 etapa2; DNS/DB/API/descargas deben seguir funcionando |
++| GDAL |Entorno restringido SS-02 y presupuestos SS-03, pero mismo UID/filesystem/secretos accesibles por proceso comprometido |Worker aislado y límites de SO pendientes. No declarar resuelto por headers, CSP o variables de entorno |
++| Almacenamiento |SS-12 usa staging/no-replace/sha, conserva publicados ante commit incierto; no atomicidad BD/FS |Validar volumen compartido, hardlinks/fsync y recuperación; locks PostgreSQL/TOCTOU de descarga pendientes |
++| Secretos |Envrefs en Compose; sin lecturas de .env. Backend Dockerfile COPY . y dockerignore no excluye expresamente futuros .env internos |Revisar build/secrets/daemon con SS-09; no imprimir docker inspect/env ni compose config sin filtrado/autorización |
++| Logs |Backend SS-10 seguro; nuevo access log Nginx mínimo; error log sigue formato nativo |Proteger error logs y collector, rotación/cuotas/retención; frontend_ssalfer no hereda logging del otro servicio por ser nuevo |
++| Salud/restart/recursos |Health/restart declarados en varios servicios; SSALFER sin healthcheck propio; no recursos fijados |Probar fallos y tamaño host/carga real en QA. No equiparar restart always con disponibilidad o cancelación SQL/GDAL |
++
++**No se cambia Compose, backend, UID, capacidades, redes, volúmenes ni límites de recursos en esta etapa.**
+diff --git a/docs/security/SS-08-ETAPA1-CORRECCION-2026-10-29.md b/docs/security/SS-08-ETAPA1-CORRECCION-2026-10-29.md
+new file mode 100644
+index 0000000..40d19fb
+--- /dev/null
++++ b/docs/security/SS-08-ETAPA1-CORRECCION-2026-10-29.md
+@@ -0,0 +1,144 @@
++# SS-08 etapa 1: endurecimiento HTTP local y diseño de verificación
++
++Fecha: 2026-10-29. Software-PA / SSALFER. Rama `dev`, HEAD `683ff75613768de28a7127c7e33a6e2ef4fc40ff`, más remediaciones locales existentes. Estado: **corrección parcial revisable; SS-08 permanece abierto y pendiente QA**.
++
++## Resultado y separación de controles
++
++Se implementan cabeceras HTTP compatibles con el código inspeccionado, CSP candidata en Report-Only, access log Nginx sin datos de solicitud y selección explícita de recursos al construir la imagen SSALFER. No se cambian roles, cookies, CSRF, CORS, confianza de proxy, API, frontend JavaScript, formatos, GIS, almacenamiento o dependencias.
++
++La configuración institucional efectiva no fue inspeccionada. No se ejecutó Nginx, Docker, navegador, TLS, PostgreSQL, migración o servicio. No se leyeron .env/credenciales institucionales, instalaron herramientas o hicieron commits/push/merge/despliegue. Sólo se ejecutaron pruebas previamente inspeccionadas con texto/dobles/archivos sintéticos propios y Node local sin red.
++
++| Control | Estado de esta entrega |
++|---|---|
++| nosniff / no-referrer / SAMEORIGIN / Permissions-Policy |Implementado en Nginx SSALFER con always; modelo estático probado, respuestas reales y posible embedding externo pendientes |
++| no-store en estáticos/API y evitar caché/almacenamiento proxy explícitos |Implementado; descarga SS-06/12 conserva attachment/octet-stream y private,no-store; no se declara borrado de cachés históricas, memoria o BFCache |
++| CSP |Sólo Report-Only; sin colector externo. No se declara bloqueante ni compatible para enforcement:29 scripts inline requieren resolución/QA |
++| Documentación operativa en imagen |Dockerfile cambia COPY global por allowlist de dos HTML raíz y directorios pages/js/styles/img. Simulación de COPY/recursos estática aprobada; imagen real pendiente |
++| Logs Nginx |Access log sólo component/request_id/status/bytes/duración; sin URL/query/IP/headers/cookie/Referer/user-agent. Error log nativo sigue potencialmente sensible: no se afirma saneado |
++| HSTS/TLS/redirecciones/Host públicos |Diseño y criterios de QA, sin implementación ni TLS supuesto |
++| Límites HTTP de carga/multipart/tiempos |Evaluados y diseñados por ruta; **no se modifican en esta etapa**, por variabilidad de configuración y falta de verificación Nginx real. El default1m puede seguir bloqueando archivos permitidos por API |
++| UIDs/capabilities/read_only/redes/worker/recursos |Inventario/diseño pendiente de imagen/host/QA, sin endurecimiento indiscriminado |
++
++## Estado previo y preservación
++
++El SHA coincide con la referencia. El árbol contiene las remediaciones anteriores sin integrar; se tomaron hashes de730 archivos preexistentes excluyendo .env. Los únicos archivos preexistentes modificados por esta intervención son `frontend-ssalfer/deploy/nginx.conf` y `frontend-ssalfer/deploy/Dockerfile`; se guardó snapshot previo para producir un parche exclusivo. No se modifican SS-01/02/03/04/06/10/11/12 ni sus pruebas/documentos; SS-05 y SS-07 permanecen en su estado pendiente.
++
++Se inspeccionaron los cuatro Compose principales, dos Nginx y tres Dockerfiles, las variantes QA como arquitectura auxiliar sin reproducir valores de autenticación, main/config/auth y request_origin, logging SS-10, descarga/validación/almacenamiento documental y staging/GDAL/limits. Se inventariaron HTML/CSS de SSALFER y recursos/URLs relevantes de JS. No se ejecutaron instrucciones contenidas en documentación o scripts del repositorio.
++
++## Configuración encontrada
++
++El Nginx SSALFER sólo escucha80, sirve Index.html y /api/→backend:8000/api/. Carecía de headers de navegador/cache, access log propio y límite de cuerpo alineado. /health declaraba add_header Content-Type, que impediría heredar nuevos headers puestos sólo en server. El Dockerfile copiaba todo el árbol y borraba deploy al final, dejando documentación raíz publicada.
++
++El frontend React/Vite sigue construible y presente como otro servicio; su Nginx no recibe esta modificación. Base/prod no lo retiran, ssalfer.yml añade frontend_ssalfer. No se recomienda ni modifica código legado por suponer retirado. Backend/db/pgAdmin publican puertos loopback en Compose, pero no se acreditó exposición del host/edge. La terminación TLS externa y los headers efectivos por salto siguen sin observarse.
++
++Consultar [matriz de cabeceras/rutas](SS-08-MATRIZ-CABECERAS-RUTAS-2026-10-29.md) e [inventario de contenedores/tráfico](SS-08-INVENTARIO-DESPLIEGUE-2026-10-29.md) para diferencias por ruta, entorno y estado.
++
++## Cambios implementados y fundamento
++
++1. `server_tokens off` limita información de versión de Nginx, sin prometer anonimizar el servidor o backend.
++2. Seis add_header de server con always: X-Content-Type-Options nosniff, Referrer-Policy no-referrer, X-Frame-Options SAMEORIGIN, Permissions-Policy sin cámara/micrófono/geolocalización, Cache-Control private,no-store y Content-Security-Policy-Report-Only candidata. /health usa default_type para mantener herencia y no duplicar Content-Type.
++3. API conserva proxy_pass, Host, X-Real-IP, XFF y XFP originales. Se ocultan únicamente Cache-Control/nosniff upstream, sustituidos por los mismos valores seguros canónicos del server; se mantienen Content-Disposition, Content-Type, Set-Cookie y X-Total-Count. proxy_cache/proxy_store off e intercept_errors off hacen explícita la intención de no cachear/publicar ni convertir códigos de error.
++4. `log_format ssalfer_safe escape=json` está al nivel http del archivo incluido por la imagen estándar. Sólo registra metadatos generados: component fijo, request_id propio de Nginx, status, bytes enviados y request_time. No usa un ID suministrado por cliente. La correlación del backend SS-10 sigue siendo independiente; no se presenta como ID end-to-end.
++5. Dockerfile copia sólo Index.html/dashboard.html y directorios de aplicación. No copia DEPLOY.md, ENTREGA.md, TESTING.md ni deploy/QA al document root. No altera ningún byte de HTML/JS/CSS/mapa ni versiones de vendor/base. Los directorios permitidos deben mantenerse libres de futuros datos/secretos; no es un escáner de contenido ni garantía sobre capas heredadas de la imagen.
++
++Las reglas de [add_header Nginx](https://nginx.org/en/docs/http/ngx_http_headers_module.html) permiten herencia/always en la versión1.27; no se introduce add_header_inherit disponible en versiones posteriores. La semántica de [proxy](https://nginx.org/en/docs/http/ngx_http_proxy_module.html) requiere verificar headers upstream, cache/buffering y errores con el binario real; las pruebas de esta entrega modelan sólo las directivas declaradas. No se ocultan ni sobrescriben headers CSP bloqueantes de un futuro upstream o edge; cualquier duplicación/contradicción con infraestructura externa debe revisarse en QA.
++
++## CSP e inventario de frontend
++
++[Inventario estructurado](ss08/inventario-recursos.json):36 páginas,29 bloques script inline,0 style blocks,2 atributos style,0 atributos de evento HTML y0 iframe/object/embed en páginas. No se detectan src de script o stylesheet remotos en HTML. JS sí asigna eventos/estilos en runtime; esos conteos no certifican DOM final, ausencia de eval, contenido dinámico o compatibilidad de vendors.
++
++Leaflet1.9.4 y bibliotecas de exportación son locales; el mapa carga tiles OpenStreetMap por HTTPS desde el navegador. API configurada /api y descargas/preview/exportaciones con blob requieren política específica. No se escanean URLs minificadas indiscriminadamente como si toda URL de licencia/comentario fuera un recurso activo. No se inventan conexiones de producción a partir de ejemplos comentados en env.js.
++
++Report-Only permite observar diferencias sin bloquear el frontend; script-src self reportaría los inline conocidos. Se conserva style-src unsafe-inline como candidata para estilos dinámicos y se consideran data/blob/tiles/fonts/workers/frames. No se añade unsafe-eval ni un colector remoto para silenciar resultados. No se afirma protección CSP efectiva frente a SS-01: su corrección por textContent se preserva y se reejecuta con dobles.
++
++## Archivos y diff exclusivo
++
++Preexistentes modificados:
++
++- `frontend-ssalfer/deploy/nginx.conf`.
++- `frontend-ssalfer/deploy/Dockerfile`.
++
++Nuevos de esta intervención:
++
++- `tests/security/test_http_deployment_security.py`.
++- `docs/security/ss08/inventario-recursos.json`.
++- `docs/security/SS-08-MATRIZ-CABECERAS-RUTAS-2026-10-29.md`.
++- `docs/security/SS-08-INVENTARIO-DESPLIEGUE-2026-10-29.md`.
++- Este informe y `SS-08-ETAPA1-CORRECCION-2026-10-29.patch`.
++
++[Parche completo](SS-08-ETAPA1-CORRECCION-2026-10-29.patch): compara los dos archivos preexistentes con el snapshot de inicio y añade sólo los artefactos propios, sin incluir el parche a sí mismo. No contiene cambios previos ni se aplica en esta intervención. Se comprueba con aplicación inversa en modo check, sin modificar archivos.
++
++## Evidencia de pruebas ejecutadas
++
++Las pruebas nuevas usan shlex/AST/HTMLParser/json y PyYAML ya instalado. safe_load lee Compose como texto sin resolver entorno ni cargar .env. El pequeño lector de bloques no es un parser Nginx completo ni sustituye nginx -t; la simulación de headers/logs/COPY no es un servidor/imagen real.
++
++```text
++python3 -B -m unittest discover -s tests/security -p 'test_http_deployment_security.py' -v
++Ran 15 tests — OK
++
++python3 -B -m unittest discover -s tests/security -p 'test_*.py' -q
++Ran 218 tests — OK (skipped=6)
++
++node tests/frontend-ssalfer/map-tooltip-security.cjs
++33 tests, 33 pass, 0 fail
++```
++
++Resultado Python:212 aprobadas y6 omitidas, incluidas las15 nuevas aprobadas. Omisiones existentes:3 pruebas nativas SQLAlchemy/psycopg2 de SS-10,2 Starlette de SS-12 y1 parser PostgreSQL de SS-07. No se instalaron esas herramientas ni se convirtió un skip en evidencia positiva. La suite puede emitir el token fijo `document_storage` en un fallo sintético esperado; no contiene datos de expediente o excepción sensible.
++
++La invocación inicial `node --test ...` informó un único archivo aprobado en este entorno; la invocación directa posterior mostró los33 casos de etiquetas, geometrías, estilos, capas, eventos y previsualización con dobles. No se declara una prueba de navegador por ello. Ninguno de esos casos se conectó al backend o tiles.
++
++Las15 pruebas nuevas cubren: unicidad/herencia/always de headers para200/401/403/404/413/500/502; health; proxy y spoofing sintético con helper real SS-04; no-cache/store/intercepción; contrato documental SS-06; ausencia de TLS/HSTS/CSP bloqueante no acreditados; candidato de recursos/inline; hashes de HTML y contenido previsto de imagen; puertos/volúmenes; logging SS-10 y nuevo access log; aritmética multipart candidata sin cambiar límites. Las pruebas de regresión existentes se inspeccionaron antes de ejecutar: no importan el engine ni hacen conexiones; GDAL se dobla y los hijos SS-12 sólo manipulan archivos sintéticos privados.
++
++También se verifican `git diff --check`, enlaces de documentos, cobertura del inventario y hashes de preservación. No se ejecutó suite backend ni collect-only con conftest PostgreSQL.
++
++## Riesgos residuales y compatibilidad
++
++- El límite HTTP no alineado permanece. Nginx default1m puede rechazar cargas válidas de25/100MiB antes de FastAPI. No se fija101m global porque ampliaría login y otras rutas; diseño26/101MiB por upload requiere probar normalización/slash, metadata y overrides efectivos. El [módulo core Nginx](https://nginx.org/en/docs/http/ngx_http_core_module.html) define el límite del cuerpo; no equivale a tamaño de archivo o respuesta.
++- TLS/HSTS, redirecciones por esquema/Host/puerto, CORS/origen y proxies externos siguen pendientes. --no-proxy-headers preserva SS-04 y también deja el riesgo conocido de Location http detrás de TLS. No activar confianza arbitraria en XFF para corregirlo.
++- SAMEORIGIN puede afectar un embedding institucional externo no documentado; Permissions-Policy puede afectar una futura función de ubicación/cámara; nosniff exige tipos estáticos correctos. Todo requiere QA de compatibilidad antes de integrar.
++- no-store incrementa tráfico de assets y no elimina por sí solo cachés anteriores, memoria de UI o acceso a copias ya guardadas. Validar atrás/adelante/logout y proxies/CDN.
++- El access log mínimo elimina URL/IP del registro normal, reduciendo datos sensibles y detalle de diagnóstico. Error logs Nginx/edge pueden seguir incluyendo URI/query y contexto sensible, incluidos errores413/502; requieren acceso restringido/retención/colector seguro. No desactivar todos los errores ni prometer saneado por regex.
++- proxy_cache/store off no evita buffering temporal de petición/respuesta o almacenamiento del navegador. Nginx/edge, multipart API y CSV temporal necesitan presupuestos/ACL/limpieza independientes; no se modifican buffering/timeouts sin pruebas reales.
++- No hay aislamiento GDAL de proceso/UID/red/filesystem; SS-02/03 permanecen parciales. SS-12 conserva ventanas de publicación/BD, locks y descarga TOCTOU pendientes. SS-04 no tiene limitación global acreditada; headers no la sustituyen.
++- SS-05 sigue pendiente de aprobación funcional y SS-07 de privilegios efectivos QA. Ninguna de esas políticas se modifica. React/Vite, backend directo, docs API y tráfico fuera de este Nginx conservan su superficie previa.
++- No se endurecen usuarios/capacidades/read_only/redes/secret management/imágenes/recursos sin probar entrypoints/directorios/volúmenes reales. Ver inventario. No se afirma que el manifiesto represente producción.
++
++## Plan QA preparado, no ejecutado ni autorizado aquí
++
++Todo se realiza posteriormente en una instancia desechable, con datos sintéticos, DNS/red institucional bloqueados y aprobación expresa. No reutilizar .env, cookies o DB institucional. Para probar proxy/API usar un upstream sintético que emita códigos/headers/cookies controlados; para semántica API real, un clon PostgreSQL/PostGIS independiente autorizado.
++
++| QA | Preparación y comprobación requerida |
++|---|---|
++| QA01 sintaxis y build |Con la misma imagen/base y contexto, nginx -t y configuración efectiva; construir imagen sólo con autorización. Backend sintético resoluble como backend:8000, sin servicios institucionales. Verificar que el formato log está en http y que mime.types/root/index/includes son los esperados |
++| QA02 headers reales |GET/HEAD/OPTIONS de HTML/assets/health/API y respuestas200/401/403/404/413/500/502 (504 si aplica). Verificar una sola nosniff/Cache-Control, always/herencia, Content-Type correcto, status/cuerpo preservados, ausencia de HSTS HTTP y CSP bloqueante no aprobada |
++| QA03 errores/logs |Upstream falla, timeout controlado y body excesivo; inspeccionar salida formateada con sentinelas sintéticas de query/cookie/Referer/PII/ID de cliente. Access log no los contiene. Registrar por separado la exposición del error log/colector y su protección, sin datos reales |
++| QA04 cadena proxy |Peticiones directas y mediante uno/dos proxies administrados, XFF/Forwarded/XFP/X-Forwarded-Host falsificados, peer exacto no confiable/confiable, duplicados y hops. Resolver IP conforme SS-04; no habilitar Uvicorn proxy-headers |
++| QA05 HTTPS/Host |TLS local de QA con dominio/certificado confiables autorizados; origin/Host/puerto, rutas con/sin slash y Location/redirects correctos. Edge elimina/normaliza headers no confiables. HSTS sólo se diseña/emite ahí tras aprobación, sin preload/subdominios por defecto |
++| QA06 autenticación |Login/logout/expiración/revocación, roles, cookie session HttpOnly y CSRF legible, Secure/SameSite/__Host-/Path/sin Domain; Origin y CSRF válidos/rechazados, CORS/preflight y credenciales correctas. No crear sesiones reales institucionales |
++| QA07 documentos/reportes |Archivos sintéticos válidos por formato SS-06, histórico, permisos positivos/negativos, attachment/octet-stream/nosniff/private,no-store, CSV SS-11 por lotes, descarga/cancelación/recurso cerrado. No declarar corregido SS-12 TOCTOU con un test de headers |
++| QA08 uploads/budgets |Elegir límites por ruta tras medir metadata/overrides efectivos. Archivo justo debajo/en límite/por encima, Content-Length/chunked, boundary/nombre/Unicode, duplicados/exceso de campos y rutas legacy/DDV/núcleos/parcelas/documentos/slash. Rechazo explícito sin truncar y sin ampliar login; no test de carga contra servicios |
++| QA09 navegador/CSP |36 páginas, login, dashboard, seguimiento individual/colectivo, mapas/capas/tooltips/popups/zoom/eventos, blobs/PDF/XLSX/CSV, fuentes/iconos e imágenes. Tiles servidos por stub local/host QA autorizado para evitar egress real. Inspeccionar violaciones Report-Only, no convertir a enforcement por cero fallos de texto |
++| QA10 cache/frame/permisos |Atrás/adelante/recarga/logout/múltiples pestañas, iframe mismo origen/otro origen, permisos de ubicación/cámara actuales/futuros. Verificar que no-store no se presenta como revocación de bytes entregados |
++| QA11 artefacto/puertos |Imagen no publica DEPLOY.md/ENTREGA.md/TESTING.md/deploy/QA; assets existentes están presentes y correctos. Confirmar manifiesto Compose exacto, no override dev/reload accidental, puertos loopback reales y servicio correcto (SSALFER vs React) |
++| QA12 contenedores/recursos |UID/capacidades/directorios temporales/volúmenes/ACL/hardlinks/fsync, logs/retención y límites host medidos; diseñar worker SS-02 y presupuestos integrales separadamente. No imponer read_only o cambios de UID para “pasar checklist” |
++
++Pruebas nativas omitidas: todas QA01–QA12. Tener un binario/browser instalado no sustituye esta aprobación; no se ejecutaron nginx -t, Docker build/config, curl a servidores, navegador o TLS en esta etapa.
++
++## Condiciones antes de autorizar despliegue
++
++1. Aprobar el diff exclusivo y ejecutar QA01–QA12 pertinentes con evidencia de éxitos, rechazos y omisiones; no confundir los212 tests Python/33 Node con tráfico real.
++2. Acreditar origen público/edge/TLS/headers/proxy y corregir de forma revisada Host/esquema/puerto; preservar SS-04 y sesiones/CSRF.
++3. Resolver el límite HTTP de cargas y presupuestos de proxy/parser/temporales con valores efectivos, sin bloqueos legítimos o ampliación arbitraria del login. Definir timeouts y cancelación real; no prometer cancelar PostgreSQL/GDAL por un timeout HTTP.
++4. Verificar CSP Report-Only y aceptación de SAMEORIGIN/Permissions-Policy/no-store/MIME; cualquier enforcement o embedding distinto requiere revisión explícita.
++5. Confirmar logs/error collector protegidos, manifiesto/imagen/puertos/volúmenes efectivos y recursos por host; mantener pendientes SS-02/05/07/12 como riesgos no cerrados.
++
++**Entrega detenida para revisión técnica. No se integra, despliega ni continúa automáticamente otra etapa.**
++
++## Trazabilidad de los archivos preexistentes
++
++SHA-256 antes y después; permite comprobar que el parche parte del árbol local de inicio y no de un agregado de remediaciones anteriores.
++
++| Archivo | SHA-256 de inicio | SHA-256 tras SS-08 |
++|---|---|---|
++| `frontend-ssalfer/deploy/nginx.conf` | `c7c6112ce5201b67546196a2cc32c096b874b0a429f77b27260a703e28aa5b2e` | `f6f91064d3552239ac17f5968738f0105ff2fea17ea74455314bf50e90a44b9b` |
++| `frontend-ssalfer/deploy/Dockerfile` | `0f84d5ff327417a330c014cfba510bff4e3bdd0bf2ae470dea86372bf7e55edb` | `af0ee10c1e87274745b7f61c554933b536272da21c00345c537ba07169c4e4bc` |

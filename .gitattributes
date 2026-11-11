@@ -14,3 +14,8 @@ Dockerfile.* text eol=lf
 
 backend/db/fixtures/catalogo_nucleos_ran.csv -text whitespace=cr-at-eol
 backend/db/fixtures/ran_municipio_inegi_crosswalk.csv -text
+
+# Preserve vendor bytes across Windows/Linux for the integrity manifest.
+frontend-ssalfer/js/vendor/** -text
+frontend-ssalfer/*.html text eol=lf
+frontend-ssalfer/pages/*.html text eol=lf
