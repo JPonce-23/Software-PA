@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "scope": "Current local vendor bytes; integrity baseline, not upstream authenticity or installed SBOM",
+  "files": [
+    {
+      "path": "frontend-ssalfer/js/vendor/EXCELJS-LICENSE.txt",
+      "size": 1084,
+      "sha256": "2ed526b7e7c7681dc2347995b5036ddf73dc27d0539cdea59b6d4a72b63a57a0",
+      "family": "exceljs",
+      "declared_version": "4.4.0",
+      "version_evidence": "filename and README only; main JS banner has date, not semantic version",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/HTML2CANVAS-LICENSE.txt",
+      "size": 1061,
+      "sha256": "86200ce4e92d9a22c41c8647a55f7a5fddff304ff89b4d36ecc699ed8c123d2c",
+      "family": "html2canvas",
+      "declared_version": "1.4.1",
+      "version_evidence": "banner in main JS; README claim for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/README.md",
+      "size": 1270,
+      "sha256": "83bdd4ab077b4c4fc4bc821a87513088f88d7cd5b2ca669b2e8d2ba50d25a879",
+      "family": "vendor-documentation",
+      "declared_version": null,
+      "version_evidence": "local documentation only",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/SheetJS-LICENSE.txt",
+      "size": 11355,
+      "sha256": "4d2a38ac35cda06a555c84074a819d413339cd3691b822cae50f8f322fe01f64",
+      "family": "sheetjs",
+      "declared_version": "0.20.3",
+      "version_evidence": "internal version literal in xlsx; README claim for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/SheetJS-README.md",
+      "size": 498,
+      "sha256": "22e910300bc86e3517e6d6b6b1fe4e12dba3d4a72fe03141d18f927cc83c0d58",
+      "family": "sheetjs",
+      "declared_version": "0.20.3",
+      "version_evidence": "internal version literal in xlsx; README claim for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/LICENSE.txt",
+      "size": 1093,
+      "sha256": "0fb3e11bd57e896c5a512afd64864d28a37de45d19835016c87ca1ad19ead969",
+      "family": "bootstrap-icons",
+      "declared_version": "1.13.1",
+      "version_evidence": "banner in CSS; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+      "size": 99556,
+      "sha256": "004322721c8557331759bc6ddaacbb689b0f0715d688aec82bd056d2d5b5cc3b",
+      "family": "bootstrap-icons",
+      "declared_version": "1.13.1",
+      "version_evidence": "banner in CSS; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff",
+      "size": 180288,
+      "sha256": "f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15",
+      "family": "bootstrap-icons",
+      "declared_version": "1.13.1",
+      "version_evidence": "banner in CSS; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff2",
+      "size": 134044,
+      "sha256": "6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61",
+      "family": "bootstrap-icons",
+      "declared_version": "1.13.1",
+      "version_evidence": "banner in CSS; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js",
+      "size": 947702,
+      "sha256": "7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9",
+      "family": "exceljs",
+      "declared_version": "4.4.0",
+      "version_evidence": "filename and README only; main JS banner has date, not semantic version",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/html2canvas-1.4.1.min.js",
+      "size": 198689,
+      "sha256": "e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb",
+      "family": "html2canvas",
+      "declared_version": "1.4.1",
+      "version_evidence": "banner in main JS; README claim for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/LICENSE.txt",
+      "size": 1369,
+      "sha256": "bbc959aaef7488b38942e7f05cfd1244351f8bce54261951ea17dd7cf60f894b",
+      "family": "leaflet",
+      "declared_version": "1.9.4",
+      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/layers-2x.png",
+      "size": 1259,
+      "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf",
+      "family": "leaflet",
+      "declared_version": "1.9.4",
+      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/layers.png",
+      "size": 696,
+      "sha256": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6",
+      "family": "leaflet",
+      "declared_version": "1.9.4",
+      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-icon-2x.png",
+      "size": 2464,
+      "sha256": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528",
+      "family": "leaflet",
+      "declared_version": "1.9.4",
+      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-icon.png",
+      "size": 1466,
+      "sha256": "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437",
+      "family": "leaflet",
+      "declared_version": "1.9.4",
+      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/images/marker-shadow.png",
+      "size": 618,
+      "sha256": "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da",
+      "family": "leaflet",
+      "declared_version": "1.9.4",
+      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.css",
+      "size": 14145,
+      "sha256": "337bfca5cabd03b39815b2700febe2b3b7edf55921c59cd49f88ecb328212303",
+      "family": "leaflet",
+      "declared_version": "1.9.4",
+      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.js",
+      "size": 147552,
+      "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a",
+      "family": "leaflet",
+      "declared_version": "1.9.4",
+      "version_evidence": "banner/internal literal in leaflet.js; directory for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
+      "path": "frontend-ssalfer/js/vendor/xlsx-0.20.3.mini.min.js",
+      "size": 279523,
+      "sha256": "0cb353f830d7288385492c83d277b058ddeac664ca51cf1393aa1fd3e2b70939",
+      "family": "sheetjs",
+      "declared_version": "0.20.3",
+      "version_evidence": "internal version literal in xlsx; README claim for auxiliary files",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    }
+  ]
+}

@@ -1,0 +1,1213 @@
+diff --git a/backend/app/services/documents.py b/backend/app/services/documents.py
+--- a/backend/app/services/documents.py
++++ b/backend/app/services/documents.py
+@@ -13,6 +13,7 @@
+ from .. import models, schemas
+ from .access import require_document_access, require_document_target_access
+ from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_context
++from .document_validation import DocumentValidationError, validate_document
+ 
+ 
+ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png"}
+@@ -162,6 +163,11 @@
+     content = await upload.read(MAX_UPLOAD_BYTES + 1)
+     if not content or len(content) > MAX_UPLOAD_BYTES:
+         raise HTTPException(status_code=413, detail="Archivo vacío o demasiado grande")
++    try:
++        canonical_mime = validate_document(content, extension, upload.content_type,
++            max_file_bytes=MAX_UPLOAD_BYTES)
++    except DocumentValidationError as exc:
++        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+     digest = hashlib.sha256(content).hexdigest()
+     previous = db.query(models.DocumentoVersion).filter(
+         models.DocumentoVersion.id_documento == document_id,
+@@ -189,7 +195,7 @@
+         tamano_bytes=len(content),
+         nombre_original=original,
+         ruta_almacenamiento=str(relative),
+-        tipo_mime=upload.content_type,
++        tipo_mime=canonical_mime,
+         id_usuario_carga=user.id_usuario,
+     )
+     db.add(version)
+diff --git a/backend/app/routers/documents.py b/backend/app/routers/documents.py
+--- a/backend/app/routers/documents.py
++++ b/backend/app/routers/documents.py
+@@ -8,6 +8,7 @@
+ from ..database import get_db
+ from ..services import documents as service
+ from ..services.document_read_models import consolidated_documents
++from ..services.document_validation import download_media_type
+ from ..services.access import (
+     require_document_access,
+     require_document_target_access,
+@@ -194,7 +195,9 @@
+     return FileResponse(
+         service.safe_version_path(version),
+         filename=version.nombre_original,
+-        media_type=version.tipo_mime or "application/octet-stream",
++        media_type=download_media_type(),
++        content_disposition_type="attachment",
++        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"},
+     )
+ 
+ 
+diff --git a/docker-compose.yml b/docker-compose.yml
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -17,6 +17,14 @@
+   REPORT_EXPORT_MAX_BYTES: ${REPORT_EXPORT_MAX_BYTES:-16777216}
+   REPORT_FETCH_BATCH_ROWS: ${REPORT_FETCH_BATCH_ROWS:-250}
+   REPORT_EXPORT_BUILD_TIMEOUT_SECONDS: ${REPORT_EXPORT_BUILD_TIMEOUT_SECONDS:-}
++  DOCUMENT_INSPECTION_ENTRIES: ${DOCUMENT_INSPECTION_ENTRIES:-2048}
++  DOCUMENT_INSPECTION_DIRECTORY_BYTES: ${DOCUMENT_INSPECTION_DIRECTORY_BYTES:-4194304}
++  DOCUMENT_INSPECTION_EXPANDED_BYTES: ${DOCUMENT_INSPECTION_EXPANDED_BYTES:-104857600}
++  DOCUMENT_INSPECTION_MEMBER_BYTES: ${DOCUMENT_INSPECTION_MEMBER_BYTES:-33554432}
++  DOCUMENT_INSPECTION_XML_BYTES: ${DOCUMENT_INSPECTION_XML_BYTES:-8388608}
++  DOCUMENT_INSPECTION_XML_NODES: ${DOCUMENT_INSPECTION_XML_NODES:-100000}
++  DOCUMENT_INSPECTION_XML_DEPTH: ${DOCUMENT_INSPECTION_XML_DEPTH:-64}
++  DOCUMENT_INSPECTION_IMAGE_RECORDS: ${DOCUMENT_INSPECTION_IMAGE_RECORDS:-4096}
+   IMPORT_MAX_FILE_SIZE_MB: ${IMPORT_MAX_FILE_SIZE_MB:-100}
+   IMPORT_GEOJSON_MAX_FEATURE_MB: ${IMPORT_GEOJSON_MAX_FEATURE_MB:-16}
+   IMPORT_MAX_RECORD_BYTES: ${IMPORT_MAX_RECORD_BYTES:-67108864}
+diff --git a/backend/tests/test_documents_dashboard.py b/backend/tests/test_documents_dashboard.py
+--- a/backend/tests/test_documents_dashboard.py
++++ b/backend/tests/test_documents_dashboard.py
+@@ -1,4 +1,5 @@
+ import uuid
++from tests._document_samples import minimal_pdf
+ 
+ 
+ def test_document_version_is_immutable_and_downloadable(
+@@ -15,7 +16,7 @@
+             "titulo": "Soporte de prueba",
+         },
+     ).json()
+-    content = b"%PDF-1.4\nSOFTWARE-PA QA\n%%EOF\n"
++    content = minimal_pdf("SOFTWARE-PA QA")
+     first = client.post(
+         f"/api/documentos/{document['id_documento']}/versiones",
+         headers=admin_headers,
+diff --git a/backend/tests/test_document_targets_039.py b/backend/tests/test_document_targets_039.py
+--- a/backend/tests/test_document_targets_039.py
++++ b/backend/tests/test_document_targets_039.py
+@@ -468,7 +468,8 @@
+     assert any(row["id_documento"] == doc["id_documento"] for row in
+                api("GET", f"/api/documentos/objetivos/actividad_campo/{activity_id}").json())
+     api("POST", path, expected=409)
+-    content = b"%PDF-1.4\nContrato B-04\n%%EOF\n"
++    from tests._document_samples import minimal_pdf
++    content = minimal_pdf("Contrato B-04")
+     version = api("POST", f"/api/documentos/{doc['id_documento']}/versiones", expected=201,
+                   files={"archivo": ("actividad.pdf", content, "application/pdf")}).json()
+     api("POST", f"/api/documentos/{doc['id_documento']}/versiones", expected=409,
+diff --git a/backend/tests/test_frontend_read_models.py b/backend/tests/test_frontend_read_models.py
+--- a/backend/tests/test_frontend_read_models.py
++++ b/backend/tests/test_frontend_read_models.py
+@@ -4,6 +4,7 @@
+ from datetime import datetime
+ from types import SimpleNamespace
+ import uuid
++from tests._document_samples import minimal_pdf
+ 
+ import pytest
+ from sqlalchemy import event
+@@ -78,7 +79,7 @@
+     requirement = api("PATCH", f"/api/requisitos-documentales/{identities['expediente_requisito']}",
+                       json={"id_documento": document["id_documento"]}).json()
+     versions = [api("POST", f"/api/documentos/{document['id_documento']}/versiones", expected=201,
+-                    files={"archivo": ("soporte.pdf", f"%PDF-{i}".encode(), "application/pdf")}).json()
++                    files={"archivo": ("soporte.pdf", minimal_pdf(f"QA version {i}"), "application/pdf")}).json()
+                 for i in (1, 2)]
+     with sql_reads(transactional_api["connection"]) as many_queries:
+         rows = api("GET", path).json()
+diff --git a/backend/app/services/document_validation.py b/backend/app/services/document_validation.py
+new file mode 100644
+index 0000000..d96afd9
+--- /dev/null
++++ b/backend/app/services/document_validation.py
+@@ -0,0 +1,374 @@
++"""Bounded format-envelope checks, NOT malware scanning or full format parsers.
++
++No extraction, image decoding, PDF object traversal or network access. OOXML
++uses stdlib ZIP/Expat with limits before ZIP indexing and during inspection.
++"""
++
++from dataclasses import dataclass
++import io
++import os
++import posixpath
++import re
++import stat
++import struct
++from urllib.parse import unquote, urlsplit
++from xml.parsers import expat
++import zipfile
++import zlib
++
++
++MIME_BY_EXTENSION = {
++    '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
++    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
++    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
++}
++_ALIASES = {'.pdf': {'application/x-pdf'}, '.jpg': {'image/jpg', 'image/pjpeg'},
++            '.jpeg': {'image/jpg', 'image/pjpeg'}, '.png': {'image/x-png'}}
++_GENERIC = {'', 'application/octet-stream', 'binary/octet-stream'}
++_CT = 'http://schemas.openxmlformats.org/package/2006/content-types'
++_RELS = 'http://schemas.openxmlformats.org/package/2006/relationships'
++_OFFICE = ('http://schemas.openxmlformats.org/officeDocument/2006/relationships',
++           'http://purl.oclc.org/ooxml/officeDocument/relationships')
++_WORD = ('http://schemas.openxmlformats.org/wordprocessingml/2006/main',
++         'http://purl.oclc.org/ooxml/wordprocessingml/main')
++_SHEET = ('http://schemas.openxmlformats.org/spreadsheetml/2006/main',
++          'http://purl.oclc.org/ooxml/spreadsheetml/main')
++_MAIN_TYPES = {
++    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
++    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml',
++}
++_SHEET_TYPES = {'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml',
++                'application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml'}
++
++
++class DocumentValidationError(Exception):
++    def __init__(self, code, detail='El contenido no corresponde a un formato documental permitido.', status=422):
++        self.code, self.detail, self.status = code, detail, status
++        super().__init__(detail)
++
++
++@dataclass(frozen=True)
++class InspectionLimits:
++    entries: int = 2048
++    directory_bytes: int = 4 * 1024 * 1024
++    expanded_bytes: int = 100 * 1024 * 1024
++    member_bytes: int = 32 * 1024 * 1024
++    xml_bytes: int = 8 * 1024 * 1024
++    xml_nodes: int = 100_000
++    xml_depth: int = 64
++    image_records: int = 4096
++
++
++def load_limits():
++    defaults = InspectionLimits()
++    values = {}
++    for name in defaults.__dataclass_fields__:
++        variable = 'DOCUMENT_INSPECTION_' + name.upper()
++        try:
++            value = int(os.getenv(variable, str(getattr(defaults, name))))
++        except ValueError as exc:
++            raise RuntimeError(f'{variable} requiere un entero positivo') from exc
++        if value <= 0:
++            raise RuntimeError(f'{variable} requiere un entero positivo')
++        values[name] = value
++    return InspectionLimits(**values)
++
++
++def _reject(code='DOCUMENT_FORMAT_INVALID'):
++    raise DocumentValidationError(code)
++
++
++def _pdf(data):
++    if not re.match(rb'%PDF-(?:1\.[0-7]|2\.0)(?:\r\n|\r|\n)', data[:16]):
++        _reject()
++    tail = re.search(rb'startxref[\x00\t\n\x0c\r ]+([0-9]{1,20})[\x00\t\n\x0c\r ]+%%EOF[\x00\t\n\x0c\r ]*\Z', data[-4096:])
++    if tail is None:
++        _reject()
++    offset = int(tail.group(1))
++    target = data[offset:offset + 64] if 0 < offset < len(data) else b''
++    if not (re.match(rb'xref[\x00\t\n\x0c\r ]', target)
++            or re.match(rb'[0-9]{1,10}\s+[0-9]{1,10}\s+obj(?:\s|<)', target)):
++        _reject()
++    # Cross-reference/object/stream semantics, signatures and JS are not parsed.
++
++
++def _png(data, limits):
++    if not data.startswith(b'\x89PNG\r\n\x1a\n'):
++        _reject()
++    position, count, image_data, palette, color = 8, 0, False, False, None
++    while position + 12 <= len(data):
++        count += 1
++        if count > limits.image_records:
++            _reject('DOCUMENT_IMAGE_COMPLEXITY')
++        size = int.from_bytes(data[position:position + 4], 'big')
++        kind = data[position + 4:position + 8]
++        end = position + 12 + size
++        if end > len(data) or not all(65 <= c <= 90 or 97 <= c <= 122 for c in kind):
++            _reject()
++        payload = memoryview(data)[position + 8:position + 8 + size]
++        crc = zlib.crc32(payload, zlib.crc32(kind)) & 0xffffffff
++        if crc != int.from_bytes(data[end - 4:end], 'big'):
++            _reject()
++        if count == 1:
++            if kind != b'IHDR' or size != 13:
++                _reject()
++            width, height, depth, color, compression, filtering, interlace = struct.unpack('>IIBBBBB', payload)
++            depths = {0: {1, 2, 4, 8, 16}, 2: {8, 16}, 3: {1, 2, 4, 8}, 4: {8, 16}, 6: {8, 16}}
++            if (not 0 < width < 2**31 or not 0 < height < 2**31 or depth not in depths.get(color, set())
++                    or compression != 0 or filtering != 0 or interlace not in (0, 1)):
++                _reject()
++        elif kind == b'IHDR':
++            _reject()
++        if kind == b'PLTE':
++            if image_data or not size or size % 3 or size > 768:
++                _reject()
++            palette = True
++        if kind == b'IDAT':
++            if color == 3 and not palette:
++                _reject()
++            image_data = image_data or size > 0
++        if kind == b'IEND':
++            if size != 0 or end != len(data) or not image_data:
++                _reject()
++            return
++        position = end
++    _reject()
++    # IDAT/ancillary streams and pixels are deliberately not decompressed.
++
++
++def _jpeg(data, limits):
++    if not data.startswith(b'\xff\xd8') or not data.endswith(b'\xff\xd9'):
++        _reject()
++    position, count, frame = 2, 0, False
++    sof = {0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf}
++    while position < len(data) - 2:
++        count += 1
++        if count > limits.image_records:
++            _reject('DOCUMENT_IMAGE_COMPLEXITY')
++        if data[position] != 0xff:
++            _reject()
++        while position < len(data) and data[position] == 0xff:
++            position += 1
++        if position + 3 > len(data):
++            _reject()
++        marker = data[position]
++        position += 1
++        if marker == 0x01:  # TEM has no length field.
++            continue
++        if marker in {0x00, 0xd8, 0xd9, *range(0xd0, 0xd8)}:
++            _reject()
++        size = int.from_bytes(data[position:position + 2], 'big')
++        if size < 2 or position + size > len(data) - 2:
++            _reject()
++        if marker in sof:
++            if size < 8 or data[position + 7] == 0 or size != 8 + 3 * data[position + 7]:
++                _reject()
++            if not int.from_bytes(data[position + 3:position + 5], 'big') or not int.from_bytes(data[position + 5:position + 7], 'big'):
++                _reject()
++            frame = True
++        if marker == 0xda:  # Stop at SOS: no entropy decoding or scan traversal.
++            if not frame or size < 6 or data[position + 2] == 0 or size != 6 + 2 * data[position + 2]:
++                _reject()
++            if position + size >= len(data) - 2:
++                _reject()
++            return
++        position += size
++    _reject()
++
++
++def _zip_preflight(data, limits):
++    """Bound/index the classic central directory before ZipFile allocates it.
++
++    This does not replace zipfile: classic directory/EOCD only, no multipart,
++    prefix or trailing containers. Local header extras are handled by zipfile.
++    Count observed central records too, not just untrusted EOCD declarations.
++    """
++    eocd = data.rfind(b'PK\x05\x06', max(0, len(data) - 65557))
++    if eocd < 0 or eocd + 22 > len(data) or not data.startswith(b'PK\x03\x04'):
++        _reject('DOCUMENT_ZIP_INVALID')
++    _, disk, start_disk, on_disk, entries, directory_size, offset, comment = struct.unpack_from('<4s4H2IH', data, eocd)
++    if (disk or start_disk or entries != on_disk or entries == 65535 or directory_size == 0xffffffff
++            or offset == 0xffffffff or eocd + 22 + comment != len(data) or offset + directory_size != eocd):
++        _reject('DOCUMENT_ZIP_PROFILE')
++    if entries > limits.entries or directory_size > limits.directory_bytes:
++        _reject('DOCUMENT_ZIP_LIMIT')
++    count, position = 0, offset
++    while position < eocd:
++        count += 1
++        if count > limits.entries:
++            _reject('DOCUMENT_ZIP_LIMIT')
++        if position + 46 > eocd or data[position:position + 4] != b'PK\x01\x02':
++            _reject('DOCUMENT_ZIP_INVALID')
++        lengths = struct.unpack_from('<3H', data, position + 28)
++        position += 46 + sum(lengths)
++        if position > eocd:
++            _reject('DOCUMENT_ZIP_INVALID')
++    if count != entries or not count:
++        _reject('DOCUMENT_ZIP_INVALID')
++
++
++class _XmlSummary:
++    """Bounded Expat metadata only; no tree, DTD, entities or resource loads."""
++    def __init__(self, limits, nodes):
++        self.root, self.body, self.sheets = None, False, []
++        self.overrides, self.relationships = {}, []
++        self.depth, self.bytes, self.nodes, self.limits = 0, 0, nodes, limits
++        self.stack = []
++        self.parser = expat.ParserCreate(namespace_separator='}')
++        if hasattr(self.parser, 'SetReparseDeferralEnabled'):
++            self.parser.SetReparseDeferralEnabled(True)
++        self.parser.StartElementHandler = self.start
++        self.parser.EndElementHandler = self.end
++        self.parser.StartDoctypeDeclHandler = self.forbidden
++        self.parser.EntityDeclHandler = self.forbidden
++        self.parser.ExternalEntityRefHandler = self.forbidden
++        self.parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
++
++    def forbidden(self, *args):
++        _reject('DOCUMENT_XML_DTD')
++
++    def start(self, name, attrs):
++        parent = self.stack[-1] if self.stack else None
++        self.stack.append(name)
++        self.depth += 1; self.nodes[0] += 1
++        if self.depth > self.limits.xml_depth or self.nodes[0] > self.limits.xml_nodes or len(attrs) > 64:
++            _reject('DOCUMENT_XML_LIMIT')
++        if self.root is None:
++            self.root = name
++        if name == _CT + '}Override' and parent == _CT + '}Types':
++            part = attrs.get('PartName')
++            if part in self.overrides:
++                _reject('DOCUMENT_OOXML_AMBIGUOUS')
++            self.overrides[part] = attrs.get('ContentType')
++        elif name == _RELS + '}Relationship' and parent == _RELS + '}Relationships':
++            self.relationships.append(dict(attrs))
++        elif name in {ns + '}body' for ns in _WORD} and self.depth == 2:
++            self.body = True
++        elif name in {ns + '}sheet' for ns in _SHEET} and parent in {ns + '}sheets' for ns in _SHEET} and self.depth == 3:
++            self.sheets.append(next((attrs[ns + '}id'] for ns in _OFFICE if ns + '}id' in attrs), None))
++
++    def end(self, name):
++        self.depth -= 1
++        self.stack.pop()
++
++    def feed(self, block, final=False):
++        self.bytes += len(block)
++        if self.bytes > self.limits.xml_bytes:
++            _reject('DOCUMENT_XML_LIMIT')
++        self.parser.Parse(block, final)
++
++
++def _ooxml(data, extension, limits):
++    _zip_preflight(data, limits)
++    main = 'word/document.xml' if extension == '.docx' else 'xl/workbook.xml'
++    required = {'[Content_Types].xml', '_rels/.rels', main}
++    if extension == '.xlsx':
++        required.add('xl/_rels/workbook.xml.rels')
++    summaries, nodes, expanded = {}, [0], 0
++    with zipfile.ZipFile(io.BytesIO(data)) as archive:
++        infos = archive.infolist()
++        if len(infos) > limits.entries:
++            _reject('DOCUMENT_ZIP_LIMIT')
++        names, folded, declared = set(), set(), 0
++        for info in infos:
++            name, mode = info.filename, info.external_attr >> 16
++            decoded = unquote(name)
++            if (not name or info.orig_filename != name or '\\' in decoded or any(ord(c) < 32 or ord(c) == 127 for c in decoded)
++                    or ':' in decoded or decoded.startswith('/')
++                    or any(p in ('.', '..', '') for p in decoded.rstrip('/').split('/'))
++                    or name in names or name.casefold() in folded
++                    or stat.S_IFMT(mode) not in (0, stat.S_IFREG, stat.S_IFDIR)
++                    or stat.S_IFMT(mode) == stat.S_IFDIR and not name.endswith('/')):
++                _reject('DOCUMENT_ZIP_PATH')
++            names.add(name); folded.add(name.casefold())
++            if info.flag_bits & 1 or info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
++                _reject('DOCUMENT_ZIP_PROFILE')
++            declared += info.file_size
++            if info.file_size > limits.member_bytes or declared > limits.expanded_bytes:
++                _reject('DOCUMENT_ZIP_LIMIT')
++        if not required <= names:
++            _reject('DOCUMENT_OOXML_PARTS')
++        for info in infos:
++            summary = _XmlSummary(limits, nodes) if info.filename in required else None
++            if summary: summaries[info.filename] = summary
++            xml = bytearray() if summary else None
++            observed = 0
++            with archive.open(info) as stream:
++                while block := stream.read(min(65536, limits.member_bytes - observed + 1,
++                                                limits.expanded_bytes - expanded + 1)):
++                    observed += len(block); expanded += len(block)
++                    if observed > limits.member_bytes or expanded > limits.expanded_bytes:
++                        _reject('DOCUMENT_ZIP_LIMIT')
++                    if summary:
++                        if len(xml) + len(block) > limits.xml_bytes:
++                            _reject('DOCUMENT_XML_LIMIT')
++                        xml.extend(block)
++            if observed != info.file_size:
++                _reject('DOCUMENT_ZIP_INVALID')
++            if summary:
++                # One bounded Parse avoids repeated incomplete-token reparsing
++                # on older Expat builds; never concatenate the whole archive.
++                summary.feed(bytes(xml), True)
++                summary.parser = None
++        types, relations, content = (summaries['[Content_Types].xml'], summaries['_rels/.rels'], summaries[main])
++        if (types.root != _CT + '}Types' or relations.root != _RELS + '}Relationships'
++                or types.overrides.get('/' + main) != _MAIN_TYPES[extension]):
++            _reject('DOCUMENT_OOXML_TYPE')
++        office = [r for r in relations.relationships if r.get('Type') in {ns + '/officeDocument' for ns in _OFFICE}]
++        if (len(office) != 1 or not office[0].get('Id') or office[0].get('TargetMode', 'Internal') != 'Internal'
++                or office[0].get('Target') not in (main, '/' + main)):
++            _reject('DOCUMENT_OOXML_RELATIONSHIP')
++        if extension == '.docx':
++            if content.root not in {ns + '}document' for ns in _WORD} or not content.body:
++                _reject('DOCUMENT_OOXML_TYPE')
++        else:
++            rels = summaries['xl/_rels/workbook.xml.rels']
++            if content.root not in {ns + '}workbook' for ns in _SHEET} or not content.sheets or rels.root != _RELS + '}Relationships':
++                _reject('DOCUMENT_OOXML_TYPE')
++            by_id = {}
++            for rel in rels.relationships:
++                if not rel.get('Id') or rel.get('Id') in by_id: _reject('DOCUMENT_OOXML_AMBIGUOUS')
++                by_id[rel.get('Id')] = rel
++            for sheet in content.sheets:
++                if not sheet:
++                    _reject('DOCUMENT_OOXML_RELATIONSHIP')
++                rel = by_id.get(sheet, {})
++                target = urlsplit(rel.get('Target', ''))
++                name = posixpath.normpath(posixpath.join('xl', unquote(target.path))) if not target.path.startswith('/') else unquote(target.path).lstrip('/')
++                if (rel.get('Type') not in {ns + suffix for ns in _OFFICE for suffix in ('/worksheet', '/chartsheet')}
++                        or rel.get('TargetMode', 'Internal') != 'Internal' or target.scheme or target.netloc or target.query or target.fragment
++                        or name not in names or types.overrides.get('/' + name) not in _SHEET_TYPES):
++                    _reject('DOCUMENT_OOXML_RELATIONSHIP')
++            # Worksheet contents/embedded objects are CRC-checked, not schema parsed.
++
++
++def validate_document(data, extension, client_mime, *, max_file_bytes, limits=None):
++    extension = extension.lower()
++    if extension not in MIME_BY_EXTENSION:
++        _reject('DOCUMENT_EXTENSION')
++    if not data or len(data) > max_file_bytes:
++        raise DocumentValidationError('DOCUMENT_SIZE', 'Archivo vacío o demasiado grande', 413)
++    limits = limits or load_limits()
++    try:
++        if extension == '.pdf': _pdf(data)
++        elif extension == '.png': _png(data, limits)
++        elif extension in ('.jpg', '.jpeg'): _jpeg(data, limits)
++        else: _ooxml(data, extension, limits)
++    except DocumentValidationError:
++        raise
++    except (zipfile.BadZipFile, zipfile.LargeZipFile, expat.ExpatError, zlib.error,
++            ValueError, NotImplementedError, RuntimeError, EOFError, OSError) as exc:
++        raise DocumentValidationError('DOCUMENT_FORMAT_INVALID') from exc
++    canonical = MIME_BY_EXTENSION[extension]
++    mime = (client_mime or '').split(';', 1)[0].strip().lower()
++    permitted = _GENERIC | {canonical} | _ALIASES.get(extension, set())
++    if extension in ('.docx', '.xlsx'): permitted |= {'application/zip', 'application/x-zip-compressed'}
++    if mime not in permitted:
++        raise DocumentValidationError('DOCUMENT_MIME_MISMATCH', 'El tipo MIME declarado es incompatible con el formato comprobado.')
++    return canonical
++
++
++def download_media_type():
++    # No schema/provenance marker distinguishes a validated upload from a legacy
++    # row with exactly the same MIME. Conservative for all versions, no rewrites.
++    return 'application/octet-stream'
+diff --git a/backend/tests/_document_samples.py b/backend/tests/_document_samples.py
+new file mode 100644
+index 0000000..bda61c0
+--- /dev/null
++++ b/backend/tests/_document_samples.py
+@@ -0,0 +1,80 @@
++"""Small synthetic format fixtures; stdlib only, no application/DB imports."""
++
++import io
++import struct
++import zipfile
++import zlib
++
++
++def minimal_pdf(label='Software PA QA'):
++    label = label.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
++    text = f'BT /F1 8 Tf 5 30 Td ({label}) Tj ET'.encode('ascii')
++    objects = [b'<< /Type /Catalog /Pages 2 0 R >>',
++        b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
++        b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 72 72] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
++        b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
++        b'<< /Length ' + str(len(text)).encode() + b' >>\nstream\n' + text + b'\nendstream']
++    result = bytearray(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n'); offsets = [0]
++    for index, body in enumerate(objects, 1):
++        offsets.append(len(result)); result.extend(f'{index} 0 obj\n'.encode() + body + b'\nendobj\n')
++    start = len(result)
++    result.extend(f'xref\n0 {len(offsets)}\n0000000000 65535 f \n'.encode())
++    for offset in offsets[1:]: result.extend(f'{offset:010} 00000 n \n'.encode())
++    result.extend(f'trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{start}\n%%EOF\n'.encode())
++    return bytes(result)
++
++
++def png_chunk(kind, content):
++    return struct.pack('>I', len(content)) + kind + content + struct.pack('>I', zlib.crc32(kind + content) & 0xffffffff)
++
++
++def minimal_png():
++    return (b'\x89PNG\r\n\x1a\n' + png_chunk(b'IHDR', struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0))
++        + png_chunk(b'IDAT', zlib.compress(b'\x00\xff\x00\x00')) + png_chunk(b'IEND', b''))
++
++
++def minimal_jpeg():
++    # Baseline grayscale 1x1: one all-zero DCT block, Huffman codes DC0/EOB0,
++    # entropy bits 00 padded with 1s. No native decoder is executed in tests.
++    def segment(marker, payload): return bytes([255, marker]) + struct.pack('>H', len(payload) + 2) + payload
++    counts = b'\x01' + b'\x00' * 15
++    return (b'\xff\xd8' + segment(0xdb, b'\x00' + b'\x01' * 64)
++        + segment(0xc0, b'\x08\x00\x01\x00\x01\x01\x01\x11\x00')
++        + segment(0xc4, b'\x00' + counts + b'\x00' + b'\x10' + counts + b'\x00')
++        + segment(0xda, b'\x01\x01\x00\x00\x3f\x00') + b'\x3f\xff\xd9')
++
++
++CT = 'http://schemas.openxmlformats.org/package/2006/content-types'
++RELS = 'http://schemas.openxmlformats.org/package/2006/relationships'
++OFFICE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
++WORD = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
++SHEET = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
++
++
++def office_parts(extension='docx', *, strict=False):
++    word = 'http://purl.oclc.org/ooxml/wordprocessingml/main' if strict else WORD
++    sheet = 'http://purl.oclc.org/ooxml/spreadsheetml/main' if strict else SHEET
++    office = 'http://purl.oclc.org/ooxml/officeDocument/relationships' if strict else OFFICE
++    main = 'word/document.xml' if extension == 'docx' else 'xl/workbook.xml'
++    main_type = ('application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'
++                 if extension == 'docx' else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml')
++    extra = ('<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
++             if extension == 'xlsx' else '')
++    parts = {
++        '[Content_Types].xml': f'<Types xmlns="{CT}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/{main}" ContentType="{main_type}"/>{extra}</Types>',
++        '_rels/.rels': f'<Relationships xmlns="{RELS}"><Relationship Id="rId1" Type="{office}/officeDocument" Target="{main}"/></Relationships>',
++    }
++    if extension == 'docx':
++        parts[main] = f'<w:document xmlns:w="{word}"><w:body><w:p><w:r><w:t>SS06 SYNTH QA</w:t></w:r></w:p></w:body></w:document>'
++    else:
++        parts[main] = f'<workbook xmlns="{sheet}" xmlns:r="{office}"><sheets><sheet name="QA" sheetId="1" r:id="rId1"/></sheets></workbook>'
++        parts['xl/_rels/workbook.xml.rels'] = f'<Relationships xmlns="{RELS}"><Relationship Id="rId1" Type="{office}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'
++        parts['xl/worksheets/sheet1.xml'] = f'<worksheet xmlns="{sheet}"><sheetData/></worksheet>'
++    return parts
++
++
++def package(parts, compression=zipfile.ZIP_DEFLATED):
++    output = io.BytesIO()
++    with zipfile.ZipFile(output, 'w', compression=compression) as archive:
++        for name, content in parts.items(): archive.writestr(name, content)
++    return output.getvalue()
+diff --git a/tests/security/test_document_validation.py b/tests/security/test_document_validation.py
+new file mode 100644
+index 0000000..4038c38
+--- /dev/null
++++ b/tests/security/test_document_validation.py
+@@ -0,0 +1,331 @@
++"""SS-06: synthetic files and isolated function bodies, no API/DB startup."""
++
++import ast
++import asyncio
++from dataclasses import replace
++import hashlib
++import io
++import os
++from pathlib import Path
++import re
++import struct
++import sys
++import tempfile
++from types import SimpleNamespace
++import unittest
++from unittest.mock import MagicMock, patch
++import uuid
++import zipfile
++import zlib
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / 'backend'))
++sys.path.insert(0, str(ROOT / 'backend/tests'))
++from app.services import document_validation as validator
++from _document_samples import minimal_pdf, minimal_png, minimal_jpeg, png_chunk, office_parts, package, CT, RELS, OFFICE
++
++
++class FormatTests(unittest.TestCase):
++    def setUp(self):
++        self.env = patch.dict(os.environ, {}, clear=True); self.env.start(); self.addCleanup(self.env.stop)
++        self.limits = validator.load_limits()
++
++    def validate(self, content, extension, mime=None, **kwargs):
++        return validator.validate_document(content, extension, mime, max_file_bytes=1024 * 1024, **kwargs)
++
++    def rejects(self, content, extension, code=None, **kwargs):
++        with self.assertRaises(validator.DocumentValidationError) as caught:
++            self.validate(content, extension, **kwargs)
++        if code: self.assertEqual(caught.exception.code, code)
++        self.assertEqual(caught.exception.status, 422)
++
++    def test_all_allowed_extensions_and_canonical_mime(self):
++        for extension, content in [('.pdf', minimal_pdf()), ('.png', minimal_png()),
++            ('.jpg', minimal_jpeg()), ('.jpeg', minimal_jpeg()),
++            ('.docx', package(office_parts('docx'))), ('.xlsx', package(office_parts('xlsx')))]:
++            self.assertEqual(self.validate(content, extension), validator.MIME_BY_EXTENSION[extension])
++        self.assertEqual(set(validator.MIME_BY_EXTENSION), {'.pdf', '.docx', '.xlsx', '.jpg', '.jpeg', '.png'})
++
++    def test_empty_and_total_size_rejection(self):
++        for content, maximum in [(b'', 100), (minimal_pdf(), 1)]:
++            with self.assertRaises(validator.DocumentValidationError) as caught:
++                validator.validate_document(content, '.pdf', None, max_file_bytes=maximum)
++            self.assertEqual(caught.exception.status, 413)
++
++    def test_pdf_text_html_wrong_signature_missing_eof_xref_and_truncation(self):
++        valid = minimal_pdf()
++        for invalid in [b'plain text', b'<html>synthetic</html>', b'%PDF-1.4\nonly header\n%%EOF\n',
++                        valid[:-6], valid.replace(b'startxref', b'not-an-xref'), valid + b'<html>trailing</html>',
++                        re.sub(rb'startxref\n\d+', b'startxref\n99999999', valid)]:
++            self.rejects(invalid, '.pdf')
++
++    def test_pdf_incremental_final_reference_and_xref_stream_envelope(self):
++        valid = minimal_pdf()
++        # Synthetic incremental tail points at an existing object. Envelope only,
++        # not a claim that this fixture has a semantically valid XRef stream.
++        offset = valid.index(b'1 0 obj')
++        wrapped = valid + f'\nstartxref\n{offset}\n%%EOF\n'.encode()
++        self.assertEqual(self.validate(wrapped, '.pdf'), 'application/pdf')
++
++    def test_png_truncation_crc_dimensions_and_arbitrary_signature_bytes(self):
++        valid = minimal_png()
++        corrupt = bytearray(valid); corrupt[30] ^= 1
++        zero_dimensions = b'\x89PNG\r\n\x1a\n' + png_chunk(b'IHDR', struct.pack('>IIBBBBB', 0, 1, 8, 2, 0, 0, 0))
++        for data in [valid[:8] + b'arbitrary', valid[:-1], bytes(corrupt), zero_dimensions,
++                     valid + b'trailing', b'wrong' + valid]:
++            self.rejects(data, '.png')
++
++    def test_png_requires_idat_iend_and_indexed_palette(self):
++        header = b'\x89PNG\r\n\x1a\n' + png_chunk(b'IHDR', struct.pack('>IIBBBBB', 1, 1, 8, 3, 0, 0, 0))
++        self.rejects(header + png_chunk(b'IEND', b''), '.png')
++        self.rejects(header + png_chunk(b'IDAT', b'not decoded') + png_chunk(b'IEND', b''), '.png')
++
++    def test_image_record_budget_and_invalid_config(self):
++        self.rejects(minimal_png(), '.png', 'DOCUMENT_IMAGE_COMPLEXITY', limits=replace(self.limits, image_records=1))
++        self.rejects(minimal_jpeg(), '.jpg', 'DOCUMENT_IMAGE_COMPLEXITY', limits=replace(self.limits, image_records=1))
++        for value in ['0', '-1', 'invalid']:
++            with patch.dict(os.environ, {'DOCUMENT_INSPECTION_ENTRIES': value}):
++                with self.assertRaises(RuntimeError): validator.load_limits()
++
++    def test_jpeg_invalid_segment_lengths_missing_frame_scan_and_eoi(self):
++        valid = minimal_jpeg()
++        for data in [b'\xff\xd8arbitrary\xff\xd9', valid[:-2], valid + b'junk', valid[:2] + b'\xff\xdb\x00\x01' + valid[8:],
++                     valid.replace(b'\xff\xc0', b'\xff\xe0', 1), valid[:valid.index(b'\xff\xda')] + b'\xff\xd9']:
++            self.rejects(data, '.jpg')
++
++    def test_ooxml_transitional_strict_stored_and_deflated(self):
++        for extension in ['docx', 'xlsx']:
++            for strict in [False, True]:
++                for compression in [zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED]:
++                    data = package(office_parts(extension, strict=strict), compression)
++                    self.assertEqual(self.validate(data, '.' + extension), validator.MIME_BY_EXTENSION['.' + extension])
++
++    def test_generic_zip_renamed_and_docx_xlsx_type_confusion(self):
++        for extension in ['.docx', '.xlsx']:
++            self.rejects(package({'hello.txt': 'synthetic'}), extension, 'DOCUMENT_OOXML_PARTS')
++        self.rejects(package(office_parts('docx')), '.xlsx')
++        self.rejects(package(office_parts('xlsx')), '.docx')
++
++    def test_ooxml_missing_parts_wrong_root_main_content_type_and_macro_main(self):
++        for target in ['[Content_Types].xml', '_rels/.rels', 'word/document.xml']:
++            parts = office_parts(); del parts[target]
++            self.rejects(package(parts), '.docx', 'DOCUMENT_OOXML_PARTS')
++        for root in ['<html/>', '<word/>', '<document xmlns="urn:wrong"><body/></document>']:
++            parts = office_parts(); parts['word/document.xml'] = root
++            self.rejects(package(parts), '.docx', 'DOCUMENT_OOXML_TYPE')
++        parts = office_parts(); parts['[Content_Types].xml'] = parts['[Content_Types].xml'].replace(
++            'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
++            'application/vnd.ms-word.document.macroEnabled.main+xml')
++        self.rejects(package(parts), '.docx', 'DOCUMENT_OOXML_TYPE')
++
++    def test_xlsx_sheet_links_must_resolve_to_declared_existing_internal_parts(self):
++        for operation in ['missing', 'external', 'wrong_type', 'unknown_id', 'missing_id']:
++            parts = office_parts('xlsx')
++            if operation == 'missing': del parts['xl/worksheets/sheet1.xml']
++            if operation == 'external': parts['xl/_rels/workbook.xml.rels'] = parts['xl/_rels/workbook.xml.rels'].replace(
++                'Target="worksheets/sheet1.xml"', 'TargetMode="External" Target="https://qa.invalid/sheet.xml"')
++            if operation == 'wrong_type': parts['xl/_rels/workbook.xml.rels'] = parts['xl/_rels/workbook.xml.rels'].replace('/worksheet"', '/not-a-sheet"')
++            if operation == 'unknown_id': parts['xl/workbook.xml'] = parts['xl/workbook.xml'].replace('r:id="rId1"', 'r:id="missing"')
++            if operation == 'missing_id': parts['xl/workbook.xml'] = parts['xl/workbook.xml'].replace('r:id="rId1"', '')
++            self.rejects(package(parts), '.xlsx', 'DOCUMENT_OOXML_RELATIONSHIP')
++
++    def test_office_root_relationship_external_or_ambiguous_rejected(self):
++        for replacement in ['TargetMode="External" Target="https://qa.invalid/document.xml"', 'Target="other.xml"']:
++            parts = office_parts(); parts['_rels/.rels'] = parts['_rels/.rels'].replace('Target="word/document.xml"', replacement)
++            self.rejects(package(parts), '.docx', 'DOCUMENT_OOXML_RELATIONSHIP')
++
++    def test_malformed_xml_and_dtd_entities_rejected_even_utf16(self):
++        for text in ['<unclosed>', '<!DOCTYPE root [<!ENTITY x "small synthetic">]><root>&x;</root>',
++                     '<!DOCTYPE root SYSTEM "file:///SS06_NOT_READ"><root/>']:
++            for encoding in ['utf-8', 'utf-16']:
++                parts = office_parts(); parts['word/document.xml'] = text.encode(encoding)
++                with patch('builtins.open', side_effect=AssertionError('no external resource access')):
++                    self.rejects(package(parts), '.docx')
++
++    def test_xml_byte_node_depth_budgets(self):
++        data = package(office_parts())
++        for changes in [dict(xml_bytes=10), dict(xml_nodes=1), dict(xml_depth=1)]:
++            self.rejects(data, '.docx', 'DOCUMENT_XML_LIMIT', limits=replace(self.limits, **changes))
++
++    def test_zip_preflight_limits_before_zipfile_object_allocation(self):
++        data = package(office_parts())
++        for changes in [dict(entries=2), dict(directory_bytes=1)]:
++            with patch.object(validator.zipfile, 'ZipFile', side_effect=AssertionError('must reject before indexing')):
++                self.rejects(data, '.docx', 'DOCUMENT_ZIP_LIMIT', limits=replace(self.limits, **changes))
++        # Lie about declared entry count; observed central records still checked.
++        forged = bytearray(data); end = forged.rfind(b'PK\x05\x06')
++        struct.pack_into('<HH', forged, end + 8, 1, 1)
++        with patch.object(validator.zipfile, 'ZipFile', side_effect=AssertionError('must reject before indexing')):
++            self.rejects(bytes(forged), '.docx', 'DOCUMENT_ZIP_INVALID')
++
++    def test_zip_profile_crc_truncation_prefix_trailing_data_and_zip64_rejected(self):
++        data = package(office_parts(), zipfile.ZIP_STORED)
++        bad_crc = bytearray(data)
++        content = data.index(b'<Types'); bad_crc[content + 1] ^= 1
++        encrypted = bytearray(data); central = encrypted.index(b'PK\x01\x02')
++        flags = struct.unpack_from('<H', encrypted, central + 8)[0]; struct.pack_into('<H', encrypted, central + 8, flags | 1)
++        zip64 = bytearray(data); end = zip64.rfind(b'PK\x05\x06'); struct.pack_into('<HH', zip64, end + 8, 65535, 65535)
++        for value in [bytes(bad_crc), data[:-1], b'prefix' + data, data + b'trailing', bytes(encrypted), bytes(zip64)]:
++            self.rejects(value, '.docx')
++
++    def test_zip_paths_symlinks_duplicates_and_special_entries(self):
++        for name in ['../escape', '/absolute', 'a/../escape', 'a\\escape', 'a/%2e%2e/escape', 'a/%5cescape', 'C:/file']:
++            parts = office_parts(); parts[name] = 'synthetic'
++            self.rejects(package(parts), '.docx', 'DOCUMENT_ZIP_PATH')
++        output = io.BytesIO()
++        with zipfile.ZipFile(output, 'w') as archive:
++            for name, value in office_parts().items(): archive.writestr(name, value)
++            info = zipfile.ZipInfo('link'); info.create_system = 3; info.external_attr = (0o120777 << 16)
++            archive.writestr(info, 'synthetic-target')
++        self.rejects(output.getvalue(), '.docx', 'DOCUMENT_ZIP_PATH')
++        parts = office_parts(); parts['WORD/document.xml'] = '<synthetic/>'
++        self.rejects(package(parts), '.docx', 'DOCUMENT_ZIP_PATH')
++
++    def test_declared_member_total_and_observed_extraction_limits(self):
++        data = package(office_parts())
++        for changes in [dict(member_bytes=1), dict(expanded_bytes=1)]:
++            self.rejects(data, '.docx', 'DOCUMENT_ZIP_LIMIT', limits=replace(self.limits, **changes))
++        infos = [zipfile.ZipInfo(name) for name in office_parts()]
++        archive = MagicMock(); archive.__enter__.return_value = archive; archive.infolist.return_value = infos
++        stream = io.BytesIO(b'xx'); archive.open.return_value = stream
++        with patch.object(validator.zipfile, 'ZipFile', return_value=archive):
++            self.rejects(data, '.docx', 'DOCUMENT_ZIP_LIMIT', limits=replace(self.limits, member_bytes=1))
++        self.assertTrue(stream.closed); archive.__exit__.assert_called_once()
++
++    def test_client_mime_generic_alias_normalization_and_mismatch(self):
++        for mime in [None, '', 'application/octet-stream', 'binary/octet-stream', 'Application/PDF; charset=x', 'application/x-pdf']:
++            self.assertEqual(self.validate(minimal_pdf(), '.pdf', mime), 'application/pdf')
++        for mime in ['text/html', 'image/png', 'application/zip']:
++            self.rejects(minimal_pdf(), '.pdf', 'DOCUMENT_MIME_MISMATCH', mime=mime)
++        self.assertEqual(self.validate(package(office_parts()), '.docx', 'application/zip'), validator.MIME_BY_EXTENSION['.docx'])
++        self.assertEqual(self.validate(minimal_jpeg(), '.jpeg', 'image/jpg'), 'image/jpeg')
++
++    def test_explicit_limitations_no_claim_of_pixel_decode_or_pdf_semantics(self):
++        # Correct framing/CRCs with undecodable IDAT is outside this stage.
++        data = b'\x89PNG\r\n\x1a\n' + png_chunk(b'IHDR', struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0))
++        data += png_chunk(b'IDAT', b'synthetic not zlib') + png_chunk(b'IEND', b'')
++        self.assertEqual(self.validate(data, '.png'), 'image/png')
++        # Ancillary Office binaries are checked for CRC/budget, not disarmed.
++        parts = office_parts(); parts['word/embeddings/synthetic.bin'] = b'INERT SYNTHETIC EMBEDDED OBJECT'
++        self.assertEqual(self.validate(package(parts), '.docx'), validator.MIME_BY_EXTENSION['.docx'])
++
++
++class HTTPError(Exception):
++    def __init__(self, status_code, detail): self.status_code, self.detail = status_code, detail
++
++
++class Version:
++    id_documento = MagicMock(); hash_sha256 = MagicMock(); numero_version = MagicMock()
++    def __init__(self, **kwargs): self.__dict__.update(kwargs)
++
++
++def service_functions():
++    tree = ast.parse((ROOT / 'backend/app/services/documents.py').read_text())
++    names = {'store_version', '_safe_original_name', 'upload_root', 'safe_version_path'}
++    nodes = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in names]
++    ns = dict(Path=Path, os=os, re=re, uuid=uuid, hashlib=hashlib, func=MagicMock(),
++        ALLOWED_EXTENSIONS={'.pdf', '.docx', '.xlsx', '.jpg', '.jpeg', '.png'}, MAX_UPLOAD_BYTES=65536,
++        models=SimpleNamespace(DocumentoVersion=Version), require_document_access=MagicMock(),
++        set_audit_context=MagicMock(), HTTPException=HTTPError,
++        DocumentValidationError=validator.DocumentValidationError, validate_document=validator.validate_document)
++    future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
++    exec(compile(ast.fix_missing_locations(ast.Module(body=[future, *nodes], type_ignores=[])), 'isolated_documents', 'exec'), ns)
++    return ns
++
++
++class IntegrationBoundaryTests(unittest.TestCase):
++    def setUp(self):
++        self.directory = tempfile.TemporaryDirectory(); self.addCleanup(self.directory.cleanup)
++        self.env = patch.dict(os.environ, {'UPLOAD_ROOT': self.directory.name}, clear=True)
++        self.env.start(); self.addCleanup(self.env.stop)
++        self.ns = service_functions(); self.user = SimpleNamespace(id_usuario=3)
++        self.db = MagicMock(); q = self.db.query.return_value
++        q.filter.return_value = q; q.first.return_value = None; q.scalar.return_value = 0
++
++    def upload(self, data, name='document.pdf', mime='application/pdf'):
++        calls = []
++        async def read(maximum): calls.append(maximum); return data[:maximum]
++        result = asyncio.run(self.ns['store_version'](self.db, 7,
++            SimpleNamespace(filename=name, content_type=mime, read=read), self.user))
++        self.assertEqual(calls, [65537]); return result
++
++    def test_canonical_mime_persisted_raw_bytes_sha_name_and_version_unchanged(self):
++        data = minimal_pdf()
++        result = self.upload(data, '../synthetic.pdf', 'application/octet-stream')
++        self.assertEqual(result.tipo_mime, 'application/pdf')
++        self.assertEqual(result.hash_sha256, hashlib.sha256(data).hexdigest())
++        self.assertEqual(result.nombre_original, 'synthetic.pdf')
++        self.assertEqual((result.numero_version, result.tamano_bytes), (1, len(data)))
++        self.assertEqual((Path(self.directory.name) / result.ruta_almacenamiento).read_bytes(), data)
++        self.ns['require_document_access'].assert_called_once_with(self.db, self.user, 7, mode='capture')
++        self.db.commit.assert_called_once()
++
++    def test_invalid_content_or_mime_rejected_before_version_lookup_or_file_write(self):
++        for data, name, mime, status in [(b'<html>SS06 SYNTH PII</html>', 'fake.pdf', 'application/pdf', 422),
++            (minimal_pdf(), 'fake.pdf', 'text/html', 422), (b'', 'empty.pdf', None, 413),
++            (b'x' * 65537, 'large.pdf', 'application/pdf', 413), (b'x', 'bad.exe', None, 422)]:
++            with self.subTest(name=name), self.assertRaises(HTTPError) as caught:
++                self.upload(data, name, mime)
++            self.assertEqual(caught.exception.status_code, status)
++            self.assertNotIn('SS06 SYNTH PII', caught.exception.detail)
++        self.db.query.assert_not_called(); self.db.add.assert_not_called(); self.db.commit.assert_not_called()
++        self.assertEqual(list(Path(self.directory.name).iterdir()), [])
++
++    def test_authorization_precedes_read_validation_or_write(self):
++        self.ns['require_document_access'].side_effect = HTTPError(403, 'denied')
++        with self.assertRaises(HTTPError): self.upload(minimal_pdf())
++        self.db.query.assert_not_called()
++        self.assertEqual(list(Path(self.directory.name).iterdir()), [])
++
++    def test_duplicate_and_commit_failure_keep_existing_behavior(self):
++        self.db.query.return_value.first.return_value = Version(id_documento=7)
++        with self.assertRaises(HTTPError) as caught: self.upload(minimal_pdf())
++        self.assertEqual(caught.exception.status_code, 409)
++        self.db.query.return_value.first.return_value = None
++        self.db.commit.side_effect = RuntimeError('SS06 SYNTH DRIVER DETAIL')
++        with self.assertRaises(HTTPError) as caught: self.upload(minimal_pdf())
++        self.assertEqual(caught.exception.status_code, 409)
++        self.assertEqual(list(Path(self.directory.name).rglob('*.pdf')), [])
++        self.db.rollback.assert_called_once()
++
++    def download(self, version, denied=False):
++        tree = ast.parse((ROOT / 'backend/app/routers/documents.py').read_text())
++        node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'download_version')
++        node.decorator_list = []
++        ns = dict(Depends=lambda *args: None, get_db=None, auth=SimpleNamespace(RoleChecker=lambda roles: None),
++            READ_ROLES=['admin', 'operador', 'visualizador', 'geografo'], HTTPException=HTTPError,
++            models=SimpleNamespace(DocumentoVersion=Version), FileResponse=lambda *a, **kw: SimpleNamespace(args=a, kwargs=kw),
++            service=SimpleNamespace(safe_version_path=MagicMock(return_value=Path('/tmp/synthetic-only'))),
++            require_document_access=MagicMock(side_effect=HTTPError(403, 'denied') if denied else None),
++            download_media_type=validator.download_media_type)
++        future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
++        exec(compile(ast.fix_missing_locations(ast.Module(body=[future, node], type_ignores=[])), 'isolated_download', 'exec'), ns)
++        db = MagicMock(); db.get.return_value = version
++        result = ns['download_version'](1, db=db, user=self.user)
++        db.commit.assert_not_called()
++        if version is not None: ns['require_document_access'].assert_called_once_with(db, self.user, version.id_documento)
++        return result
++
++    def test_new_and_legacy_downloads_never_use_unverified_mime_or_mutate_history(self):
++        for mime in ['text/html', 'application/pdf', None, 'image/svg+xml', 'bad\r\nInjected: value']:
++            version = Version(id_documento=7, nombre_original='original.pdf', tipo_mime=mime)
++            before = vars(version).copy()
++            response = self.download(version)
++            self.assertEqual(response.kwargs['media_type'], 'application/octet-stream')
++            self.assertEqual(response.kwargs['filename'], 'original.pdf')
++            self.assertEqual(response.kwargs['content_disposition_type'], 'attachment')
++            self.assertEqual(response.kwargs['headers'], {'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-store'})
++            self.assertEqual(vars(version), before)
++
++    def test_download_missing_and_denied_versions_keep_access_control(self):
++        with self.assertRaises(HTTPError) as error: self.download(None)
++        self.assertEqual(error.exception.status_code, 404)
++        with self.assertRaises(HTTPError) as error: self.download(Version(id_documento=7), denied=True)
++        self.assertEqual(error.exception.status_code, 403)
++
++    def test_safe_path_and_allowed_extension_set_are_preserved(self):
++        with self.assertRaises(HTTPError): self.ns['safe_version_path'](Version(ruta_almacenamiento='../outside.pdf'))
++        self.assertNotIn('app.database', sys.modules); self.assertNotIn('app.main', sys.modules)
++
++
++if __name__ == '__main__': unittest.main()
+diff --git a/docs/security/SS-06-ETAPA1-CORRECCION-2026-10-28.md b/docs/security/SS-06-ETAPA1-CORRECCION-2026-10-28.md
+new file mode 100644
+index 0000000..8c9bf2f
+--- /dev/null
++++ b/docs/security/SS-06-ETAPA1-CORRECCION-2026-10-28.md
+@@ -0,0 +1,281 @@
++# SS-06 etapa 1 — Reconocimiento documental acotado y MIME del servidor
++
++Fecha: 2026-10-28. Software-PA / SSALFER. Rama dev, HEAD `683ff75613768de28a7127c7e33a6e2ef4fc40ff`, más correcciones locales SS-01, SS-02, SS-03, SS-04, SS-10 y SS-11.
++
++## Dictamen y alcance efectivo
++
++**Corrección local parcial implementada y comprobada de forma aislada; QA integrada pendiente.** Se conservan PDF, DOCX, XLSX, JPG/JPEG y PNG. La carga ya no acepta únicamente una extensión: incorpora reconocimiento de envoltura/estructura básica y presupuestos de inspección. El MIME persistido de las nuevas versiones lo determina una tabla del servidor, nunca el valor del cliente.
++
++**No es un validador completo de PDF, imágenes u OOXML, ni un antivirus, CDR o verificador de firma digital.** Un archivo que supera este perfil todavía puede estar corrupto en partes no interpretadas, contener contenido activo/malware o ser políglota. Se incluye una prueba que demuestra expresamente esa limitación. No se declara resuelto el análisis seguro de contenido ni se certifica preparación institucional por inspeccionar cabeceras/CRC.
++
++Las descargas de **todas las versiones**, nuevas e históricas, usan application/octet-stream, attachment, nosniff y private,no-store. Se elige esa compatibilidad conservadora porque el esquema actual no distingue una versión validada de una histórica con el mismo MIME; no se supone que un MIME canónico en una fila histórica sea prueba de inspección. Las nuevas cargas sí guardan el MIME específico canónico, pero no se reutiliza ciegamente para servirlas. No hay revisión/migración automática de documentos anteriores ni parsing nuevo durante las descargas.
++
++Resultado Python: **156 pruebas descubiertas, 153 aprobadas y 3 omitidas**. Son 28 pruebas SS-06 nuevas aprobadas y las regresiones anteriores; las tres omisiones son comprobaciones nativas previas de SS-10. No se ejecutó PostgreSQL/PostGIS, Docker, migraciones, scripts operativos, commits/push/merge o despliegues. No se leyeron .env, documentos reales ni logs institucionales; no se instalaron dependencias ni se enviaron archivos a analizadores externos.
++
++## Inspección y preservación
++
++Se revisaron services/documents.py, routers/documents.py, access.py, modelos/esquemas Documento/DocumentoVersion, pruebas de documentos y read models, configuración de uploads/Compose, Nginx SSALFER y consumidores DocumentosAPI. Se contrastaron SS-06 de auditoría y plan. El esquema mantiene hash SHA-256, tamaño, nombre original, ruta, MIME, versión, fecha y actor; **no tiene marca de validación de contenido, motor o perfil**.
++
++Antes de modificar se guardaron hashes de los archivos previos y snapshots del alcance, sin leer .env. Los tres tests de integración originales no tenían cambios locales; se verificó su contenido inicial por hash antes de tomar el snapshot. Se preservan todos los códigos, pruebas e informes de remediaciones anteriores. Sólo cambian seis archivos preexistentes de este alcance, enumerados al final.
++
++Comparación AST: la única función existente modificada en servicio es store_version, y en router download_version. Autorización, saneamiento de nombres, safe_version_path, creación/baja/vínculos y demás endpoints quedan intactos. Se verificaron idénticas las llamadas de deduplicación/hash lookup, numeración max+1, escritura, commit, rollback y compensación unlink. **No se corrige SS-05 ni SS-12**, ni se añade bloqueo/versionado concurrente, metadato histórico o migración.
++
++## Herramientas disponibles y decisión técnica
++
++El Python local no dispone de Pillow, pypdf/PyPDF2, defusedxml, openpyxl, FastAPI ni SQLAlchemy. Tampoco están qpdf/pdfinfo/pngcheck/jpeginfo. El requirements del backend incluye openpyxl pero no un decoder de imagen o parser PDF dedicado; no se cambia la lista de dependencias para resolverlo. /usr/bin/file ya está disponible y se utilizó sólo como comprobación local de identificación de fixtures pequeños, con stdin y entorno mínimo, no como dependencia del validador desplegado.
++
++Se implementan comprobaciones limitadas de envoltura, no un parser completo artesanal. PDF no recorre objetos ni descomprime streams; PNG no decodifica IDAT/píxeles; JPEG inspecciona segmentos de cabecera hasta el primer SOS y no decodifica entropía; OOXML usa zipfile/Expat estándar para el contenedor y metadatos mínimos, sin extracción ni árbol XML completo. La semántica interna completa queda fuera del perfil y debe verificarse con herramientas mantenidas dentro de un worker aislado.
++
++Expat local identificado: expat_2.6.1, con API de reparse deferral. El código la habilita cuando existe y entrega cada parte XML seleccionada en una sola llamada Parse acotada, evitando repetir tokens incompletos en feeds pequeños de versiones antiguas. Esto no equivale a demostrar ausencia de CVE ni a conocer la versión de la imagen de producción: verificar Python/Expat/zlib/zipfile y parches del artefacto real en QA.
++
++## Perfil aceptado y rechazos
++
++| Formato / extensiones | Comprobaciones realizadas | Qué NO demuestra |
++|---|---|---|
++| PDF .pdf | Cabecera en byte0, PDF1.0..1.7 o2.0, terminación %%EOF, startxref final en ventana4096 y offset dentro del archivo apuntando a xref o comienzo de objeto | No resuelve referencias, comprueba XRef stream, abre páginas, descifra, interpreta JavaScript ni verifica certificados/firmas |
++| PNG .png | Firma, encuadre de todos los chunks, longitudes, CRC, IHDR único inicial con parámetros básicos legales, dimensiones no nulas, paleta cuando es indexado, IDAT presente e IEND final | No descomprime IDAT/ancillary ni acredita decodificación de píxeles, metadatos complejos o ausencia de malware |
++| JPEG .jpg/.jpeg | SOI/EOI, longitudes de segmentos de cabecera, SOF con dimensiones/componentes básicos, SOS y presencia de bytes posteriores antes de EOI | No interpreta tablas Huffman/cuanti­zación, scans/entropía, Exif, thumbnails ni dimensiones de memoria del decoder |
++| DOCX .docx | ZIP con directorio clásico acotado, [Content_Types].xml, _rels/.rels y word/document.xml; raíz/namespace, tipo principal DOCX, relación officeDocument interna y body directo | No valida todo el esquema OOXML, objetos incrustados, vínculos externos auxiliares, firmas de paquete ni contenido activo |
++| XLSX .xlsx | Lo anterior con xl/workbook.xml, xl/_rels/workbook.xml.rels; workbook/sheets, IDs y relación a hoja/chart existente con tipo declarado compatible | No interpreta fórmulas, conexiones de datos, hojas/estilos completos, enlaces o binarios embebidos |
++
++Se admiten namespaces principales Transitional y Strict en las partes revisadas y compresión ZIP STORED/DEFLATED. Se rechazan ZIP genéricos renombrados, DOCX/XLSX cruzados, faltas de partes obligatorias, XML roto en las partes inspeccionadas, DTD/entidades, relación principal externa, tipo principal macro-enabled incompatible con .docx/.xlsx, CRC incorrecto, datos truncados y límites excedidos.
++
++El perfil de directorio requiere EOCD clásico, no multidisco, prefix autoextraíble o bytes posteriores al contenedor; rechaza contadores/dimensiones de directorio que exigen EOCD ZIP64. Los extras de cabecera local los maneja zipfile y **no se afirma rechazo exhaustivo de cualquier variante local ZIP64**. Se rechazan cifrado ZIP y métodos BZIP2/LZMA/otros; OOXML cifrado en contenedor OLE tampoco cumple este perfil. Nombres absolutos, dot-segments, backslashes, controles/NUL, colisiones exactas/casefold, symlinks y archivos especiales se rechazan sin extraer nada.
++
++Estas restricciones pueden rechazar variantes legítimas poco habituales: PDFs con prefijo, trailers inusuales o referencias no reconocidas por el perfil, imágenes con estructuras especiales, OOXML cifrado, directorio ZIP extendido, partes principales en rutas no convencionales o documentos grandes. No se clasifican automáticamente como malware. Es imprescindible corpus QA antes de integrar; no relajar a aceptación por extensión si hay incompatibilidad.
++
++Las [estructuras mínimas WordprocessingML](https://learn.microsoft.com/en-us/office/open-xml/word/structure-of-a-wordprocessingml-document) y [SpreadsheetML](https://learn.microsoft.com/en-us/office/open-xml/spreadsheet/structure-of-a-spreadsheetml-document) sirven de referencia para partes principales y vínculos. El [estándar PNG](https://www.w3.org/TR/png/) define chunks/parámetros; las comprobaciones seleccionadas no implementan toda la norma. Las reglas PDF/JPEG son un perfil operativo limitado, no una certificación de conformidad ISO ni sustituto de sus decodificadores.
++
++## OOXML: presupuestos y coste real
++
++La preinspección del EOCD y directorio cuenta también **registros observados** y verifica tamaños/offsets antes de que ZipFile construya ZipInfo para todo el archivo. Así no se confía en un conteo EOCD pequeño falsificado para permitir un índice masivo. Se conserva la lectura normal con zipfile para validar el contenedor; el preflight no reemplaza su implementación.
++
++Se examinan los metadatos de cada miembro antes de abrirlo. Luego se leen todos los miembros en bloques de hasta64KiB para comprobar CRC y bytes observados, sin escribir archivos, resolver vínculos, abrir recursos externos o inspeccionar contenedores anidados. Se rechaza por tamaño declarado **y por bytes realmente obtenidos**, usando el menor presupuesto restante para cada read. Todos los streams/ZipFile se cierran mediante context managers ante éxito/error.
++
++Sólo las partes obligatorias de metadatos/principal se entregan a Expat. Se acumula una parte XML hasta su límite, se parsea una vez, se descarta el parser y se conservan resúmenes mínimos. La [API Expat](https://docs.python.org/3/library/pyexpat.html) permite callbacks que rechazan DOCTYPE, declaraciones de entidad y referencias externas, incluso con UTF-16; no se basa esa defensa en buscar cadenas de bytes con regex. Se limita profundidad, número global de nodos y atributos por elemento. No hay expansión de entidades ni descarga de schemas.
++
++| Variable / control | Valor predeterminado | Alcance |
++|---|---|---|
++| MAX_UPLOAD_BYTES, existente | Código20MiB; Compose25MiB =26214400 bytes | Se conserva exactamente el límite previo y lectura máximo+1; no se cambia tamaño de documentos admitidos por configuración |
++| DOCUMENT_INSPECTION_ENTRIES | 2048 entradas | EOCD, registros observados e índice ZIP; no 0=ilimitado |
++| DOCUMENT_INSPECTION_DIRECTORY_BYTES | 4194304 bytes =4MiB | Directorio antes de ZipFile; limita índice/strings de metadata |
++| DOCUMENT_INSPECTION_EXPANDED_BYTES | 104857600 bytes =100MiB | Suma declarada y observada de miembros del contenedor exterior |
++| DOCUMENT_INSPECTION_MEMBER_BYTES | 33554432 bytes =32MiB | Cada miembro declarado/observado |
++| DOCUMENT_INSPECTION_XML_BYTES | 8388608 bytes =8MiB | Por parte XML interpretada, no por todo el árbol Office |
++| DOCUMENT_INSPECTION_XML_NODES | 100000 nodos | Contador compartido entre las partes XML seleccionadas |
++| DOCUMENT_INSPECTION_XML_DEPTH | 64 niveles | Máxima profundidad de esas partes |
++| DOCUMENT_INSPECTION_IMAGE_RECORDS | 4096 registros | Chunks PNG y segmentos JPEG antes del primer scan |
++| XML attrs | 64 atributos por elemento | Se comprueba después de que Expat tokenice el elemento |
++| PDF tail | 4096 bytes | Ventana final de reconocimiento startxref/EOF, sin parsing de objetos |
++
++Las ocho variables nuevas se exponen en el anchor Compose, sin tocar valores SS-03/SS-04/SS-10/SS-11 ni MAX_UPLOAD_BYTES. Son cuotas conservadoras de inspección, no capacidades medidas de la infraestructura. Los fixtures existentes eran diminutos y no representaban volumen institucional. Los presupuestos deben calibrarse con documentos QA legítimos antes de desplegar; no se presupone RAM/CPU/disco disponible.
++
++El límite total de archivo no equivale a un límite de body multipart/proxy: FastAPI puede recibir/spoolar antes de entrar en store_version. Nginx versionado no declara un client_max_body_size específico para estos documentos; debe verificarse su política efectiva y overhead en QA. No se modifica Nginx ni la recepción global en esta intervención.
++
++## MIME canónico y cabeceras del cliente
++
++Después de superar el perfil se usa una tabla fija:
++
++| Extensión | MIME persistido del servidor |
++|---|---|
++| .pdf | application/pdf |
++| .docx | application/vnd.openxmlformats-officedocument.wordprocessingml.document |
++| .xlsx | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet |
++| .jpg / .jpeg | image/jpeg |
++| .png | image/png |
++
++El Content-Type del cliente se normaliza sólo para comparar el tipo base; sus parámetros no se guardan ni ejecutan. Se aceptan ausente/vacío, application/octet-stream y binary/octet-stream si el contenido cumple el perfil. application/zip y application/x-zip-compressed sólo son genéricos aceptados para DOCX/XLSX que ya superaron la inspección. Aliases limitados: application/x-pdf, image/jpg, image/pjpeg e image/x-png. Todos se convierten al MIME canónico anterior.
++
++Una inconsistencia manifiesta, por ejemplo PDF con text/html o image/png declarado, produce422. El MIME no determina el detector ni se usa para saltar la comprobación de contenido. No se admiten nuevas extensiones ni se permite ZIP genérico mediante un MIME Office.
++
++La validación se inserta después de autorización de captura, nombre/extensión y límite existente, **antes de la fase de búsqueda de versiones, escritura y persistencia**. Las comprobaciones de autorización previas sí consultan DB en la aplicación real; las pruebas de frontera las sustituyen por dobles y no deben interpretarse como que toda solicitud rechazada evita cualquier acceso a DB o parsing multipart.
++
++## Descarga y versiones históricas
++
++Se conserva db.get(version), 404 si no existe, require_document_access para cada descarga y safe_version_path. Continúa attachment con el nombre original saneado por la carga; no se modifica la política de acceso por vínculo, el acceso a versiones anteriores o las bajas lógicas.
++
++Cabeceras/control nuevos:
++
++```text
++Content-Type: application/octet-stream
++Content-Disposition: attachment; filename=...  (construido por FileResponse)
++X-Content-Type-Options: nosniff
++Cache-Control: private, no-store
++```
++
++La API no puede distinguir una fila histórica con application/pdf de una recién reconocida sin un marcador de procedencia. Se elige MIME binario conservador **también para las nuevas versiones**, aunque su metadata guardada sea específica: es control del servidor y evita inferir validación a partir de un dato antiguo del cliente. No se releen/reparsean documentos históricos en cada descarga ni se incrementa ese coste para lectores. No se reescribe tipo_mime existente ni se altera SHA/archivo/historial.
++
++La [documentación de FileResponse](https://starlette.dev/responses/#fileresponse) permite MIME, filename y content_disposition_type explícitos. Las pruebas comprueban esos argumentos/cabeceras con dobles, no una respuesta HTTP real. private,no-store evita autorizar almacenamiento nuevo en caches compatibles; no borra descargas/caches históricas ni gobierna un proxy que sobrescriba cabeceras.
++
++Compatibilidad observada: frontend-ssalfer/js/api/documentos.js publica la URL de descarga y el cuerpo/nombre permanecen iguales. El cambio de MIME de descarga es intencional y documentado; debe probarse el comportamiento de navegadores/aplicaciones institucionales, descarga/range y cualquier visor externo. No se promete preview inline, que ya estaba fuera del contrato attachment.
++
++Etapa posterior: añadir, mediante diseño/migración nueva autorizada, un registro de evaluación asociado al SHA exacto, perfil/motor/versiones, fecha y estado de aprobación/cuarentena. Sólo una versión con procedencia verificable puede volver a ofrecer MIME específico en descarga bajo la política aprobada. La revisión de históricos debe ser independiente, acotada y auditable, sin reescribirlos automáticamente ni declarar confiables por fecha o MIME.
++
++## Integridad y controles que permanecen
++
++Los bytes recibidos se almacenan sin modificación; SHA-256 se calcula sobre el original. No hay recomposición de imágenes, normalización Office o sanitización PDF que cambie firmas/valor jurídico. La extensión permitida, nombre saneado, UUID/ruta por versión, verificación bajo upload_root y tamaño se conservan. La numeración concurrente, transacciones y compensación siguen exactamente como antes: SS-12 permanece pendiente.
++
++Los roles captura admin/operador y lectura de los cuatro roles permanecen; access.py no cambia. La lógica de documento compartido que acepta un vínculo legible no se rediseña ni se presenta como resuelta: SS-05 sigue su propio alcance. No se alteran migraciones, modelos, schemas, sesiones o auditoría funcional; sólo el MIME de **nuevas** DocumentoVersion se obtiene del servidor.
++
++## Pruebas ejecutadas
++
++Suite final:
++
++```sh
++python3 -B -m unittest discover -s tests/security -p 'test_*.py' -q
++# Ran 156 tests; OK (skipped=3)
++# 153 aprobadas; 28 nuevas SS-06 aprobadas
++```
++
++Los datos son sintéticos y pequeños: PDF mínimo con xref/trailer (590 bytes), PNG1x1 (69), JPEG baseline gris1x1 (137), DOCX mínimo (803) y XLSX mínimo (1320). /usr/bin/file --brief --mime-type - identificó respectivamente application/pdf, image/png, image/jpeg y los MIME OOXML canónicos. Sólo se enviaron esos bytes sintéticos por stdin a una herramienta local ya instalada, con PATH/LC_ALL mínimos y timeout; no hubo red ni ficheros institucionales. Identificación libmagic **no prueba renderizado/decodificación o ausencia de malware**, y la aplicación no la invoca.
++
++| Requisito | Evidencia aislada | Limitación |
++|---|---|---|
++| PDF válido de fixture / texto-HTML renombrado | Perfil de fixture aceptado; texto/HTML, cabecera sola, falta EOF/xref, offset fuera y truncamiento rechazados | No parser semántico; hay prueba que permite un objeto final sin comprobar tipo XRef |
++| PNG/JPEG | Firmas/estructura fixture aceptadas; CRC/longitudes/dimensiones/truncamiento/cabecera arbitraria rechazados | No pixels/entropía; IDAT no-zlib con CRC correcto pasa y se prueba como limitación |
++| DOCX/XLSX | Transitional/Strict, ZIP_STORED/DEFLATED, partes/tipos/relaciones y hojas internas | No esquema completo Office ni renderizado |
++| ZIP genérico / formato cruzado | Rechazo de ZIP sin partes y de DOCX↔XLSX | No implica desarme de archivos compatibles maliciosos |
++| Vacíos / tamaño | 413 y lectura máximo+1 conservada | No prueba body parser ni límite efectivo Nginx |
++| MIME | Genéricos/aliases aceptados con canon; incompatibles rechazados | Comportamiento de algunos clientes legacy exige QA |
++| ZIP/XML presupuestos | Rechazo previo a indexación, conteo EOCD mentiroso, tamaño individual/acumulado declarado y observado, CRC y directorio truncado | Límites bajos en fixtures, no bombas reales ni estrés |
++| Rutas ZIP / XML externo | Dot-segments, symlink y colisiones casefold rechazados; DTD/entidades UTF-8/UTF-16 rechazadas con open externo bloqueado en la prueba | Sin extracción ni resolución de enlaces; no pentest de parsers nativos |
++| MIME persistido | Cuerpo real de store_version con DB simulado, canonical_mime en nueva versión, hash/tamaño/bytes exactos | No persistencia PostgreSQL real |
++| Descarga | Canon binario, attachment/nosniff/cache, MIME histórico malicioso ignorado y fila no mutada | FileResponse/headers simulado; navegador/proxy pendiente |
++| Acceso | La llamada de autorización precede read/validación; captura/read conservados; 403/404 preservados | No se reproducen roles/joins en DB; funciones de acceso intactas por hash/AST |
++| Integridad de versiones | Duplicado409, escritura/hash/nombre/número y rollback/compensación originales con dobles | No carrera concurrente ni remediación SS-12 |
++| Regresiones previas | 125 pruebas previas aprobadas; tres nativas anteriores omitidas | No equivale a suites integradas institucionales |
++
++Las pruebas importan sólo el módulo stdlib y fixtures puros; extraen por AST funciones específicas de carga/descarga con modelos/Session/Request/FileResponse simulados. No ejecutan imports/top-level del engine/app ni conftest. La lectura y escritura de prueba usan un TemporaryDirectory propio eliminado al finalizar. El contenedor OOXML no se extrae, no hay subprocesos en el validador, no se emplea malware real, y los rechazos no incluyen bytes/nombres/datos del archivo en su detalle público.
++
++### Fixtures originales actualizados, sin cambiar assertions
++
++Se encontraron tres tests de integración que subían sólo b'%PDF-...' sin estructura: test_documents_dashboard.py, test_document_targets_039.py y test_frontend_read_models.py. Esos datos deben rechazarse con el nuevo perfil. Se cambió únicamente su construcción a minimal_pdf del helper puro backend/tests/_document_samples.py, conservando expectativas de permisos, SHA, duplicados, versión vigente y descarga. En el caso de dos versiones se mantiene contenido distinto por etiqueta para no alterar la deduplicación.
++
++Esas suites no se ejecutaron ni se importaron, pues conftest requiere/importa aplicación y DB de prueba autorizada. Se verificó sintaxis y se ejercitaron los fixtures mediante la suite aislada, sin PostgreSQL. No se dejan intencionalmente fixtures inválidos para aparentar que el test de aceptación de un PDF valida el formato.
++
++Omitidas: suites PostgreSQL documentales/read models, TestClient/Starlette reales, navegador, corpus Word/Excel/PDF e imágenes institucionales de QA, decodificadores, antivirus/CDR y ensayos de recursos bajo contención. Las tres omisiones automáticas de unittest son pruebas nativas SQLAlchemy/psycopg2 de SS-10; no se presentan como pruebas nativas documentales ejecutadas.
++
++## Riesgos residuales separados
++
++- **Macros/contenido activo/embebidos:** el MIME principal macro-enabled incompatible con DOCX/XLSX se rechaza, pero binarios VBA/OLE u objetos ocultos en un paquete que cumple el perfil no se analizan ni eliminan. Enlaces externos auxiliares se conservan sin resolverlos. No se declara «sin macros».
++- **JavaScript PDF y acciones:** no se inspeccionan objetos/acciones/formularios, adjuntos, launch, contenido remoto ni cifrado. Un PDF peligroso puede tener cabecera/xref/EOF normales.
++- **Malware estructuralmente válido:** ninguna firma, CRC o raíz XML detecta por sí sola malware. El hash sólo identifica bytes; no acredita autor o benignidad. Tampoco se valida criptográficamente firma digital/certificado del documento.
++- **Políglotas:** se rechazan algunos prefijos/trailers obvios, pero un atacante puede construir contenidos que cumplan varios perfiles o escondan payload dentro de streams/metadata/partes. No hay garantía universal contra políglotas.
++- **Integridad profunda:** CRC correcto puede acompañar IDAT/entropía/worksheet XML no interpretable. Se mantiene una prueba positiva de ese límite para no confundir reconocimiento con validación completa. Errores internos pueden aparecer al abrirlo con un cliente real.
++- **Descompresión/parsing complejo:** se leen hasta100MiB por OOXML, se tokeniza XML acotado y se mantienen metadatos en memoria. zipfile/zlib/Expat siguen procesando entrada no confiable en el proceso API; versiones/parches, memoria nativa y fallos del parser no quedan aislados por estos contadores. Contenedores anidados no se expanden ni analizan recursivamente.
++- **Disponibilidad:** store_version es async pero inspección/CRC/XML/hash/escritura son trabajo síncrono; pueden ocupar event loop y mantener contexto/conexión DB de autorización. No hay deadline duro, cgroups ni cuota global de inspecciones simultáneas. No se introduce un hilo improvisado ni se cambia la transacción de versiones. Requiere worker y presupuestos medidos.
++- **Memoria y límites de entrada:** el archivo ya se lee íntegro hasta el límite previo; BytesIO, buffer XML y objetos Expat tienen sobrecoste. El máximo por archivo/parte no es un límite RSS de toda la API. Un cliente puede consumir recursos del parser multipart antes de la validación del servicio; entrada/proxy/rate limiting deben verificarse aparte.
++- **Versiones históricas:** siguen pudiendo contener cualquier contenido que se aceptó antes. Se sirven como binario privado, no como «aprobadas»; no se revalidan ni desinfectan. Descargarlas y abrirlas puede ejecutar funciones de la aplicación cliente.
++- **SS-05/SS-12 y almacenamiento:** compartir permisos, numeración concurrente, TOCTOU del path/FileResponse, atomicidad DB/archivo y huérfanos conservan sus condiciones anteriores. No se anuncian resueltos por esta validación.
++
++La [guía OWASP de carga de archivos](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html) recomienda combinar tipos/firmas, almacenamiento y controles de contenido; no tomar Content-Type o cabeceras como prueba única de seguridad. Los [riesgos de descompresión zipfile](https://docs.python.org/3/library/zipfile.html#decompression-pitfalls) sustentan presupuestos previos y observados; no proporcionan aislamiento del proceso por sí mismos.
++
++## Recomendación posterior: cuarentena y worker documental
++
++Diseñar un worker por trabajo, separado de API, sin credenciales de DB/sesiones, UID no privilegiado y filesystem privado con entrada read-only. Mantener bloqueado el acceso a red del parser y montajes ajenos, limitar RAM/CPU/PID/disco/tiempo, cancelar/recolectar el trabajo completo y validar una salida de metadatos acotada vinculada al SHA original. Reutilizar los criterios del diseño SS-02 etapa2, sin conceder al parser facultades de backend o administración Docker.
++
++Incorporar parsers/decodificadores mantenidos para PDF/imágenes/OOXML, antivirus con actualización controlada y, según política institucional, CDR. No enviar expedientes a servicios externos sin autorización. Registrar estado de cuarentena/evaluación por hash con versiones de motor/definiciones/perfil, resultados y actor/fecha. Distinguir «recibido», «formato reconocido» y «aprobado para entrega»; un fallo debe permanecer en cuarentena, sin publicar un éxito silencioso.
++
++Esa etapa exige diseño de esquema/contratos/UX y autorización independiente antes de imponer retención de descarga o reclasificar históricos. No modificar la política de vínculos SS-05 como efecto lateral. Si CDR produce bytes distintos, conservar el original inmutable y crear derivado/versionado explícito con procedencia: no sobrescribir un documento firmado ni afirmar que su firma original sigue validando el derivado.
++
++## Aceptación requerida en QA desechable
++
++1. Ejecutar pruebas nativas de documentos, targets y read models en PostgreSQL QA autorizado, verificando upload201, MIME canónico persistido, bytes/SHA, duplicado409 y rollback/cleanup sin alterar permisos o eventos. Ensayar cuatro roles y documentos compartidos sólo según la política vigente.
++2. Usar corpus legítimo sintético/QA autorizado: PDF incremental/linealizado/firmado/cifrado, PNG profundidades/interlace/ancillary, JPEG baseline/progresivo/Exif, DOCX/XLSX Strict/Transitional con imágenes/tablas/gráficos/firmas y tamaños reales. Clasificar falsos rechazos del perfil antes de decidir nuevas capacidades; no aceptar por extensión para evitarlos.
++3. Comprobar HTTP FileResponse real: attachment con nombre saneado/Unicode, MIME binario uniforme, nosniff y private,no-store en200/206, y tras proxies. Probar descarga nueva/histórica, 404/403, enlaces SSALFER y apertura por aplicaciones aprobadas. No afirmar que nosniff impide toda ejecución al abrir un archivo descargado.
++4. Medir tiempo/RSS/CPU/latencia/event loop y uso de conexiones durante inspecciones acotadas/concurrentes en un sandbox desechable. Ajustar cuotas, proxy/body multipart, worker y rate limiting con esos datos; no realizar estrés institucional.
++5. Inventariar versiones y parches reales de Python/Expat/zlib, controles del contenedor y ACL/retención de almacenamiento. Probar fallos y límites con datasets sintéticos pequeños; pruebas más hostiles requieren aislamiento fuerte independiente.
++6. Aprobar el flujo de cuarentena/AV/CDR y la procedencia de evaluación antes de habilitar MIME específico por versión o revisar históricos. Revisiones/migraciones de datos se autorizan por separado; esta entrega no las realiza.
++
++## Archivos modificados y patch exclusivo
++
++| Archivo | Cambio |
++|---|---|
++| backend/app/services/documents.py | Validación antes de la fase de versión/escritura y MIME canónico nuevo |
++| backend/app/routers/documents.py | Descarga binaria conservadora y cabeceras seguras |
++| backend/app/services/document_validation.py | Nuevo: reconocimiento y presupuestos acotados |
++| docker-compose.yml | Ocho variables de inspección, sin alterar correcciones previas |
++| backend/tests/_document_samples.py | Nuevo: fixtures mínimos stdlib |
++| backend/tests/test_documents_dashboard.py | Sólo fixture PDF e import del helper |
++| backend/tests/test_document_targets_039.py | Sólo fixture PDF e import del helper |
++| backend/tests/test_frontend_read_models.py | Sólo fixtures PDF distintos por versión e import |
++| tests/security/test_document_validation.py | Nuevo: 28 pruebas aisladas |
++| docs/security/SS-06-ETAPA1-CORRECCION-2026-10-28.md | Nuevo: este informe |
++| docs/security/SS-06-ETAPA1-CORRECCION-2026-10-28.patch | Nuevo: diff exclusivo |
++
++El patch compara contra los snapshots locales **anteriores a SS-06**, comprobados por SHA, no contra el árbol HEAD sin correcciones. Así no mezcla los cambios previos del Compose ni reescribe SS-01/02/03/04/10/11. Incluye los tres archivos nuevos de implementación/fixtures/pruebas y este informe; no se incluye a sí mismo. No debe aplicarse como sustituto de las remediaciones anteriores.
++
++Comprobaciones: git diff --check, AST/YAML sin interpolación de .env y git apply --reverse --check --whitespace=error-all, sin aplicar ni revertir el parche. Hashes finales de implementación/pruebas:
++
++| Archivo | SHA-256 |
++|---|---|
++| backend/app/services/documents.py | `a78f36cf21be48b03526741f5b5f4f7cdb9fa469d7def62b15597248eb386c9b` |
++| backend/app/routers/documents.py | `2ad8106a2c6b94384b633efc01555457e5222179b4b3644617c14a85e6372e56` |
++| docker-compose.yml | `c8ff985a99895e92ee3b8189fe96a83e7e353fe1e7af383d7a4841ec3514e0b6` |
++| backend/tests/test_documents_dashboard.py | `09667044b9fe5f6f2ceaa4a55c532d2d409ef08c122dabd943c0ae32a1bfee09` |
++| backend/tests/test_document_targets_039.py | `71627685a865ed5701f6f09807505b8b8b871e671b3c8eca31b6ba14c9360265` |
++| backend/tests/test_frontend_read_models.py | `22cb1fedc535fefda07f2156b05944ca16e7b8d6f507bfa9e47629107e035b68` |
++| backend/app/services/document_validation.py | `ca81df595d85419406d7f7a00ad6a90499ff1bbc1dfd332cdb5d249f3f6a277c` |
++| backend/tests/_document_samples.py | `2f65ec5f698d0f639e9eaa887b73f5ccae824394b27c1b2e153795be662f37ad` |
++| tests/security/test_document_validation.py | `89abfe5e512d455b1cb2dba269e7994c9963fd7afb2d0521831e7ffce70268ad` |
++
++El [diff completo y revisable](SS-06-ETAPA1-CORRECCION-2026-10-28.patch) contiene exactamente esta intervención. Extracto de los dos puntos de integración en archivos preexistentes:
++
++```diff
++diff --git a/backend/app/services/documents.py b/backend/app/services/documents.py
++--- a/backend/app/services/documents.py
+++++ b/backend/app/services/documents.py
++@@ -13,6 +13,7 @@
++ from .. import models, schemas
++ from .access import require_document_access, require_document_target_access
++ from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_context
+++from .document_validation import DocumentValidationError, validate_document
++ 
++ 
++ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png"}
++@@ -162,6 +163,11 @@
++     content = await upload.read(MAX_UPLOAD_BYTES + 1)
++     if not content or len(content) > MAX_UPLOAD_BYTES:
++         raise HTTPException(status_code=413, detail="Archivo vacío o demasiado grande")
+++    try:
+++        canonical_mime = validate_document(content, extension, upload.content_type,
+++            max_file_bytes=MAX_UPLOAD_BYTES)
+++    except DocumentValidationError as exc:
+++        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
++     digest = hashlib.sha256(content).hexdigest()
++     previous = db.query(models.DocumentoVersion).filter(
++         models.DocumentoVersion.id_documento == document_id,
++@@ -189,7 +195,7 @@
++         tamano_bytes=len(content),
++         nombre_original=original,
++         ruta_almacenamiento=str(relative),
++-        tipo_mime=upload.content_type,
+++        tipo_mime=canonical_mime,
++         id_usuario_carga=user.id_usuario,
++     )
++     db.add(version)
++diff --git a/backend/app/routers/documents.py b/backend/app/routers/documents.py
++--- a/backend/app/routers/documents.py
+++++ b/backend/app/routers/documents.py
++@@ -8,6 +8,7 @@
++ from ..database import get_db
++ from ..services import documents as service
++ from ..services.document_read_models import consolidated_documents
+++from ..services.document_validation import download_media_type
++ from ..services.access import (
++     require_document_access,
++     require_document_target_access,
++@@ -194,7 +195,9 @@
++     return FileResponse(
++         service.safe_version_path(version),
++         filename=version.nombre_original,
++-        media_type=version.tipo_mime or "application/octet-stream",
+++        media_type=download_media_type(),
+++        content_disposition_type="attachment",
+++        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"},
++     )
++ 
++ 
++```
++
++**Intervención detenida para revisión técnica.** No se inicia worker/antivirus/CDR ni otra remediación, no se modifica producción y no se integra o despliega esta corrección.

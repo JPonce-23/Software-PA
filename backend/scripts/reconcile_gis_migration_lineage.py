@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import re
 import sys
+from uuid import uuid4
 
 import psycopg2
 from psycopg2 import sql
@@ -174,7 +175,8 @@ def main():
         print(json.dumps(execute(connection,apply=args.apply,expected_database=args.expected_database),indent=2,default=str))
         return 0
     except Exception as exc:
-        print('ABORTADO: '+str(exc),file=sys.stderr)
+        code = ('GIS_COMMIT_UNCERTAIN' if isinstance(exc, CommitUncertain) else 'GIS_LINEAGE_FAILED')
+        print(f'ABORTADO [{code}] correlacion={uuid4().hex}; verificar estado en solo lectura',file=sys.stderr)
         return 1
     finally:
         if connection:connection.close()

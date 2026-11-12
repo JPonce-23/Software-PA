@@ -1,0 +1,11 @@
+{
+  "autorizacion": "QA-PENDIENTE",
+  "clon_verificado": false,
+  "database": "ss07_qa_clon",
+  "server_addr": "127.0.0.1",
+  "server_port": 55432,
+  "cluster_marker": "ss07_qa_desechable",
+  "inspector": "ss07_inspector_qa",
+  "runtime": "ss07_runtime_qa",
+  "migrator": "ss07_migrator_qa"
+}

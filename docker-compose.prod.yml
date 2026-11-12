@@ -1,71 +1,67 @@
+# Explicit selection: base + ssalfer + prod. Requires Compose >= 2.24.4
+# (!reset removes inherited host ports). Never combine with the dev override.
 services:
+  db:
+    ports: !reset []
+    command: ["postgres", "-c", "max_connections=60", "-c", "shared_buffers=128MB", "-c", "work_mem=4MB", "-c", "maintenance_work_mem=64MB"]
+    mem_limit: 1g
+  pgadmin:
+    profiles: ["admin-tools"]
+    ports: !reset []
   backend:
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "${BACKEND_WORKERS:-2}", "--no-proxy-headers"]
+    ports: !reset []
+    user: "10001:10001"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-proxy-headers", "--log-config", "/app/logging.json", "--no-access-log"]
     environment:
       APP_ENV: production
       AUTH_COOKIE_SECURE: "true"
-      CORS_ORIGINS: https://${PUBLIC_HOST:?Define la IP publica o dominio sin esquema ni ruta}
-      AUTH_TRUSTED_PROXY_IPS: ${TLS_PROXY_IP:-172.30.84.2}
-    networks:
-      default:
-      tls_backend:
-        aliases: [backend_secure]
-
+      CORS_ORIGINS: https://${PUBLIC_HOST:?Define el dominio público sin esquema ni puerto}
+      AUTH_TRUSTED_PROXY_IPS: ${TLS_PROXY_IP:-172.30.85.2}
+      # Fixed publication contract: UI, API and both proxies agree.
+      MAX_UPLOAD_BYTES: "26214400"
+      IMPORT_MAX_FILE_SIZE_MB: "100"
+    mem_limit: 2g
+    pids_limit: 160
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+  frontend_ssalfer:
+    ports: !reset []
   tls_proxy:
     build:
       context: ./deploy/tls
     restart: unless-stopped
     environment:
-      PUBLIC_HOST: ${PUBLIC_HOST:?Define la IP publica o dominio sin esquema ni ruta}
+      PUBLIC_HOST: ${PUBLIC_HOST:?Define el dominio público sin esquema ni puerto}
       NGINX_ENVSUBST_FILTER: ^PUBLIC_HOST$
-    ports:
-      - "80:80"
-      - "443:443"
+    ports: ["80:80", "443:443"]
     volumes:
       - tls_certificates:/etc/letsencrypt:ro
       - acme_challenges:/var/www/certbot:ro
     networks:
       default:
-      tls_backend:
-        ipv4_address: ${TLS_PROXY_IP:-172.30.84.2}
+        ipv4_address: ${TLS_PROXY_IP:-172.30.85.2}
+      ingress:
     depends_on:
       frontend_ssalfer:
         condition: service_started
       backend:
         condition: service_healthy
-    security_opt:
-      - no-new-privileges:true
-
-  acme_http:
-    image: nginx:1.27-alpine
-    profiles: ["certificate-bootstrap"]
-    ports:
-      - "80:80"
-    volumes:
-      - ./deploy/tls/bootstrap.conf:/etc/nginx/conf.d/default.conf:ro
-      - acme_challenges:/var/www/certbot:ro
-
-  certbot:
-    image: certbot/certbot:v5.4.0
-    profiles: ["certificate-tools"]
-    volumes:
-      - tls_certificates:/etc/letsencrypt
-      - acme_challenges:/var/www/certbot
-
-  certificate_renewal:
-    image: certbot/certbot:v5.4.0
-    restart: unless-stopped
-    entrypoint: /bin/sh
-    command: ["-c", "while :; do certbot renew --non-interactive --webroot -w /var/www/certbot; sleep 43200; done"]
-    volumes:
-      - tls_certificates:/etc/letsencrypt
-      - acme_challenges:/var/www/certbot
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options:
+        max-size: ${DOCKER_LOG_MAX_SIZE:-10m}
+        max-file: ${DOCKER_LOG_MAX_FILES:-3}
 
 networks:
-  tls_backend:
+  default:
+    internal: true
     ipam:
       config:
-        - subnet: ${TLS_PROXY_SUBNET:-172.30.84.0/24}
+        - subnet: ${PROD_INTERNAL_SUBNET:-172.30.85.0/24}
+          # Dynamic service addresses must exclude the trusted edge address.
+          ip_range: ${PROD_INTERNAL_DYNAMIC_RANGE:-172.30.85.128/25}
+  ingress:
 
 volumes:
   tls_certificates:

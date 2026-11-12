@@ -47,7 +47,7 @@ backend/check_schema.py
 backend/extract.py
 ssalfer-deploy.bundle
 
-# Artefactos privados y secretos locales
+# Selected PR #5 exclusions; QA sources remain trackable.
 outputs/
 .qa-backups/
 *.env.local
@@ -55,7 +55,3 @@ outputs/
 *.key
 *.dump
 *.backup
-frontend-ssalfer/deploy/*.png
-frontend-ssalfer/deploy/*.jpg
-frontend-ssalfer/deploy/*.json
-frontend-ssalfer/deploy/*.cjs

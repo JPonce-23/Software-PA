@@ -3,6 +3,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
@@ -47,6 +48,9 @@ def _database_session_factory():
             database=_required_env("DB_NAME"),
         ),
         pool_pre_ping=True,
+        hide_parameters=True,
+        echo=False,
+        echo_pool=False,
     )
     return sessionmaker(autocommit=False, autoflush=False, bind=owner_engine), owner_engine
 
@@ -191,6 +195,9 @@ def create_admin() -> None:
 if __name__ == "__main__":
     try:
         create_admin()
-    except BootstrapError as exc:
-        print(f"No se creó el administrador: {exc}", file=sys.stderr)
+    except BootstrapError:
+        print(f"ERROR [ADMIN_CONFIGURATION_ERROR] correlacion={uuid4().hex}", file=sys.stderr)
+        raise SystemExit(1)
+    except Exception:
+        print(f"ERROR [ADMIN_OPERATION_FAILED] correlacion={uuid4().hex}", file=sys.stderr)
         raise SystemExit(1)

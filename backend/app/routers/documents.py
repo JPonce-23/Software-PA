@@ -1,7 +1,8 @@
 """Document metadata, controlled links and immutable versions."""
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from uuid import UUID
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile
+from ..services.document_download import DescriptorDownloadResponse
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -174,14 +175,22 @@ def list_versions(
 )
 async def upload_version(
     id_documento: int,
+    response: Response,
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(auth.RoleChecker(CAPTURE_ROLES)),
+    idempotency_key: UUID | None = Header(default=None, alias="Idempotency-Key"),
 ):
-    return await service.store_version(db, id_documento, archivo, user)
+    version = await service.store_version(db, id_documento, archivo, user,
+        idempotency_key=idempotency_key)
+    response.status_code = 200 if version._idempotency_replayed else 201
+    response.headers["Idempotency-Key"] = version._idempotency_key
+    response.headers["Idempotency-Replayed"] = str(version._idempotency_replayed).lower()
+    response.headers["X-Document-Operation-Id"] = version._upload_operation_id
+    return version
 
 
-@router.get("/documentos/versiones/{id_version}/descarga")
+@router.api_route("/documentos/versiones/{id_version}/descarga", methods=["GET", "HEAD"])
 def download_version(
     id_version: int,
     db: Session = Depends(get_db),
@@ -191,10 +200,12 @@ def download_version(
     if version is None:
         raise HTTPException(status_code=404, detail="Versión no encontrada")
     require_document_access(db, user, version.id_documento)
-    return FileResponse(
-        service.safe_version_path(version),
+    return DescriptorDownloadResponse(
+        relative=version.ruta_almacenamiento,
+        document_id=version.id_documento,
+        size=version.tamano_bytes,
+        sha256=version.hash_sha256,
         filename=version.nombre_original,
-        media_type=version.tipo_mime or "application/octet-stream",
     )
 
 

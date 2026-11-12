@@ -1,0 +1,279 @@
+-- SS-07: plantilla de metadatos. No ejecutar sin preparación y aprobación QA.
+-- No lee tablas funcionales, cuerpos SQL ni valores de secuencias.
+
+-- Q00 Identidades esperadas/observadas; sólo configuración segura
+SELECT current_user AS inspector_current, session_user AS inspector_session,
+ pg_catalog.current_database() AS database_name,
+ pg_catalog.current_setting('server_version_num') AS server_version_num,
+ pg_catalog.current_setting('search_path') AS inspector_search_path,
+ @@RUNTIME@@ <> @@MIGRATOR@@ AS runtime_migrator_distintos,
+ EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = @@RUNTIME@@) AS runtime_existe,
+ EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = @@MIGRATOR@@) AS migrator_existe,
+ EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'software_pa_app') AS contrato_existe;
+
+-- Q01 Atributos visibles; nunca password/hash
+SELECT oid, rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin,
+ rolreplication, rolbypassrls, rolconnlimit
+FROM pg_catalog.pg_roles ORDER BY rolname;
+
+-- Q02 Aristas de membresía, grantor y ADMIN OPTION PG15
+SELECT parent.rolname AS parent_role, member.rolname AS member_role,
+ grantor.rolname AS grantor_role, m.admin_option
+FROM pg_catalog.pg_auth_members m
+JOIN pg_catalog.pg_roles parent ON parent.oid=m.roleid
+JOIN pg_catalog.pg_roles member ON member.oid=m.member
+JOIN pg_catalog.pg_roles grantor ON grantor.oid=m.grantor
+ORDER BY parent.rolname, member.rolname;
+
+-- Q03 Membresía transitiva vs privilegios inmediatamente heredables
+WITH identidades AS (
+ SELECT r.oid, r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@, @@MIGRATOR@@, 'software_pa_app', current_user)
+    OR r.oid = (SELECT d.datdba FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+)
+
+SELECT i.rolname AS identity_role, r.rolname AS reachable_role,
+ pg_catalog.pg_has_role(i.oid,r.oid,'MEMBER') AS member,
+ pg_catalog.pg_has_role(i.oid,r.oid,'USAGE') AS immediately_available
+FROM identidades i CROSS JOIN pg_catalog.pg_roles r
+WHERE pg_catalog.pg_has_role(i.oid,r.oid,'MEMBER') OR r.rolsuper
+ORDER BY i.rolname,r.rolname;
+
+-- Q04 Bases y capacidades CONNECT/CREATE/TEMP; ACL estructural
+WITH identidades AS (
+ SELECT r.oid, r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@, @@MIGRATOR@@, 'software_pa_app', current_user)
+    OR r.oid = (SELECT d.datdba FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+)
+
+SELECT i.rolname, d.datname, pg_catalog.pg_get_userbyid(d.datdba) AS owner_role,
+ d.datallowconn, d.datistemplate, d.datacl,
+ pg_catalog.has_database_privilege(i.oid,d.oid,'CONNECT') AS can_connect,
+ pg_catalog.has_database_privilege(i.oid,d.oid,'CREATE') AS can_create,
+ pg_catalog.has_database_privilege(i.oid,d.oid,'TEMPORARY') AS can_temp,
+ pg_catalog.pg_has_role(i.oid,d.datdba,'USAGE') AS owner_role_available
+FROM identidades i CROSS JOIN pg_catalog.pg_database d ORDER BY i.rolname,d.datname;
+
+-- Q05 Schemas, PUBLIC y CREATE; fuera de aplicación también
+WITH identidades AS (
+ SELECT r.oid, r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@, @@MIGRATOR@@, 'software_pa_app', current_user)
+    OR r.oid = (SELECT d.datdba FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+)
+
+SELECT i.rolname,n.nspname,pg_catalog.pg_get_userbyid(n.nspowner) AS owner_role,n.nspacl,
+ pg_catalog.has_schema_privilege(i.oid,n.oid,'USAGE') AS can_usage,
+ pg_catalog.has_schema_privilege(i.oid,n.oid,'CREATE') AS can_create,
+ pg_catalog.pg_has_role(i.oid,n.nspowner,'USAGE') AS owner_role_available
+FROM identidades i CROSS JOIN pg_catalog.pg_namespace n
+WHERE n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+ORDER BY i.rolname,n.nspname;
+
+-- Q06 Objetos relacionales/propietarios/ACL/RLS sin leer filas
+SELECT n.nspname,c.relname,c.relkind,pg_catalog.pg_get_userbyid(c.relowner) AS owner_role,
+ c.relacl,c.relrowsecurity,c.relforcerowsecurity,c.relpersistence,
+ (SELECT e.extname FROM pg_catalog.pg_depend d JOIN pg_catalog.pg_extension e ON e.oid=d.refobjid
+  WHERE d.classid='pg_catalog.pg_class'::pg_catalog.regclass AND d.objid=c.oid
+   AND d.refclassid='pg_catalog.pg_extension'::pg_catalog.regclass AND d.deptype='e' LIMIT 1) AS extension_name
+FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+WHERE c.relkind IN ('r','p','v','m','f','S')
+ AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+ORDER BY n.nspname,c.relkind,c.relname;
+
+-- Q07 Privilegios efectivos tablas/vistas y capacidad por ownership
+WITH identidades AS (
+ SELECT r.oid, r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@, @@MIGRATOR@@, 'software_pa_app', current_user)
+    OR r.oid = (SELECT d.datdba FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+)
+
+SELECT i.rolname,n.nspname,c.relname,c.relkind,
+ pg_catalog.has_table_privilege(i.oid,c.oid,'SELECT') AS can_select,
+ pg_catalog.has_table_privilege(i.oid,c.oid,'INSERT') AS can_insert,
+ pg_catalog.has_table_privilege(i.oid,c.oid,'UPDATE') AS can_update,
+ pg_catalog.has_table_privilege(i.oid,c.oid,'DELETE') AS can_delete,
+ pg_catalog.has_table_privilege(i.oid,c.oid,'TRUNCATE') AS can_truncate,
+ pg_catalog.has_table_privilege(i.oid,c.oid,'REFERENCES') AS can_references,
+ pg_catalog.has_table_privilege(i.oid,c.oid,'TRIGGER') AS can_trigger,
+ pg_catalog.pg_has_role(i.oid,c.relowner,'USAGE') AS owner_role_available,
+ pg_catalog.has_table_privilege(i.oid,c.oid,'SELECT WITH GRANT OPTION') AS grant_select,
+ pg_catalog.has_table_privilege(i.oid,c.oid,'UPDATE WITH GRANT OPTION') AS grant_update
+FROM identidades i CROSS JOIN pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+WHERE c.relkind IN ('r','p','v','m','f') AND n.nspname NOT IN ('pg_catalog','information_schema')
+ AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+ORDER BY i.rolname,n.nspname,c.relname;
+
+-- Q08 ACL de columnas y derechos efectivos incluso sin grant de tabla
+WITH identidades AS (
+ SELECT r.oid, r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@, @@MIGRATOR@@, 'software_pa_app', current_user)
+    OR r.oid = (SELECT d.datdba FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+)
+
+SELECT i.rolname,n.nspname,c.relname,a.attname,a.attacl,
+ pg_catalog.has_column_privilege(i.oid,c.oid,a.attnum,'SELECT') AS can_select,
+ pg_catalog.has_column_privilege(i.oid,c.oid,a.attnum,'INSERT') AS can_insert,
+ pg_catalog.has_column_privilege(i.oid,c.oid,a.attnum,'UPDATE') AS can_update,
+ pg_catalog.has_column_privilege(i.oid,c.oid,a.attnum,'REFERENCES') AS can_references
+FROM identidades i CROSS JOIN pg_catalog.pg_attribute a
+JOIN pg_catalog.pg_class c ON c.oid=a.attrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+WHERE a.attnum>0 AND NOT a.attisdropped AND a.attacl IS NOT NULL
+ AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+ORDER BY i.rolname,n.nspname,c.relname,a.attnum;
+
+-- Q09 Secuencias: ACL/USAGE/SELECT/UPDATE; sin last_value/nextval
+WITH identidades AS (
+ SELECT r.oid, r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@, @@MIGRATOR@@, 'software_pa_app', current_user)
+    OR r.oid = (SELECT d.datdba FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+)
+
+SELECT i.rolname,n.nspname,c.relname,pg_catalog.pg_get_userbyid(c.relowner) AS owner_role,c.relacl,
+ pg_catalog.has_sequence_privilege(i.oid,c.oid,'USAGE') AS can_usage,
+ pg_catalog.has_sequence_privilege(i.oid,c.oid,'SELECT') AS can_select,
+ pg_catalog.has_sequence_privilege(i.oid,c.oid,'UPDATE') AS can_update,
+ pg_catalog.pg_has_role(i.oid,c.relowner,'USAGE') AS owner_role_available
+FROM identidades i CROSS JOIN pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+WHERE c.relkind='S' AND n.nspname NOT IN ('pg_catalog','information_schema')
+ORDER BY i.rolname,n.nspname,c.relname;
+
+-- Q10 Asociación secuencia-columna serial/identity por dependencia
+SELECT ns.nspname AS sequence_schema,s.relname AS sequence_name,
+ nt.nspname AS table_schema,t.relname AS table_name,a.attname,d.deptype
+FROM pg_catalog.pg_depend d JOIN pg_catalog.pg_class s ON s.oid=d.objid AND s.relkind='S'
+JOIN pg_catalog.pg_namespace ns ON ns.oid=s.relnamespace
+JOIN pg_catalog.pg_class t ON t.oid=d.refobjid JOIN pg_catalog.pg_namespace nt ON nt.oid=t.relnamespace
+JOIN pg_catalog.pg_attribute a ON a.attrelid=t.oid AND a.attnum=d.refobjsubid
+WHERE d.classid='pg_catalog.pg_class'::pg_catalog.regclass
+ AND d.refclassid='pg_catalog.pg_class'::pg_catalog.regclass AND d.deptype IN ('a','i')
+ORDER BY ns.nspname,s.relname;
+
+-- Q11 Rutinas por OID/firma, ownership, SECURITY DEFINER y EXECUTE
+WITH identidades AS (
+ SELECT r.oid, r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@, @@MIGRATOR@@, 'software_pa_app', current_user)
+    OR r.oid = (SELECT d.datdba FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+)
+
+SELECT i.rolname,n.nspname,p.proname,p.oid,p.proargtypes,p.prorettype,p.prokind,
+ pg_catalog.pg_get_userbyid(p.proowner) AS owner_role,p.prosecdef,p.proacl,l.lanname,
+ ARRAY(SELECT cfg FROM pg_catalog.unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%') AS search_path_configuration,
+ pg_catalog.has_function_privilege(i.oid,p.oid,'EXECUTE') AS can_execute,
+ pg_catalog.pg_has_role(i.oid,p.proowner,'USAGE') AS owner_role_available,
+ EXISTS (SELECT 1 FROM pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) x
+  WHERE x.grantee=0 AND x.privilege_type='EXECUTE') AS public_execute
+FROM identidades i CROSS JOIN pg_catalog.pg_proc p
+JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace JOIN pg_catalog.pg_language l ON l.oid=p.prolang
+WHERE n.nspname NOT IN ('pg_catalog','information_schema')
+ORDER BY i.rolname,n.nspname,p.proname,p.oid;
+
+-- Q12 ACL existentes expandidas incluidas por defecto implícito
+WITH objetos AS (
+ SELECT 'relation' AS kind,n.nspname,c.relname AS name,c.relowner AS owner_oid,
+ COALESCE(c.relacl,pg_catalog.acldefault(CASE WHEN c.relkind='S' THEN 'S'::"char" ELSE 'r'::"char" END,c.relowner)) AS acl
+ FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+ WHERE c.relkind IN ('r','p','v','m','f','S')
+ UNION ALL
+ SELECT 'schema',n.nspname,n.nspname,n.nspowner,COALESCE(n.nspacl,pg_catalog.acldefault('n',n.nspowner)) FROM pg_catalog.pg_namespace n
+ UNION ALL
+ SELECT 'routine',n.nspname,p.proname,p.proowner,COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))
+ FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+)
+SELECT o.kind,o.nspname,o.name,pg_catalog.pg_get_userbyid(o.owner_oid) AS owner_role,
+ x.grantor,x.grantee,x.privilege_type,x.is_grantable
+FROM objetos o CROSS JOIN LATERAL pg_catalog.aclexplode(o.acl) x
+WHERE o.nspname NOT IN ('pg_catalog','information_schema') AND o.nspname NOT LIKE 'pg_toast%' AND o.nspname NOT LIKE 'pg_temp_%'
+ORDER BY o.kind,o.nspname,o.name,x.grantee,x.privilege_type;
+
+-- Q13 Default ACL por creador/esquema; cero filas no implica denegación
+SELECT pg_catalog.pg_get_userbyid(d.defaclrole) AS creator_role,
+ n.nspname,d.defaclobjtype,x.grantor,x.grantee,x.privilege_type,x.is_grantable
+FROM pg_catalog.pg_default_acl d LEFT JOIN pg_catalog.pg_namespace n ON n.oid=d.defaclnamespace
+CROSS JOIN LATERAL pg_catalog.aclexplode(d.defaclacl) x
+ORDER BY creator_role,n.nspname,d.defaclobjtype,x.grantee,x.privilege_type;
+
+-- Q14 Triggers declarados/habilitados y función invocada; sin ejecutar
+SELECT n.nspname,c.relname,t.tgname,t.tgenabled,t.tgisinternal,t.tgdeferrable,t.tginitdeferred,
+ pn.nspname AS function_schema,p.proname,p.oid AS function_oid,p.prosecdef,
+ pg_catalog.pg_get_userbyid(p.proowner) AS function_owner
+FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class c ON c.oid=t.tgrelid
+JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid JOIN pg_catalog.pg_namespace pn ON pn.oid=p.pronamespace
+WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+ORDER BY n.nspname,c.relname,t.tgname;
+
+-- Q15 Extensiones/objetos miembros; no ejecuta funciones de extensión
+SELECT e.extname,e.extversion,pg_catalog.pg_get_userbyid(e.extowner) AS owner_role,
+ n.nspname,e.extrelocatable,d.classid,d.objid,d.objsubid
+FROM pg_catalog.pg_extension e JOIN pg_catalog.pg_namespace n ON n.oid=e.extnamespace
+LEFT JOIN pg_catalog.pg_depend d ON d.refobjid=e.oid
+ AND d.refclassid='pg_catalog.pg_extension'::pg_catalog.regclass AND d.deptype='e'
+ORDER BY e.extname,d.classid,d.objid,d.objsubid;
+
+-- Q16 Dependencias de vistas y función/objetos; sólo OIDs estructurales
+SELECT n.nspname,c.relname,r.rulename,d.refclassid,d.refobjid,d.refobjsubid,d.deptype,
+ c.reloptions
+FROM pg_catalog.pg_rewrite r JOIN pg_catalog.pg_class c ON c.oid=r.ev_class
+JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+JOIN pg_catalog.pg_depend d ON d.classid='pg_catalog.pg_rewrite'::pg_catalog.regclass AND d.objid=r.oid
+WHERE c.relkind IN ('v','m') AND n.nspname NOT IN ('pg_catalog','information_schema')
+ORDER BY n.nspname,c.relname,d.refclassid,d.refobjid,d.refobjsubid;
+
+-- Q17 Sólo search_path de configuración de rol/base, sin otras opciones
+SELECT s.setrole,s.setdatabase,
+ ARRAY(SELECT cfg FROM pg_catalog.unnest(s.setconfig) cfg WHERE cfg LIKE 'search_path=%') AS search_path_configuration
+FROM pg_catalog.pg_db_role_setting s ORDER BY s.setrole,s.setdatabase;
+
+-- Q18 Políticas RLS: existencia/roles/comandos; no expresiones ni datos
+SELECT n.nspname,c.relname,p.polname,p.polcmd,p.polpermissive,p.polroles
+FROM pg_catalog.pg_policy p JOIN pg_catalog.pg_class c ON c.oid=p.polrelid
+JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace ORDER BY n.nspname,c.relname,p.polname;
+
+-- Q19 Tipos y lenguajes requeridos por firmas/extensiones
+WITH identidades AS (
+ SELECT r.oid, r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@, @@MIGRATOR@@, 'software_pa_app', current_user)
+    OR r.oid = (SELECT d.datdba FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+)
+
+SELECT i.rolname,n.nspname,t.typname,pg_catalog.pg_get_userbyid(t.typowner) AS owner_role,
+ t.typacl,pg_catalog.has_type_privilege(i.oid,t.oid,'USAGE') AS can_usage
+FROM identidades i CROSS JOIN pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace
+WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+ORDER BY i.rolname,n.nspname,t.typname;
+
+-- Q20 Lenguajes: USAGE no equivale a permiso de CREATE schema
+WITH identidades AS (
+ SELECT r.oid, r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@, @@MIGRATOR@@, 'software_pa_app', current_user)
+    OR r.oid = (SELECT d.datdba FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+)
+
+SELECT i.rolname,l.lanname,l.lanpltrusted,pg_catalog.pg_get_userbyid(l.lanowner) AS owner_role,
+ l.lanacl,pg_catalog.has_language_privilege(i.oid,l.oid,'USAGE') AS can_usage
+FROM identidades i CROSS JOIN pg_catalog.pg_language l ORDER BY i.rolname,l.lanname;
+
+-- Q21 EXECUTE de rutinas administrativas pg_catalog; no invocarlas
+WITH identidades AS (
+ SELECT r.oid,r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@,@@MIGRATOR@@,'software_pa_app',current_user)
+)
+SELECT i.rolname,p.proname,p.oid,p.proargtypes,p.prosecdef,
+ pg_catalog.has_function_privilege(i.oid,p.oid,'EXECUTE') AS can_execute
+FROM identidades i CROSS JOIN pg_catalog.pg_proc p
+JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+WHERE n.nspname='pg_catalog' AND p.proname IN
+ ('pg_read_file','pg_read_binary_file','pg_ls_dir','pg_stat_file','pg_ls_logdir','lo_import','lo_export',
+  'pg_terminate_backend','pg_cancel_backend','pg_reload_conf','pg_rotate_logfile','pg_log_backend_memory_contexts')
+ORDER BY i.rolname,p.proname,p.oid;
+
+-- Q22 ACL de parámetros PG15, sin valores de configuración
+WITH identidades AS (
+ SELECT r.oid,r.rolname FROM pg_catalog.pg_roles r
+ WHERE r.rolname IN (@@RUNTIME@@,@@MIGRATOR@@,'software_pa_app',current_user)
+)
+SELECT i.rolname,p.parname,p.paracl,
+ pg_catalog.has_parameter_privilege(i.oid,p.parname,'SET') AS can_set,
+ pg_catalog.has_parameter_privilege(i.oid,p.parname,'ALTER SYSTEM') AS can_alter_system
+FROM identidades i CROSS JOIN pg_catalog.pg_parameter_acl p
+ORDER BY i.rolname,p.parname;

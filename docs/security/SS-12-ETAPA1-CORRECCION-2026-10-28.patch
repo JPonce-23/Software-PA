@@ -1,0 +1,1361 @@
+diff --git a/backend/app/services/documents.py b/backend/app/services/documents.py
+--- a/backend/app/services/documents.py
++++ b/backend/app/services/documents.py
+@@ -3,7 +3,6 @@
+ import hashlib
+ import os
+ import re
+-import uuid
+ from pathlib import Path
+ 
+ from fastapi import HTTPException, UploadFile
+@@ -14,6 +13,7 @@
+ from .access import require_document_access, require_document_target_access
+ from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_context
+ from .document_validation import DocumentValidationError, validate_document
++from .document_storage import DocumentStorageError, stage_document, storage_event
+ 
+ 
+ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png"}
+@@ -175,40 +175,48 @@
+     ).first()
+     if previous is not None:
+         raise HTTPException(status_code=409, detail="Esta versión ya fue cargada")
+-    next_version = (
+-        db.query(func.coalesce(func.max(models.DocumentoVersion.numero_version), 0))
+-        .filter(models.DocumentoVersion.id_documento == document_id)
+-        .scalar()
+-        + 1
+-    )
+-    relative = Path(str(document_id)) / f"{next_version:04d}-{uuid.uuid4().hex}{extension}"
+-    destination = (upload_root() / relative).resolve()
+-    if upload_root() not in destination.parents:
+-        raise HTTPException(status_code=422, detail="Ruta documental no válida")
+-    destination.parent.mkdir(parents=True, exist_ok=True)
+-    destination.write_bytes(content)
+-    set_audit_context(db, user.id_usuario)
+-    version = models.DocumentoVersion(
+-        id_documento=document_id,
+-        numero_version=next_version,
+-        hash_sha256=digest,
+-        tamano_bytes=len(content),
+-        nombre_original=original,
+-        ruta_almacenamiento=str(relative),
+-        tipo_mime=canonical_mime,
+-        id_usuario_carga=user.id_usuario,
+-    )
+-    db.add(version)
+-    try:
+-        db.commit()
+-    except Exception as exc:
++    try:
++        root = upload_root()
++    except OSError as exc:
+         db.rollback()
+-        destination.unlink(missing_ok=True)
+-        raise HTTPException(
+-            status_code=409, detail="No fue posible registrar la versión"
+-        ) from exc
+-    db.refresh(version)
+-    return version
++        raise HTTPException(status_code=507, detail="No fue posible completar el almacenamiento documental.") from exc
++    try:
++        with stage_document(root, document_id, content, digest) as staged:
++            # Parent-row serialization is pending PostgreSQL QA. Existing unique
++            # constraints remain the last defense; no process-local mutex/retry.
++            next_version = (
++                db.query(func.coalesce(func.max(models.DocumentoVersion.numero_version), 0))
++                .filter(models.DocumentoVersion.id_documento == document_id)
++                .scalar() + 1
++            )
++            relative = Path(str(document_id)) / f"{next_version:04d}-{staged.operation_id}{extension}"
++            staged.publish(relative.name)
++            try:
++                set_audit_context(db, user.id_usuario)
++                version = models.DocumentoVersion(
++                    id_documento=document_id,
++                    numero_version=next_version,
++                    hash_sha256=digest,
++                    tamano_bytes=len(content),
++                    nombre_original=original,
++                    ruta_almacenamiento=str(relative),
++                    tipo_mime=canonical_mime,
++                    id_usuario_carga=user.id_usuario,
++                )
++                db.add(version)
++                db.commit()
++            except BaseException as exc:
++                storage_event('DOCUMENT_REGISTRATION_UNCONFIRMED', staged.operation_id)
++                db.rollback()
++                if not isinstance(exc, Exception):
++                    raise
++                raise HTTPException(status_code=409,
++                    detail="No fue posible confirmar el registro de la versión; consulte el historial antes de reintentar.") from exc
++            db.refresh(version)
++            return version
++    except DocumentStorageError as exc:
++        db.rollback()
++        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+ 
+ 
+ def safe_version_path(version: models.DocumentoVersion) -> Path:
+diff --git a/tests/security/test_document_validation.py b/tests/security/test_document_validation.py
+--- a/tests/security/test_document_validation.py
++++ b/tests/security/test_document_validation.py
+@@ -22,6 +22,7 @@
+ sys.path.insert(0, str(ROOT / 'backend'))
+ sys.path.insert(0, str(ROOT / 'backend/tests'))
+ from app.services import document_validation as validator
++from app.services import document_storage as storage
+ from _document_samples import minimal_pdf, minimal_png, minimal_jpeg, png_chunk, office_parts, package, CT, RELS, OFFICE
+ 
+ 
+@@ -227,6 +228,8 @@
+         ALLOWED_EXTENSIONS={'.pdf', '.docx', '.xlsx', '.jpg', '.jpeg', '.png'}, MAX_UPLOAD_BYTES=65536,
+         models=SimpleNamespace(DocumentoVersion=Version), require_document_access=MagicMock(),
+         set_audit_context=MagicMock(), HTTPException=HTTPError,
++        DocumentStorageError=storage.DocumentStorageError, stage_document=storage.stage_document,
++        storage_event=MagicMock(),
+         DocumentValidationError=validator.DocumentValidationError, validate_document=validator.validate_document)
+     future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
+     exec(compile(ast.fix_missing_locations(ast.Module(body=[future, *nodes], type_ignores=[])), 'isolated_documents', 'exec'), ns)
+@@ -285,7 +288,12 @@
+         self.db.commit.side_effect = RuntimeError('SS06 SYNTH DRIVER DETAIL')
+         with self.assertRaises(HTTPError) as caught: self.upload(minimal_pdf())
+         self.assertEqual(caught.exception.status_code, 409)
+-        self.assertEqual(list(Path(self.directory.name).rglob('*.pdf')), [])
++        # SS-12: commit may already have succeeded when its response is lost.
++        # Preserve the published file; only this operation's staging is cleaned.
++        retained = list(Path(self.directory.name).rglob('*.pdf'))
++        self.assertEqual(len(retained), 1)
++        self.assertEqual(retained[0].read_bytes(), minimal_pdf())
++        self.assertEqual(list(Path(self.directory.name).rglob('.pending-*')), [])
+         self.db.rollback.assert_called_once()
+ 
+     def download(self, version, denied=False):
+diff --git a/backend/app/services/document_storage.py b/backend/app/services/document_storage.py
+new file mode 100644
+index 0000000..7ff24c0
+--- /dev/null
++++ b/backend/app/services/document_storage.py
+@@ -0,0 +1,211 @@
++"""Private staging and no-replace publication on a trusted POSIX filesystem.
++
++Published names are NEVER removed by compensation: DB commit can be ambiguous.
++This is not a DB/filesystem transaction or protection from a compromised UID.
++"""
++
++import errno
++import hashlib
++import hmac
++import logging
++import os
++from pathlib import Path
++import re
++import stat
++import uuid
++
++from ..safe_logging import DiagnosticEvent
++
++
++class DocumentStorageError(Exception):
++    def __init__(self, code, detail='No fue posible preparar o publicar el archivo documental.', status=409):
++        self.code, self.detail, self.status = code, detail, status
++        super().__init__(detail)
++
++
++def storage_event(code, operation_id):
++    # Only server-generated operation ID and static codes; never path/exception.
++    event = DiagnosticEvent(category='document_storage', code=code, component='documents',
++        correlation_id=operation_id, method=None, route=None, status=None, response_complete=None)
++    logging.getLogger('ssalfer.diagnostics').error('document_storage',
++        extra={'safe_event': event}, exc_info=False, stack_info=False)
++
++
++def _identity(info):
++    return info.st_dev, info.st_ino
++
++
++def _io_code(error):
++    return {errno.ENOSPC: 'DOCUMENT_STORAGE_FULL', errno.EDQUOT: 'DOCUMENT_STORAGE_QUOTA',
++            errno.EACCES: 'DOCUMENT_STORAGE_PERMISSIONS', errno.EPERM: 'DOCUMENT_STORAGE_PERMISSIONS',
++            errno.EXDEV: 'DOCUMENT_STORAGE_CROSS_DEVICE', errno.ELOOP: 'DOCUMENT_STORAGE_SYMLINK'}.get(
++                error.errno, 'DOCUMENT_STORAGE_IO')
++
++
++def _directory_flags():
++    if not all(hasattr(os, flag) for flag in ('O_NOFOLLOW', 'O_DIRECTORY', 'O_CLOEXEC')):
++        raise DocumentStorageError('DOCUMENT_STORAGE_UNSUPPORTED', status=503)
++    return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
++
++
++def _open_root(root):
++    root = Path(root)
++    if not root.is_absolute() or len(root.parts) <= 1 or '..' in root.parts:
++        raise DocumentStorageError('DOCUMENT_STORAGE_ROOT_INVALID')
++    fd = os.open('/', _directory_flags())
++    try:
++        for part in root.parts[1:]:
++            child = os.open(part, _directory_flags(), dir_fd=fd)
++            os.close(fd); fd = child
++        return fd
++    except BaseException:
++        os.close(fd)
++        raise
++
++
++class StagedDocument:
++    def __init__(self, root, document_id, content, digest):
++        if type(document_id) is not int or document_id <= 0:
++            raise DocumentStorageError('DOCUMENT_STORAGE_ID_INVALID')
++        self.root, self.document_name = Path(root), str(document_id)
++        self.content, self.digest = content, digest
++        self.operation_id = uuid.uuid4().hex
++        self.stage_name = '.pending-' + self.operation_id
++        self.root_fd = self.document_fd = self.stage_fd = self.file_fd = None
++        self.stage_identity = self.file_identity = None
++        self.created_stage = False
++        self.published_name = None
++
++    def __enter__(self):
++        try:
++            self.root_fd = _open_root(self.root)
++            if os.fstat(self.root_fd).st_mode & stat.S_IWOTH:
++                raise DocumentStorageError('DOCUMENT_STORAGE_PUBLIC_ROOT')
++            try:
++                os.mkdir(self.document_name, mode=0o700, dir_fd=self.root_fd)
++            except FileExistsError:
++                pass
++            self.document_fd = os.open(self.document_name, _directory_flags(), dir_fd=self.root_fd)
++            if os.fstat(self.document_fd).st_mode & stat.S_IWOTH:
++                raise DocumentStorageError('DOCUMENT_STORAGE_PUBLIC_DIRECTORY')
++            # mkdir is exclusive. On collision, never adopt/delete that directory.
++            try:
++                os.mkdir(self.stage_name, mode=0o700, dir_fd=self.document_fd)
++            except FileExistsError as exc:
++                raise DocumentStorageError('DOCUMENT_STAGING_COLLISION') from exc
++            self.created_stage = True
++            stage_entry = os.stat(self.stage_name, dir_fd=self.document_fd, follow_symlinks=False)
++            if not stat.S_ISDIR(stage_entry.st_mode):
++                raise DocumentStorageError('DOCUMENT_STAGING_CHANGED')
++            self.stage_identity = _identity(stage_entry)
++            self.stage_fd = os.open(self.stage_name, _directory_flags(), dir_fd=self.document_fd)
++            if _identity(os.fstat(self.stage_fd)) != self.stage_identity:
++                raise DocumentStorageError('DOCUMENT_STAGING_CHANGED')
++            self.file_fd = os.open('payload', os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
++                mode=0o600, dir_fd=self.stage_fd)
++            self.file_identity = _identity(os.fstat(self.file_fd))
++            remaining = memoryview(self.content)
++            while remaining:
++                written = os.write(self.file_fd, remaining[:65536])
++                if written <= 0:
++                    raise OSError(errno.EIO, 'Incomplete document write')
++                remaining = remaining[written:]
++            os.fsync(self.file_fd)
++            os.lseek(self.file_fd, 0, os.SEEK_SET)
++            observed, checksum = 0, hashlib.sha256()
++            while block := os.read(self.file_fd, min(65536, len(self.content) - observed + 1)):
++                observed += len(block)
++                if observed > len(self.content):
++                    raise DocumentStorageError('DOCUMENT_STORAGE_SIZE_CHANGED')
++                checksum.update(block)
++            if observed != len(self.content) or not hmac.compare_digest(checksum.hexdigest(), self.digest):
++                raise DocumentStorageError('DOCUMENT_STORAGE_HASH_MISMATCH')
++            os.fsync(self.stage_fd)
++            return self
++        except OSError as exc:
++            storage_event(_io_code(exc), self.operation_id)
++            self.close()
++            raise DocumentStorageError('DOCUMENT_STORAGE_IO', status=507) from exc
++        except BaseException:
++            self.close()
++            raise
++
++    def publish(self, name):
++        try:
++            self._publish(name)
++        except OSError as exc:
++            storage_event(_io_code(exc), self.operation_id)
++            raise DocumentStorageError('DOCUMENT_STORAGE_IO', status=507) from exc
++
++    def _publish(self, name):
++        if self.published_name is not None:
++            raise DocumentStorageError('DOCUMENT_STORAGE_ALREADY_PUBLISHED')
++        match = re.fullmatch(r'([0-9]{4,})-[0-9a-f]{32}\.(?:pdf|docx|xlsx|jpe?g|png)', name)
++        if not match or int(match.group(1)) <= 0:
++            raise DocumentStorageError('DOCUMENT_STORAGE_NAME_INVALID')
++        current = os.stat(self.document_name, dir_fd=self.root_fd, follow_symlinks=False)
++        if not stat.S_ISDIR(current.st_mode) or _identity(current) != _identity(os.fstat(self.document_fd)):
++            raise DocumentStorageError('DOCUMENT_STORAGE_DIRECTORY_CHANGED')
++        source = os.stat('payload', dir_fd=self.stage_fd, follow_symlinks=False)
++        if not stat.S_ISREG(source.st_mode) or _identity(source) != self.file_identity:
++            raise DocumentStorageError('DOCUMENT_STORAGE_SOURCE_CHANGED')
++        try:
++            os.link('payload', name, src_dir_fd=self.stage_fd, dst_dir_fd=self.document_fd, follow_symlinks=False)
++        except FileExistsError as exc:
++            raise DocumentStorageError('DOCUMENT_STORAGE_COLLISION') from exc
++        # From here on, retain the final entry, even if verification/fsync/DB fails.
++        self.published_name = name
++        published = os.stat(name, dir_fd=self.document_fd, follow_symlinks=False)
++        if not stat.S_ISREG(published.st_mode) or _identity(published) != self.file_identity:
++            raise DocumentStorageError('DOCUMENT_STORAGE_PUBLISHED_CHANGED')
++        os.fsync(self.document_fd)
++        os.fsync(self.root_fd)  # Persist a newly created document directory too.
++
++    def close(self):
++        failure = self.created_stage and self.stage_identity is None
++        # Pin the inode until unlink completes; never delete an entry that was
++        # substituted. Do not scan/rmtree a directory or unlink any published name.
++        if self.file_fd is not None and self.stage_fd is not None:
++            try:
++                entry = os.stat('payload', dir_fd=self.stage_fd, follow_symlinks=False)
++                if stat.S_ISREG(entry.st_mode) and _identity(entry) == self.file_identity:
++                    os.unlink('payload', dir_fd=self.stage_fd)
++                else:
++                    failure = True
++            except FileNotFoundError:
++                pass
++            except OSError:
++                failure = True
++        for attribute in ('file_fd',):
++            fd = getattr(self, attribute)
++            if fd is not None:
++                setattr(self, attribute, None)
++                try: os.close(fd)
++                except OSError: failure = True
++        if self.created_stage and self.stage_identity is not None and self.document_fd is not None:
++            try:
++                entry = os.stat(self.stage_name, dir_fd=self.document_fd, follow_symlinks=False)
++                if stat.S_ISDIR(entry.st_mode) and _identity(entry) == self.stage_identity:
++                    os.rmdir(self.stage_name, dir_fd=self.document_fd)
++                    os.fsync(self.document_fd)
++                else:
++                    failure = True
++            except FileNotFoundError:
++                pass
++            except OSError:
++                failure = True
++        for attribute in ('stage_fd', 'document_fd', 'root_fd'):
++            fd = getattr(self, attribute)
++            if fd is not None:
++                setattr(self, attribute, None)
++                try: os.close(fd)
++                except OSError: failure = True
++        if failure:
++            storage_event('DOCUMENT_STAGING_CLEANUP_INCOMPLETE', self.operation_id)
++
++    def __exit__(self, exc_type, exc_value, traceback):
++        self.close()
++
++
++def stage_document(root, document_id, content, digest):
++    return StagedDocument(root, document_id, content, digest)
+diff --git a/tests/security/test_document_storage.py b/tests/security/test_document_storage.py
+new file mode 100644
+index 0000000..bd38815
+--- /dev/null
++++ b/tests/security/test_document_storage.py
+@@ -0,0 +1,352 @@
++"""SS-12: real POSIX operations on owned temporary files; synthetic DB doubles.
++
++No PostgreSQL, server, Docker, migrations or institutional files. Child Python
++processes below run only this pure storage module on tiny synthetic payloads.
++"""
++
++import asyncio
++from concurrent.futures import ThreadPoolExecutor
++import errno
++import hashlib
++import io
++import json
++import logging
++import os
++from pathlib import Path
++import subprocess
++import sys
++import tempfile
++import threading
++import time
++import unittest
++from unittest.mock import MagicMock, patch
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / 'backend'))
++from app.services import document_storage as storage
++from app.safe_logging import SafeJSONFormatter
++from test_document_validation import service_functions, minimal_pdf
++
++
++def digest(data): return hashlib.sha256(data).hexdigest()
++NAME = '0001-' + 'a' * 32 + '.pdf'
++
++
++class StorageTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
++        self.root = Path(self.temp.name)
++        self.real_event = storage.storage_event
++        self.events = patch.object(storage, 'storage_event'); self.event = self.events.start(); self.addCleanup(self.events.stop)
++
++    def stage(self, data=b'SS12 tiny synthetic complete bytes', doc=7):
++        return storage.stage_document(self.root, doc, data, digest(data))
++
++    def assert_clean(self): self.assertEqual(list(self.root.rglob('.pending-*')), [])
++
++    def test_private_complete_file_hash_fsync_publication_and_cleanup(self):
++        data = b'SS12 original\x00\xff bytes'
++        with self.stage(data) as staged:
++            owned_fds = [staged.root_fd, staged.document_fd, staged.stage_fd, staged.file_fd]
++            self.assertFalse((self.root / '7' / NAME).exists())
++            self.assertEqual(os.fstat(staged.file_fd).st_mode & 0o777, 0o600)
++            self.assertEqual(os.fstat(staged.stage_fd).st_mode & 0o777, 0o700)
++            staged.publish(NAME)
++            self.assertEqual((self.root / '7' / NAME).read_bytes(), data)
++            self.assertEqual(os.stat(self.root / '7' / NAME).st_ino, os.fstat(staged.file_fd).st_ino)
++        final = self.root / '7' / NAME
++        self.assertEqual(digest(final.read_bytes()), digest(data)); self.assertEqual(final.stat().st_nlink, 1)
++        self.assert_clean(); self.assertIsNone(staged.root_fd); self.assertIsNone(staged.file_fd)
++        for fd in owned_fds:
++            with self.assertRaises(OSError): os.fstat(fd)
++
++    def test_existing_file_and_symlink_never_overwritten_or_deleted(self):
++        document = self.root / '7'; document.mkdir()
++        foreign = self.root / 'foreign'; foreign.write_bytes(b'foreign')
++        for symlink in [False, True]:
++            target = document / NAME
++            if target.exists() or target.is_symlink(): target.unlink()
++            if symlink: target.symlink_to(foreign)
++            else: target.write_bytes(b'existing')
++            with self.stage() as staged:
++                with self.assertRaises(storage.DocumentStorageError) as error: staged.publish(NAME)
++                self.assertEqual(error.exception.code, 'DOCUMENT_STORAGE_COLLISION')
++            self.assertEqual(foreign.read_bytes(), b'foreign')
++            self.assertEqual(target.read_bytes(), b'foreign' if symlink else b'existing')
++            self.assert_clean()
++
++    def test_partial_os_writes_are_completed_and_zero_write_is_rejected(self):
++        real_write = os.write
++        def partial_write(fd, data):
++            self.assertFalse((self.root / '7' / NAME).exists())
++            return real_write(fd, data[:3])
++        with patch.object(storage.os, 'write', side_effect=partial_write):
++            with self.stage(b'1234567890') as staged: staged.publish(NAME)
++        self.assertEqual((self.root / '7' / NAME).read_bytes(), b'1234567890')
++        with patch.object(storage.os, 'write', return_value=0):
++            with self.assertRaises(storage.DocumentStorageError):
++                with self.stage(doc=8): pass
++        self.assert_clean()
++
++    def test_failure_or_cancel_during_write_flush_and_hash_removes_only_private_stage(self):
++        foreign = self.root / 'foreign'; foreign.write_bytes(b'preserved')
++        for function, error in [('write', OSError(errno.ENOSPC, 'synthetic full disk')),
++                ('write', PermissionError('synthetic')), ('write', asyncio.CancelledError()),
++                ('fsync', OSError(errno.EIO, 'synthetic')), ('fsync', asyncio.CancelledError()),
++                ('read', OSError(errno.EIO, 'synthetic'))]:
++            with self.subTest(function=function, kind=type(error).__name__), patch.object(storage.os, function, side_effect=error):
++                with self.assertRaises((storage.DocumentStorageError, asyncio.CancelledError)):
++                    with self.stage(): pass
++            self.assert_clean(); self.assertEqual(list((self.root / '7').glob('*.pdf')), [])
++            self.assertEqual(foreign.read_bytes(), b'preserved')
++
++    def test_readback_hash_mismatch_rejects_before_publication(self):
++        with self.assertRaises(storage.DocumentStorageError) as error:
++            with storage.stage_document(self.root, 7, b'abc', '0' * 64): pass
++        self.assertEqual(error.exception.code, 'DOCUMENT_STORAGE_HASH_MISMATCH')
++        self.assert_clean(); self.assertEqual(list((self.root / '7').glob('*.pdf')), [])
++
++    def test_root_document_symlinks_escape_and_world_write_are_rejected(self):
++        real = self.root / 'real'; real.mkdir()
++        link = self.root / 'link'; link.symlink_to(real, target_is_directory=True)
++        with self.assertRaises(storage.DocumentStorageError):
++            with storage.stage_document(link, 7, b'a', digest(b'a')): pass
++        (self.root / '7').symlink_to(real, target_is_directory=True)
++        with self.assertRaises(storage.DocumentStorageError):
++            with self.stage(): pass
++        self.assertEqual(list(real.iterdir()), [])
++        with self.assertRaises(storage.DocumentStorageError):
++            with storage.stage_document('/', 7, b'a', digest(b'a')): pass
++        for doc in [-1, True, '../x']:
++            with self.assertRaises(storage.DocumentStorageError): self.stage(doc=doc)
++        (self.root / '7').unlink(); self.root.chmod(0o777)
++        try:
++            with self.assertRaises(storage.DocumentStorageError):
++                with self.stage(): pass
++        finally: self.root.chmod(0o700)
++
++    def test_stage_collision_does_not_adopt_or_clean_existing_directory(self):
++        doc = self.root / '7'; doc.mkdir()
++        stage = doc / ('.pending-' + 'b' * 32); stage.mkdir(); (stage / 'foreign').write_bytes(b'foreign')
++        with patch.object(storage.uuid, 'uuid4', return_value=type('Token', (), {'hex': 'b' * 32})()):
++            with self.assertRaises(storage.DocumentStorageError):
++                with self.stage(): pass
++        self.assertEqual((stage / 'foreign').read_bytes(), b'foreign')
++
++    def test_invalid_publication_names_and_double_publication_rejected(self):
++        with self.stage() as staged:
++            for name in ['../outside.pdf', '/absolute.pdf', '0000-' + 'a' * 32 + '.pdf', 'client.pdf']:
++                with self.assertRaises(storage.DocumentStorageError): staged.publish(name)
++            staged.publish(NAME)
++            with self.assertRaises(storage.DocumentStorageError): staged.publish(NAME)
++        self.assert_clean()
++
++    def test_source_substitution_is_detected_and_foreign_entry_is_not_deleted(self):
++        foreign = self.root / 'foreign'; foreign.write_bytes(b'foreign')
++        with self.stage() as staged:
++            original = self.root / '7' / staged.stage_name / 'payload'
++            original.unlink(); original.symlink_to(foreign)
++            with self.assertRaises(storage.DocumentStorageError): staged.publish(NAME)
++        self.assertTrue(original.is_symlink()); self.assertEqual(foreign.read_bytes(), b'foreign')
++        self.event.assert_called_with('DOCUMENT_STAGING_CLEANUP_INCOMPLETE', staged.operation_id)
++
++    def test_document_directory_substitution_does_not_redirect_publication_or_cleanup(self):
++        with self.stage() as staged:
++            (self.root / '7').rename(self.root / 'old-document')
++            (self.root / '7').mkdir()
++            foreign = self.root / '7' / NAME; foreign.write_bytes(b'foreign')
++            with self.assertRaises(storage.DocumentStorageError) as error: staged.publish(NAME)
++            self.assertEqual(error.exception.code, 'DOCUMENT_STORAGE_DIRECTORY_CHANGED')
++        self.assertEqual(foreign.read_bytes(), b'foreign'); self.assert_clean()
++
++    def test_cleanup_permission_error_keeps_publication_and_reports_incomplete_cleanup(self):
++        staged = self.stage().__enter__(); staged.publish(NAME)
++        with patch.object(storage.os, 'unlink', side_effect=PermissionError('synthetic cleanup denial')):
++            staged.close()
++        self.assertTrue((self.root / '7' / NAME).is_file())
++        self.assertIsNone(staged.root_fd); self.assertIsNone(staged.file_fd)
++        self.event.assert_called_with('DOCUMENT_STAGING_CLEANUP_INCOMPLETE', staged.operation_id)
++
++    def test_abrupt_child_exit_documents_partial_stage_and_published_orphan_windows(self):
++        script = '''import hashlib, os, pathlib, sys
++from app.services.document_storage import stage_document
++root=pathlib.Path(sys.argv[1]); phase=sys.argv[2]; name=sys.argv[3]; data=b'SS12 tiny crash fixture'
++if phase=='partial':
++ original=os.write
++ def partial(fd, content):
++  original(fd,content[:3]); os._exit(17)
++ os.write=partial
++with stage_document(root,7,data,hashlib.sha256(data).hexdigest()) as staged:
++ if phase=='published': staged.publish(name)
++ os._exit(17)
++'''
++        env = {'PATH': '/usr/bin:/bin', 'PYTHONPATH': str(ROOT / 'backend'), 'LC_ALL': 'C.UTF-8'}
++        for phase in ['partial', 'staged', 'published']:
++            root = self.root / phase; root.mkdir()
++            result = subprocess.run([sys.executable, '-B', '-c', script, str(root), phase, NAME],
++                env=env, capture_output=True, timeout=5)
++            self.assertEqual((result.returncode, result.stderr), (17, b''))
++            payloads = list(root.rglob('payload')); self.assertEqual(len(payloads), 1)
++            self.assertEqual(payloads[0].read_bytes(), b'SS1' if phase == 'partial' else b'SS12 tiny crash fixture')
++            final = root / '7' / NAME
++            self.assertEqual(final.exists(), phase == 'published')
++            if final.exists(): self.assertEqual(final.read_bytes(), b'SS12 tiny crash fixture')
++
++    def test_unexpected_foreign_stage_content_is_never_recursively_removed(self):
++        with self.stage() as staged:
++            foreign = self.root / '7' / staged.stage_name / 'foreign'
++            foreign.write_bytes(b'foreign')
++        self.assertEqual(foreign.read_bytes(), b'foreign')
++        self.event.assert_called_with('DOCUMENT_STAGING_CLEANUP_INCOMPLETE', staged.operation_id)
++
++    def test_failed_hardlink_has_no_copy_or_replace_fallback(self):
++        with self.stage() as staged, patch.object(storage.os, 'link', side_effect=OSError(errno.EXDEV, 'synthetic')):
++            with self.assertRaises(storage.DocumentStorageError): staged.publish(NAME)
++        self.assert_clean(); self.assertFalse((self.root / '7' / NAME).exists())
++
++    def test_directory_fsync_failure_after_link_retains_published_entry(self):
++        with self.stage() as staged:
++            with patch.object(storage.os, 'fsync', side_effect=OSError(errno.EIO, 'synthetic')):
++                with self.assertRaises(storage.DocumentStorageError): staged.publish(NAME)
++        self.assertTrue((self.root / '7' / NAME).is_file()); self.assert_clean()
++
++    def test_exception_after_publication_retains_final_and_closes_staging(self):
++        with self.assertRaises(RuntimeError):
++            with self.stage() as staged:
++                staged.publish(NAME)
++                raise RuntimeError('synthetic after publication')
++        self.assertTrue((self.root / '7' / NAME).is_file()); self.assert_clean()
++
++    def test_storage_diagnostics_use_final_safe_format_without_paths_or_exception_text(self):
++        stream = io.StringIO(); handler = logging.StreamHandler(stream); handler.setFormatter(SafeJSONFormatter())
++        logger = logging.getLogger('ssalfer.diagnostics')
++        old = (logger.handlers, logger.level, logger.propagate, logger.disabled)
++        try:
++            logger.handlers = [handler]; logger.setLevel(logging.ERROR); logger.propagate = False; logger.disabled = False
++            failure = OSError(errno.ENOSPC, 'SS12_SECRET_SYNTHETIC', str(self.root / 'private-client-name'))
++            self.real_event(storage._io_code(failure), 'a' * 32)
++        finally:
++            logger.handlers, level, logger.propagate, logger.disabled = old; logger.setLevel(level)
++        output = stream.getvalue(); event = json.loads(output)
++        self.assertEqual((event['code'], event['component'], event['correlation_id']),
++            ('DOCUMENT_STORAGE_FULL', 'documents', 'a' * 32))
++        self.assertNotIn('SS12_SECRET_SYNTHETIC', output); self.assertNotIn(str(self.root), output)
++
++    def test_simultaneous_threads_use_exclusive_publication_without_mutex(self):
++        barrier = threading.Barrier(2)
++        def worker(value):
++            with self.stage(value) as staged:
++                barrier.wait(timeout=5)
++                try: staged.publish(NAME); return 'ok'
++                except storage.DocumentStorageError as error: return error.code
++        with ThreadPoolExecutor(max_workers=2) as pool:
++            results = list(pool.map(worker, [b'complete-A', b'complete-B']))
++        self.assertEqual(sorted(results), ['DOCUMENT_STORAGE_COLLISION', 'ok'])
++        self.assertIn((self.root / '7' / NAME).read_bytes(), [b'complete-A', b'complete-B'])
++        self.assert_clean()
++
++    def test_independent_documents_do_not_share_a_process_lock(self):
++        barrier = threading.Barrier(2)
++        def worker(doc):
++            with self.stage(str(doc).encode(), doc) as staged:
++                barrier.wait(timeout=5); staged.publish(NAME)
++        with ThreadPoolExecutor(max_workers=2) as pool: list(pool.map(worker, [7, 8]))
++        self.assertEqual((self.root / '7' / NAME).read_bytes(), b'7')
++        self.assertEqual((self.root / '8' / NAME).read_bytes(), b'8'); self.assert_clean()
++
++    def test_separate_python_processes_share_the_same_exclusive_filesystem_rule(self):
++        script = '''import hashlib, pathlib, sys, time
++from app.services.document_storage import stage_document, DocumentStorageError
++root=pathlib.Path(sys.argv[1]); tag=sys.argv[2]; data=('complete-'+tag).encode()
++with stage_document(root,7,data,hashlib.sha256(data).hexdigest()) as staged:
++ (root/('ready-'+tag)).write_text('ready')
++ deadline=time.monotonic()+5
++ while not (root/'go').exists():
++  if time.monotonic()>deadline: raise RuntimeError('synthetic barrier timeout')
++  time.sleep(.005)
++ try: staged.publish(sys.argv[3]); print('ok')
++ except DocumentStorageError as error: print(error.code)
++'''
++        env = {'PATH': '/usr/bin:/bin', 'PYTHONPATH': str(ROOT / 'backend'), 'LC_ALL': 'C.UTF-8'}
++        children = []
++        try:
++            for tag in ['A', 'B']:
++                children.append(subprocess.Popen([sys.executable, '-B', '-c', script, str(self.root), tag, NAME],
++                    env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True))
++            deadline = time.monotonic() + 5
++            while not all((self.root / ('ready-' + tag)).exists() for tag in ['A', 'B']):
++                self.assertLess(time.monotonic(), deadline)
++                time.sleep(.005)
++            (self.root / 'go').write_text('go')
++            results = []
++            for child in children:
++                output, errors = child.communicate(timeout=5)
++                self.assertEqual((child.returncode, errors), (0, '')); results.append(output.strip())
++            self.assertEqual(sorted(results), ['DOCUMENT_STORAGE_COLLISION', 'ok'])
++            self.assertIn((self.root / '7' / NAME).read_bytes(), [b'complete-A', b'complete-B'])
++            self.assert_clean()
++        finally:
++            for child in children:
++                if child.poll() is None: child.kill(); child.communicate(timeout=5)
++
++
++class ServiceFailureTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
++        self.root = Path(self.temp.name)
++        self.env = patch.dict(os.environ, {'UPLOAD_ROOT': str(self.root)}, clear=True)
++        self.env.start(); self.addCleanup(self.env.stop)
++        self.ns = service_functions(); self.user = type('User', (), {'id_usuario': 3})()
++        self.db = MagicMock(); query = self.db.query.return_value
++        query.filter.return_value = query; query.first.return_value = None; query.scalar.return_value = 0
++
++    def upload(self):
++        async def read(size): return minimal_pdf()
++        upload = type('Upload', (), {'filename': 'synthetic.pdf', 'content_type': 'application/pdf'})()
++        upload.read = read
++        return asyncio.run(self.ns['store_version'](self.db, 7, upload, self.user))
++
++    def test_lost_commit_ack_never_deletes_potentially_committed_bytes(self):
++        committed = []
++        def commit():
++            committed.append(self.db.add.call_args.args[0])
++            raise RuntimeError('SS12 synthetic lost COMMIT response')
++        self.db.commit.side_effect = commit
++        with self.assertRaises(Exception) as caught: self.upload()
++        self.assertEqual(caught.exception.status_code, 409)
++        self.assertIn('consulte el historial', caught.exception.detail)
++        self.assertEqual(len(committed), 1)
++        path = self.root / committed[0].ruta_almacenamiento
++        self.assertEqual(path.read_bytes(), minimal_pdf())
++        self.assertEqual(digest(path.read_bytes()), committed[0].hash_sha256)
++        self.assertEqual(list(self.root.rglob('.pending-*')), [])
++        self.db.rollback.assert_called_once()
++
++    def test_cancel_during_commit_retains_file_rolls_back_and_propagates(self):
++        self.db.commit.side_effect = asyncio.CancelledError()
++        with self.assertRaises(asyncio.CancelledError): self.upload()
++        self.assertEqual(len(list(self.root.rglob('*.pdf'))), 1)
++        self.assertEqual(list(self.root.rglob('.pending-*')), []); self.db.rollback.assert_called_once()
++
++    def test_refresh_failure_after_commit_and_rollback_failure_do_not_delete_file(self):
++        self.db.refresh.side_effect = RuntimeError('synthetic HTTP failure after commit')
++        with self.assertRaises(RuntimeError): self.upload()
++        self.assertEqual(len(list(self.root.rglob('*.pdf'))), 1)
++        self.assertEqual(list(self.root.rglob('.pending-*')), [])
++        self.db.refresh.side_effect = None
++        self.db.commit.side_effect = RuntimeError('synthetic commit')
++        self.db.rollback.side_effect = RuntimeError('synthetic rollback')
++        with self.assertRaises(RuntimeError): self.upload()
++        self.assertEqual(len(list(self.root.rglob('*.pdf'))), 2)
++        self.assertEqual(list(self.root.rglob('.pending-*')), [])
++
++    def test_storage_error_rejects_before_record_commit(self):
++        with patch.object(storage.os, 'write', side_effect=OSError(errno.ENOSPC, 'synthetic')):
++            with self.assertRaises(Exception) as caught: self.upload()
++        self.assertEqual(caught.exception.status_code, 507)
++        self.db.add.assert_not_called(); self.db.commit.assert_not_called()
++        self.assertEqual(list(self.root.rglob('*.pdf')), [])
++        self.assertEqual(list(self.root.rglob('.pending-*')), [])
++
++
++if __name__ == '__main__': unittest.main()
+diff --git a/tests/security/test_document_starlette_pending.py b/tests/security/test_document_starlette_pending.py
+new file mode 100644
+index 0000000..1b8ca4e
+--- /dev/null
++++ b/tests/security/test_document_starlette_pending.py
+@@ -0,0 +1,53 @@
++"""Native local FileResponse checks, skipped when Starlette is unavailable.
++
++No DB/app imports or server/network. The second test documents the CURRENT
++path-reopen race; passing it is evidence of risk, never acceptance of a fix.
++"""
++
++import asyncio
++import importlib.util
++import os
++from pathlib import Path
++import tempfile
++import unittest
++
++
++@unittest.skipUnless(importlib.util.find_spec('starlette') is not None, 'Native Starlette unavailable; download QA pending')
++class FileResponsePendingTests(unittest.TestCase):
++    def response(self, path):
++        from starlette.responses import FileResponse
++        return FileResponse(path, filename='synthetic.pdf', media_type='application/octet-stream',
++            content_disposition_type='attachment', headers={'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-store'})
++
++    def collect(self, response):
++        messages = []
++        async def send(message): messages.append(message)
++        async def receive(): return {'type': 'http.disconnect'}
++        scope = {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.4'},
++                 'method': 'GET', 'path': '/download', 'headers': [], 'query_string': b''}
++        asyncio.run(response(scope, receive, send))
++        return messages
++
++    def test_actual_attachment_binary_nosniff_private_headers(self):
++        with tempfile.TemporaryDirectory() as root:
++            path = Path(root) / 'synthetic.pdf'; path.write_bytes(b'SS12 synthetic bytes')
++            messages = self.collect(self.response(path))
++            headers = dict(messages[0]['headers'])
++            self.assertEqual(headers[b'content-type'], b'application/octet-stream')
++            self.assertTrue(headers[b'content-disposition'].startswith(b'attachment'))
++            self.assertEqual(headers[b'x-content-type-options'], b'nosniff')
++            self.assertEqual(headers[b'cache-control'], b'private, no-store')
++
++    def test_current_path_based_download_can_observe_substituted_file(self):
++        with tempfile.TemporaryDirectory() as root:
++            path = Path(root) / 'original.pdf'; path.write_bytes(b'original-synthetic')
++            checked = path.resolve(); self.assertTrue(checked.is_file())
++            response = self.response(checked)
++            replacement = Path(root) / 'replacement'; replacement.write_bytes(b'replacement-synthetic')
++            os.replace(replacement, path)  # Both files belong only to this fixture.
++            messages = self.collect(response)
++            body = b''.join(message.get('body', b'') for message in messages if message['type'] == 'http.response.body')
++            self.assertEqual(body, b'replacement-synthetic')
++
++
++if __name__ == '__main__': unittest.main()
+diff --git a/tests/qa/test_document_publication_postgresql.py b/tests/qa/test_document_publication_postgresql.py
+new file mode 100644
+index 0000000..445f6aa
+--- /dev/null
++++ b/tests/qa/test_document_publication_postgresql.py
+@@ -0,0 +1,179 @@
++"""PREPARED ONLY: disposable PostgreSQL contract tests, never run implicitly.
++
++Standalone unittest file outside backend/tests/conftest.py. Requires explicit
++SS12_QA_ENABLE=1 and dedicated QA_* connection fields; never loads .env or app's
++engine. Checks cluster identity BEFORE creating synthetic document rows. Leaves
++committed QA rows; discard the disposable cluster after the authorized run.
++
++These are SQL/publication protocol tests, not native FastAPI/RBAC tests.
++"""
++
++from concurrent.futures import ThreadPoolExecutor
++import hashlib
++import importlib.util
++import os
++from pathlib import Path
++import sys
++import tempfile
++import threading
++import unittest
++import uuid
++
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / 'backend'))
++ENABLED = os.getenv('SS12_QA_ENABLE') == '1'
++DATABASE = 'software_pa_test'
++CLUSTER = 'ss12-document-disposable'
++
++
++@unittest.skipUnless(ENABLED, 'Requires explicit disposable SS12 PostgreSQL QA authorization')
++class PostgreSQLContracts(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        if (os.getenv('APP_ENV') != 'test' or os.getenv('SS12_QA_DATABASE') != DATABASE
++                or os.getenv('SS12_QA_ALLOW_DATABASE') != DATABASE):
++            raise RuntimeError('Explicit disposable QA database authorization required')
++        host = os.getenv('SS12_QA_HOST')
++        if host not in ('127.0.0.1', 'localhost', 'db'):
++            raise RuntimeError('Only explicitly authorized local/lab QA hosts allowed')
++        for key in ['SS12_QA_PORT', 'SS12_QA_USER', 'SS12_QA_PASSWORD', 'SS12_QA_ACTOR_ID']:
++            if not os.getenv(key): raise RuntimeError(key + ' is required')
++        port, cls.actor = int(os.environ['SS12_QA_PORT']), int(os.environ['SS12_QA_ACTOR_ID'])
++        if not 0 < port < 65536 or cls.actor <= 0: raise RuntimeError('Invalid QA port/actor')
++        # Imports happen after opt-in/validation. No app.database or dotenv.
++        from sqlalchemy import create_engine, text
++        from sqlalchemy.engine import URL
++        from sqlalchemy.exc import IntegrityError, OperationalError
++        from sqlalchemy.orm import Session
++        from app.services import document_storage, document_validation
++        cls.text, cls.Session = staticmethod(text), Session
++        cls.IntegrityError, cls.OperationalError = IntegrityError, OperationalError
++        cls.storage, cls.validation = document_storage, document_validation
++        spec = importlib.util.spec_from_file_location('ss12_synthetic_samples', ROOT / 'backend/tests/_document_samples.py')
++        samples = importlib.util.module_from_spec(spec); spec.loader.exec_module(samples)
++        cls.pdf = staticmethod(samples.minimal_pdf)
++        cls.engine = create_engine(URL.create('postgresql+psycopg2', host=host, port=port,
++            database=DATABASE, username=os.environ['SS12_QA_USER'], password=os.environ['SS12_QA_PASSWORD']),
++            hide_parameters=True, echo=False, echo_pool=False, pool_size=4, max_overflow=0,
++            pool_timeout=3, isolation_level='READ COMMITTED',
++            connect_args={'connect_timeout': 3, 'options': '-c statement_timeout=3000 -c lock_timeout=1000'})
++        cls.addClassCleanup(cls.engine.dispose)
++        with cls.engine.connect() as connection:
++            actual = connection.execute(text("SELECT current_database(), current_setting('cluster_name')")).one()
++            if tuple(actual) != (DATABASE, CLUSTER):
++                raise RuntimeError('Refusing unverified/non-disposable QA cluster')
++            actor = connection.execute(text("SELECT 1 FROM usuario WHERE id_usuario=:actor AND activo AND rol='admin'"),
++                {'actor': cls.actor}).scalar()
++            if actor != 1: raise RuntimeError('Explicit active synthetic QA admin required')
++
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
++        self.root = Path(self.temp.name)
++        self.documents = []
++        with self.engine.begin() as connection:
++            connection.execute(self.text("SELECT set_config('app.current_user_id', :actor, true)"), {'actor': str(self.actor)})
++            for _ in range(2):
++                self.documents.append(connection.execute(self.text(
++                    "INSERT INTO documento(tipo_documento,estado,titulo,creado_por) "
++                    "VALUES ('ss12_qa','disponible',:marker,:actor) RETURNING id_documento"),
++                    {'marker': 'SS12_SYNTHETIC_' + uuid.uuid4().hex, 'actor': self.actor}).scalar_one())
++
++    def protocol(self, document_id, content, *, proposed=False, barrier=None):
++        """Reference SQL protocol: current order vs proposed parent-lock order.
++
++        It does not import/replace the actual service. Native API acceptance must
++        separately exercise store_version against the same disposable cluster.
++        """
++        checksum = hashlib.sha256(content).hexdigest()
++        mime = self.validation.validate_document(content, '.pdf', None, max_file_bytes=1048576)
++        with self.storage.stage_document(self.root, document_id, content, checksum) as staged:
++            with self.Session(bind=self.engine) as session:
++                session.execute(self.text("SELECT set_config('app.current_user_id', :actor, true)"), {'actor': str(self.actor)})
++                if proposed:
++                    if barrier: barrier.wait(timeout=5)
++                    session.execute(self.text("SELECT id_documento FROM documento WHERE id_documento=:doc FOR UPDATE"), {'doc': document_id}).one()
++                found = session.execute(self.text("SELECT 1 FROM documento_version WHERE id_documento=:doc AND hash_sha256=:hash"),
++                    {'doc': document_id, 'hash': checksum}).scalar()
++                if found: return 409, None
++                number = session.execute(self.text("SELECT coalesce(max(numero_version),0)+1 FROM documento_version WHERE id_documento=:doc"),
++                    {'doc': document_id}).scalar_one()
++                if barrier and not proposed: barrier.wait(timeout=5)  # Force same stale max.
++                name = f'{number:04d}-{uuid.uuid4().hex}.pdf'
++                values = dict(doc=document_id, number=number, hash=checksum, size=len(content),
++                    path=f'{document_id}/{name}', mime=mime, actor=self.actor)
++                try:
++                    if not proposed: staged.publish(name)
++                    session.execute(self.text(
++                        "INSERT INTO documento_version(id_documento,numero_version,hash_sha256,tamano_bytes,nombre_original,ruta_almacenamiento,tipo_mime,id_usuario_carga) "
++                        "VALUES (:doc,:number,:hash,:size,'ss12-qa.pdf',:path,:mime,:actor)"), values)
++                    if proposed: staged.publish(name)  # Constraints tested before publication.
++                    session.commit()
++                    return 201, number
++                except self.IntegrityError as error:
++                    code = error.orig.pgcode
++                    session.rollback()
++                    if code != '23505': raise
++                    return 409, None
++
++    def test_actual_unique_constraints_exist_and_are_immediate(self):
++        with self.engine.connect() as connection:
++            rows = connection.execute(self.text("SELECT conname, condeferrable FROM pg_constraint WHERE conrelid='public.documento_version'::regclass AND contype='u'"))
++            constraints = dict(rows)
++        for name in ['uq_documento_version', 'uq_documento_hash', 'uq_documento_ruta']:
++            self.assertIn(name, constraints); self.assertIs(constraints[name], False)
++
++    def test_row_lock_is_per_document_released_on_commit_and_rollback(self):
++        for finish in ['commit', 'rollback']:
++            with self.Session(bind=self.engine) as first, self.Session(bind=self.engine) as second:
++                first.execute(self.text("SELECT id_documento FROM documento WHERE id_documento=:doc FOR UPDATE"), {'doc': self.documents[0]}).one()
++                second.execute(self.text("SELECT id_documento FROM documento WHERE id_documento=:doc FOR UPDATE NOWAIT"), {'doc': self.documents[1]}).one()
++                second.rollback()
++                with self.assertRaises(self.OperationalError) as caught:
++                    second.execute(self.text("SELECT id_documento FROM documento WHERE id_documento=:doc FOR UPDATE NOWAIT"), {'doc': self.documents[0]}).one()
++                self.assertEqual(caught.exception.orig.pgcode, '55P03')
++                second.rollback(); getattr(first, finish)()
++                second.execute(self.text("SELECT id_documento FROM documento WHERE id_documento=:doc FOR UPDATE NOWAIT"), {'doc': self.documents[0]}).one()
++                second.rollback()  # One explicit retry; never an unbounded retry loop.
++
++    def test_current_order_concurrent_distinct_bytes_relies_on_unique_constraint(self):
++        barrier = threading.Barrier(2)
++        with ThreadPoolExecutor(max_workers=2) as pool:
++            jobs = [pool.submit(self.protocol, self.documents[0], self.pdf(label), barrier=barrier) for label in ['A', 'B']]
++            results = [job.result(timeout=10) for job in jobs]
++        self.assertEqual(sorted(code for code, _ in results), [201, 409])
++        self.assertEqual(len(list(self.root.rglob('*.pdf'))), 2)  # Conservative retained orphan.
++
++    def test_current_order_concurrent_identical_bytes_has_one_confirmed_hash(self):
++        barrier = threading.Barrier(2)
++        with ThreadPoolExecutor(max_workers=2) as pool:
++            jobs = [pool.submit(self.protocol, self.documents[0], self.pdf('same'), barrier=barrier) for _ in range(2)]
++            results = [job.result(timeout=10) for job in jobs]
++        self.assertEqual(sorted(code for code, _ in results), [201, 409])
++        with self.engine.connect() as connection:
++            count = connection.execute(self.text("SELECT count(*) FROM documento_version WHERE id_documento=:doc"), {'doc': self.documents[0]}).scalar_one()
++        self.assertEqual(count, 1)
++
++    def test_proposed_read_committed_parent_lock_contract(self):
++        for document, labels in [(self.documents[0], ['A', 'B']), (self.documents[1], ['same', 'same'])]:
++            barrier = threading.Barrier(2)
++            with ThreadPoolExecutor(max_workers=2) as pool:
++                jobs = [pool.submit(self.protocol, document, self.pdf(label), proposed=True, barrier=barrier) for label in labels]
++                results = [job.result(timeout=10) for job in jobs]
++            if labels[0] != labels[1]: self.assertEqual(sorted(results), [(201, 1), (201, 2)])
++            else: self.assertEqual(sorted(code for code, _ in results), [201, 409])
++
++    def test_rollback_after_publication_retains_file_without_confirmed_row(self):
++        content = self.pdf('rollback'); checksum = hashlib.sha256(content).hexdigest()
++        name = '0001-' + uuid.uuid4().hex + '.pdf'
++        with self.storage.stage_document(self.root, self.documents[0], content, checksum) as staged:
++            with self.Session(bind=self.engine) as session:
++                session.execute(self.text("SELECT id_documento FROM documento WHERE id_documento=:doc FOR UPDATE"), {'doc': self.documents[0]}).one()
++                staged.publish(name); session.rollback()
++        self.assertEqual((self.root / str(self.documents[0]) / name).read_bytes(), content)
++        with self.engine.connect() as connection:
++            count = connection.execute(self.text("SELECT count(*) FROM documento_version WHERE id_documento=:doc"), {'doc': self.documents[0]}).scalar_one()
++        self.assertEqual(count, 0)
++
++
++if __name__ == '__main__': unittest.main()
+diff --git a/docs/security/SS-12-ETAPA1-CORRECCION-2026-10-28.md b/docs/security/SS-12-ETAPA1-CORRECCION-2026-10-28.md
+new file mode 100644
+index 0000000..0b2d6a3
+--- /dev/null
++++ b/docs/security/SS-12-ETAPA1-CORRECCION-2026-10-28.md
+@@ -0,0 +1,401 @@
++# SS-12 etapa 1 — Publicación documental exclusiva y recuperación conservadora
++
++Fecha: 2026-10-28. Software-PA / SSALFER, rama dev, HEAD `683ff75613768de28a7127c7e33a6e2ef4fc40ff`, más remediaciones locales SS-01/02/03/04/06/10/11.
++
++## Dictamen y límites de esta entrega
++
++**Implementación local parcial validada sobre el filesystem de pruebas; SS-12 permanece abierto.** Se sustituye la escritura directa del archivo final por staging privado, escritura exclusiva, fsync y comprobación SHA-256 por descriptor, seguida de publicación mediante hard link exclusivo sin reemplazo. La compensación **nunca elimina un nombre publicado**, incluso si falla commit, rollback, refresh o la respuesta HTTP. Se limpian únicamente entradas conocidas del staging de la operación cuando su identidad coincide.
++
++**No se ofrece atomicidad entre PostgreSQL y filesystem, ausencia de huérfanos, protección contra un host/UID comprometido ni numeración serializada ya demostrada.** No se implementa el bloqueo padre mientras no exista QA PostgreSQL para validar transacciones/orden de locks. Se mantienen max(numero_version)+1 y las restricciones únicas existentes; una carga legítima concurrente aún puede terminar en409. No hay mutex por proceso ni retry automático.
++
++La descarga conserva íntegramente safe_version_path y FileResponse de SS-06. **El TOCTOU de descarga no se declara corregido.** Se prepara una prueba nativa que puede documentar la sustitución del path y otra de headers; ambas quedaron omitidas por falta de Starlette. La alternativa de descriptor necesita validación real del framework antes de integrar.
++
++Resultado final de la suite aislada: **182 pruebas descubiertas, 177 aprobadas y 5 omitidas**. Se aprobaron24 nuevas SS-12 y las153 anteriores, incluidas las28 de SS-06. Las omisiones son tres nativas previas de SS-10 y dos nuevas de Starlette. **Seis pruebas PostgreSQL QA adicionales fueron preparadas pero no ejecutadas ni importadas**. Los procesos hijos utilizados en pruebas sólo manipularon pequeños archivos sintéticos propios; no hubo conexión a servicios.
++
++No se accedió a producción/servidor institucional, leyó .env, instaló software, ejecutó Docker/migraciones, modificó documentos reales o realizó commit/push/merge/despliegue.
++
++## Inspección y estado previo
++
++Se inspeccionaron services/documents.py, routers/documents.py, document_validation.py de SS-06, Documento/DocumentoVersion, restricciones y trigger de inmutabilidad de la migración001, pruebas documentales/rollback, conftest, volúmenes/UPLOAD_ROOT y los informes SS-12. SQLAlchemy, psycopg2, FastAPI y Starlette siguen ausentes en el Python local; no se intentó suplirlos instalando paquetes o utilizando un servicio real.
++
++El estado inicial coincide con dev/HEAD de referencia y contiene todas las remediaciones anteriores sin integrar. Se tomaron snapshots/hashes sin leer .env. Sólo cambian dos archivos preexistentes de este alcance: store_version dentro de services/documents.py y el adaptador/expectativa correspondiente de su prueba SS-06. Validador SS-06, router de descargas, access.py, modelos, schemas, migraciones, configuración del engine, Compose y frontend permanecen intactos.
++
++Restricciones declaradas existentes, sin duplicarlas ni alterarlas:
++
++| Restricción | Garantía declarada |
++|---|---|
++| uq_documento_version | UNIQUE(id_documento,numero_version) |
++| uq_documento_hash | UNIQUE(id_documento,hash_sha256) |
++| uq_documento_ruta | UNIQUE(ruta_almacenamiento) |
++| chk_documento_version | Número positivo y tamaño no negativo |
++| fn_documento_version_inmutable | Rechaza UPDATE/DELETE de versiones |
++
++Su definición está comprobada como texto en modelo/migración. **Su aplicación efectiva, privilegios y semántica bajo concurrencia no se inspeccionaron en un servidor**; las pruebas QA preparadas la verifican posteriormente.
++
++## Escenarios de carrera: evidencia y estado
++
++| Escenario | Estado de evidencia | Control implementado / pendiente |
++|---|---|---|
++| Dos cargas distintas al mismo documento calculan el mismo max+1 | Confirmado por secuencia de código; PostgreSQL real pendiente | No se serializa aún. Unicidad declarada es última defensa,409 posible; protocolo con fila padre se diseña más abajo |
++| Dos cargas de los mismos bytes | Lookup SHA existente no coordina solicitudes; uniqueness declarada | Duplicado observado temprano409; carrera entre lookup/commit pendiente QA. No se reintenta ni se crean dos números confirmados por una garantía nueva del código |
++| Dos publicadores intentan el mismo nombre final | Confirmado por dos threads y dos procesos Python independientes en filesystem local | os.link no reemplaza; uno publica y el otro obtiene colisión controlada; bytes completos de uno solo |
++| Escritura corta o parcial | Confirmado por escrituras parciales reales y cero-write/error simulado | Se completa en bucle acotado; el nombre final todavía no existe; readback/tamaño/SHA antes de publicar |
++| Disco lleno, permiso denegado, fallo fsync/read | Simulación de errno y cancelación, sin fallo físico del disco | Limpieza de staging propio cuando es posible,507 controlado en IO; no publicación parcial ni copy fallback |
++| Fallo después de link y antes del registro/commit | Reproducido con excepción y os._exit de hijo en la fase de filesystem | Se conserva el archivo final. Puede quedar huérfano; no se barre ni elimina automáticamente |
++| COMMIT confirmado en servidor pero respuesta perdida | Riesgo real del protocolo, simulado con doble que marca commit y lanza excepción | Nunca unlink final;409 indica resultado no confirmado e invita a consultar historial. No se afirma reproducido en PostgreSQL real |
++| COMMIT exitoso seguido de refresh/HTTP fallido | Simulado con doble; HTTP real pendiente | Archivo publicado permanece, sin retry automático |
++| Cancelación durante write/fsync/commit | BaseException inyectada en esos puntos y pruebas de cierre | Staging propio cerrado; publicado conservado. IO/SQL síncronos pueden no reaccionar de inmediato a una desconexión real |
++| Terminación abrupta del proceso | os._exit(17) real en hijos sintéticos, sin finally | Se observan staging parcial, staging completo y publicación sin registro. Es una demostración de ventanas residuales, no fallo eléctrico de host |
++| Sustitución de payload/directorio | Reproducida localmente en rutas sintéticas propias | Comprobaciones nofollow/identidad rechazan la sustitución observada y no eliminan entradas ajenas; no se promete resistencia absoluta a un actor con el mismo UID/root |
++| Archivo cambiado después de safe_version_path y antes de FileResponse | Código/path reopening identificado, Starlette real ausente | Implementación intacta; prueba nativa pendiente y diseño de descriptor, sin afirmar filtración reproducida |
++| Varias instancias compartiendo volumen | Dos procesos locales prueban exclusión FS, no PostgreSQL/FS distribuido | Requiere mismo almacenamiento físico, UID/ACL y semántica de hard links/fsync; QA NFS/CIFS/multihost pendiente |
++
++## Implementación del almacenamiento
++
++Nuevo módulo document_storage.py, sin DB, red, shell ni ejecución de herramientas. Trabaja con bytes originales ya autorizados/reconocidos por SS-06.
++
++1. Abrir la raíz canónica configurada mediante descriptores de directorio, recorriendo componentes con O_DIRECTORY/O_NOFOLLOW/O_CLOEXEC. Rechazar raíz del sistema, dot-segments y plataformas sin esas banderas. El servicio conserva upload_root(), que resuelve la raíz **administrada** configurada; esa configuración y sus ancestros son una frontera de confianza, no una ruta del cliente.
++2. Abrir/crear el directorio numérico del documento sin seguir symlinks. Rechazar root/directorio documental escribibles por cualquiera. No cambiar permisos de carpetas históricas ni asumir que una variable demuestra ACL correctas.
++3. Crear exclusivamente .pending-UUID (0700) y payload (O_CREAT|O_EXCL,0600). Si el nombre ya existe no se adopta, reutiliza o borra. No hay búsqueda/limpieza global y no se elimina el directorio documental, que puede servir a otra solicitud.
++4. Escribir por fd en bloques de hasta64KiB, atendiendo short writes y rechazando cero-write. fsync del archivo, lectura por el mismo fd con conteo acotado y SHA-256/tamaño exactos. Se conserva todo byte del original, incluido formato/MIME de SS-06; no se transforma ni se recodifica.
++5. Generar el nombre final con el número calculado y el mismo UUID servidor de la operación: numero-UUID.ext. El patrón admite las mismas extensiones y nunca usa el nombre del cliente como ruta. La correlación de operación permite asociar un evento seguro con el sufijo del archivo sin registrar documento/usuario/path en logs.
++6. Comprobar directorio/payload regulares y sus dev/inode. Publicar con os.link entre staging y directorio final por dir_fd, follow_symlinks=False. El hard link crea el nombre final de forma exclusiva; **no se usa os.replace/rename que sobrescriba**, ni exists+write, ni copy ante EXDEV. Verificar la identidad de la nueva entrada y fsync de los directorios documental/raíz antes de intentar registrar la versión.
++7. Al salir, unlink sólo del payload creado por esta operación si la identidad sigue coincidiendo; rmdir sólo del staging identificado y vacío. Mantener el fd de directorio hasta terminar esa comprobación. No hay rmtree ni iteración de directorios, y ningún código de compensación elimina el nombre final.
++
++La [API os.link/dir_fd de Python](https://docs.python.org/3/library/os.html#os.link) permite estas operaciones sin abrir rutas de cliente; sus garantías concretas siguen dependiendo del sistema de archivos. Las pruebas usan Linux local y demuestran exclusión por llamada del sistema, no un mutex Python. Staging y destino están bajo el mismo directorio documental para evitar una publicación cross-filesystem. Si hard links o fsync de directorio no funcionan, se falla de forma explícita; no se degrada silenciosamente a una copia insegura.
++
++Los descriptores se cierran en éxito y error; las pruebas comprueban EBADF después de cerrar los fd propios. Si cleanup falla o hay una entrada desconocida, se conserva el contenido sospechoso y se emite DOCUMENT_STAGING_CLEANUP_INCOMPLETE, sin convertir la limpieza en un borrado de archivos ajenos. Una carpeta vacía de documento puede quedar creada; no se elimina por riesgo de uso concurrente.
++
++### Permisos y sustituciones: límites reales
++
++0700/0600 dan privacidad por UID, **no aislamiento frente a otros procesos con ese mismo UID, root o un administrador del volumen**. Las verificaciones de identidad detectan sustituciones observadas, pero no constituyen compare-and-unlink atómico contra un atacante que puede renombrar entradas justo después del stat, escribir en el mismo inode o cambiar mounts. Los directorios deben estar administrados y protegidos de actores ajenos. Tampoco se garantiza que un directorio canónico no cambie entre comprobación y commit DB.
++
++No se modifican ACL/propietarios de archivos existentes. Nuevas carpetas/archivos privados pueden requerir revisar UID/GID/backup entre contenedores y el host. No aplicar chmod masivo para sortearlo; validar el modelo de servicio. Compose base usa uploads_data y desarrollo un bind mount; el mismo nombre de volumen en **dos hosts** no demuestra almacenamiento compartido. No se ejecutó Docker ni se inspeccionó un mount institucional.
++
++fsync solicita persistencia al kernel/filesystem, no prueba la durabilidad del hardware/NFS/configuración efectiva. El montaje, journaling, coherencia, enlaces y recuperación de backups requieren QA. Los archivos nuevos no son inmutables a nivel de kernel: se evita sobrescritura accidental por este código, no escritura deliberada de un propietario comprometido.
++
++## Secuencia real de store_version en etapa 1
++
++| Fase | Operación y propiedad | Qué puede fallar |
++|---|---|---|
++| 1 | Autorización de captura, nombre/extensión, límite y validación SS-06; hash original | Se conservan401/403/413/422 y las reglas existentes; sin staging para contenido rechazado |
++| 2 | Lookup temprano SHA; si ya existe,409 | No es una coordinación entre solicitudes; puede quedar obsoleto inmediatamente |
++| 3 | Staging privado completo +fsync+readback SHA | Sólo entradas propias; sin nombre final ni registro nuevo |
++| 4 | Calcular max+1 como antes y preparar ruta servidor | No hay lock padre todavía; una carrera de número sigue posible |
++| 5 | Link exclusivo y fsync de directorios | El final ya existe; DB todavía no lo confirma. Puede quedar archivo sin registro |
++| 6 | Contexto de auditoría, add y commit de DocumentoVersion | commit hace flush implícito; uniqueness puede fallar después de publicar. No se añade flush o transacción experimental antes de QA |
++| 7 | Refresh/retorno y cleanup del staging | Fallo HTTP no implica fallo DB. El final se conserva siempre |
++
++El [comportamiento de flush/commit de SQLAlchemy](https://docs.sqlalchemy.org/en/20/orm/session_basics.html#flushing) no crea una transacción con el filesystem. No se añade un engine, pool ni aislamiento global. La transacción existente de autorización puede seguir abierta durante IO; stage1 no resuelve el coste síncrono en event loop ni conexión retenida.
++
++Ante excepción de registro se intenta rollback y se conserva el archivo publicado. Una excepción normal produce409 con mensaje controlado **«No fue posible confirmar el registro de la versión; consulte el historial antes de reintentar.»**; cancelaciones BaseException se propagan después del rollback. Si rollback falla, su error también se propaga y el final sigue intacto. Un OSError de la capa FS se traduce a error de almacenamiento507; colisiones/política de ruta producen409 y plataforma no soportada503. El frontend conserva el esquema de éxito y los nombres/bytes, pero esos fallos y la precisión del mensaje deben comprobarse en QA.
++
++[COMMIT PostgreSQL](https://www.postgresql.org/docs/15/sql-commit.html) confirma los cambios DB, no la publicación de archivos. Si se pierde la respuesta de la conexión, un rollback posterior no deshace un commit ya confirmado por servidor. **No deducir fracaso de la transacción a partir de la excepción del cliente.** No se consulta/reintenta automáticamente contra otra conexión ni se vuelve a publicar al ver409.
++
++## Cambio explícito respecto a una expectativa de SS-06
++
++La prueba previa de commit fallido exigía que no quedara ningún PDF. Esa compensación era insegura bajo COMMIT incierto. Se cambia **sólo esa expectativa** a conservar un archivo completo con bytes/SHA originales y ningún staging normal; también se inyecta el nuevo helper en el adaptador aislado. No se debilitan las pruebas de formato, MIME canónico, tamaño, autorización o headers. El validador SS-06 y sus presupuestos están idénticos por hash, al igual que el router de descarga.
++
++Todos los demás archivos previos de remediación y sus documentos permanecen sin cambios. Los documentos anteriores describen la entrega histórica; este informe deja trazable por qué su expectativa de borrado en rollback se sustituye en SS-12.
++
++## Diagnóstico seguro
++
++Se reutiliza DiagnosticEvent/ssalfer.diagnostics de SS-10. Sólo se registran códigos constantes (DOCUMENT_STORAGE_FULL/PERMISSIONS/QUOTA/CROSS_DEVICE/SYMLINK/IO, CLEANUP_INCOMPLETE o REGISTRATION_UNCONFIRMED), componente documents y UUID de operación generado por servidor. No se interpolan OSError, path, hash, nombre original, actor, parámetros SQL, cuerpo o cabeceras. La correlación de operación es distinta de la correlación HTTP y no contiene datos de usuario.
++
++La prueba nueva captura el formato final SafeJSONFormatter y comprueba ausencia de nombre/path/sentinela sintético del error. No se insertan eventos de DB para cada fallo de almacenamiento ni se altera auditoría funcional. El registro de diagnóstico no es una bitácora durable de publicación: si el proceso muere antes de emitirlo, puede no existir evidencia suficiente para resolver automáticamente el estado.
++
++## Diseño de serialización PostgreSQL pendiente de validación
++
++**Propuesta, no implementada en store_version.** Usar una fila estable de documento como coordinador, no locks del proceso ni sólo SELECT max. Secuencia para evaluar en QA:
++
++1. Terminar autenticación/autorización inicial y reconocimiento/preparación privada antes de adquirir el lock documental; evitar CPU de inspección bajo un bloqueo largo. La separación de sesiones debe diseñarse expresamente: no empezar otra transacción en una Session que ya ha hecho autobegin sin revisarla.
++2. Abrir una transacción de asignación con aislamiento **READ COMMITTED** explícitamente verificado en QA. SELECT del id/activo del documento con FOR UPDATE por PK; proyección mínima/of documento, evitando que eager joins provoquen locks en otras tablas o FOR UPDATE sobre lado nullable de un outer join.
++3. Revalidar documento/alcance con la misma política actual, sin ampliar SS-05. Tras adquirir el lock volver a buscar SHA y calcular max+1. La comprobación temprana previa al staging sólo es una optimización, no una decisión definitiva.
++4. Insertar/flush de la versión dentro de la transacción para probar constraints antes de publicar. Publicar el staging ya completo y confirmar. Un fallo anterior a publicación deja sólo staging conocido; una publicación seguida de fallo DB conserva la ventana que necesita reconciliación.
++5. Mantener orden consistente: autenticación finalizada → un documento padre → inserción/versiones/auditoría. Para operaciones futuras con varios documentos, ordenar IDs. Revisar también FKs a actor y mutadores de catálogo/vínculos/usuarios: **no se afirma ausencia global de deadlocks** por dibujar un orden local. No bloquear relaciones adicionales sin justificación.
++6. Locks se liberan por commit/rollback; documentos distintos usan filas distintas. Definir lock_timeout/statement_timeout según mediciones y fallo controlado; ningún retry infinito. Si se autorizan reintentos por40001/40P01, deben reiniciar toda la transacción con idempotencia y límite, nunca sólo repetir max+1 sobre un snapshot antiguo.
++
++[PostgreSQL documenta los row locks y deadlocks](https://www.postgresql.org/docs/15/explicit-locking.html). READ COMMITTED es relevante: con REPEATABLE READ y un snapshot anterior, esperar un lock de una fila que no se actualiza no hace visible mágicamente una versión hija insertada después. Otra alternativa es un contador padre actualizado de forma atómica, pero requiere cambio de esquema/contrato autorizado. No se elige aquí como arreglo improvisado.
++
++FOR UPDATE compite con locks por FK, y un FOR NO KEY UPDATE bien coordinado podría reducir bloqueos si se valida con todos los escritores. No se sustituye automáticamente por una combinación SQLAlchemy no probada. Todas las instancias/escritores deben adoptar el mismo protocolo; durante despliegues mixtos se sigue dependiendo de constraints.
++
++Las restricciones existentes permanecen como última defensa aun con serialización. Revalidarlas contra servidor QA, no asumir que coinciden con el modelo. No se propone duplicarlas ni alterar migraciones históricas.
++
++## Diseño de recuperación y reconciliación — requiere autorización posterior
++
++### Ventanas que no desaparecen
++
++| Punto de caída | Posible estado persistente | Tratamiento conservador |
++|---|---|---|
++| Durante escritura privada | payload parcial sin final/registro | No lo presenta esta API como versión. Clasificar staging pendiente; no borrarlo sólo por edad |
++| Staging completo antes de publicación | Archivo privado completo sin registro | Puede ser trabajo en vuelo o terminado abruptamente; hace falta identidad/lease durable |
++| Link efectuado, antes/después de fsync de directorio | Final completo y staging, DB todavía sin registro | No puede inferirse rollback. Durabilidad real depende de FS; conservar candidatos |
++| Commit falla de forma conocida o desconocida tras publicar | Final con/sin fila confirmada | Conservar; ausencia en una lectura aislada puede ser una transacción aún en curso |
++| Commit confirmado y respuesta perdida | Registro y archivo correctos, cliente no sabe | Consultar historial/operación y verificar por SHA; no borrar ni reintentar a ciegas |
++| Caída de almacenamiento / restore desalineado | Fila confirmada sin archivo o bytes distintos | Incidente de integridad/disponibilidad; no borrar histórico ni reutilizar el número |
++
++La política actual favorece conservar evidencia y disponibilidad de una versión potencialmente confirmada sobre eliminar residuos inmediatamente. Puede aumentar la cantidad de archivos publicados sin registro tras conflictos inequívocos; es una limitación deliberada y necesita cuota/monitoreo/reconciliación, no una afirmación de que el huérfano desapareció.
++
++### Bitácora propuesta
++
++Una migración nueva, forward-only y autorizada podría crear una entidad de publicación/trabajo separada de documento_version inmutable. Campos a diseñar: UUID de operación/idempotencia generado por servidor, documento/actor, hash/tamaño/MIME esperado, ruta servidor, número asignado, perfil de validación, estado/fechas, lease/propietario de intento y referencia a la versión confirmada. No guardar contraseñas, sesiones ni cuerpos en la bitácora o logs. Aplicar permisos mínimos, retención y auditoría de decisiones.
++
++Protocolo propuesto:
++
++- Registrar intención durable antes de preparar el archivo. Si falla la confirmación de intención, consultar esa operación antes de crear otro trabajo; no deducir que no existe.
++- Preparar archivo bajo identidad de operación con datos validados. Guardar metadatos de fase/lease sin mantener un lock documental durante inspección. Un estado durable puede quedar por detrás del filesystem; no asumir sincronía perfecta.
++- Bajo la transacción documental serializada, asignar/flush, publicar y confirmar **versión + estado confirmado de la bitácora en la misma transacción DB**. Así la consulta posterior a un COMMIT incierto puede resolver el estado DB con una lectura nueva del primario; no hace atómica la publicación de FS.
++- No actualizar la misma fila de bitácora desde una segunda conexión mientras otra transacción la tiene bloqueada para aparentar un estado «publicado durable»: puede bloquearse a sí misma. Si se necesita un manifiesto FS adicional, especificar orden/fsync y reconciliar las dos bitácoras sin prometer atomicidad.
++- Al reiniciar, reconciliar únicamente trabajos propios y terminales, respetando leases/epochs y operaciones activas de otras instancias. Un TTL o mtime antiguo no demuestra que el trabajo terminó. Controlar trabajo máximo/cola/archivos simultáneos con coordinación compartida y cuotas reales.
++
++### Reconciliador propuesto: primero sólo lectura
++
++Construir un inventario privado acotado por lotes de filas/versiones y entradas controladas del volumen; correlacionar operación/ruta exacta, tamaño/hash y, cuando corresponda, identidad de FS. No usar sólo el prefijo de número: dos intentos no confirmados pueden tener el mismo número y distintos UUID.
++
++Clasificaciones de revisión:
++
++- Fila + archivo + hash/tamaño concordantes: consistencia observada en ese instante, sin certificar que un host con privilegios no lo cambie después.
++- Archivo publicado sin fila visible: candidato sin referencia, **no huérfano confirmado automáticamente**. Resolver transacciones/bitácora/leases y despliegues en vuelo antes de cualquier decisión.
++- Fila sin archivo: incidente; recuperar desde backup íntegro con SHA esperado, conservando versión e histórico. No borrar la fila para «hacer coincidir» el inventario.
++- Hash/tamaño discrepantes o entrada inesperada/symlink: incidente/quarantena de revisión; no sobrescribir ni seguir el enlace para completar la operación.
++- Staging conocido o entradas ajenas en él: revisar propietario de operación y fase. Nunca rmtree general ni purga por antigüedad en este paso.
++
++La limpieza posterior requiere autorización/política explícita, prueba de inactividad, periodo de retención, trazabilidad y barreras contra carreras. El reconciliador **no se implementa ni ejecuta en esta etapa**. Ningún archivo huérfano institucional fue enumerado o eliminado.
++
++Backups deben coordinar puntos de recuperación DB/volumen, manifiestos de hashes y verificación de restauración. Incluso una bitácora DB no recupera bytes que nunca persistieron físicamente. Probar pérdida de proceso, servidor DB, mount y restauración en QA; no prometerlo a partir de fsync o un try/except.
++
++## Descarga y TOCTOU: diseño, sin cambio de implementación
++
++safe_version_path actualmente resuelve/comprueba el path y FileResponse lo abre después. Cambiar la entrada entre ambos puede cambiar el contenido; no se compara SHA en el camino actual. Se conservan autorización, attachment, application/octet-stream, nosniff y private,no-store de SS-06 exactamente.
++
++Propuesta Linux a validar: abrir raíz/documento/archivo con dir_fd, O_NOFOLLOW/O_DIRECTORY donde corresponda y O_RDONLY/O_CLOEXEC para el archivo; fstat regular; contrastar tamaño y hash mediante el **mismo descriptor** que luego se entrega. No volver a abrir el path tras validar. Usar el fd evita una sustitución del nombre posterior, pero no evita escritura en el mismo inode por un actor con acceso: puede requerirse almacenamiento inmutable o snapshot privado verificado y permisos del volumen.
++
++FileResponse usa path y optimizaciones/rangos del servidor: no se adapta pasando un fd de manera no documentada. Diseñar una respuesta propietaria de descriptor o snapshot y probar con Starlette real: Content-Disposition/encoding, range200/206/416, tamaño, cancelación antes/durante streaming, fallos, cierre, cliente lento y caché. No sustituir el mecanismo actual sin ese ensayo. No reabrirlo después de hashear y llamar a eso protección TOCTOU.
++
++Las dos pruebas nativas preparadas verifican headers y documentan la reapertura por path al sustituir **dos archivos sintéticos propios**. Una prueba de riesgo que pasa no es aceptación de una corrección. En este entorno ambas quedaron omitidas; no se afirma que la reproducción nativa se ejecutó.
++
++## Pruebas ejecutadas y evidencia
++
++```sh
++python3 -B -m unittest discover -s tests/security -p 'test_document_storage.py' -q
++# 23 pruebas de almacenamiento/servicio aprobadas en esa ejecución intermedia
++python3 -B -m unittest discover -s tests/security -p 'test_*.py' -q
++# Ejecución final: Ran 182 tests; OK (skipped=5)
++# 177 aprobadas, incluidas24 nuevas SS-12 y28 de SS-06
++```
++
++La prueba de diagnóstico seguro se añadió después del primer comando; la suite final incluye las24. Las pruebas se inspeccionaron antes de ejecutarlas. Usan TemporaryDirectory propio, datos sintéticos pequeños y módulo puro; los cuerpos de servicio/modelos/DB se aíslan con el adaptador de SS-06. No se importó app.database/app.main ni conftest, ni se ejecutó pytest/collect-only. Linux ejecuta os.open/link/fsync/read/write/unlink/rmdir reales bajo el directorio de prueba; se inyectan errores sólo en los puntos indicados.
++
++| Control | Evidencia ejecutada | Límite |
++|---|---|---|
++| Privacidad/exclusividad | mkdir exclusivo0700, payload0600 O_EXCL, colisión de archivo/symlink/directorio preservada | FS local; UID/root ajeno no aislado |
++| Publicación completa | Durante short writes el final no existe; readback/tamaño/SHA y enlace del mismo inode; link exclusivo | No prueba durabilidad ante pérdida eléctrica |
++| Recursos | FD propios dan EBADF tras cierre; staging limpio en caminos ordinarios/error/cancel simulado | Si cleanup es denegado o detecta entrada desconocida se conserva y registra |
++| Datos/bytes | Bytes originales y SHA exactos; sin modificación del MIME SS-06 | No hashing nuevo en descarga |
++| Fallos | ENOSPC/EACCES/EIO, cero-write, cancel en write/fsync/commit, constructor/hash, fallo de link/EXDEV y fsync posterior | Simulación de errores, no disco/servidor real averiado |
++| No borrar ajenos | Fuente sustituida, directorio documental renombrado, entradas desconocidas y link existente | No defensa total ante una carrera hostil del mismo UID entre stat/unlink |
++| Concurrencia FS | Dos threads y dos procesos Python independientes, barrera local, un ganador por nombre | No coordinación PostgreSQL ni prueba multihost/NFS |
++| Caída de proceso | Tres hijos con os._exit17 en parcial/staged/published dejan estados residuales esperados | No commit PostgreSQL ni caída de host |
++| Commit incierto | Doble marca confirmación y lanza; archivo íntegro retenido, rollback intentado,409 sin retry | No fallo real de conexión al servidor |
++| Refresh/rollback fallidos | Archivo final retenido y staging liberado | Persistencia real de DB pendiente |
++| SS-06 | 28 regresiones aprobadas con única expectativa de compensación corregida y adaptador nuevo | Pruebas HTTP/DB originales no ejecutadas |
++| Observabilidad | Captura formateada final sin sentinel/path/errores crudos | No acredita recolectores externos o configuración desplegada |
++
++En la salida final apareció un token controlado document_storage durante un fallo de IO sintético antes de configurar el logger en ese test; no incluyó paths, datos ni excepción. La prueba dedicada sí captura el formatter final versionado y verifica los campos seguros. No se utiliza ese token como bitácora ni se afirma trazabilidad durable por ese log.
++
++### PostgreSQL QA preparado — no ejecutado
++
++Archivo independiente tests/qa/test_document_publication_postgresql.py, **fuera de backend/tests/conftest.py**. Antes de importar el motor requiere SS12_QA_ENABLE=1, APP_ENV=test, SS12_QA_DATABASE y SS12_QA_ALLOW_DATABASE iguales a software_pa_test, host local/lab permitido, puerto/usuario/password/actor QA explícitos. No carga .env ni el engine habitual. Primero consulta identidad de DB/cluster y actor sintético activo; exige cluster_name=ss12-document-disposable antes de crear datos.
++
++Estas guardas son complementarias, **no autorización ni prueba física de que un servidor es desechable**. El operador debe acreditar y autorizar el clon y endpoints. No se leyeron esos valores de conexión ni se ejecutó/importó el archivo en esta intervención. Sólo se verificó su AST.
++
++Seis ensayos preparados:
++
++1. Constraints únicas reales y no diferibles, sin crear/alterar constraints.
++2. Dos sesiones: mismo documento bloqueado con NOWAIT, otro documento independiente, liberación por commit/rollback y un único reintento explícito.
++3. Protocolo de orden actual con max forzado simultáneo y bytes diferentes: una confirmación y un conflicto, archivos publicados conservados.
++4. Mismos bytes: una sola confirmación SHA y409 controlado por unicidad.
++5. Protocolo **propuesto** de READ COMMITTED + lock padre + insert antes de publicar: números1/2 para distintos bytes y un rechazo para duplicado.
++6. Rollback tras publicación: archivo retenido sin fila confirmada.
++
++Son pruebas nativas de SQL y de un protocolo de referencia expresamente separado de store_version, **no una ejecución nativa del endpoint/RBAC** ni implementación del lock propuesta en producción. Deben complementarse con las suites API documentales del clon autorizado. Sus timeouts3s/1s y barreras5s son valores pequeños de ensayo QA, no configuración operativa de la API.
++
++El runner futuro crea filas sintéticas y usa un TemporaryDirectory propio; no borra filas históricas ni ejecuta migraciones. El clon debe descartarse mediante el procedimiento independiente autorizado después de las pruebas. No trasladar estas guardas a una conexión institucional ni reutilizar sus credenciales.
++
++## Requisitos de aceptación QA y riesgos residuales
++
++- Ejecutar primero las comprobaciones de almacenamiento con filesystem/volumen real de QA y los24 tests nuevos: hard links, fsync de archivo/directorio, mode/UID/GID/ACL, ausencia de fallback inseguro y archivos completos. Probar al menos dos procesos/instancias sobre el mismo mount físico.
++- En PostgreSQL desechable autorizado ejecutar el archivo preparado y las suites API reales: confirmar control de número/hash/409 y límites de espera, aislamiento efectivo, locks liberados, distintos documentos, cambios de estado/activos, usuarios y FKs. Verificar que la propuesta no produce deadlocks con mutadores relacionados antes de implementarla.
++- Inducir fallo controlado de conexión durante COMMIT en ese clon, resolver estado desde una conexión nueva al primario y comprobar archivo/fila. No usar el test doble como evidencia de que el servidor confirmó o revirtió una transacción real.
++- Validar confirmación + pérdida HTTP y cliente que reintenta: sin sobrescritura ni borrado, con recuperación por historial/idempotencia. Probar la nueva respuesta409 de incertidumbre y507 de IO en SSALFER, sin logout/cambios de autorización.
++- Ejecutar las dos pruebas Starlette nativas y diseñar/validar la respuesta de descriptor antes de cambiar download. Validar range/cancel/headers y hashes con archivos sintéticos, incluidos lectores autorizados y denegados mediante API real.
++- Medir coste de readback/fsync, event loop/Session retenida, RAM/FD/disk y concurrencia. Añadir presupuestos/worker/cola sólo con diseño aprobado; no cambiar el pool global o aplicar sleeps/mutex para ocultar el problema.
++- Probar journal/reconciliador propuesto y restauración consistente DB+FS con datos QA antes de autorizar limpieza. **No purga automática de huérfanos en esta etapa.** Los candidatos pueden corresponder a operaciones vivas o commits inciertos.
++
++Siguen pendientes numeración serializada, un protocolo adoptado por todos los escritores, resolución automática de commit incierto, bitácora durable, cuotas/retención/reconciliación, resistencia a fallos de host/volumen y TOCTOU de descarga. Nuevos permisos privados y rechazo de symlinks/world-writable/hardlinks no disponibles pueden descubrir configuraciones legítimas pero incompatibles; revisar sin ampliar permisos de históricos a ciegas. El incremento de huérfanos conservados ante conflictos conocidos es un riesgo de disponibilidad que debe gestionarse con esa segunda etapa.
++
++## Archivos y diff exclusivo
++
++| Archivo | Cambio |
++|---|---|
++| backend/app/services/documents.py | Sólo store_version: staging/publicación y conservación ante incertidumbre |
++| backend/app/services/document_storage.py | Nuevo: primitive de almacenamiento/diagnóstico POSIX |
++| tests/security/test_document_validation.py | Adaptador SS-06 y expectativa de compensación justificada |
++| tests/security/test_document_storage.py | Nuevo:24 pruebas aisladas, FS local/procesos/dobles |
++| tests/security/test_document_starlette_pending.py | Nuevo: dos pruebas nativas omitidas en este entorno |
++| tests/qa/test_document_publication_postgresql.py | Nuevo: seis ensayos QA opt-in preparados, no ejecutados |
++| docs/security/SS-12-ETAPA1-CORRECCION-2026-10-28.md | Nuevo: informe y diseño de recuperación |
++| docs/security/SS-12-ETAPA1-CORRECCION-2026-10-28.patch | Nuevo: diff exclusivo de esta intervención |
++
++El patch compara con snapshots del estado local **antes de SS-12**, no con HEAD sin las correcciones previas. Incluye los cuatro archivos nuevos de implementación/pruebas y este informe; excluye únicamente el patch mismo. Se verifica por git apply --reverse --check --whitespace=error-all y git diff --check, sin aplicar ni revertir nada. No modifica migraciones, restricciones, servicio de validación, router de descarga, Compose, frontend ni otros hallazgos.
++
++| Archivo de implementación/pruebas | SHA-256 final |
++|---|---|
++| backend/app/services/documents.py | `a9df440899a0d1a121a6821c461a3082204b8bc20d583c80b1cde27700939dc9` |
++| tests/security/test_document_validation.py | `341b18e6476ba36fe4db454708e03b4a0221d7aa8955af1e165cb7aca1271f56` |
++| backend/app/services/document_storage.py | `4c9f70f526c078c4f4a1fc15729654f1eed7409f30880c378fc90ad46adae541` |
++| tests/security/test_document_storage.py | `bc177a4572c2932094fccb5097f87adac3c40ac725c130d246a764ec9d1a39c0` |
++| tests/security/test_document_starlette_pending.py | `fccba68a1ccffc4155dd567dd04d4cef8dcea1986d03ac5b814d5093797a620a` |
++| tests/qa/test_document_publication_postgresql.py | `2b1f89888c6182acd463915e22ebf696103af56e21256a0f93e04c919684f1dc` |
++
++El [parche completo y revisable](SS-12-ETAPA1-CORRECCION-2026-10-28.patch) contiene exactamente esta intervención. Diff de los archivos preexistentes:
++
++```diff
++diff --git a/backend/app/services/documents.py b/backend/app/services/documents.py
++--- a/backend/app/services/documents.py
+++++ b/backend/app/services/documents.py
++@@ -3,7 +3,6 @@
++ import hashlib
++ import os
++ import re
++-import uuid
++ from pathlib import Path
++ 
++ from fastapi import HTTPException, UploadFile
++@@ -14,6 +13,7 @@
++ from .access import require_document_access, require_document_target_access
++ from .common import apply_update, commit_or_conflict, mark_inactive, set_audit_context
++ from .document_validation import DocumentValidationError, validate_document
+++from .document_storage import DocumentStorageError, stage_document, storage_event
++ 
++ 
++ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png"}
++@@ -175,40 +175,48 @@
++     ).first()
++     if previous is not None:
++         raise HTTPException(status_code=409, detail="Esta versión ya fue cargada")
++-    next_version = (
++-        db.query(func.coalesce(func.max(models.DocumentoVersion.numero_version), 0))
++-        .filter(models.DocumentoVersion.id_documento == document_id)
++-        .scalar()
++-        + 1
++-    )
++-    relative = Path(str(document_id)) / f"{next_version:04d}-{uuid.uuid4().hex}{extension}"
++-    destination = (upload_root() / relative).resolve()
++-    if upload_root() not in destination.parents:
++-        raise HTTPException(status_code=422, detail="Ruta documental no válida")
++-    destination.parent.mkdir(parents=True, exist_ok=True)
++-    destination.write_bytes(content)
++-    set_audit_context(db, user.id_usuario)
++-    version = models.DocumentoVersion(
++-        id_documento=document_id,
++-        numero_version=next_version,
++-        hash_sha256=digest,
++-        tamano_bytes=len(content),
++-        nombre_original=original,
++-        ruta_almacenamiento=str(relative),
++-        tipo_mime=canonical_mime,
++-        id_usuario_carga=user.id_usuario,
++-    )
++-    db.add(version)
++-    try:
++-        db.commit()
++-    except Exception as exc:
+++    try:
+++        root = upload_root()
+++    except OSError as exc:
++         db.rollback()
++-        destination.unlink(missing_ok=True)
++-        raise HTTPException(
++-            status_code=409, detail="No fue posible registrar la versión"
++-        ) from exc
++-    db.refresh(version)
++-    return version
+++        raise HTTPException(status_code=507, detail="No fue posible completar el almacenamiento documental.") from exc
+++    try:
+++        with stage_document(root, document_id, content, digest) as staged:
+++            # Parent-row serialization is pending PostgreSQL QA. Existing unique
+++            # constraints remain the last defense; no process-local mutex/retry.
+++            next_version = (
+++                db.query(func.coalesce(func.max(models.DocumentoVersion.numero_version), 0))
+++                .filter(models.DocumentoVersion.id_documento == document_id)
+++                .scalar() + 1
+++            )
+++            relative = Path(str(document_id)) / f"{next_version:04d}-{staged.operation_id}{extension}"
+++            staged.publish(relative.name)
+++            try:
+++                set_audit_context(db, user.id_usuario)
+++                version = models.DocumentoVersion(
+++                    id_documento=document_id,
+++                    numero_version=next_version,
+++                    hash_sha256=digest,
+++                    tamano_bytes=len(content),
+++                    nombre_original=original,
+++                    ruta_almacenamiento=str(relative),
+++                    tipo_mime=canonical_mime,
+++                    id_usuario_carga=user.id_usuario,
+++                )
+++                db.add(version)
+++                db.commit()
+++            except BaseException as exc:
+++                storage_event('DOCUMENT_REGISTRATION_UNCONFIRMED', staged.operation_id)
+++                db.rollback()
+++                if not isinstance(exc, Exception):
+++                    raise
+++                raise HTTPException(status_code=409,
+++                    detail="No fue posible confirmar el registro de la versión; consulte el historial antes de reintentar.") from exc
+++            db.refresh(version)
+++            return version
+++    except DocumentStorageError as exc:
+++        db.rollback()
+++        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
++ 
++ 
++ def safe_version_path(version: models.DocumentoVersion) -> Path:
++diff --git a/tests/security/test_document_validation.py b/tests/security/test_document_validation.py
++--- a/tests/security/test_document_validation.py
+++++ b/tests/security/test_document_validation.py
++@@ -22,6 +22,7 @@
++ sys.path.insert(0, str(ROOT / 'backend'))
++ sys.path.insert(0, str(ROOT / 'backend/tests'))
++ from app.services import document_validation as validator
+++from app.services import document_storage as storage
++ from _document_samples import minimal_pdf, minimal_png, minimal_jpeg, png_chunk, office_parts, package, CT, RELS, OFFICE
++ 
++ 
++@@ -227,6 +228,8 @@
++         ALLOWED_EXTENSIONS={'.pdf', '.docx', '.xlsx', '.jpg', '.jpeg', '.png'}, MAX_UPLOAD_BYTES=65536,
++         models=SimpleNamespace(DocumentoVersion=Version), require_document_access=MagicMock(),
++         set_audit_context=MagicMock(), HTTPException=HTTPError,
+++        DocumentStorageError=storage.DocumentStorageError, stage_document=storage.stage_document,
+++        storage_event=MagicMock(),
++         DocumentValidationError=validator.DocumentValidationError, validate_document=validator.validate_document)
++     future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
++     exec(compile(ast.fix_missing_locations(ast.Module(body=[future, *nodes], type_ignores=[])), 'isolated_documents', 'exec'), ns)
++@@ -285,7 +288,12 @@
++         self.db.commit.side_effect = RuntimeError('SS06 SYNTH DRIVER DETAIL')
++         with self.assertRaises(HTTPError) as caught: self.upload(minimal_pdf())
++         self.assertEqual(caught.exception.status_code, 409)
++-        self.assertEqual(list(Path(self.directory.name).rglob('*.pdf')), [])
+++        # SS-12: commit may already have succeeded when its response is lost.
+++        # Preserve the published file; only this operation's staging is cleaned.
+++        retained = list(Path(self.directory.name).rglob('*.pdf'))
+++        self.assertEqual(len(retained), 1)
+++        self.assertEqual(retained[0].read_bytes(), minimal_pdf())
+++        self.assertEqual(list(Path(self.directory.name).rglob('.pending-*')), [])
++         self.db.rollback.assert_called_once()
++ 
++     def download(self, version, denied=False):
++```
++
++**Entrega detenida para revisión técnica.** No se ejecutan pruebas PostgreSQL QA, no se implementa el lock o reconciliador propuesto, no se cambia la descarga ni se integra/despliega esta etapa.

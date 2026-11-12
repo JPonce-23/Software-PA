@@ -1,13 +1,12 @@
-# Bloqueo reproducible obtenido del contenedor de desarrollo funcional.
+# Runtime y herramientas existentes; pins compatibles con Python 3.11.
+# Autenticación usa bcrypt/sesiones opacas: se retiró el árbol JOSE/RSA no utilizado.
 aiofiles==25.1.0
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.14.2
 bcrypt==5.0.0
 certifi==2026.10.19
-cffi==2.0.0
 click==8.4.2
-cryptography==50.0.0
 et_xmlfile==2.0.0
 fastapi==0.138.2
 GeoAlchemy2==0.20.0
@@ -22,18 +21,17 @@ openpyxl==3.1.5
 packaging==26.2
 pandas==3.0.3
 passlib==1.7.4
+Pillow==13.0.0
 pluggy==1.6.0
 psycopg2-binary==2.9.12
-pyasn1==0.6.4
-pycparser==3.0
 pydantic==2.13.4
 pydantic_core==2.46.4
 Pygments==2.20.0
+pypdf==6.21.4
 pytest==9.1.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 python-multipart==0.0.32
-rsa==4.9.1
 six==1.17.0
 SQLAlchemy==2.0.51
 starlette==1.3.1

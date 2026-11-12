@@ -1,0 +1,3 @@
+# CI-only tools. Runtime pins remain in backend/requirements.txt.
+PyYAML==6.0.3
+pglast==8.7

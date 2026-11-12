@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "scope": "reviewed_local_build_inputs_not_upstream_attestation",
+  "files": [
+    {
+      "path": "deploy/tls/Dockerfile",
+      "sha256": "3db8848d30a883f0e785518ba4f8b72b00e567b1092375f658f3e86768223848",
+      "size": 531
+    },
+    {
+      "path": "deploy/tls/.dockerignore",
+      "sha256": "61fd5865996bc0c09debc28ef39ae01a18077e84e685bba9cc39248d140e27aa",
+      "size": 81
+    },
+    {
+      "path": "deploy/tls/default.conf.template",
+      "sha256": "115d5b46a003d36175226cc49c34f0e0ce1bb3d7c4bb151ec47eb0ea1771f62a",
+      "size": 2406
+    },
+    {
+      "path": "deploy/tls/headers.conf",
+      "sha256": "634889e5ad8564963a1e002b65f598b091d7ffb3dceb52743453d05b9680402b",
+      "size": 783
+    },
+    {
+      "path": "deploy/tls/proxy.conf",
+      "sha256": "e2c30a5d602ad4fb46b1754ed35864cf8b2f58fab8d702284f719ad619fa9ff0",
+      "size": 881
+    },
+    {
+      "path": "deploy/tls/validate-host.sh",
+      "sha256": "7d59825b8a19c682addb9cc332076261c605b1cf4d4c92cd25ecd9fb8dc74297",
+      "size": 248
+    }
+  ]
+}

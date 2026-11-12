@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from types import SimpleNamespace
 import uuid
+from tests._document_samples import minimal_pdf
 
 import pytest
 from sqlalchemy import event
@@ -78,7 +79,7 @@ def test_consolidation_all_provenances_versions_and_constant_queries(
     requirement = api("PATCH", f"/api/requisitos-documentales/{identities['expediente_requisito']}",
                       json={"id_documento": document["id_documento"]}).json()
     versions = [api("POST", f"/api/documentos/{document['id_documento']}/versiones", expected=201,
-                    files={"archivo": ("soporte.pdf", f"%PDF-{i}".encode(), "application/pdf")}).json()
+                    files={"archivo": ("soporte.pdf", minimal_pdf(f"QA version {i}"), "application/pdf")}).json()
                 for i in (1, 2)]
     with sql_reads(transactional_api["connection"]) as many_queries:
         rows = api("GET", path).json()
