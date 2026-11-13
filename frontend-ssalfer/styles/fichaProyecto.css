@@ -33,3 +33,5 @@
 .proyecto-datos #kpiNucleos, .proyecto-datos #kpiParcelasAfectaciones, .proyecto-datos #kpiSuperficie { font-size:clamp(1.6rem, 2.5vw, 2rem); font-weight:750; line-height:1.2; color:var(--verde); font-variant-numeric:tabular-nums; overflow-wrap:anywhere; margin:10px 0; }
 .proyecto-resumen a:focus-visible, #datosFinancieros a:focus-visible { outline:3px solid #2b6fac; outline-offset:3px; }
 @media(max-width:700px) { .proyecto-resumen { grid-template-columns:1fr; } .proyecto-datos { padding-top:0; } .proyecto-reportes { border-left:0; border-top:1px solid #bdd1c4; padding:68px 0 0; } .proyecto-reportes > h2 { top:16px; left:0; } }
+
+.proyecto-resumen .proyecto-seguimiento-fifonafe { grid-column:1/-1; width:min(100%,620px); justify-self:center; }

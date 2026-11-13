@@ -212,6 +212,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 )}`;
         }
 
+        const seguimiento = document.getElementById("enlaceSeguimientoFifonafe");
+        if (seguimiento) seguimiento.href = `/pages/seguimientoFifonafe.html?id_proyecto=${encodeURIComponent(idProyecto)}`;
         const enlaceColectivos = document.getElementById("enlaceReporteColectivos");
         if (enlaceColectivos) enlaceColectivos.href = `/pages/reportesColectivos.html?id_proyecto=${encodeURIComponent(idProyecto)}`;
         if (elementos.enlaceReporteConvenios) {

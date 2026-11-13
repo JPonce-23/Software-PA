@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html data-role="admin operador visualizador" lang="es">
+<head>
+    <script src="/js/utils/permisos.js"></script>
+    <script src="/js/utils/proteccion.js"></script>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>Seguimiento FIFONAFE | SSALFER</title>
+
+    <link
+        rel="stylesheet"
+        href="/styles/dashboard.css">
+
+    <link
+        rel="stylesheet"
+        href="/styles/seguimientoFifonafe.css">
+
+    <link
+        rel="stylesheet"
+        href="/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css">
+
+    <link
+        rel="icon"
+        type="image/png"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+    <link rel="stylesheet" href="/styles/shared.css">
+
+<link rel="stylesheet" href="/styles/marco.css">
+<link rel="stylesheet" href="/styles/tablasScroll.css">
+<script defer src="/js/utils/tablasScroll.js"></script>
+</head>
+
+<body>
+
+<aside class="aside">
+
+
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">
+            Usuario
+        </span>
+
+    </div>
+
+
+    <nav class="barra">
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+            <div
+                class="proyectos-lista-dinamica"
+                id="proyectosLista">
+            </div>
+
+        </div>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Reportes
+            </h4>
+
+
+            <a href="/pages/reporteActividadesPeriodo.html">
+
+                <i class="bi bi-bar-chart-line"></i>
+
+                <span>
+                    Avance por periodo
+                </span>
+
+            </a>
+
+
+            <a href="/pages/reportesConvenios.html">
+
+                <i class="bi bi-file-earmark-text"></i>
+
+                <span>
+                    Convenios
+                </span>
+
+            </a>
+
+
+            <a
+                href="/pages/reportesFifonafe.html"
+                class="activo">
+
+                <i class="bi bi-bank"></i>
+
+                <span>
+                    FIFONAFE
+                </span>
+
+            </a>
+
+        </div>
+
+
+        <div class="usuario-panel">
+
+            <button
+                class="usuario-btn"
+                type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">
+                    Usuario
+                </span>
+
+                <i class="bi bi-chevron-up"></i>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="/dashboard.html">
+
+                    <i class="bi bi-house"></i>
+
+                    Dashboard
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Procuraduría Agraria">
+
+        <img
+            src="/img/PA_LOGO_VERDE.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+<main class="contenedor seguimiento-fifonafe">
+<section class="sf-encabezado"><div><h1>Seguimiento FIFONAFE</h1><p>COP, oficios y respuestas del proyecto.</p></div><button id="btnVolver" data-volver="proyecto" class="btn-secundario">Volver al proyecto</button></section>
+<section class="tarjeta sf-controles"><label>Proyecto<select id="sfProyecto"><option value="">Selecciona un proyecto</option></select></label><button id="sfRegistrar" class="btn-principal" data-role="admin operador" disabled>Registrar COP o vincular seguimiento</button></section>
+<div id="sfError" role="alert" hidden></div><p id="sfEstado" role="status" aria-live="polite"></p>
+<section class="sf-totales" aria-label="Totales del proyecto"><article class="tarjeta"><h2>Individuales</h2><strong id="sfIndividuales">—</strong></article><article class="tarjeta"><h2>Colectivos</h2><strong id="sfColectivos">—</strong></article></section>
+<div class="sf-filtros"><label>Mostrar<select id="sfAmbito"><option value="">Todos los COP</option><option value="individual">Individuales</option><option value="colectivo">Colectivos</option></select></label><button id="sfActualizar" class="btn-secundario">Actualizar</button></div>
+<p>El avance y el conflicto se muestran por separado. Sin respuesta no significa sin conflicto.</p>
+<div id="sfListado" class="sf-listado"></div>
+<nav class="sf-paginacion" aria-label="Páginas de COP"><button id="sfAnterior" class="btn-secundario" disabled>Anterior</button><span id="sfPagina"></span><button id="sfSiguiente" class="btn-secundario" disabled>Siguiente</button></nav>
+<dialog id="sfDetalle" aria-labelledby="sfTitulo"><div class="sf-modal-cabecera"><h2 id="sfTitulo"></h2><button id="sfCerrar" class="btn-secundario" autofocus>Cerrar</button></div><div id="sfDetalleContenido"></div></dialog>
+</main>
+
+
+<footer class="footer"><p>© 2026 Procuraduría Agraria. Todos los derechos reservados.</p></footer>
+
+
+<script src="/js/env.js"></script>
+
+<script src="/js/config.js"></script>
+
+<script src="/js/api/cliente.js"></script>
+
+<script src="/js/api/auth.js"></script>
+
+<script src="/js/api/proyectos.js"></script>
+
+<script src="/js/api/reportes.js"></script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/experiencia.js"></script>
+<script src="/js/utils/navegacion.js"></script>
+
+<script src="/js/utils/marco.js"></script>
+<script src="/js/dashboard.js"></script>
+
+<script src="/js/api/documentos.js"></script>
+<script src="/js/api/nucleos.js"></script>
+<script src="/js/api/afectaciones.js"></script>
+<script src="/js/utils/gestion.js"></script>
+<script src="/js/seguimientoFifonafe.js"></script>
+
+
+</body>
+</html>

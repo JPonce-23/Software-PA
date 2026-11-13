@@ -1715,3 +1715,14 @@ class RevisionCambioGisDecision(Base):
     id_seguimiento_evento = Column(BigInteger, ForeignKey("seguimiento_evento.id_seguimiento_evento"))
     creado_por = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
     creado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class EtiquetaSeguimientoFifonafe(Base):
+    __tablename__ = "etiqueta_seguimiento_fifonafe"
+    id_etiqueta = Column(BigInteger, primary_key=True)
+    id_convenio = Column(Integer, ForeignKey("convenio.id_convenio"), nullable=False)
+    codigo = Column(String(40), nullable=False)
+    habilitada = Column(Boolean, nullable=False)
+    motivo = Column(Text, nullable=False)
+    creado_por = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    creado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

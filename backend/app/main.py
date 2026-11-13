@@ -137,8 +137,8 @@ def health():
         db.close()
     return {"status": "ok", "schema": version}
 
+from .routers import fifonafe_tracking
+app.include_router(fifonafe_tracking.router, prefix="/api")
 
 app.add_middleware(ErrorHeadersMiddleware)
-
-# Registered last: observe CSRF/CORS and routing, retaining route templates only.
 app.add_middleware(SafeDiagnosticsMiddleware, routes=app.routes)
