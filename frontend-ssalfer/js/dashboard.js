@@ -1165,7 +1165,7 @@ configurarAccesoMapa();
                             <span
                                 class="dashboard-resumen-etiqueta"
                             >
-                                Resumen general
+                                Vista rápida
                             </span>
 
                         </div>
@@ -1430,6 +1430,13 @@ configurarAccesoMapa();
                 `;
 
 
+                const resumenLink = document.createElement("a");
+                resumenLink.className = "dashboard-acceso-resumen";
+                resumenLink.href = `/pages/resumenProyecto.html?id_proyecto=${encodeURIComponent(proyecto.id_proyecto)}`;
+                resumenLink.setAttribute("data-role", "admin operador visualizador");
+                resumenLink.setAttribute("aria-label", `Resumen ampliado de ${proyecto.nombre_proyecto}`);
+                resumenLink.innerHTML = '<i class="bi bi-book" aria-hidden="true"></i><strong>Resumen</strong><small>Ver avance</small>';
+                articulo.append(resumenLink);
                 articulo.removeAttribute("aria-busy");
                 window.SSALFER_DASHBOARD_EXCEL?.registrar({orden,proyecto,kpis:kpisDashboard.filter(k=>k.id_proyecto===proyecto.id_proyecto),cop:copResumen,elemento:articulo});
             }

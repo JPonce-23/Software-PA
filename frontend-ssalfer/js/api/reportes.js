@@ -88,6 +88,7 @@
     }
 
     window.ReportesAPI = {
+        obtenerResumenProyecto: id => get(`/proyectos/${encodeURIComponent(id)}/resumen-ampliado`),
         obtenerReferenciasReporte,
         obtenerReferenciasContexto,
         generalConvenios: (id, params = {}, completo = false) => get(`/proyectos/${encodeURIComponent(id)}/reportes/convenios/general${completo ? '/completo' : ''}?${new URLSearchParams(params)}`),

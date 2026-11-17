@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html data-role="admin operador visualizador" lang="es">
+<head>
+    <script src="/js/utils/permisos.js"></script>
+    <script src="/js/utils/proteccion.js"></script>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>Resumen del proyecto | SSALFER</title>
+
+    <link
+        rel="stylesheet"
+        href="/styles/dashboard.css">
+
+    <link
+        rel="stylesheet"
+        href="/styles/resumenProyecto.css">
+
+    <link
+        rel="stylesheet"
+        href="/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css">
+
+    <link
+        rel="icon"
+        type="image/png"
+        href="/img/LOGOS VERDE/IMAGOTIPO.png">
+    <link rel="stylesheet" href="/styles/shared.css">
+
+<link rel="stylesheet" href="/styles/marco.css">
+<link rel="stylesheet" href="/styles/tablasScroll.css">
+<script defer src="/js/utils/tablasScroll.js"></script>
+</head>
+
+<body>
+
+<aside class="aside">
+
+
+
+
+    <div class="logo-aside">
+
+        <img
+            src="/img/LOGOS VERDE/IMAGOTIPO.png"
+            alt="Logo SSALFER">
+
+    </div>
+
+
+    <div class="bienvenida">
+
+        <h3>
+            Bienvenido
+        </h3>
+
+        <span class="js-usuario-nombre">
+            Usuario
+        </span>
+
+    </div>
+
+
+    <nav class="barra">
+
+        <a href="/dashboard.html">
+
+            <i class="bi bi-train-front"></i>
+
+            <span>
+                Todos los proyectos
+            </span>
+
+        </a>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Proyectos
+            </h4>
+
+            <div
+                class="proyectos-lista-dinamica"
+                id="proyectosLista">
+            </div>
+
+        </div>
+
+
+        <div class="proyectos">
+
+            <h4>
+                Reportes
+            </h4>
+
+
+            <a href="/pages/reporteActividadesPeriodo.html">
+
+                <i class="bi bi-bar-chart-line"></i>
+
+                <span>
+                    Avance por periodo
+                </span>
+
+            </a>
+
+
+            <a href="/pages/reportesConvenios.html">
+
+                <i class="bi bi-file-earmark-text"></i>
+
+                <span>
+                    Convenios
+                </span>
+
+            </a>
+
+
+            <a
+                href="/pages/reportesFifonafe.html"
+                >
+
+                <i class="bi bi-bank"></i>
+
+                <span>
+                    FIFONAFE
+                </span>
+
+            </a>
+
+        </div>
+
+
+        <div class="usuario-panel">
+
+            <button
+                class="usuario-btn"
+                type="button">
+
+                <i class="bi bi-person-circle"></i>
+
+                <span class="js-usuario-nombre">
+                    Usuario
+                </span>
+
+                <i class="bi bi-chevron-up"></i>
+
+            </button>
+
+
+            <div class="opciones-usuario">
+
+                <a href="/dashboard.html">
+
+                    <i class="bi bi-house"></i>
+
+                    Dashboard
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</aside>
+
+
+<header class="header">
+
+    <div class="logo-ssalfer">
+
+        <img
+            src="/img/LOGOS VERDE/SSALFER.png"
+            alt="SSALFER">
+
+        <img
+            src="/img/LOGOS VERDE/NOMBRE_LOGO.png"
+            alt="Nombre SSALFER">
+
+    </div>
+
+
+    <a
+        class="logo-pa"
+        href="https://www.gob.mx/pa"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Procuraduría Agraria">
+
+        <img
+            src="/img/PA_LOGO_VERDE.png"
+            alt="Procuraduría Agraria">
+
+    </a>
+
+</header>
+
+
+<main class="contenedor resumen-proyecto">
+<section class="rp-cabecera tarjeta"><div><span>VISTA DEL PROYECTO</span><h1>Resumen ampliado</h1></div><label for="rpProyecto">Proyecto<select id="rpProyecto"><option value="">Selecciona un proyecto</option></select></label><div class="rp-acciones"><a id="rpFicha" class="btn-secundario" hidden>Ver proyecto</a><a id="rpSeguimiento" class="btn-secundario" hidden>Seguimiento FIFONAFE</a><button id="rpActualizar" class="btn-secundario">Actualizar</button></div></section>
+<p id="rpEstado" role="status" aria-live="polite">Selecciona un proyecto.</p><div id="rpError" role="alert" hidden></div>
+<div id="rpContenido" aria-busy="false"></div>
+</main>
+
+
+<footer class="footer"><p>© 2026 Procuraduría Agraria. Todos los derechos reservados.</p></footer>
+
+
+<script src="/js/env.js"></script>
+
+<script src="/js/config.js"></script>
+
+<script src="/js/api/cliente.js"></script>
+
+<script src="/js/api/auth.js"></script>
+
+<script src="/js/api/proyectos.js"></script>
+
+<script src="/js/api/reportes.js"></script>
+
+
+<script src="/js/utils/formatters.js"></script>
+<script src="/js/utils/ui.js"></script>
+<script src="/js/utils/experiencia.js"></script>
+<script src="/js/utils/navegacion.js"></script>
+
+<script src="/js/utils/marco.js"></script>
+<script src="/js/dashboard.js"></script>
+
+
+
+
+
+<script src="/js/resumenProyecto.js"></script>
+
+
+</body>
+</html>

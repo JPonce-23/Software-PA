@@ -2990,3 +2990,25 @@ body:has(.aside.collapsed) .nucleo-info h3 {
     gap: 12px;
     padding-top: 16px;
 }
+/* Acceso independiente: evita enlaces anidados dentro de la tarjeta del proyecto. */
+.tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) { display: grid; grid-template-columns: minmax(0,1fr) 100px; gap: 12px; }
+.tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) > a { min-width: 0; }
+html[data-rol-actual="geografo"] .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) { grid-template-columns: minmax(0,1fr); }
+@media(min-width: 1280px) {
+ .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) > a:not(.dashboard-acceso-resumen) { grid-template-columns: minmax(0,.95fr) minmax(0,1.1fr); }
+ .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) .dashboard-kpi-ejecutivo { grid-template-columns: 1fr; gap: 4px; }
+ .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) .dashboard-kpi-icono { display: none; }
+}
+.tarjeta-dashboard-ejecutivo > a.dashboard-acceso-resumen { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .55rem; text-align: center; text-decoration: none; color: var(--verde); border: 1px solid #bfd3c4; border-radius: 12px; background: #f0f7f2; padding: .7rem; }
+.dashboard-acceso-resumen i { font-size: 2rem; }
+.dashboard-acceso-resumen:hover { background: #e0eee3; transform: translateY(-2px); }
+.dashboard-acceso-resumen:focus-visible { outline: 3px solid var(--verde); outline-offset: 3px; }
+.tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) .dashboard-kpi-ejecutivo { min-height: 88px; padding: 9px; }
+.tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) .dashboard-graficas-grid { grid-template-columns: minmax(0,.7fr) minmax(0,1.3fr); }
+@media(max-width: 850px) {
+ .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) { grid-template-columns: minmax(0,1fr); }
+ .tarjeta-dashboard-ejecutivo > a.dashboard-acceso-resumen { flex-direction: row; }
+}
+@media(max-width: 600px) {
+ .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) .dashboard-graficas-grid { grid-template-columns: minmax(0,1fr); }
+}

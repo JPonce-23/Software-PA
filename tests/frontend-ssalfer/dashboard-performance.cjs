@@ -129,7 +129,7 @@ async function load({reference=false,data=dataset(),fail=()=>false,delays={},exp
     const button=()=>nodes.get('btnExportarDashboardExcel');
     for(let i=0;i<2000&&(!button()||button().disabled)&&!(nodes.get('listaProyectosDashboard').children.length===data.projects.length&&nodes.get('listaProyectosDashboard').children.every(e=>!e.attributes['aria-busy']));i++)await new Promise(resolve=>setTimeout(resolve,1));
     const ready=button()&&!button().disabled;
-    const cards=nodes.get('listaProyectosDashboard').children.map(e=>e.innerHTML);
+    const cards=nodes.get('listaProyectosDashboard').children.map(e=>e.innerHTML.replace('Resumen general','Vista rápida')); // Intentional label change; compare all KPI values unchanged.
     let sheets=null;
     if(exportExcel&&ready){
         await button().onclick();

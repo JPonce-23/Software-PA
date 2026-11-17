@@ -21,6 +21,14 @@ router = APIRouter(tags=["Dashboard y mapa"])
 READ_ROLES = ["admin", "operador", "visualizador", "geografo"]
 
 
+@router.get("/proyectos/{id_proyecto}/resumen-ampliado")
+def expanded_project_summary(id_proyecto: int, db: Session = Depends(get_db),
+                             user=Depends(auth.RoleChecker(["admin", "operador", "visualizador"]))):
+    require_project_access(db, user, id_proyecto, load_details=False)
+    from ..services.project_overview import project_overview
+    return project_overview(db, id_proyecto)
+
+
 class DashboardCsvResponse(StreamingResponse):
     """Own the file even if ASGI is cancelled before iteration starts."""
     def __init__(self, output):
