@@ -92,14 +92,78 @@ class RegistryTests(unittest.TestCase):
                     client.call(url)
                 request.assert_not_called()
 
+    def package(self):
+        return {'name': 'software-pa-native-postgis', 'package_type': 'container',
+                'owner': {'login': 'JPonce-23'}, 'visibility': 'private',
+                'repository': {'full_name': 'JPonce-23/Software-PA'}}
+
     def test_wrong_visibility_or_repository_fails(self):
-        values = [{'visibility': 'public', 'repository': {'full_name': 'JPonce-23/Software-PA'}},
-                  {'visibility': 'private', 'repository': {'full_name': 'other/repo'}}]
+        values = [dict(self.package(), visibility='public'),
+                  dict(self.package(), repository={'full_name': 'other/repo'}),
+                  dict(self.package(), repository=None), dict(self.package(), repository={})]
         for value in values:
             with patch.dict(os.environ, {'GH_TOKEN': 'dummy'}), patch.object(registry, 'request',
                     return_value=(200, {}, json.dumps(value).encode())):
                 with self.assertRaises(ValueError):
                     registry.package_state()
+
+    def test_private_metadata_uses_authenticated_endpoint_and_job_token(self):
+        # Private metadata must use the documented authenticated route.
+        def response(url, **kwargs):
+            self.assertEqual(url, 'https://api.github.com/user/packages/container/software-pa-native-postgis')
+            self.assertEqual(kwargs['headers']['Authorization'], 'Bearer ghs_dummy_job_token')
+            self.assertEqual(kwargs['headers']['Accept'], 'application/vnd.github+json')
+            return 200, {}, json.dumps(self.package()).encode()
+        with patch.dict(os.environ, {'GH_TOKEN': 'ghs_dummy_job_token', 'GITHUB_ACTOR': 'DrMannx'}, clear=True), \
+                patch.object(registry, 'request', side_effect=response) as request:
+            result = registry.package_state()
+        request.assert_called_once()
+        self.assertEqual(result['visibility'], 'private')
+        self.assertEqual(result['repository'], 'JPonce-23/Software-PA')
+        self.assertEqual(result['owner'], 'JPonce-23')
+        self.assertEqual(result['metadata_api'], registry.PACKAGE_METADATA_URL)
+
+    def test_authenticated_namespace_cannot_substitute_another_package(self):
+        values = [dict(self.package(), owner={'login': 'DrMannx'}),
+                  dict(self.package(), owner=None),
+                  dict(self.package(), name='another-package'),
+                  dict(self.package(), package_type='npm')]
+        for value in values:
+            with self.subTest(value=value), patch.dict(os.environ, {'GH_TOKEN': 'dummy'}), \
+                    patch.object(registry, 'request', return_value=(200, {}, json.dumps(value).encode())):
+                with self.assertRaisesRegex(ValueError, 'PACKAGE_IDENTITY_MISMATCH'):
+                    registry.package_state()
+
+    def test_metadata_auth_and_service_errors_fail_even_before_publication(self):
+        for status in [401, 403, 429, 500, 503]:
+            for preflight in [False, True]:
+                with self.subTest(status=status, preflight=preflight), \
+                        patch.dict(os.environ, {'GH_TOKEN': 'dummy'}), \
+                        patch.object(registry, 'request', return_value=(status, {}, b'{}')):
+                    with self.assertRaisesRegex(ValueError, 'PACKAGE_METADATA_NOT_READABLE'):
+                        registry.package_state(allow_absent=preflight)
+
+    def test_preflight_404_does_not_claim_privacy_or_proven_absence(self):
+        with patch.dict(os.environ, {'GH_TOKEN': 'dummy'}), \
+                patch.object(registry, 'request', return_value=(404, {}, b'{}')):
+            result = registry.package_state(allow_absent=True)
+            self.assertIsNone(result['visibility'])
+            self.assertEqual(result['state'], 'absent-or-not-readable')
+            with self.assertRaisesRegex(ValueError, 'PACKAGE_METADATA_NOT_READABLE'):
+                registry.package_state()
+
+    def test_private_metadata_does_not_confuse_repository_visibility(self):
+        value = self.package()
+        value['repository']['private'] = False
+        with patch.dict(os.environ, {'GH_TOKEN': 'dummy'}), \
+                patch.object(registry, 'request', return_value=(200, {}, json.dumps(value).encode())):
+            self.assertEqual(registry.package_state()['visibility'], 'private')
+        value['visibility'] = 'public'
+        value['repository']['private'] = True
+        with patch.dict(os.environ, {'GH_TOKEN': 'dummy'}), \
+                patch.object(registry, 'request', return_value=(200, {}, json.dumps(value).encode())):
+            with self.assertRaisesRegex(ValueError, 'PACKAGE_MUST_BE_PRIVATE'):
+                registry.package_state()
 
     def test_post_publication_metadata_must_be_readable(self):
         with patch.dict(os.environ, {'GH_TOKEN': 'dummy'}), patch.object(registry, 'request', return_value=(404, {}, b'{}')):
@@ -131,6 +195,71 @@ class RegistryTests(unittest.TestCase):
                     client.publish(root, report)
                 upload.assert_called_once()
                 call.assert_not_called()
+
+
+class RemoteIntegrityTests(unittest.TestCase):
+    def verify(self, change_config=None, corrupt=None):
+        config = {'os': 'linux', 'architecture': 'amd64',
+                  'rootfs': {'diff_ids': prepare.CATALOG['rootfs_diff_ids']},
+                  'config': {'Labels': {'org.opencontainers.image.source': prepare.SOURCE_URL,
+                                        'org.opencontainers.image.revision': prepare.SOURCE_COMMIT,
+                                        'org.opencontainers.image.version': prepare.VERSION}}}
+        if change_config:
+            change_config(config)
+        config_bytes = json.dumps(config, sort_keys=True).encode()
+        config_digest = registry.digest_bytes(config_bytes)
+        manifest_bytes = json.dumps({'config': {'digest': config_digest}}, sort_keys=True).encode()
+        manifest_digest = registry.digest_bytes(manifest_bytes)
+        report = {'candidate': {'digest': manifest_digest}, 'candidate_config': config_digest}
+        package = RegistryTests().package()
+        replies = {registry.ROOT + '/manifests/' + manifest_digest: manifest_bytes,
+                   registry.ROOT + '/blobs/' + config_digest: config_bytes,
+                   registry.ROOT + '/manifests/' + prepare.TAG: manifest_bytes,
+                   registry.PACKAGE_METADATA_URL: json.dumps(package).encode()}
+        if corrupt:
+            key = {'manifest': registry.ROOT + '/manifests/' + manifest_digest,
+                   'config': registry.ROOT + '/blobs/' + config_digest,
+                   'tag': registry.ROOT + '/manifests/' + prepare.TAG}[corrupt]
+            replies[key] += b' '
+        seen = []
+        def response(url, method='GET', data=None, headers=None):
+            seen.append(url)
+            return 200, {}, replies[url]
+        client = object.__new__(registry.Registry)
+        client.token = 'dummy-registry-token'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'blobs/sha256').mkdir(parents=True)
+            prepare.blob(root, manifest_digest).write_bytes(manifest_bytes)
+            with patch.dict(os.environ, {'GH_TOKEN': 'dummy-job-token'}), \
+                    patch.object(registry, 'request', side_effect=response):
+                result = client.verify(root, report)
+        return result, seen
+
+    def test_remote_verification_includes_authenticated_private_package_metadata(self):
+        result, seen = self.verify()
+        self.assertEqual(result['package']['visibility'], 'private')
+        self.assertIn(registry.PACKAGE_METADATA_URL, seen)
+        self.assertEqual(result['source_commit'], prepare.SOURCE_COMMIT)
+
+    def test_corrupt_remote_manifest_config_or_tag_remains_rejected(self):
+        for target, error in [('manifest', 'REMOTE_MANIFEST_DIGEST'),
+                              ('config', 'REMOTE_CONFIG_DIGEST'), ('tag', 'REMOTE_TAG_DIGEST')]:
+            with self.subTest(target=target), self.assertRaisesRegex(ValueError, error):
+                self.verify(corrupt=target)
+
+    def test_remote_provenance_platform_and_rootfs_remain_mandatory(self):
+        changes = [(lambda c: c['config']['Labels'].update({'org.opencontainers.image.source': 'other'}),
+                    'REMOTE_SOURCE_LABEL'),
+                   (lambda c: c['config']['Labels'].update({'org.opencontainers.image.revision': '0'*40}),
+                    'REMOTE_SOURCE_COMMIT'),
+                   (lambda c: c['config']['Labels'].update({'org.opencontainers.image.version': 'other'}),
+                    'REMOTE_VERSION'),
+                   (lambda c: c.update({'architecture': 'arm64'}), 'REMOTE_PLATFORM'),
+                   (lambda c: c['rootfs'].update({'diff_ids': []}), 'REMOTE_ROOTFS')]
+        for change, error in changes:
+            with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
+                self.verify(change_config=change)
 
 
 class EnvironmentTests(unittest.TestCase):

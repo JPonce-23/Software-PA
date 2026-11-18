@@ -13,6 +13,7 @@ from pa5_supply import digest_bytes, require
 REPOSITORY = 'jponce-23/software-pa-native-postgis'
 ROOT = 'https://ghcr.io/v2/' + REPOSITORY
 MANIFEST_TYPE = 'application/vnd.oci.image.manifest.v1+json'
+PACKAGE_METADATA_URL = 'https://api.github.com/user/packages/container/software-pa-native-postgis'
 
 
 class NoCredentialRedirect(urllib.request.HTTPRedirectHandler):
@@ -34,18 +35,30 @@ def request(url, method='GET', data=None, headers=None):
 
 
 def package_state(allow_absent=False):
-    url = 'https://api.github.com/users/JPonce-23/packages/container/software-pa-native-postgis'
-    status, _, payload = request(url, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+    # /users/{username}/packages is documented for public packages. The authenticated
+    # endpoint supports installation tokens (including GITHUB_TOKEN) and private metadata.
+    # Do not derive the package owner from GITHUB_ACTOR: the dispatcher may differ.
+    status, _, payload = request(PACKAGE_METADATA_URL, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
         'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
         'User-Agent': 'software-pa-pa5-publisher'})
     if status == 404 and allow_absent:
         return {'state': 'absent-or-not-readable', 'visibility': None}
     require(status == 200, 'PACKAGE_METADATA_NOT_READABLE')
     obj = json.loads(payload)
+    require(isinstance(obj, dict), 'PACKAGE_METADATA_INVALID')
+    owner = obj.get('owner') or {}
+    repository = obj.get('repository') or {}
+    require(obj.get('name') == 'software-pa-native-postgis' and
+            obj.get('package_type') == 'container' and isinstance(owner, dict) and
+            isinstance(owner.get('login'), str) and owner['login'].lower() == 'jponce-23',
+            'PACKAGE_IDENTITY_MISMATCH')
     require(obj.get('visibility') == 'private', 'PACKAGE_MUST_BE_PRIVATE')
-    require(obj.get('repository', {}).get('full_name', '').lower() == 'jponce-23/software-pa',
+    require(isinstance(repository, dict) and isinstance(repository.get('full_name'), str) and
+            repository['full_name'].lower() == 'jponce-23/software-pa',
             'PACKAGE_REPOSITORY_LINK_REQUIRED')
-    return {'visibility': obj['visibility'], 'repository': obj['repository']['full_name']}
+    return {'visibility': obj['visibility'], 'repository': repository['full_name'],
+            'owner': owner['login'], 'name': obj['name'], 'package_type': obj['package_type'],
+            'metadata_api': PACKAGE_METADATA_URL}
 
 
 class Registry:

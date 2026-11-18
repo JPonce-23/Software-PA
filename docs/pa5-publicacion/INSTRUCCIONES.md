@@ -124,6 +124,14 @@ Exigir `publish` y `consume` verdes. Conservar URLs de ambos jobs, commit ejecut
 
 La creación inicial de un paquete de contenedor es privada por defecto. La herencia de permisos del repositorio no equivale a herencia de visibilidad. El API del workflow exige privacidad y vinculación y falla si no puede demostrarlas. Fuentes: [Container registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry), [acceso y visibilidad](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
 
+## Revisión del acceso a metadatos con GITHUB_TOKEN
+
+La revisión local del PR #9 sustituye la consulta `/users/JPonce-23/packages/...`, documentada para paquetes públicos, por `GET /user/packages/container/software-pa-native-postgis`, la ruta del usuario autenticado que admite tokens de instalación. Se utiliza el mismo `GITHUB_TOKEN` del job: `packages: write` sólo en publish y `packages: read` en consume, sin PAT ni permisos adicionales. La respuesta debe identificar el paquete container exacto, su propietario `JPonce-23` (independiente de quién dispara el workflow), visibilidad private y asociación real con `JPonce-23/Software-PA`. El label OCI source se comprueba por separado y no sustituye la asociación que devuelve GitHub.
+
+Los errores 401/403, límites y fallos del servicio detienen la operación. Un 404 previo sigue siendo «ausente o no legible», nunca prueba de privacidad; después de publicar es fatal. No se consulta una ruta pública como fallback, no se eleva el token ni se cambian permisos. Las verificaciones de manifiesto, config, tag, procedencia, plataforma y rootfs permanecen obligatorias. Referencias: [GET package autenticado](https://docs.github.com/en/rest/packages/packages#get-a-package-for-the-authenticated-user), [GET package público de un usuario](https://docs.github.com/en/rest/packages/packages#get-a-package-for-a-user).
+
+La suite actual contiene 24 pruebas unitarias, incluidas regresiones de metadatos y de integridad/procedencia del consumidor. Sus respuestas HTTP son simuladas: la compatibilidad operativa y el acceso real con el GITHUB_TOKEN de Software-PA siguen pendientes de ejecución remota autorizada. El mecanismo y la autorización pendiente de distribución del archivo Docker no cambian. La evidencia local inicial de 16 pruebas se conserva como registro histórico.
+
 ## Inventario de permisos y acceso posterior de DrMannx
 
 | Identidad | Permiso y finalidad | Estado actual |
