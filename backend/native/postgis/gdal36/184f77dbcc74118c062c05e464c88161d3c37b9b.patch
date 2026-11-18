@@ -1,0 +1,98 @@
+From 184f77dbcc74118c062c05e464c88161d3c37b9b Mon Sep 17 00:00:00 2001
+From: Even Rouault <even.rouault@spatialys.com>
+Date: Wed, 15 Apr 2026 16:46:58 +0200
+Subject: [PATCH] HDF4-EOS: fix heap-buffer-overflow
+
+Fixes #14363
+---
+ autotest/gcore/data/hdf4/issue_14363.he4 | Bin 0 -> 9542 bytes
+ autotest/gcore/hdf4_read.py              |  12 ++++++++++++
+ autotest/gcore/hdf4multidim.py           |  11 +++++++++++
+ frmts/hdf4/hdf-eos/GDapi.c               |   5 ++++-
+ 4 files changed, 27 insertions(+), 1 deletion(-)
+ create mode 100644 autotest/gcore/data/hdf4/issue_14363.he4
+
+diff --git a/autotest/gcore/data/hdf4/issue_14363.he4 b/autotest/gcore/data/hdf4/issue_14363.he4
+new file mode 100644
+index 0000000000000000000000000000000000000000..ffc97094b8df132cb8c3e4df88d78c513d0988a6
+GIT binary patch
+literal 9542
+zcmeI2OG{fp6vrpNLM*g}E($KnZLna$%AJR=MHXsI+7cgVlokrN(M<G;8hdl4_*GnX
+z+2YqIUH8j$+0G-rICJRcbk$rioSeCL{{J})KjwP!aQI1q{b2Tb#tMv;j!g8S_>B#j
+z_&Z}0m&LC(p8RO?%f%};Y~n8_j!isb;-4mdVd7B}|1$9_6OWnHq=}!~8GrY$LF@}L
+zsKcNRgFP_V1A{#<*aL$-@E`2~X3tCZ{KVMnYAxE;SugFLMruYzTl!eHdOC`yqnh5!
+z&Rf|<Bo?P55esGS|JzmH+Su8w)U&j`ooDC!`FW<tOa0{5n`*+xOC>wH-a65h^4f)s
+z%O>}(nx0g6Y@+u!(azbK&KkOtZ+6qud@av<m8p0po;H6k&5e!jXPs@O2Z#M3ZpZA0
+z9o)>iM|wXu%c|5@nwv>|b;D%65hI{a?TSrib-kLvY(LY=TeValx6OT}jpetiE6qyv
+zI_FkWD&2f{3+f!Vlb9!oeZUPhFV1wOT3c@>wZ_I$Qwl$lo;1>4UYRP}WtXSRcFkpL
+z+xZDgfoy-SYeTmN1i1kx1q{fWWx6We8j$1$oD?viFawI*fRh3SW-$Y^<OZA+FffN1
+zm?Jmfq=12W%)mUk0Vf3vEMNu}$PG9tU|<n5ut;veNdW_nnjsSLnB0Naf)*^+gBJb)
+z44oFVfZ>qS<B*4W$T1*tdLVi&SOpA;oF0ih%tVesk<&xbYr!gDSmg9r<Y6vy42+x}
+zj9v>?0Yf9FM<Wljkz;V=^l<cApbEmCDMM%y^mO!E&;mwBK~F~!rlY{<DCp_vwO|!6
+zItqF^itu?+V00Apbo5%V3K$&)Jsm~(%qTEA3VJ$vEm#GNj)I<!B7ANX7##&Y9laK;
+z0!BwcPe&0xJ4%d>lAexU3sga3bd>aT^jgpYMn_3cNB=JXXaS?6q^F|{(@|n{l=O7;
+zTCfTj9VI;-Wtff<qobs!qt}8}!00IH=_tc=lo%Z)JsrIktO7<yNl!-^rlZ2>sOahF
+zwLldVMn^?YN3R7fV02XUbX4ItYlYEK(bLgu!75;MRP=OI;WulA(NWRU(QCmfV02XU
+zbX4ItYlYEK(bLgu!75;MRP=OI;WulA(NWRU(QAP!%wlw$rKh9Qy3?z<ZhDO0Y2eg-
+zf9dwF`&}s4xhhOtnoj44`82;LVq?2Yjh)qP_SpBT)^y%#o0(@~R$R*S%(Rl+L$*=o
+znq>v|3#6xK-TmaCot}Q`*yd0#+3R*@4z*%qE7jWFXUt;{Y=0<n?UCO7FLq`(DPxbU
+j(a0*Md*`|C!NkqYL&YoiYo}2*=6h#s#4g*8``P{g;YO18
+
+literal 0
+HcmV?d00001
+
+diff --git a/autotest/gcore/hdf4_read.py b/autotest/gcore/hdf4_read.py
+index a73f318d2c59..8cca336ee7c4 100755
+--- a/autotest/gcore/hdf4_read.py
++++ b/autotest/gcore/hdf4_read.py
+@@ -607,3 +607,15 @@ def test_hdf4_gh_14356():
+         pytest.skip()
+ 
+     gdal.Open("data/hdf4/issue_14356.he4")
++
++
++###############################################################################
++# Test bugfix for https://github.com/OSGeo/gdal/issues/14363
++
++
++def test_hdf4_gh_14363():
++
++    if gdaltest.hdf4_drv is None:
++        pytest.skip()
++
++    gdal.Open("data/hdf4/issue_14363.he4")
+diff --git a/autotest/gcore/hdf4multidim.py b/autotest/gcore/hdf4multidim.py
+index 4851916e2937..88808da754a9 100644
+--- a/autotest/gcore/hdf4multidim.py
++++ b/autotest/gcore/hdf4multidim.py
+@@ -541,3 +541,14 @@ def test_hdf4_multidim_gh_14356():
+     ds = gdal.OpenEx("data/hdf4/issue_14356.he4", gdal.OF_MULTIDIM_RASTER)
+ 
+     gdal.MultiDimInfo(ds)
++
++
++###############################################################################
++# Test bugfix for https://github.com/OSGeo/gdal/issues/14363
++
++
++def test_hdf4_multidim_gh_14363():
++
++    ds = gdal.OpenEx("data/hdf4/issue_14363.he4", gdal.OF_MULTIDIM_RASTER)
++
++    gdal.MultiDimInfo(ds)
+diff --git a/frmts/hdf4/hdf-eos/GDapi.c b/frmts/hdf4/hdf-eos/GDapi.c
+index aa757a12ee0a..b9793243ae6e 100644
+--- a/frmts/hdf4/hdf-eos/GDapi.c
++++ b/frmts/hdf4/hdf-eos/GDapi.c
+@@ -3147,7 +3147,10 @@ GDnentries(int32 gridID, int32 entrycode, int32 * strbufsize)
+ 		     * Get all string values Don't count quotes
+ 		     */
+ 		    EHgetmetavalue(metaptrs, &valName[i][0], utlstr);
+-		    *strbufsize += (int32)strlen(utlstr) - 2;
++		    if( utlstr[0] == '"' && utlstr[strlen(utlstr)-1] == '"' )
++		        *strbufsize += (int32)strlen(utlstr) - 2;
++		    else
++		        *strbufsize += (int32)strlen(utlstr);
+ 		}
+ 		/* Increment number of entries */
+ 		nEntries++;

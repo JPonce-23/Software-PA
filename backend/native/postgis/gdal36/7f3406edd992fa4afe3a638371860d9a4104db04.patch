@@ -1,0 +1,65 @@
+From 7f3406edd992fa4afe3a638371860d9a4104db04 Mon Sep 17 00:00:00 2001
+From: Phuc-Thanh Nguyen <83806633+npt-1707@users.noreply.github.com>
+Date: Fri, 2 May 2025 01:45:00 +0800
+Subject: [PATCH] frmts/zlib/contrib/infback9/inftree9.c: Fix potential
+ vulnerable cloned functions. (#12244)
+
+Related to CVE-2016-9840
+---
+ frmts/zlib/contrib/infback9/inftree9.c | 18 ++++++++----------
+ 1 file changed, 8 insertions(+), 10 deletions(-)
+
+diff --git a/frmts/zlib/contrib/infback9/inftree9.c b/frmts/zlib/contrib/infback9/inftree9.c
+index 56c292bf329b..8194a7c0bb65 100644
+--- a/frmts/zlib/contrib/infback9/inftree9.c
++++ b/frmts/zlib/contrib/infback9/inftree9.c
+@@ -52,7 +52,7 @@ int inflate_table9(codetype type, unsigned short FAR *lens,
+     code FAR *next;             /* next available space in table */
+     const unsigned short FAR *base;     /* base value table to use */
+     const unsigned short FAR *extra;    /* extra bits table to use */
+-    int end;                    /* use base and extra for symbol > end */
++    unsigned match;             /* use base and extra for symbol >= match */
+     unsigned short count[MAXBITS+1];    /* number of codes of each length */
+     unsigned short offs[MAXBITS+1];     /* offsets in table for each length */
+     static const unsigned short lbase[31] = { /* Length codes 257..285 base */
+@@ -173,19 +173,17 @@ int inflate_table9(codetype type, unsigned short FAR *lens,
+     switch (type) {
+     case CODES:
+         base = extra = work;    /* dummy value--not used */
+-        end = 19;
++        match = 20;
+         break;
+     case LENS:
+         base = lbase;
+-        base -= 257;
+         extra = lext;
+-        extra -= 257;
+-        end = 256;
++        match = 257;
+         break;
+     default:            /* DISTS */
+         base = dbase;
+         extra = dext;
+-        end = -1;
++        match = 0;
+     }
+ 
+     /* initialize state for loop */
+@@ -208,13 +206,13 @@ int inflate_table9(codetype type, unsigned short FAR *lens,
+     for (;;) {
+         /* create table entry */
+         this.bits = (unsigned char)(len - drop);
+-        if ((int)(work[sym]) < end) {
++        if ((unsigned)(work[sym]) + 1 < match) {
+             this.op = (unsigned char)0;
+             this.val = work[sym];
+         }
+-        else if ((int)(work[sym]) > end) {
+-            this.op = (unsigned char)(extra[work[sym]]);
+-            this.val = base[work[sym]];
++        else if ((work[sym]) >= match) {
++            this.op = (unsigned char)(extra[work[sym]- match]);
++            this.val = base[work[sym]- match];
+         }
+         else {
+             this.op = (unsigned char)(32 + 64);         /* end of block */
