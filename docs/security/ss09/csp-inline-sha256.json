@@ -1,0 +1,179 @@
+{
+  "scope": "Scripts inline publicados por frontend-ssalfer/deploy/Dockerfile; UTF-8 tras read_text, sin strip al calcular SHA-256. CSP Report-Only en frontend y TLS; no implica bloqueo ni validación de navegador.",
+  "scripts": [
+    {
+      "page": "Index.html",
+      "line": 67,
+      "bytes": 2199,
+      "sha256": "tLiZ7d9F54Z+tEtcOZUIcIq3zYmr2jThOVnAwVbXNVM="
+    },
+    {
+      "page": "dashboard.html",
+      "line": 344,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/actividades.html",
+      "line": 1052,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/afectacion.html",
+      "line": 963,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/asamblea.html",
+      "line": 794,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/derechosColectivos.html",
+      "line": 231,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/detalleAfectacion.html",
+      "line": 1084,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/documentos.html",
+      "line": 230,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/estadoFinanciero.html",
+      "line": 458,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/expedienteDocumental.html",
+      "line": 1165,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/fichaConvenio.html",
+      "line": 983,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/fichaFifonafe.html",
+      "line": 795,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/fichaProyecto.html",
+      "line": 556,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/fichaRan.html",
+      "line": 845,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/fifonafe.html",
+      "line": 1092,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/gestionGeoespacial.html",
+      "line": 1261,
+      "bytes": 170,
+      "sha256": "exbl8sIP9/kdAr5KMdNqeKwp3sX6bjMBhQ5q0fh9VsI="
+    },
+    {
+      "page": "pages/indemnizacion.html",
+      "line": 1064,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/mapa.html",
+      "line": 703,
+      "bytes": 124,
+      "sha256": "eBwjXLe8ZkutH1BQuUUTD6eqlesYB5uKLZlAZ9qiI9w="
+    },
+    {
+      "page": "pages/nucleoAgrario.html",
+      "line": 919,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/nuevoConvenio.html",
+      "line": 1246,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/nuevoProyecto.html",
+      "line": 553,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/orv.html",
+      "line": 1151,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/padrones.html",
+      "line": 817,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/parcela.html",
+      "line": 860,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/persona.html",
+      "line": 802,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/reportesColectivos.html",
+      "line": 230,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/seguimiento.html",
+      "line": 1116,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/tramiteRan.html",
+      "line": 639,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    },
+    {
+      "page": "pages/unidadAgraria.html",
+      "line": 1076,
+      "bytes": 96,
+      "sha256": "yXesgTDaeX1tsllDjO1S7i5LHde5KaHFfkTN5YyKbZk="
+    }
+  ]
+}
