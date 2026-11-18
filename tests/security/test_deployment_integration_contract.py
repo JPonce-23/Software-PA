@@ -78,6 +78,31 @@ class DeploymentIntegrationContract(unittest.TestCase):
         for name in ('backend','db','pgadmin','frontend_ssalfer'):
             self.assertEqual(source['services'][name]['ports'],[])
 
+    def test_database_uses_only_validated_pa5_without_automatic_pull(self):
+        import yaml
+        source=yaml.safe_load((ROOT/'docker-compose.yml').read_text())['services']['db']
+        self.assertEqual(source['image'],'software-pa-libgdal36-candidate:20261117-pa5@sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c')
+        self.assertEqual(source['platform'],'linux/amd64')
+        self.assertEqual(source['pull_policy'],'never')
+        self.assertIn('postgres_data:/var/lib/postgresql/data',source['volumes'])
+        docker=(ROOT/'backend/Dockerfile').read_text()
+        self.assertIn('COPY --from=gdal-build /opt/gdal /opt/gdal',docker)
+        self.assertNotIn('libgdal36',docker)
+
+    def test_pgadmin_is_optional_loopback_only_and_not_a_dependency(self):
+        import yaml
+        from test_http_deployment_security import ComposeLoader
+        services=yaml.safe_load((ROOT/'docker-compose.yml').read_text())['services']
+        admin=services['pgadmin']
+        self.assertEqual(admin['profiles'],['admin-tools'])
+        self.assertTrue(all(p.startswith('127.0.0.1:') for p in admin['ports']))
+        self.assertEqual(admin['environment']['PGADMIN_DEFAULT_PASSWORD'],'${PGADMIN_DEFAULT_PASSWORD:-}')
+        self.assertTrue('@sha256:' in admin['image'])
+        for service in services.values():self.assertNotIn('pgadmin',service.get('depends_on',{}))
+        prod=yaml.load((ROOT/'docker-compose.prod.yml').read_text(),Loader=ComposeLoader)
+        self.assertEqual(prod['services']['pgadmin']['ports'],[])
+        self.assertEqual(prod['services']['pgadmin']['profiles'],['admin-tools'])
+
     def test_pool_budget_is_per_worker_and_parameters_remain_hidden(self):
         source=(ROOT/'backend/app/database.py').read_text()
         self.assertIn('_read_positive_int("DB_POOL_SIZE", 5)',source)

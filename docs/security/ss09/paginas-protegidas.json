@@ -1,0 +1,1137 @@
+{
+  "schema_version": 1,
+  "scope": "Static inventory of reconciled dev b38ec384 plus recovered delta; not browser or enforced CSP approval",
+  "remote_commit": "b38ec384009f36ccc2be93ac9ee375d51f16845f",
+  "pages": [
+    {
+      "local": {
+        "path": "pages/fichaProyecto.html",
+        "sha256": "47cc826b380cab41709987cfd7e45cc10b2301a475906e5f9009f6645e723143",
+        "scripts": [
+          "/js/utils/permisos.js",
+          "/js/utils/proteccion.js",
+          "/js/utils/tablasScroll.js",
+          "/js/env.js",
+          "/js/config.js",
+          "/js/api/cliente.js",
+          "/js/api/auth.js",
+          "/js/api/catalogos.js",
+          "/js/api/usuarios.js",
+          "/js/api/proyectos.js",
+          "/js/api/nucleos.js",
+          "/js/api/personas.js",
+          "/js/api/orv.js",
+          "/js/api/padrones.js",
+          "/js/api/actividades.js",
+          "/js/api/parcelas.js",
+          "/js/api/unidadesAgrarias.js",
+          "/js/api/afectaciones.js",
+          "/js/api/seguimiento.js",
+          "/js/api/asambleas.js",
+          "/js/api/tramitesRan.js",
+          "/js/api/convenios.js",
+          "/js/api/fifonafe.js",
+          "/js/api/documentos.js",
+          "/js/api/indemnizacion.js",
+          "/js/api/reportes.js",
+          "/js/utils/formatters.js",
+          "/js/utils/ui.js",
+          "/js/utils/experiencia.js",
+          "/js/utils/navegacion.js",
+          "/js/utils/marco.js",
+          "/js/dashboard.js",
+          "/js/utils/gestion.js",
+          "/js/utils/usuariosProyecto.js",
+          "/js/fichaProyecto.js",
+          "/js/asignacionesUsuarios.js"
+        ],
+        "styles": [
+          "/styles/dashboard.css",
+          "/styles/shared.css",
+          "/styles/nuevoProyecto.css",
+          "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "/styles/marco.css",
+          "/styles/gestion.css",
+          "/styles/fichaProyecto.css",
+          "/styles/tablasScroll.css"
+        ],
+        "images": [
+          "/img/LOGOS VERDE/IMAGOTIPO.png",
+          "/img/LOGOS VERDE/SSALFER.png",
+          "/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "/img/PA_LOGO_VERDE.png"
+        ],
+        "inline_scripts": 1,
+        "inline_styles": 0,
+        "style_attributes": 0,
+        "events": [],
+        "frames": []
+      },
+      "previous_inventory": {
+        "path": "pages/fichaProyecto.html",
+        "sha256": "9c0561c7dd257b9e1fa3238dbb387eef121fe40d7656930df24250e0a3bf0f1d",
+        "scripts": [
+          "/js/utils/permisos.js",
+          "/js/utils/proteccion.js",
+          "/js/utils/tablasScroll.js",
+          "/js/env.js",
+          "/js/config.js",
+          "/js/api/cliente.js",
+          "/js/api/auth.js",
+          "/js/api/catalogos.js",
+          "/js/api/usuarios.js",
+          "/js/api/proyectos.js",
+          "/js/api/nucleos.js",
+          "/js/api/personas.js",
+          "/js/api/orv.js",
+          "/js/api/padrones.js",
+          "/js/api/actividades.js",
+          "/js/api/parcelas.js",
+          "/js/api/unidadesAgrarias.js",
+          "/js/api/afectaciones.js",
+          "/js/api/seguimiento.js",
+          "/js/api/asambleas.js",
+          "/js/api/tramitesRan.js",
+          "/js/api/convenios.js",
+          "/js/api/fifonafe.js",
+          "/js/api/documentos.js",
+          "/js/api/indemnizacion.js",
+          "/js/api/reportes.js",
+          "/js/utils/formatters.js",
+          "/js/utils/ui.js",
+          "/js/utils/experiencia.js",
+          "/js/utils/navegacion.js",
+          "/js/utils/marco.js",
+          "/js/dashboard.js",
+          "/js/utils/gestion.js",
+          "/js/utils/usuariosProyecto.js",
+          "/js/fichaProyecto.js",
+          "/js/asignacionesUsuarios.js"
+        ],
+        "styles": [
+          "/styles/dashboard.css",
+          "/styles/shared.css",
+          "/styles/nuevoProyecto.css",
+          "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "/styles/marco.css",
+          "/styles/gestion.css",
+          "/styles/fichaProyecto.css",
+          "/styles/tablasScroll.css"
+        ],
+        "images": [
+          "/img/LOGOS VERDE/IMAGOTIPO.png",
+          "/img/LOGOS VERDE/SSALFER.png",
+          "/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "/img/PA_LOGO_VERDE.png"
+        ],
+        "inline_scripts": 1,
+        "inline_styles": 0,
+        "style_attributes": 0,
+        "events": [],
+        "frames": []
+      },
+      "inventory_differences": {
+        "sha256": {
+          "old": "9c0561c7dd257b9e1fa3238dbb387eef121fe40d7656930df24250e0a3bf0f1d",
+          "actual": "47cc826b380cab41709987cfd7e45cc10b2301a475906e5f9009f6645e723143"
+        }
+      },
+      "remote": {
+        "path": "pages/fichaProyecto.html",
+        "sha256": "47cc826b380cab41709987cfd7e45cc10b2301a475906e5f9009f6645e723143",
+        "scripts": [
+          "/js/utils/permisos.js",
+          "/js/utils/proteccion.js",
+          "/js/utils/tablasScroll.js",
+          "/js/env.js",
+          "/js/config.js",
+          "/js/api/cliente.js",
+          "/js/api/auth.js",
+          "/js/api/catalogos.js",
+          "/js/api/usuarios.js",
+          "/js/api/proyectos.js",
+          "/js/api/nucleos.js",
+          "/js/api/personas.js",
+          "/js/api/orv.js",
+          "/js/api/padrones.js",
+          "/js/api/actividades.js",
+          "/js/api/parcelas.js",
+          "/js/api/unidadesAgrarias.js",
+          "/js/api/afectaciones.js",
+          "/js/api/seguimiento.js",
+          "/js/api/asambleas.js",
+          "/js/api/tramitesRan.js",
+          "/js/api/convenios.js",
+          "/js/api/fifonafe.js",
+          "/js/api/documentos.js",
+          "/js/api/indemnizacion.js",
+          "/js/api/reportes.js",
+          "/js/utils/formatters.js",
+          "/js/utils/ui.js",
+          "/js/utils/experiencia.js",
+          "/js/utils/navegacion.js",
+          "/js/utils/marco.js",
+          "/js/dashboard.js",
+          "/js/utils/gestion.js",
+          "/js/utils/usuariosProyecto.js",
+          "/js/fichaProyecto.js",
+          "/js/asignacionesUsuarios.js"
+        ],
+        "styles": [
+          "/styles/dashboard.css",
+          "/styles/shared.css",
+          "/styles/nuevoProyecto.css",
+          "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "/styles/marco.css",
+          "/styles/gestion.css",
+          "/styles/fichaProyecto.css",
+          "/styles/tablasScroll.css"
+        ],
+        "images": [
+          "/img/LOGOS VERDE/IMAGOTIPO.png",
+          "/img/LOGOS VERDE/SSALFER.png",
+          "/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "/img/PA_LOGO_VERDE.png"
+        ],
+        "inline_scripts": 1,
+        "inline_styles": 0,
+        "style_attributes": 0,
+        "events": [],
+        "frames": []
+      },
+      "remote_blob_sha1": "1c6fb93585314f3b9f5e3b3ee66a64bb176e4bbb",
+      "same_content_as_dev": true,
+      "remote_added_links": [],
+      "resources": [
+        {
+          "kind": "script",
+          "url": "/js/utils/permisos.js",
+          "path": "frontend-ssalfer/js/utils/permisos.js",
+          "sha256": "168d555834ba84faf74d6e35c3188eaf28b34d1595e1aa6699904a466a765103"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/proteccion.js",
+          "path": "frontend-ssalfer/js/utils/proteccion.js",
+          "sha256": "d6ba617aa15d70acd4577cd1b17d3284772303c2799eb307c24b74a12e40ff92"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/tablasScroll.js",
+          "path": "frontend-ssalfer/js/utils/tablasScroll.js",
+          "sha256": "9167cb7ab89559e2bf84dae778418cd24fa7af2658dfbf8c127bbf5ff0d01370"
+        },
+        {
+          "kind": "script",
+          "url": "/js/env.js",
+          "path": "frontend-ssalfer/js/env.js",
+          "sha256": "381bf474542a5f3d60f034b1f2de7980d52e678593527fa0db33d2d38205f59b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/config.js",
+          "path": "frontend-ssalfer/js/config.js",
+          "sha256": "0de89165fcf24a40ad5eac04770e99359a8eac407057319bb08651124628610c"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/cliente.js",
+          "path": "frontend-ssalfer/js/api/cliente.js",
+          "sha256": "8f6d5f1b2231630640842f1f639616c748ff4a8ab3b35bcf5f7c45f15c8978ac"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/auth.js",
+          "path": "frontend-ssalfer/js/api/auth.js",
+          "sha256": "9f67a6d4bc645c64b5a9a6d8e7dae499a119a96f52df6e620b2521b75170f93c"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/catalogos.js",
+          "path": "frontend-ssalfer/js/api/catalogos.js",
+          "sha256": "f8a9dc34002b019beb6b1e3d5130b09fbfbe9e9a44304f71978abc4e119e6f5c"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/usuarios.js",
+          "path": "frontend-ssalfer/js/api/usuarios.js",
+          "sha256": "6f67de46d6d4f789fcf649b6566435e47de940e3ed1a39fe822102a9b11c5a8b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/proyectos.js",
+          "path": "frontend-ssalfer/js/api/proyectos.js",
+          "sha256": "3922bee09e28332926807a3244715da9aea61a1b9674ea830b5d400482bfd1c6"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/nucleos.js",
+          "path": "frontend-ssalfer/js/api/nucleos.js",
+          "sha256": "d487f12b63f9d14cca3ed36cc4469f5c9dd9472518c549797259a32d93b9f1f9"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/personas.js",
+          "path": "frontend-ssalfer/js/api/personas.js",
+          "sha256": "d4f01013c57c71911a6afcfca05b466d80498f496fa439b3184a6696d095e8d5"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/orv.js",
+          "path": "frontend-ssalfer/js/api/orv.js",
+          "sha256": "2b6d65471191f1c1916ee4a191745202345d7d50d7dc78c1a29c9bf5df115d43"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/padrones.js",
+          "path": "frontend-ssalfer/js/api/padrones.js",
+          "sha256": "4324bcc738758384028d848af85fc42415bdaa8249b1a418300d9726f2061093"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/actividades.js",
+          "path": "frontend-ssalfer/js/api/actividades.js",
+          "sha256": "fb304cc2063aa6400ac1a576d103cfc8ef2feb580b77114a90d54313ff988efc"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/parcelas.js",
+          "path": "frontend-ssalfer/js/api/parcelas.js",
+          "sha256": "0cbc11a812d75a9b08a132f478c2ab7565463dd9a15ed5418b2a8630b730cbb5"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/unidadesAgrarias.js",
+          "path": "frontend-ssalfer/js/api/unidadesAgrarias.js",
+          "sha256": "335bce71eabf73ec8eb82746db4e055631980218590964abbf9ae343513d1a3b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/afectaciones.js",
+          "path": "frontend-ssalfer/js/api/afectaciones.js",
+          "sha256": "f7933d331e58ebc0f92e0ec2f33904418f5c06bca378a3e7728e55d583c07971"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/seguimiento.js",
+          "path": "frontend-ssalfer/js/api/seguimiento.js",
+          "sha256": "fff8728b4b681fdb519018bf0cd606f14efc276d0c13fb9bed354fe78dbb4086"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/asambleas.js",
+          "path": "frontend-ssalfer/js/api/asambleas.js",
+          "sha256": "933f89d7ab1b8f2980cda4eb5e33b3b7f6637e142f09302e3e4fd08067f5a711"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/tramitesRan.js",
+          "path": "frontend-ssalfer/js/api/tramitesRan.js",
+          "sha256": "f55eccbb360cb7db5422ecf526c7d8a039aba59adce97698423322121b78d50b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/convenios.js",
+          "path": "frontend-ssalfer/js/api/convenios.js",
+          "sha256": "c886456870c83455bd6b130fb29286999a224c5358223e4753f0fc8cd76c142d"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/fifonafe.js",
+          "path": "frontend-ssalfer/js/api/fifonafe.js",
+          "sha256": "851739debde0452a23327adc1cafa8d3c3b4f207d136424e63e4ab2fa32272cd"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/documentos.js",
+          "path": "frontend-ssalfer/js/api/documentos.js",
+          "sha256": "dcdc89912dc9d2e7a21183ef3f26aff1d39a434ed31591905754aea826672c45"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/indemnizacion.js",
+          "path": "frontend-ssalfer/js/api/indemnizacion.js",
+          "sha256": "98838d9e632ac829e53d23f31d7e6377604ef2bd1cab2d38e9414c012eee0ce8"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/reportes.js",
+          "path": "frontend-ssalfer/js/api/reportes.js",
+          "sha256": "3ce698c8a0ae3b330db94410965e3fa3cd36c08bc943401df085f3c74cd48e4f"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/formatters.js",
+          "path": "frontend-ssalfer/js/utils/formatters.js",
+          "sha256": "5fd26d5ccfaa1d28953daeb657e0f909b825d2671b93aad89c5a676d945a722b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/ui.js",
+          "path": "frontend-ssalfer/js/utils/ui.js",
+          "sha256": "94f02f11e7486f3befbb333ba778e664c164aad05865cc90de7c608fab5cfeac"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/experiencia.js",
+          "path": "frontend-ssalfer/js/utils/experiencia.js",
+          "sha256": "daa42905f477009435de7bc9a5481019de4f0a63e833501812ada599ba79b7bb"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/navegacion.js",
+          "path": "frontend-ssalfer/js/utils/navegacion.js",
+          "sha256": "7f6d237f89a3c7265778e0257ef443f90b4648c980aa849fa4a2ccce976b2a97"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/marco.js",
+          "path": "frontend-ssalfer/js/utils/marco.js",
+          "sha256": "70d0ee915ef9a7cc5d1f1b399fd3fcf88595e7c440889c40c749fa8c32bebce8"
+        },
+        {
+          "kind": "script",
+          "url": "/js/dashboard.js",
+          "path": "frontend-ssalfer/js/dashboard.js",
+          "sha256": "1542d865926ecb4d51a84957a8af2ea1019629a57d65870eaade62e3f424efa1"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/gestion.js",
+          "path": "frontend-ssalfer/js/utils/gestion.js",
+          "sha256": "fb99a8e196d58e0d8f1acfab05fadbf8e4e48921e77e53e374f909ba161927a3"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/usuariosProyecto.js",
+          "path": "frontend-ssalfer/js/utils/usuariosProyecto.js",
+          "sha256": "21336308bcc71128fdc1273e943b5d8328518db2c4ffcea498eec7defec2afee"
+        },
+        {
+          "kind": "script",
+          "url": "/js/fichaProyecto.js",
+          "path": "frontend-ssalfer/js/fichaProyecto.js",
+          "sha256": "a49ff22d781b13617734cd25de28ec124afeaddacbc1d1e6e221eae810ae9e50"
+        },
+        {
+          "kind": "script",
+          "url": "/js/asignacionesUsuarios.js",
+          "path": "frontend-ssalfer/js/asignacionesUsuarios.js",
+          "sha256": "092355e7dc119ba42ae3413d05a407f0260961949ccd02d6853ae2158347bf65"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/dashboard.css",
+          "path": "frontend-ssalfer/styles/dashboard.css",
+          "sha256": "103fc527c3db5a58f6d02f0d7307e6a89ed549ebb6659fc947b9f99a4dbc1438"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/shared.css",
+          "path": "frontend-ssalfer/styles/shared.css",
+          "sha256": "b2cb76035a7413b5af769f6e1e9c49d57e7e65f62db58308ddcb84e8a25edbc3"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/nuevoProyecto.css",
+          "path": "frontend-ssalfer/styles/nuevoProyecto.css",
+          "sha256": "ea14945e8d09073fe4f3d9341f7baa0d1c6de658a14f2331077998f0dd79af3c"
+        },
+        {
+          "kind": "style",
+          "url": "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "sha256": "004322721c8557331759bc6ddaacbb689b0f0715d688aec82bd056d2d5b5cc3b"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/marco.css",
+          "path": "frontend-ssalfer/styles/marco.css",
+          "sha256": "332eabe42086bc1a5eb1653d0f6eae874f9d65c8d687d8415ad80cbe82efab0e"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/gestion.css",
+          "path": "frontend-ssalfer/styles/gestion.css",
+          "sha256": "7a4fa6d2cf1e3410c89a35dfe7f2e1969e3aa661647e5bbe2f310c07f0118c44"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/fichaProyecto.css",
+          "path": "frontend-ssalfer/styles/fichaProyecto.css",
+          "sha256": "39d9e524a3210cb84b99ea62a9670d87371a7e8ec4178166521b662ae2192c39"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/tablasScroll.css",
+          "path": "frontend-ssalfer/styles/tablasScroll.css",
+          "sha256": "0d4dce9625df6adf0f527791983af71d3dbb0aca7f776a511bd79b2b5b876146"
+        },
+        {
+          "kind": "image",
+          "url": "/img/LOGOS VERDE/IMAGOTIPO.png",
+          "path": "frontend-ssalfer/img/LOGOS VERDE/IMAGOTIPO.png",
+          "sha256": "c48b473c058a2d22b74e9eca7c9881a9b571b445e80ebcd2d2df8033033ec4ee"
+        },
+        {
+          "kind": "image",
+          "url": "/img/LOGOS VERDE/SSALFER.png",
+          "path": "frontend-ssalfer/img/LOGOS VERDE/SSALFER.png",
+          "sha256": "20b116b52fff0ca45a6685ae5c8d1ae4375e421ead00f29b3da1c7c801957c7c"
+        },
+        {
+          "kind": "image",
+          "url": "/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "path": "frontend-ssalfer/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "sha256": "be17b3dfb5c8cb7f89eed25b418fbec986bb667c78479eeabb909f1d9028baf8"
+        },
+        {
+          "kind": "image",
+          "url": "/img/PA_LOGO_VERDE.png",
+          "path": "frontend-ssalfer/img/PA_LOGO_VERDE.png",
+          "sha256": "9dfad212b8aab848ebf610732f0cfd9be40ed2243c0d3064cf497a0f270378ad"
+        }
+      ],
+      "css_dependencies": [
+        {
+          "source": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "url": "./fonts/bootstrap-icons.woff2?e34853135f9e39acf64315236852cd5a",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff2",
+          "sha256": "6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61"
+        },
+        {
+          "source": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "url": "./fonts/bootstrap-icons.woff?e34853135f9e39acf64315236852cd5a",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff",
+          "sha256": "f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15"
+        }
+      ],
+      "local_inline_script_sha256": [
+        "c977ac8130da797d6db259438ced52ee2e4b1dd7b929a1c57e44cde58c8a6d99"
+      ],
+      "vendor_resources": [
+        {
+          "kind": "style",
+          "url": "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "sha256": "004322721c8557331759bc6ddaacbb689b0f0715d688aec82bd056d2d5b5cc3b"
+        },
+        {
+          "source": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "url": "./fonts/bootstrap-icons.woff2?e34853135f9e39acf64315236852cd5a",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff2",
+          "sha256": "6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61"
+        },
+        {
+          "source": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "url": "./fonts/bootstrap-icons.woff?e34853135f9e39acf64315236852cd5a",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff",
+          "sha256": "f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15"
+        }
+      ],
+      "licenses": [
+        {
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/LICENSE.txt",
+          "sha256": "0fb3e11bd57e896c5a512afd64864d28a37de45d19835016c87ca1ad19ead969",
+          "package": "bootstrap-icons",
+          "version": "1.13.1",
+          "license": "MIT"
+        }
+      ],
+      "javascript_reference_scan": {
+        "ExcelJS": [],
+        "html2canvas": [],
+        "XLSX": [],
+        "dashboardExcel": [],
+        "exceljs-4.4.0.min.js": [],
+        "import(": [],
+        "createElement(\"script\")": []
+      },
+      "exceljs": {
+        "loaded_by_page": false,
+        "reason": "No ExcelJS, html2canvas or dashboardExcel script in either page; static JS scan found no loader or ExcelJS API reference in their direct scripts. XLSX mentions in document UI are accepted upload formats.",
+        "active_bundle_elsewhere": "frontend-ssalfer/js/vendor/exceljs-4.4.0-ssalfer.min.js",
+        "bundle_sha256": "cd738e64c8d89615473b662ba0bc8fdd8b07d6baa29837b3225986529bba7a57",
+        "runtime_graph": "frontend-ssalfer/tools/exceljs/runtime-graph.json",
+        "licenses": "frontend-ssalfer/js/vendor/ExcelJS-build-LICENSES.txt",
+        "runtime_graph_sha256": "f0a11fbdede19ec8efe43122e36f3470eb63ad4953e160363f641797d7f92ff1",
+        "licenses_sha256": "68f45056f6ee03c52436e72d8734e5c7665f7c8e98d60f041af272516f8ad563"
+      },
+      "csp": {
+        "mode": "Report-Only",
+        "inline_scripts": 1,
+        "inline_would_be_blocked_by_script_src_self": true,
+        "inline_style_attributes": 0,
+        "events": [],
+        "frames": [],
+        "review": "Reinventoried on pinned dev, retaining FIFONAFE/project summary unchanged. Browser enforcement remains pending."
+      }
+    },
+    {
+      "local": {
+        "path": "pages/fichaFifonafe.html",
+        "sha256": "d0b15391fe8dcad27f4f081bb4052e6b6e3a7b4f97e898dd2387de978848eb0a",
+        "scripts": [
+          "/js/utils/permisos.js",
+          "/js/utils/proteccion.js",
+          "/js/utils/tablasScroll.js",
+          "/js/env.js",
+          "/js/config.js",
+          "/js/api/cliente.js",
+          "/js/api/auth.js",
+          "/js/api/catalogos.js",
+          "/js/api/proyectos.js",
+          "/js/api/nucleos.js",
+          "/js/api/personas.js",
+          "/js/api/orv.js",
+          "/js/api/padrones.js",
+          "/js/api/actividades.js",
+          "/js/api/parcelas.js",
+          "/js/api/unidadesAgrarias.js",
+          "/js/api/afectaciones.js",
+          "/js/api/seguimiento.js",
+          "/js/api/asambleas.js",
+          "/js/api/tramitesRan.js",
+          "/js/api/convenios.js",
+          "/js/api/fifonafe.js",
+          "/js/api/documentos.js",
+          "/js/api/indemnizacion.js",
+          "/js/api/reportes.js",
+          "/js/utils/gestion.js",
+          "/js/utils/contexto.js",
+          "/js/utils/gestorDocumentos.js",
+          "/js/utils/directorioPersonas.js",
+          "/js/utils/marco.js",
+          "/js/dashboard.js",
+          "/js/utils/formatters.js",
+          "/js/utils/ui.js",
+          "/js/utils/experiencia.js",
+          "/js/utils/documentos.js",
+          "/js/fichaFifonafe.js",
+          "/js/intervinientesFifonafe.js"
+        ],
+        "styles": [
+          "/styles/dashboard.css",
+          "/styles/shared.css",
+          "/styles/fichaFifonafe.css",
+          "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "/styles/gestion.css",
+          "/styles/marco.css",
+          "/styles/tablasScroll.css"
+        ],
+        "images": [
+          "/img/LOGOS VERDE/IMAGOTIPO.png",
+          "/img/LOGOS VERDE/SSALFER.png",
+          "/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "/img/PA_LOGO_VERDE.png"
+        ],
+        "inline_scripts": 1,
+        "inline_styles": 0,
+        "style_attributes": 0,
+        "events": [],
+        "frames": []
+      },
+      "previous_inventory": {
+        "path": "pages/fichaFifonafe.html",
+        "sha256": "e986b78459c3140b7379abf6b273da9fbed0d50054e2a10a3acf2c8241707e21",
+        "scripts": [
+          "/js/utils/permisos.js",
+          "/js/utils/proteccion.js",
+          "/js/utils/tablasScroll.js",
+          "/js/env.js",
+          "/js/config.js",
+          "/js/api/cliente.js",
+          "/js/api/auth.js",
+          "/js/api/catalogos.js",
+          "/js/api/proyectos.js",
+          "/js/api/nucleos.js",
+          "/js/api/personas.js",
+          "/js/api/orv.js",
+          "/js/api/padrones.js",
+          "/js/api/actividades.js",
+          "/js/api/parcelas.js",
+          "/js/api/unidadesAgrarias.js",
+          "/js/api/afectaciones.js",
+          "/js/api/seguimiento.js",
+          "/js/api/asambleas.js",
+          "/js/api/tramitesRan.js",
+          "/js/api/convenios.js",
+          "/js/api/fifonafe.js",
+          "/js/api/documentos.js",
+          "/js/api/indemnizacion.js",
+          "/js/api/reportes.js",
+          "/js/utils/gestion.js",
+          "/js/utils/contexto.js",
+          "/js/utils/gestorDocumentos.js",
+          "/js/utils/directorioPersonas.js",
+          "/js/utils/marco.js",
+          "/js/dashboard.js",
+          "/js/utils/formatters.js",
+          "/js/utils/ui.js",
+          "/js/utils/experiencia.js",
+          "/js/utils/documentos.js",
+          "/js/fichaFifonafe.js",
+          "/js/intervinientesFifonafe.js"
+        ],
+        "styles": [
+          "/styles/dashboard.css",
+          "/styles/shared.css",
+          "/styles/fichaFifonafe.css",
+          "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "/styles/gestion.css",
+          "/styles/marco.css",
+          "/styles/tablasScroll.css"
+        ],
+        "images": [
+          "/img/LOGOS VERDE/IMAGOTIPO.png",
+          "/img/LOGOS VERDE/SSALFER.png",
+          "/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "/img/PA_LOGO_VERDE.png"
+        ],
+        "inline_scripts": 1,
+        "inline_styles": 0,
+        "style_attributes": 0,
+        "events": [],
+        "frames": []
+      },
+      "inventory_differences": {
+        "sha256": {
+          "old": "e986b78459c3140b7379abf6b273da9fbed0d50054e2a10a3acf2c8241707e21",
+          "actual": "d0b15391fe8dcad27f4f081bb4052e6b6e3a7b4f97e898dd2387de978848eb0a"
+        }
+      },
+      "remote": {
+        "path": "pages/fichaFifonafe.html",
+        "sha256": "d0b15391fe8dcad27f4f081bb4052e6b6e3a7b4f97e898dd2387de978848eb0a",
+        "scripts": [
+          "/js/utils/permisos.js",
+          "/js/utils/proteccion.js",
+          "/js/utils/tablasScroll.js",
+          "/js/env.js",
+          "/js/config.js",
+          "/js/api/cliente.js",
+          "/js/api/auth.js",
+          "/js/api/catalogos.js",
+          "/js/api/proyectos.js",
+          "/js/api/nucleos.js",
+          "/js/api/personas.js",
+          "/js/api/orv.js",
+          "/js/api/padrones.js",
+          "/js/api/actividades.js",
+          "/js/api/parcelas.js",
+          "/js/api/unidadesAgrarias.js",
+          "/js/api/afectaciones.js",
+          "/js/api/seguimiento.js",
+          "/js/api/asambleas.js",
+          "/js/api/tramitesRan.js",
+          "/js/api/convenios.js",
+          "/js/api/fifonafe.js",
+          "/js/api/documentos.js",
+          "/js/api/indemnizacion.js",
+          "/js/api/reportes.js",
+          "/js/utils/gestion.js",
+          "/js/utils/contexto.js",
+          "/js/utils/gestorDocumentos.js",
+          "/js/utils/directorioPersonas.js",
+          "/js/utils/marco.js",
+          "/js/dashboard.js",
+          "/js/utils/formatters.js",
+          "/js/utils/ui.js",
+          "/js/utils/experiencia.js",
+          "/js/utils/documentos.js",
+          "/js/fichaFifonafe.js",
+          "/js/intervinientesFifonafe.js"
+        ],
+        "styles": [
+          "/styles/dashboard.css",
+          "/styles/shared.css",
+          "/styles/fichaFifonafe.css",
+          "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "/styles/gestion.css",
+          "/styles/marco.css",
+          "/styles/tablasScroll.css"
+        ],
+        "images": [
+          "/img/LOGOS VERDE/IMAGOTIPO.png",
+          "/img/LOGOS VERDE/SSALFER.png",
+          "/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "/img/PA_LOGO_VERDE.png"
+        ],
+        "inline_scripts": 1,
+        "inline_styles": 0,
+        "style_attributes": 0,
+        "events": [],
+        "frames": []
+      },
+      "remote_blob_sha1": "0d881a3be5bb3180cc6e8594ff2dddb75470715f",
+      "same_content_as_dev": true,
+      "remote_added_links": [],
+      "resources": [
+        {
+          "kind": "script",
+          "url": "/js/utils/permisos.js",
+          "path": "frontend-ssalfer/js/utils/permisos.js",
+          "sha256": "168d555834ba84faf74d6e35c3188eaf28b34d1595e1aa6699904a466a765103"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/proteccion.js",
+          "path": "frontend-ssalfer/js/utils/proteccion.js",
+          "sha256": "d6ba617aa15d70acd4577cd1b17d3284772303c2799eb307c24b74a12e40ff92"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/tablasScroll.js",
+          "path": "frontend-ssalfer/js/utils/tablasScroll.js",
+          "sha256": "9167cb7ab89559e2bf84dae778418cd24fa7af2658dfbf8c127bbf5ff0d01370"
+        },
+        {
+          "kind": "script",
+          "url": "/js/env.js",
+          "path": "frontend-ssalfer/js/env.js",
+          "sha256": "381bf474542a5f3d60f034b1f2de7980d52e678593527fa0db33d2d38205f59b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/config.js",
+          "path": "frontend-ssalfer/js/config.js",
+          "sha256": "0de89165fcf24a40ad5eac04770e99359a8eac407057319bb08651124628610c"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/cliente.js",
+          "path": "frontend-ssalfer/js/api/cliente.js",
+          "sha256": "8f6d5f1b2231630640842f1f639616c748ff4a8ab3b35bcf5f7c45f15c8978ac"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/auth.js",
+          "path": "frontend-ssalfer/js/api/auth.js",
+          "sha256": "9f67a6d4bc645c64b5a9a6d8e7dae499a119a96f52df6e620b2521b75170f93c"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/catalogos.js",
+          "path": "frontend-ssalfer/js/api/catalogos.js",
+          "sha256": "f8a9dc34002b019beb6b1e3d5130b09fbfbe9e9a44304f71978abc4e119e6f5c"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/proyectos.js",
+          "path": "frontend-ssalfer/js/api/proyectos.js",
+          "sha256": "3922bee09e28332926807a3244715da9aea61a1b9674ea830b5d400482bfd1c6"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/nucleos.js",
+          "path": "frontend-ssalfer/js/api/nucleos.js",
+          "sha256": "d487f12b63f9d14cca3ed36cc4469f5c9dd9472518c549797259a32d93b9f1f9"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/personas.js",
+          "path": "frontend-ssalfer/js/api/personas.js",
+          "sha256": "d4f01013c57c71911a6afcfca05b466d80498f496fa439b3184a6696d095e8d5"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/orv.js",
+          "path": "frontend-ssalfer/js/api/orv.js",
+          "sha256": "2b6d65471191f1c1916ee4a191745202345d7d50d7dc78c1a29c9bf5df115d43"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/padrones.js",
+          "path": "frontend-ssalfer/js/api/padrones.js",
+          "sha256": "4324bcc738758384028d848af85fc42415bdaa8249b1a418300d9726f2061093"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/actividades.js",
+          "path": "frontend-ssalfer/js/api/actividades.js",
+          "sha256": "fb304cc2063aa6400ac1a576d103cfc8ef2feb580b77114a90d54313ff988efc"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/parcelas.js",
+          "path": "frontend-ssalfer/js/api/parcelas.js",
+          "sha256": "0cbc11a812d75a9b08a132f478c2ab7565463dd9a15ed5418b2a8630b730cbb5"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/unidadesAgrarias.js",
+          "path": "frontend-ssalfer/js/api/unidadesAgrarias.js",
+          "sha256": "335bce71eabf73ec8eb82746db4e055631980218590964abbf9ae343513d1a3b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/afectaciones.js",
+          "path": "frontend-ssalfer/js/api/afectaciones.js",
+          "sha256": "f7933d331e58ebc0f92e0ec2f33904418f5c06bca378a3e7728e55d583c07971"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/seguimiento.js",
+          "path": "frontend-ssalfer/js/api/seguimiento.js",
+          "sha256": "fff8728b4b681fdb519018bf0cd606f14efc276d0c13fb9bed354fe78dbb4086"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/asambleas.js",
+          "path": "frontend-ssalfer/js/api/asambleas.js",
+          "sha256": "933f89d7ab1b8f2980cda4eb5e33b3b7f6637e142f09302e3e4fd08067f5a711"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/tramitesRan.js",
+          "path": "frontend-ssalfer/js/api/tramitesRan.js",
+          "sha256": "f55eccbb360cb7db5422ecf526c7d8a039aba59adce97698423322121b78d50b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/convenios.js",
+          "path": "frontend-ssalfer/js/api/convenios.js",
+          "sha256": "c886456870c83455bd6b130fb29286999a224c5358223e4753f0fc8cd76c142d"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/fifonafe.js",
+          "path": "frontend-ssalfer/js/api/fifonafe.js",
+          "sha256": "851739debde0452a23327adc1cafa8d3c3b4f207d136424e63e4ab2fa32272cd"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/documentos.js",
+          "path": "frontend-ssalfer/js/api/documentos.js",
+          "sha256": "dcdc89912dc9d2e7a21183ef3f26aff1d39a434ed31591905754aea826672c45"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/indemnizacion.js",
+          "path": "frontend-ssalfer/js/api/indemnizacion.js",
+          "sha256": "98838d9e632ac829e53d23f31d7e6377604ef2bd1cab2d38e9414c012eee0ce8"
+        },
+        {
+          "kind": "script",
+          "url": "/js/api/reportes.js",
+          "path": "frontend-ssalfer/js/api/reportes.js",
+          "sha256": "3ce698c8a0ae3b330db94410965e3fa3cd36c08bc943401df085f3c74cd48e4f"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/gestion.js",
+          "path": "frontend-ssalfer/js/utils/gestion.js",
+          "sha256": "fb99a8e196d58e0d8f1acfab05fadbf8e4e48921e77e53e374f909ba161927a3"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/contexto.js",
+          "path": "frontend-ssalfer/js/utils/contexto.js",
+          "sha256": "9310b4be54ad1508716dce3b3d44ee5080504f9b35c1599f3bacb120cc89d63d"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/gestorDocumentos.js",
+          "path": "frontend-ssalfer/js/utils/gestorDocumentos.js",
+          "sha256": "714c7bfa41f1cc71947c1934dd0627da1347dd452f4bef1bbe352da5201c169b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/directorioPersonas.js",
+          "path": "frontend-ssalfer/js/utils/directorioPersonas.js",
+          "sha256": "a9a23721da928c2d3d69836388f63cdcb280bedce7b113bb67437d9f9e711453"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/marco.js",
+          "path": "frontend-ssalfer/js/utils/marco.js",
+          "sha256": "70d0ee915ef9a7cc5d1f1b399fd3fcf88595e7c440889c40c749fa8c32bebce8"
+        },
+        {
+          "kind": "script",
+          "url": "/js/dashboard.js",
+          "path": "frontend-ssalfer/js/dashboard.js",
+          "sha256": "1542d865926ecb4d51a84957a8af2ea1019629a57d65870eaade62e3f424efa1"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/formatters.js",
+          "path": "frontend-ssalfer/js/utils/formatters.js",
+          "sha256": "5fd26d5ccfaa1d28953daeb657e0f909b825d2671b93aad89c5a676d945a722b"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/ui.js",
+          "path": "frontend-ssalfer/js/utils/ui.js",
+          "sha256": "94f02f11e7486f3befbb333ba778e664c164aad05865cc90de7c608fab5cfeac"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/experiencia.js",
+          "path": "frontend-ssalfer/js/utils/experiencia.js",
+          "sha256": "daa42905f477009435de7bc9a5481019de4f0a63e833501812ada599ba79b7bb"
+        },
+        {
+          "kind": "script",
+          "url": "/js/utils/documentos.js",
+          "path": "frontend-ssalfer/js/utils/documentos.js",
+          "sha256": "2361f0d0a6a42651856dd1eb4fee2144660d09e2aa969189fac2a355eaa78367"
+        },
+        {
+          "kind": "script",
+          "url": "/js/fichaFifonafe.js",
+          "path": "frontend-ssalfer/js/fichaFifonafe.js",
+          "sha256": "c1e1bbaa158f7f4bf5a3b0f2a34653a15bc676da86f20b7f939a3ec67505f8b6"
+        },
+        {
+          "kind": "script",
+          "url": "/js/intervinientesFifonafe.js",
+          "path": "frontend-ssalfer/js/intervinientesFifonafe.js",
+          "sha256": "70886593f292d3a897ba8585aef7f4362ecdbeb828d3eda948bc9edd7c1b2ed7"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/dashboard.css",
+          "path": "frontend-ssalfer/styles/dashboard.css",
+          "sha256": "103fc527c3db5a58f6d02f0d7307e6a89ed549ebb6659fc947b9f99a4dbc1438"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/shared.css",
+          "path": "frontend-ssalfer/styles/shared.css",
+          "sha256": "b2cb76035a7413b5af769f6e1e9c49d57e7e65f62db58308ddcb84e8a25edbc3"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/fichaFifonafe.css",
+          "path": "frontend-ssalfer/styles/fichaFifonafe.css",
+          "sha256": "a632ba8c9e8c4d7378e9a4e8ad8d33ed5cbe6002c29e85e5301ea1971296cd9e"
+        },
+        {
+          "kind": "style",
+          "url": "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "sha256": "004322721c8557331759bc6ddaacbb689b0f0715d688aec82bd056d2d5b5cc3b"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/gestion.css",
+          "path": "frontend-ssalfer/styles/gestion.css",
+          "sha256": "7a4fa6d2cf1e3410c89a35dfe7f2e1969e3aa661647e5bbe2f310c07f0118c44"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/marco.css",
+          "path": "frontend-ssalfer/styles/marco.css",
+          "sha256": "332eabe42086bc1a5eb1653d0f6eae874f9d65c8d687d8415ad80cbe82efab0e"
+        },
+        {
+          "kind": "style",
+          "url": "/styles/tablasScroll.css",
+          "path": "frontend-ssalfer/styles/tablasScroll.css",
+          "sha256": "0d4dce9625df6adf0f527791983af71d3dbb0aca7f776a511bd79b2b5b876146"
+        },
+        {
+          "kind": "image",
+          "url": "/img/LOGOS VERDE/IMAGOTIPO.png",
+          "path": "frontend-ssalfer/img/LOGOS VERDE/IMAGOTIPO.png",
+          "sha256": "c48b473c058a2d22b74e9eca7c9881a9b571b445e80ebcd2d2df8033033ec4ee"
+        },
+        {
+          "kind": "image",
+          "url": "/img/LOGOS VERDE/SSALFER.png",
+          "path": "frontend-ssalfer/img/LOGOS VERDE/SSALFER.png",
+          "sha256": "20b116b52fff0ca45a6685ae5c8d1ae4375e421ead00f29b3da1c7c801957c7c"
+        },
+        {
+          "kind": "image",
+          "url": "/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "path": "frontend-ssalfer/img/LOGOS VERDE/NOMBRE_LOGO.png",
+          "sha256": "be17b3dfb5c8cb7f89eed25b418fbec986bb667c78479eeabb909f1d9028baf8"
+        },
+        {
+          "kind": "image",
+          "url": "/img/PA_LOGO_VERDE.png",
+          "path": "frontend-ssalfer/img/PA_LOGO_VERDE.png",
+          "sha256": "9dfad212b8aab848ebf610732f0cfd9be40ed2243c0d3064cf497a0f270378ad"
+        }
+      ],
+      "css_dependencies": [
+        {
+          "source": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "url": "./fonts/bootstrap-icons.woff2?e34853135f9e39acf64315236852cd5a",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff2",
+          "sha256": "6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61"
+        },
+        {
+          "source": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "url": "./fonts/bootstrap-icons.woff?e34853135f9e39acf64315236852cd5a",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff",
+          "sha256": "f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15"
+        }
+      ],
+      "local_inline_script_sha256": [
+        "c977ac8130da797d6db259438ced52ee2e4b1dd7b929a1c57e44cde58c8a6d99"
+      ],
+      "vendor_resources": [
+        {
+          "kind": "style",
+          "url": "/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "sha256": "004322721c8557331759bc6ddaacbb689b0f0715d688aec82bd056d2d5b5cc3b"
+        },
+        {
+          "source": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "url": "./fonts/bootstrap-icons.woff2?e34853135f9e39acf64315236852cd5a",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff2",
+          "sha256": "6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61"
+        },
+        {
+          "source": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/bootstrap-icons.css",
+          "url": "./fonts/bootstrap-icons.woff?e34853135f9e39acf64315236852cd5a",
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/fonts/bootstrap-icons.woff",
+          "sha256": "f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15"
+        }
+      ],
+      "licenses": [
+        {
+          "path": "frontend-ssalfer/js/vendor/bootstrap-icons-1.13.1/LICENSE.txt",
+          "sha256": "0fb3e11bd57e896c5a512afd64864d28a37de45d19835016c87ca1ad19ead969",
+          "package": "bootstrap-icons",
+          "version": "1.13.1",
+          "license": "MIT"
+        }
+      ],
+      "javascript_reference_scan": {
+        "ExcelJS": [],
+        "html2canvas": [],
+        "XLSX": [
+          "frontend-ssalfer/js/utils/gestorDocumentos.js"
+        ],
+        "dashboardExcel": [],
+        "exceljs-4.4.0.min.js": [],
+        "import(": [],
+        "createElement(\"script\")": []
+      },
+      "exceljs": {
+        "loaded_by_page": false,
+        "reason": "No ExcelJS, html2canvas or dashboardExcel script in either page; static JS scan found no loader or ExcelJS API reference in their direct scripts. XLSX mentions in document UI are accepted upload formats.",
+        "active_bundle_elsewhere": "frontend-ssalfer/js/vendor/exceljs-4.4.0-ssalfer.min.js",
+        "bundle_sha256": "cd738e64c8d89615473b662ba0bc8fdd8b07d6baa29837b3225986529bba7a57",
+        "runtime_graph": "frontend-ssalfer/tools/exceljs/runtime-graph.json",
+        "licenses": "frontend-ssalfer/js/vendor/ExcelJS-build-LICENSES.txt",
+        "runtime_graph_sha256": "f0a11fbdede19ec8efe43122e36f3470eb63ad4953e160363f641797d7f92ff1",
+        "licenses_sha256": "68f45056f6ee03c52436e72d8734e5c7665f7c8e98d60f041af272516f8ad563"
+      },
+      "csp": {
+        "mode": "Report-Only",
+        "inline_scripts": 1,
+        "inline_would_be_blocked_by_script_src_self": true,
+        "inline_style_attributes": 0,
+        "events": [],
+        "frames": [],
+        "review": "Reinventoried on pinned dev, retaining FIFONAFE/project summary unchanged. Browser enforcement remains pending."
+      }
+    }
+  ]
+}

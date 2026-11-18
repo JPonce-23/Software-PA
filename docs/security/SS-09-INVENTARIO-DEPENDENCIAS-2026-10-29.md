@@ -1,3 +1,5 @@
+> Fotografía histórica de 2026-10-29. Para los artefactos actuales de integración consultar [SS-09 +pa5, 2026-11-18](SS-09-INTEGRACION-PA5-2026-11-18.md) y `ss09/inventario-declarado.json`; las referencias de bundles/imágenes de este documento no son la selección activa.
+
 # SS-09 etapa 1: inventario de dependencias y artefactos declarados
 
 Fecha: 2026-10-29. Software-PA, rama dev, HEAD `683ff75613768de28a7127c7e33a6e2ef4fc40ff` más remediaciones locales. **No es SBOM del entorno instalado, ni inventario del artefacto desplegado.** [Informe](SS-09-ETAPA1-CORRECCION-2026-10-29.md), [plan](SS-09-PLAN-CADENA-SUMINISTRO.md).

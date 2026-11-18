@@ -24,7 +24,9 @@ SOURCES=('backend/requirements.txt','backend/tests/requirements-convenio-report.
  'docker-compose.prod.yml','docker-compose.ssalfer.yml',
  'backend/tests/convenio_report_compose.yml','backend/tests/lineage_compose.yml',
  'deploy/tls/Dockerfile','deploy/tls/.dockerignore','deploy/tls/default.conf.template',
- 'deploy/tls/headers.conf','deploy/tls/proxy.conf','deploy/tls/validate-host.sh')
+ 'deploy/tls/headers.conf','deploy/tls/proxy.conf','deploy/tls/validate-host.sh',
+ 'frontend-ssalfer/tools/exceljs/runtime-graph.json','frontend-ssalfer/tools/exceljs/package-lock.json',
+ 'docs/security/ss09/native-pa5.json')
 TLS_FILES=('Dockerfile','.dockerignore','default.conf.template','headers.conf','proxy.conf','validate-host.sh')
 LEGACY_SOURCES=('frontend/package.json','frontend/package-lock.json','frontend/Dockerfile','frontend/.dockerignore')
 APP_IMPORTS={'PIL':'pillow','pypdf':'pypdf','fastapi':'fastapi','sqlalchemy':'sqlalchemy','pydantic':'pydantic',
@@ -197,7 +199,7 @@ def image_record(value,source):
     # Fixed registry families used in the reviewed repository; do not echo new
     # credentialed registry refs/URLs/variables before they receive review.
     match=re.fullmatch(r'([a-z0-9./-]+)(?::([a-z0-9._-]+))?(?:@sha256:([0-9a-f]{64}))?',value)
-    if not match or match[1] not in IMAGE_ROOTS:
+    if not match or (match[1] not in IMAGE_ROOTS and value!='software-pa-libgdal36-candidate:20261117-pa5@sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c'):
         return dict(source=source,reference=None,immutable_reference=False,actual_digest_verified=False,review='unapproved_reference')
     return dict(source=source,reference=value,immutable_reference=bool(match[3]),
         actual_digest_verified=False,platform='not_observed',review='digest_pending' if not match[3] else 'digest_reference_only')
@@ -324,6 +326,31 @@ def audit(root):
     node.update(role='legacy_not_official_frontend',source_status='present_audited' if legacy else 'absent_retired',
                 functional_qa_required_for_ssalfer=False)
     vendors=vendor_inventory(root);images=inspect_images(sources)
+    graph=json.loads(sources['frontend-ssalfer/tools/exceljs/runtime-graph.json'])
+    lock=json.loads(sources['frontend-ssalfer/tools/exceljs/package-lock.json'])
+    bundle=read_bytes(root,'frontend-ssalfer/js/vendor/exceljs-4.4.0-ssalfer.min.js')
+    exceljs_ok=(graph.get('artifact')=='exceljs-4.4.0-ssalfer.min.js'
+        and graph.get('sha256')==hashlib.sha256(bundle).hexdigest()
+        and graph.get('package_lock_sha256')==hashlib.sha256(read_bytes(root,'frontend-ssalfer/tools/exceljs/package-lock.json')).hexdigest()
+        and not (root/'frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js').exists()
+        and bool(graph.get('packages'))
+        and not {'elliptic','crypto-browserify','browserify-sign','create-ecdh'} & {p['name'] for p in graph['packages']}
+        and all(any(v.get('version')==p['version'] and v.get('integrity')==p['integrity'] and v.get('resolved')==p['resolved']
+                    for v in lock['packages'].values()) for p in graph['packages']))
+    exceljs=dict(local_bundle_and_lock_coherent=exceljs_ok,artifact=graph['artifact'],sha256=graph['sha256'],
+        package_lock_sha256=graph['package_lock_sha256'],runtime_packages=graph['packages'],modules=len(graph['modules']),
+        full_provenance_verifier='frontend-ssalfer/tools/exceljs/verify.py',sca='pending')
+    native=json.loads(sources['docs/security/ss09/native-pa5.json'])
+    native_ok=(native['image_reference']=='software-pa-libgdal36-candidate:20261117-pa5@sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c'
+        and native['image_reference'] in sources['docker-compose.yml']
+        and native['library']['abi']==36
+        and native['library']['sha256']=='10c9bc0c0bbafe2f16b51c130ad5f4ba2030c204cbbac5a271a79e6418abadeb'
+        and len(native['packages'])==3 and all(p['version']=='3.10.3+dfsg-1+pa5' for p in native['packages'])
+        and native['backend']['abi']==39
+        and native['backend']['requirements_sha256']==hashlib.sha256(read_bytes(root,'backend/requirements.txt')).hexdigest()
+        and all(row['actual']==row['expected'] for row in native['core_llvm'].values()))
+
+
     ignore=sources['backend/.dockerignore'];patterns={s.strip() for s in ignore.splitlines() if s.strip() and not s.lstrip().startswith('#')}
     docker=sources['backend/Dockerfile'];ssalfer=sources['frontend-ssalfer/deploy/Dockerfile']
     preserved=('requirements.txt','Dockerfile','logging.json','app/main.py','app/safe_logging.py',
@@ -338,6 +365,8 @@ def audit(root):
     workflows=sum(1 for p in workflow_dir.iterdir() if p.suffix in ('.yml','.yaml')) if workflow_dir.is_dir() else 0
     issues=['PYTHON_DISTRIBUTION_HASHES_UNVERIFIED','PYTHON_GRAPH_UNVERIFIED','NATIVE_AND_INSTALLED_ARTIFACTS_UNOBSERVED',
             'CVE_SCA_NOT_PERFORMED','GITHUB_EFFECTIVE_POLICIES_UNOBSERVED','INSTITUTIONAL_PROFILE_PENDING_APPROVAL']
+    if not native_ok:issues.append('NATIVE_SELECTION_DRIFT')
+    if not exceljs_ok:issues.append('EXCELJS_BUNDLE_OR_LOCK_DRIFT')
     if any(not r['immutable_reference'] for r in images):issues.append('MUTABLE_IMAGE_REFERENCES')
     if any(r['reference'] is None for r in images):issues.append('UNAPPROVED_IMAGE_REFERENCE')
     if context['missing_required_ignore_patterns']:issues.append('BACKEND_IGNORE_POLICY_INCOMPLETE')
@@ -362,7 +391,7 @@ def audit(root):
     if not (root/'frontend-ssalfer/.dockerignore').is_file():
         issues.append('SSALFER_BUILD_CONTEXT_IGNORE_NOT_DECLARED')
     if '--reload' in docker:issues.append('DOCKERFILE_DEFAULT_RELOAD_DECLARED')
-    integrity_failure=any(code in issues for code in ('VENDOR_LOCAL_INTEGRITY_FAILURE',
+    integrity_failure=any(code in issues for code in ('NATIVE_SELECTION_DRIFT','EXCELJS_BUNDLE_OR_LOCK_DRIFT','VENDOR_LOCAL_INTEGRITY_FAILURE',
         'NODE_DIRECT_RANGE_MISMATCH_OR_UNSUPPORTED','NODE_RESOLUTION_METADATA_REQUIRES_REVIEW',
         'BACKEND_REQUIRED_RESOURCE_EXCLUDED','BACKEND_IGNORE_POLICY_INCOMPLETE',
         'UNAPPROVED_IMAGE_REFERENCE','SS04_SS10_RUNTIME_COMMAND_DRIFT',
@@ -372,9 +401,7 @@ def audit(root):
         assessment='incomplete_requires_qa',local_integrity_ok=not integrity_failure,
         python=py,qa_python=python_inventory(sources['backend/tests/requirements-convenio-report.txt']),
         node=node,vendors=vendors,images=images,
-        native=dict(apt_declared_packages=[p for p in ('gdal-bin','libpq-dev','gcc') if re.search(r'\b'+re.escape(p)+r'\b',docker)],
-                    apt_versions=None,gdal_geos_proj_libpq_versions=None,postgresql_postgis_installed_versions=None,
-                    build_tools_in_backend_runtime='gcc' in docker),
+        exceljs=exceljs,native=native,
         contexts=dict(backend=context,ssalfer_selective_copy=('COPY . ' not in ssalfer and 'COPY Index.html dashboard.html' in ssalfer),
             ssalfer_ignore_file_present=(root/'frontend-ssalfer/.dockerignore').is_file(),
             react_source_status=node['source_status'],
