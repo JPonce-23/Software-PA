@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "source_commit": "ae9cd6021b15d45f4091ab9854d394348cacfbc0",
+  "version": "3.10.3+dfsg-1+pa5",
+  "tag": "3.10.3-dfsg-1-pa5",
+  "source_index": "sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c",
+  "source_config": "sha256:dfe80e1feb214799ba101b037f0b72e2499de606a63ef88497f4e13bb1ed3f19",
+  "source_archive_sha256": "4099c542cf891338320396fca45fac0bc47bd1064217e70b331259981ad025b2",
+  "candidate": {
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "digest": "sha256:08cb9799c6f9d8f616264bbddeee73b0010b06cbdd219e544a196e504190fea0",
+    "size": 4772
+  },
+  "candidate_config": "sha256:96377c4ff49bb164e961b42d684e3a605b01848e518d32f65bc834f32826cdad",
+  "platform": "linux/amd64",
+  "rootfs_unchanged": true,
+  "layers_unchanged": true,
+  "historical_attestation_applies_to_candidate": false
+}

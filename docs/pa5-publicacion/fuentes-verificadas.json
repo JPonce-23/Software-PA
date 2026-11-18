@@ -1,0 +1,120 @@
+{
+  "source_commit": "ae9cd6021b15d45f4091ab9854d394348cacfbc0",
+  "files": {
+    "backend/native/postgis/Dockerfile.gdal36-pa5-candidate": {
+      "expected": "c04c9a402aadb6d4dfff2054c830b074211b3142e20a7058c35756b7f5ac5f9c",
+      "actual": "c04c9a402aadb6d4dfff2054c830b074211b3142e20a7058c35756b7f5ac5f9c",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/security-inventory-pa5.patch": {
+      "expected": "9fea2c31b39eb6c09ec87b2fc18944ba9a30f3af08bbc45612e82198c3445338",
+      "actual": "9fea2c31b39eb6c09ec87b2fc18944ba9a30f3af08bbc45612e82198c3445338",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/backport.json": {
+      "expected": "f408b583ceb6ca316304923b6f2f2f651463b327ca9720d269f0e86f50826621",
+      "actual": "f408b583ceb6ca316304923b6f2f2f651463b327ca9720d269f0e86f50826621",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/README.md": {
+      "expected": "3d67ff7911b6cfa93efb5a20b89b9164349aeca236ed67b751da161de99c079a",
+      "actual": "3d67ff7911b6cfa93efb5a20b89b9164349aeca236ed67b751da161de99c079a",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/7f3406edd992fa4afe3a638371860d9a4104db04.patch": {
+      "expected": "d974b127b3d5599ef26d8c0f763aca8fa2f57dc924b87ea1b016499e59f80eb8",
+      "actual": "d974b127b3d5599ef26d8c0f763aca8fa2f57dc924b87ea1b016499e59f80eb8",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/backport-pa5.json": {
+      "expected": "132e890786a1dd5fbf4d90c1a98b61fb7050e26e515910d4de8336b254d6eb2c",
+      "actual": "132e890786a1dd5fbf4d90c1a98b61fb7050e26e515910d4de8336b254d6eb2c",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/prepare-source-pa4.py": {
+      "expected": "6c1e80402a396c0907e9d2917b34a6ea3bdc0e390f2fd0f0b06fa4d15be20dde",
+      "actual": "6c1e80402a396c0907e9d2917b34a6ea3bdc0e390f2fd0f0b06fa4d15be20dde",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/184f77dbcc74118c062c05e464c88161d3c37b9b.patch": {
+      "expected": "18608c18a907d20a6d716fc69c8284ced5121ac318fcc4025a19d9cde85bdb8e",
+      "actual": "18608c18a907d20a6d716fc69c8284ced5121ac318fcc4025a19d9cde85bdb8e",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/security-enumeration-pa4.patch": {
+      "expected": "682e713ee0dd8db31fd84c7c6fd1495794934943f122ffa3711b7779efe61307",
+      "actual": "682e713ee0dd8db31fd84c7c6fd1495794934943f122ffa3711b7779efe61307",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/security-backport.patch": {
+      "expected": "96de956f17387303a769e8b6857d1db3bab5ee36dec9f6cbdcf0469d7153233f",
+      "actual": "96de956f17387303a769e8b6857d1db3bab5ee36dec9f6cbdcf0469d7153233f",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/c49254dc6380af2f02ff43ca79e3cf7c1bc82f01.patch": {
+      "expected": "3268e82995799b4b1b7cd4abbc4a678e10ad999026393ff6b15eebae3cc0114f",
+      "actual": "3268e82995799b4b1b7cd4abbc4a678e10ad999026393ff6b15eebae3cc0114f",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/backport-pa3.json": {
+      "expected": "5f0604f4caec467b59ac2bf246a88c87992772daa0af39c26e21fbc60f8960df",
+      "actual": "5f0604f4caec467b59ac2bf246a88c87992772daa0af39c26e21fbc60f8960df",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/build-packages-pa5.sh": {
+      "expected": "2fdb223fa861903c5266ff793ea611e37ac842a1cc771ef72837d49bb1fb6f10",
+      "actual": "2fdb223fa861903c5266ff793ea611e37ac842a1cc771ef72837d49bb1fb6f10",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/backport-pa4.json": {
+      "expected": "bd5652ba99042c64c1ce669407b5d90486f9a065361604079ac79871d708e3da",
+      "actual": "bd5652ba99042c64c1ce669407b5d90486f9a065361604079ac79871d708e3da",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/50eea7456d83c9586f112ef96b43249372839dea.patch": {
+      "expected": "d73e82ac0b5c08798c2c8c83a7c87a75feea56f240a82f97b5b0c2d20ba3f81e",
+      "actual": "d73e82ac0b5c08798c2c8c83a7c87a75feea56f240a82f97b5b0c2d20ba3f81e",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/9491e794f1757f08063ea2f7a274ad2994afa636.patch": {
+      "expected": "808e143ed48d576d39783e2b25d15cb62d11c2aaf42eaee1908741c1da74d053",
+      "actual": "808e143ed48d576d39783e2b25d15cb62d11c2aaf42eaee1908741c1da74d053",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/3e04c0385630e4d42517046d9a4967dfccfeb7fd.patch": {
+      "expected": "e2013adc49fdc5f98432b3840a4e427220b057e498fcff28c02aa182306147fb",
+      "actual": "e2013adc49fdc5f98432b3840a4e427220b057e498fcff28c02aa182306147fb",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/build-packages.sh": {
+      "expected": "4c094476aa7bf53b7a8c86f88009539366045143597e54326ef53a225c94c16a",
+      "actual": "4c094476aa7bf53b7a8c86f88009539366045143597e54326ef53a225c94c16a",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/prepare-source.py": {
+      "expected": "82bcbec4fffb0eef29950e7997caab34f37238591f0732c756675eef46e60442",
+      "actual": "82bcbec4fffb0eef29950e7997caab34f37238591f0732c756675eef46e60442",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/security-metadata-pa3.patch": {
+      "expected": "6e00e267f42e7fa431d910dce5a3c8ef57d09037fbdbe82d40e101145c6dfe47",
+      "actual": "6e00e267f42e7fa431d910dce5a3c8ef57d09037fbdbe82d40e101145c6dfe47",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/a791f70f8eaec540974ec989ca6fb00266b7646c.patch": {
+      "expected": "fae5adc4468c004fa96c5dfb66d95acf0a25e5ec7d45c51577bbe150524f1ec6",
+      "actual": "fae5adc4468c004fa96c5dfb66d95acf0a25e5ec7d45c51577bbe150524f1ec6",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/prepare-source-pa5.py": {
+      "expected": "5b03f68bd679f0fa4005f43c3456b8f7a5b00670b5cfc246c19c18c0131fcd84",
+      "actual": "5b03f68bd679f0fa4005f43c3456b8f7a5b00670b5cfc246c19c18c0131fcd84",
+      "match": true
+    },
+    "backend/native/postgis/gdal36/build-packages-pa4.sh": {
+      "expected": "71a465f6a9e813f48b82aeb8b684b90dbf41c2734613c55b2fb8f349d7d7cb33",
+      "actual": "71a465f6a9e813f48b82aeb8b684b90dbf41c2734613c55b2fb8f349d7d7cb33",
+      "match": true
+    }
+  }
+}

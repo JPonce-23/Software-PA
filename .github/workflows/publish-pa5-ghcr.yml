@@ -1,0 +1,191 @@
+name: Publish reviewed PA5 to GHCR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Confirm exact version 3.10.3+dfsg-1+pa5
+        required: true
+        type: string
+      source_commit:
+        description: Confirm source ae9cd6021b15d45f4091ab9854d394348cacfbc0
+        required: true
+        type: string
+      approved_digest:
+        description: Leave empty to prepare only; otherwise paste the reviewed candidate manifest sha256
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pa5-first-publication
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONNOUSERSITE: '1'
+  PYTHON_DOTENV_DISABLED: '1'
+
+jobs:
+  prepare:
+    if: github.repository == 'JPonce-23/Software-PA' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      digest: ${{ steps.identity.outputs.digest }}
+      config: ${{ steps.identity.outputs.config }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Confirm reviewed inputs
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          REQUESTED_COMMIT: ${{ inputs.source_commit }}
+          REQUESTED_DIGEST: ${{ inputs.approved_digest }}
+        run: |
+          set -euo pipefail
+          test "$REQUESTED_VERSION" = '3.10.3+dfsg-1+pa5'
+          test "$REQUESTED_COMMIT" = 'ae9cd6021b15d45f4091ab9854d394348cacfbc0'
+          [[ -z "$REQUESTED_DIGEST" || "$REQUESTED_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          python3 -B -m unittest discover -s tests/publisher -v
+      - name: Verify protected publication environment exists
+        if: inputs.approved_digest != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B publisher/pa5/controls.py
+      - name: Record managed runner tooling
+        run: |
+          python3 --version
+          docker version
+          printf 'Runner image: %s %s\n' "$ImageOS" "$ImageVersion"
+      - name: Download owner-authorized release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_ASSET_ID: ${{ vars.PA5_SOURCE_ASSET_ID }}
+        run: python3 -B publisher/pa5/download.py "$SOURCE_ASSET_ID" "$RUNNER_TEMP/source.tar"
+      - name: Verify source and derive candidate without registry credentials
+        id: identity
+        env:
+          REQUESTED_DIGEST: ${{ inputs.approved_digest }}
+        run: |
+          set -euo pipefail
+          python3 -B publisher/pa5/prepare.py "$RUNNER_TEMP/source.tar" "$RUNNER_TEMP/prepared" --docker-archive
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads((Path(os.environ['RUNNER_TEMP'])/'prepared/candidate.json').read_text())
+          digest=report['candidate']['digest']
+          assert not os.environ['REQUESTED_DIGEST'] or os.environ['REQUESTED_DIGEST']==digest
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write('digest='+digest+'\nconfig='+report['candidate_config']+'\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as out:
+              out.write('Candidate for explicit review (new metadata identity): `'+digest+'`\n\n')
+              out.write('Source commit: `'+report['source_commit']+'`; version: `'+report['version']+'`.\n')
+          PY
+      - name: Load candidate and verify native components on disposable runner
+        run: |
+          set -euo pipefail
+          docker load -i "$RUNNER_TEMP/prepared/candidate.docker.tar"
+          bash publisher/pa5/native.sh pa5-publish-candidate:verified '${{ steps.identity.outputs.config }}' | tee "$RUNNER_TEMP/prepared/native.log"
+          cp inspect.json packages-and-linkage.txt "$RUNNER_TEMP/prepared/"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pa5-preparation-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/prepared/*.json
+            ${{ runner.temp }}/prepared/*.log
+            ${{ runner.temp }}/prepared/*.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: prepare
+    if: inputs.approved_digest != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: pa5-publish
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Reverify original bytes and publish only approved identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_ASSET_ID: ${{ vars.PA5_SOURCE_ASSET_ID }}
+          APPROVED_DIGEST: ${{ inputs.approved_digest }}
+          PREPARED_DIGEST: ${{ needs.prepare.outputs.digest }}
+          PA5_EXCLUSIVE_WRITER: ${{ vars.PA5_EXCLUSIVE_WRITER }}
+        run: |
+          set -euo pipefail
+          test "$APPROVED_DIGEST" = "$PREPARED_DIGEST"
+          python3 -B publisher/pa5/controls.py
+          python3 -B publisher/pa5/download.py "$SOURCE_ASSET_ID" "$RUNNER_TEMP/source.tar"
+          python3 -B publisher/pa5/registry.py publish "$RUNNER_TEMP/source.tar" "$RUNNER_TEMP/published" "$APPROVED_DIGEST"
+          cat "$RUNNER_TEMP/published/registry-evidence.json" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pa5-publication-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/published/*.json
+          if-no-files-found: error
+          retention-days: 90
+
+  consume:
+    needs: [prepare, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Independently download and check remote digest, metadata and privacy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_ASSET_ID: ${{ vars.PA5_SOURCE_ASSET_ID }}
+          APPROVED_DIGEST: ${{ needs.prepare.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python3 -B publisher/pa5/download.py "$SOURCE_ASSET_ID" "$RUNNER_TEMP/source.tar"
+          python3 -B publisher/pa5/registry.py verify "$RUNNER_TEMP/source.tar" "$RUNNER_TEMP/consumed" "$APPROVED_DIGEST"
+      - name: Pull by immutable digest with read-only GITHUB_TOKEN
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REMOTE_DIGEST: ${{ needs.prepare.outputs.digest }}
+          EXPECTED_CONFIG: ${{ needs.prepare.outputs.config }}
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG="$RUNNER_TEMP/pa5-docker-auth"
+          mkdir -m 700 "$DOCKER_CONFIG"
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          unset GH_TOKEN
+          image="ghcr.io/jponce-23/software-pa-native-postgis@$REMOTE_DIGEST"
+          docker pull --platform linux/amd64 "$image"
+          bash publisher/pa5/native.sh "$image" "$EXPECTED_CONFIG" | tee "$RUNNER_TEMP/consumed/native.log"
+          cp inspect.json packages-and-linkage.txt "$RUNNER_TEMP/consumed/"
+          cat "$RUNNER_TEMP/consumed/registry-evidence.json" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pa5-independent-consumer-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/consumed/*.json
+            ${{ runner.temp }}/consumed/*.log
+            ${{ runner.temp }}/consumed/*.txt
+          if-no-files-found: error
+          retention-days: 90
