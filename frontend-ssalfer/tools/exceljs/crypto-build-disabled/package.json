@@ -1,0 +1,7 @@
+{
+  "name": "@ssalfer/crypto-build-disabled",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.cjs",
+  "license": "MIT"
+}
