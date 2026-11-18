@@ -1,0 +1,25 @@
+{
+  "commit": "ae9cd6021b15d45f4091ab9854d394348cacfbc0",
+  "files": {
+    "publisher/pa5/pa5_supply.py": {
+      "source": "deploy/ci/pa5_supply.py",
+      "sha256": "d6435b74f5668b9415ead7f414fb39b49f364478b3d142d9129cc8b3508305ff"
+    },
+    "publisher/pa5/pa5-supply-catalog.json": {
+      "source": "deploy/ci/pa5-supply-catalog.json",
+      "sha256": "447b284835d87c7179f2af2e37d72d9fcab0149d5abd48967bf304c5bc203e0b"
+    },
+    "publisher/pa5/pa5-native-smoke.sh": {
+      "source": "deploy/ci/pa5-native-smoke.sh",
+      "sha256": "9061b54a44593fb0390ff8ce0544ef90e67a1c556e4a3553422307636764bf62"
+    },
+    "publisher/pa5/PA5-PROCEDENCIA.json": {
+      "source": "backend/native/postgis/PA5-PROCEDENCIA.json",
+      "sha256": "0edb76ae41e32378f0219db4f153ed5b554c35356b5acaf84c82459c7047c62b"
+    },
+    "publisher/pa5/Dockerfile.f2e1-reference": {
+      "source": "backend/native/postgis/Dockerfile.pa5-validated-runtime",
+      "sha256": "2a5a571997b4dd266bddead5a6663e02108f6251b8b847e6be1bbc1e5e818617"
+    }
+  }
+}

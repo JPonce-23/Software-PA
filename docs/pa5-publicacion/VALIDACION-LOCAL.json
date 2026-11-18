@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-18",
+  "state": "LOCAL_OFFLINE_PASS",
+  "unittest_count": 16,
+  "source_archive_real": true,
+  "source_blobs": 33,
+  "source_layers": 29,
+  "source_build_inputs": 23,
+  "candidate_deterministic_from_real_source": true,
+  "candidate_digest": "sha256:08cb9799c6f9d8f616264bbddeee73b0010b06cbdd219e544a196e504190fea0",
+  "docker_archive_serialization_verified": true,
+  "docker_archive_unique_layer_payloads": 27,
+  "yaml_permissions_actions_shell_python_checks": "PASS",
+  "local_engine_import": "NOT_RUN",
+  "local_native_smoke": "NOT_RUN",
+  "local_native_blocker": "Main Engine inaccessible; isolated rootless daemon lacks newuidmap",
+  "remote_ci": "NOT_RUN",
+  "registry_publication": "NOT_RUN",
+  "independent_registry_pull": "NOT_RUN",
+  "production_approval": false,
+  "pr8_unchanged": true,
+  "existing_workspace_diff_and_status_unchanged": true
+}

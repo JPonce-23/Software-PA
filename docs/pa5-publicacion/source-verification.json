@@ -1,0 +1,24 @@
+{
+  "state": "PASS",
+  "scope": "offline OCI bytes and final-layer packages; not Engine import or smoke",
+  "supplied_index_digest": "sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c",
+  "local_index_digest": "sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c",
+  "platform": "linux/amd64",
+  "blobs": 33,
+  "layers": 29,
+  "protected_payloads": {
+    "usr/lib/postgresql/15/lib/postgis-3.so": "f302aca21231b7855fa66644b5cfd58085cf12fa4fda70627ec21b437cb636e0",
+    "usr/lib/postgresql/15/lib/bitcode/postgis-3/flatgeobuf.bc": "9f3a0c2f303bb1159ae662dcb9024f7904b03da3cab05b30e5f557a4e542bd42",
+    "usr/lib/postgresql/15/lib/bitcode/postgis-3/lwgeom_in_flatgeobuf.bc": "d994e2eb001a679d6cf5a414fc8dd2702cc79e65825ee46dfdb00c8545f092df",
+    "usr/lib/postgresql/15/lib/bitcode/postgis-3.index.bc": "b95e9e68087c1e6e491775a10e71936f573c970a5dab0c84cda1dba35220e578",
+    "usr/lib/x86_64-linux-gnu/libgdal.so.36.3.10.3": "10c9bc0c0bbafe2f16b51c130ad5f4ba2030c204cbbac5a271a79e6418abadeb"
+  },
+  "packages": {
+    "libgdal36": "3.10.3+dfsg-1+pa5",
+    "gdal-data": "3.10.3+dfsg-1+pa5",
+    "gdal-plugins": "3.10.3+dfsg-1+pa5",
+    "postgresql-15": "15.19-1.pgdg13+2",
+    "postgresql-15-postgis-3": "3.6.4+dfsg-2.pgdg13+1",
+    "postgresql-15-postgis-3-scripts": "3.6.4+dfsg-2.pgdg13+1"
+  }
+}

@@ -1,0 +1,11 @@
+La imagen +pa5 validada todavía no tiene un mecanismo de primera publicación controlada en GHCR. Este PR añade un workflow manual en main que importa el archivo F2-E1 por su checksum fijo, valida su procedencia y prepara un candidato linux/amd64 sin recompilar ni alterar capas o bibliotecas.
+
+El candidato añade etiquetas OCI de fuente, commit y versión, por lo que tiene una identidad nueva y exige aprobación explícita de su digest. La preparación prueba componentes sin permisos de paquetes; sólo el job protegido por `pa5-publish` recibe `packages: write`. Otro runner descarga por digest con `packages: read` y comprueba PostgreSQL/PostGIS, GDAL, LLVM, hashes, paquetes, privacidad y vinculación del paquete.
+
+Se rechazan errores de autenticación como evidencia de ausencia, etiquetas existentes, identidades distintas y environments sin revisión del propietario o sin política main. Las Actions oficiales se fijan por SHA; no se usan PAT, pull_request_target ni código arbitrario de PR con credenciales. No se añaden datos de aplicación, .env, respaldos ni binarios.
+
+Validación local: 16 pruebas unitarias aprobadas; archivo real F2-E1 verificado (33 blobs, 29 capas, paquetes y hashes protegidos); 23 entradas de fuente contrastadas con el commit aprobado; candidato derivado de forma determinista; sintaxis YAML, shell y Python comprobada. No se ejecutó Docker/smoke local porque el daemon aislado requiere newuidmap, ausente en el entorno. El workflow exige smoke remoto previo a publicación.
+
+Operación pendiente del propietario: revisar/fusionar este PR mínimo hacia main, autorizar la distribución del archivo fuente, configurar environment/variables y exclusividad del escritor, ejecutar preparación, aprobar nueva identidad y revisar publicación/consumo reales. Si la fuente debe permanecer privada, no usar una Release de un repo público; revisar primero una fuente privada compatible. No se ha publicado ningún paquete ni se ha demostrado CI remoto.
+
+El PR #8 y dev no cambian. Su verificador actual exige la identidad anterior: conciliación posterior del catálogo requerirá autorización separada después de aprobar/publicar el candidato. La publicación no habilita por sí sola sus gates. Los límites de reproducibilidad, permisos, concurrencia frente a otros escritores e instrucciones exactas están en `docs/pa5-publicacion/INSTRUCCIONES.md`.

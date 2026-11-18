@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "scope": "Frozen F2-E1 artifact identity; remote digest must be separately approved, not assumed",
+  "repository": "ghcr.io/jponce-23/software-pa-native-postgis",
+  "local_index_digest": "sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c",
+  "archive_sha256": "4099c542cf891338320396fca45fac0bc47bd1064217e70b331259981ad025b2",
+  "archive_size_bytes": 263294464,
+  "index_manifests": [
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:27e9ca0702414c9515cf205df5635af7ad7509385dffcf7dcf6fb048c185f9b7",
+      "size": 5799,
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:1f8153f7e0fc6ea415172f2547020b091ffb7aef9127c5b7cf4a3cf69bc89d61",
+      "size": 564,
+      "annotations": {
+        "vnd.docker.reference.digest": "sha256:27e9ca0702414c9515cf205df5635af7ad7509385dffcf7dcf6fb048c185f9b7",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    }
+  ],
+  "platform_manifest_digest": "sha256:27e9ca0702414c9515cf205df5635af7ad7509385dffcf7dcf6fb048c185f9b7",
+  "config_digest": "sha256:dfe80e1feb214799ba101b037f0b72e2499de606a63ef88497f4e13bb1ed3f19",
+  "layers": [
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:f2be67225471500c788ce88c597eb5ea8336e912ad1ca4815650e0281afe2034",
+      "size": 29843579
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:e0428ef87eb889d4f487073625c72ff382113f5e03de6e7348e306e7cbda3953",
+      "size": 1165
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:c9b382b1f732a16b95426b8ea9025469ea5748c7fe138bf8733529c23d17c29d",
+      "size": 6442939
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:0f6d195ee34511f506f9a1e140cb0a3579e2c11b54aa2470b2d37f5024af389c",
+      "size": 1256745
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:d1b142a2d3aca2dc455b263f41505aeb4efc0d34fd89d44c871e458b33d2623d",
+      "size": 8203805
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:2ab475e318db9061b345624bac6fa0e530648e4d0c30248260f3b643611ec082",
+      "size": 1311706
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:bee16f784947d11ac5f777aabe34afafdb2163ba84858bde233d3a106b530fc6",
+      "size": 116
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:633cb79824549677619cf46b06e40c98de9842d9d8e4536a4cfb6bfb59690fb3",
+      "size": 3146
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:bf5dc03c54335117e22beec718683807a52f6fc5c2faa0aa5a8313676b8413c4",
+      "size": 111108102
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:426e36b5695b88a169f8f6d573db50142a2ed32d1d92a6591132f74d38ead65a",
+      "size": 9941
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:8a5ff7b733f5c16696c5bf0d395a6f511c3854ed8c5805923d7d1319175d0c55",
+      "size": 128
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:09018b22bca260d320d3ecc78031ac78fb9b735128a5bfece33d6bb25514eed5",
+      "size": 167
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:bd451b9fde8decedcda87b1d8d5800b1e8f1a92eded32e22353c67a576b128db",
+      "size": 6110
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:ee1936713636f086852bddd0441964bc663a0aa7a4378720cbdd66d4bf0072b0",
+      "size": 184
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:8075d82836a38156ba603c85c13ec87f2d59f195285a8fa2d14e25673db1c056",
+      "size": 77232546
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+      "size": 32
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:d659b0e0c2b7c1b5bd8e356e4ce75e1ff9feb81cc7010fc5eac5363de67e77b8",
+      "size": 807
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:650074f1b92118a9f7d9b48fe7c1c8dc2cd311add4d343897f1f0beab9af3da9",
+      "size": 588
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:74b5f810789d83e0ee2add5a644c466743a7a091eb7e4bc006e9e8fc56610cd5",
+      "size": 254
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:a224fb3ec0ec3e2b3363747965ea9f6744e2752d7afa06a4dcd93e53047e0be2",
+      "size": 2627203
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:595943a39fec614c3f8f6ba048ff0e3318a70aae645b9fe1c1b96920a24b73a9",
+      "size": 2235836
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:bfca83377f0d09de0631c54bd487c022a49678aaf75a9df3e2051ac6e0cfbb60",
+      "size": 81492
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:1f9b640412e2109efdeace48ec20a20d6455f6a7266c1a1e1450f9ea272597f4",
+      "size": 26120
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:f2db09965c71eae8d56b55a0a3af98376b4fe0cffdf0fa1ba562cb47b5fbc10f",
+      "size": 16569
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:271ea0582cc35ef4d05971f4092a1a0a31cd1e9dc04492a91119c53a750775c6",
+      "size": 1096
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:74f5ba922e9ed4f4367213db582debd54d01720285b71f7564b24dbbf8567cd9",
+      "size": 9853508
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+      "size": 32
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:ce494f7db5356009327d23f5112a484e72ab45842028c20b81f5046804cf2713",
+      "size": 12969153
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+      "size": 32
+    }
+  ],
+  "rootfs_diff_ids": [
+    "sha256:a70f6272827f64e1427d048ced77491aab5d64ab95725e56920802ff391197d7",
+    "sha256:bad7ac542f8f71815a4e3eb1ae935f43cef7e5148ed932a34fcea165330d740f",
+    "sha256:10daca7c4475cf31a0de1d572ba547d258dd44d869da1eb8536ea9e54f4fdd31",
+    "sha256:0bed2a4a850052272fe3e0d07dd34963f93c492e7f547a129753200d795aca7b",
+    "sha256:e1eb3edef25cf9e04a8bdb648e35f832f1d5936ce6e14b820371e1b6a166ab78",
+    "sha256:86de9887e546727c325a740553db1143e2dc5aca24a891559189d601d9b81117",
+    "sha256:8978834d28764c3ed7183dd9bc52391e44a12068cca0d2beaa637fce907e513f",
+    "sha256:163c4897d031bb0ae3a311206c43894ee91ff3aead5c85db9c77044cca6751a9",
+    "sha256:3fccdeca7c3cf1028fa60c8e24c59efdc11b5338d6503a113255b46cc12c8c9f",
+    "sha256:efb0551e9426bc3d171819cfef776f62157f9dc1b219b21cef554345ec9b50c3",
+    "sha256:6e8082627ede9ddc287d627956fb25ed25b16598beb317f33a9f627cfc2c3f88",
+    "sha256:76f6bcb7dd4359f0c940314bb0ef4e4eba07403e143aa35f278d5f8b71be79e2",
+    "sha256:8cd4531fc5ba33da3bcf5d6c66c386fc9db4a77263d02c369340f2885238c220",
+    "sha256:ef9399aa3a28afb10e3a98ee39946f9e05ec0ba08f5215ca5f12282afdd53cea",
+    "sha256:d50bd3e7931b83607fbf2e45d0663993e37c0d41918ea712eb537241b0427857",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+    "sha256:b39bf14fdcf964ab22478939535c748c33df16db3f4bd6dc6df24b7e0df7d935",
+    "sha256:231cc7a2ea4d91cd877ff660f2a4b66635bac2dae9b6d4469841f129ae193ebe",
+    "sha256:6474dd71744e08af94e4d4794fe11103c30b9c8de70f6e6302d79b8d088a39b5",
+    "sha256:027724b27a41048d01710e5c1e1b119c9ccb04528961849d150a1da295e63785",
+    "sha256:d3309ddea444a3f7a9467d40efbba8cac0c7985723620d45b6b434247877048a",
+    "sha256:6ca6789270b7b01a3c2fe3d66b49c8ede1261bd3c84a1c0aeed799590d694610",
+    "sha256:28a072d9591823257d7aaaaa26954a5bcc8f75fc02431ae8c790d9a6db5641cc",
+    "sha256:f0c50a24dfbb0504bc1a95f18e0335af2e4026557f01ecc83a8e6eeb52e1606e",
+    "sha256:a80b19bcf69c38531cd722c4e116f2c891f3b1b85d3f7fddbb92c91587a7a612",
+    "sha256:c57f19fc52f78e30bfc409e8021c6e6a8d05ec247f02c41622daea006845e55a",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+    "sha256:2b4232ed268422cc3ae5ce31ca4b281e30a2e36a940fafe7371e9dbe8c69bb17",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+  ],
+  "protected_payloads": {
+    "usr/lib/postgresql/15/lib/bitcode/postgis-3.index.bc": "b95e9e68087c1e6e491775a10e71936f573c970a5dab0c84cda1dba35220e578",
+    "usr/lib/postgresql/15/lib/bitcode/postgis-3/flatgeobuf.bc": "9f3a0c2f303bb1159ae662dcb9024f7904b03da3cab05b30e5f557a4e542bd42",
+    "usr/lib/postgresql/15/lib/bitcode/postgis-3/lwgeom_in_flatgeobuf.bc": "d994e2eb001a679d6cf5a414fc8dd2702cc79e65825ee46dfdb00c8545f092df",
+    "usr/lib/postgresql/15/lib/postgis-3.so": "f302aca21231b7855fa66644b5cfd58085cf12fa4fda70627ec21b437cb636e0",
+    "usr/lib/x86_64-linux-gnu/libgdal.so.36.3.10.3": "10c9bc0c0bbafe2f16b51c130ad5f4ba2030c204cbbac5a271a79e6418abadeb"
+  },
+  "package_versions": {
+    "libgdal36": "3.10.3+dfsg-1+pa5",
+    "gdal-data": "3.10.3+dfsg-1+pa5",
+    "gdal-plugins": "3.10.3+dfsg-1+pa5",
+    "postgresql-15": "15.19-1.pgdg13+2",
+    "postgresql-15-postgis-3": "3.6.4+dfsg-2.pgdg13+1",
+    "postgresql-15-postgis-3-scripts": "3.6.4+dfsg-2.pgdg13+1"
+  },
+  "remote_digest": null,
+  "remote_publication_verified": false
+}
