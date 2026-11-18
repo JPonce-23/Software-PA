@@ -37,8 +37,59 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="rp-pagos"><h3>Pagos registrados por afectación</h3><strong>${d.pagos_registros === 0 ? 'Sin pagos registrados' : money(d.pagos_total)}</strong><p>${number(d.pagos_registros)} pagos registrados. No se restan de los montos de COP: pertenecen a afectaciones y no existe una relación directa de cada pago con un COP.</p></div></section>
             <details class="rp-metodo"><summary>Qué información incluye este resumen</summary><p>Registros activos de los núcleos vinculados al proyecto. Actividades realizadas: tienen fecha de realización. Asambleas celebradas: tienen convocatoria activa con fecha de realización y resultado «Celebrada»; cada asamblea se cuenta una sola vez. Los porcentajes reflejan el avance sobre lo registrado, no sobre una meta institucional. «Sin dato» indica información no disponible; un cero indica que la consulta no encontró registros.</p></details>`;
     }
+    function enlazarTarjetas() {
+        const id = encodeURIComponent($('rpProyecto').value);
+        const cards = [...$('rpContenido').querySelectorAll('article')];
+        const targets = [
+            [`/pages/fichaProyecto.html?id=${id}#nucleosAgrarios`],
+            [null,'parcelas'], [null,'afectaciones'],
+            [`/pages/reportesColectivos.html?id_proyecto=${id}`],
+            [null,'convocatorias'], [null,'sensibilizacion'], [null,'caminamiento'], [null,'asambleas'],
+            [`/pages/seguimientoFifonafe.html?id_proyecto=${id}&ambito=individual`],
+            [`/pages/seguimientoFifonafe.html?id_proyecto=${id}&ambito=colectivo`],
+            [`/pages/reportesConvenios.html?id_proyecto=${id}`],
+            [`/pages/reportesConvenios.html?id_proyecto=${id}`]
+        ];
+        cards.forEach((card,i) => {
+            const [url,scope] = targets[i];
+            const control = document.createElement(url ? 'a' : 'button');
+            control.className = 'rp-origen';
+            const title = card.querySelector('h2,h3').textContent;
+            control.textContent = 'Consultar registros →';
+            control.setAttribute('aria-label', `Consultar ${title}`);
+            if(url) control.href=url;
+            else { control.type='button'; control.onclick=()=>abrirNucleos(scope,control); }
+            card.classList.add('rp-consultable'); card.append(control);
+        });
+        const pay=document.createElement('button');pay.type='button';pay.className='rp-origen';pay.textContent='Consultar afectaciones y pagos →';pay.onclick=()=>abrirNucleos('pagos',pay);
+        $('rpContenido').querySelector('.rp-pagos').append(pay);
+    }
+    const dialog=document.createElement('dialog');dialog.className='rp-dialogo';dialog.setAttribute('aria-labelledby','rpDialogTitulo');document.body.append(dialog);
+    let focoOrigen;
+    dialog.addEventListener('close',()=>focoOrigen?.focus());
+    async function abrirNucleos(scope,control) {
+        focoOrigen=control;
+        const actual=revision, id=$('rpProyecto').value;
+        dialog.innerHTML='<h2 id="rpDialogTitulo">Consultar registros por núcleo</h2><p>Selecciona un núcleo para abrir sus registros. Azul: registros disponibles. Verde: realizados o con pagos registrados. Anaranjado: pendientes o sin pagos registrados.</p><button type="button" class="rp-cerrar">Cerrar</button><div class="rp-opciones" aria-live="polite">Consultando núcleos…</div>';
+        dialog.querySelector('.rp-cerrar').onclick=()=>dialog.close();dialog.showModal();
+        try {
+            const rows=[];
+            for(let skip=0;;skip+=200) {
+                const batch=await window.ClienteAPI.get(`/proyectos/${encodeURIComponent(id)}/resumen-ampliado/origenes?tipo=${encodeURIComponent(scope)}&skip=${skip}&limit=200`);
+                if(actual!==revision||!dialog.open)return;
+                rows.push(...batch);if(batch.length<200)break;
+            }
+            const pages={pagos:'afectacion',parcelas:'parcela',afectaciones:'afectacion',convocatorias:'asamblea',asambleas:'asamblea',sensibilizacion:'actividades',caminamiento:'actividades'};
+            dialog.querySelector('.rp-opciones').innerHTML=rows.map(n=>{
+                const activity=['sensibilizacion','caminamiento','asambleas','convocatorias'].includes(scope);
+                const color=scope==='pagos'?(n.realizados>0?'verde':'pendiente'):activity?(n.realizados===n.total?'verde':n.pendientes>0?'pendiente':'azul'):'azul';
+                const label=scope==='pagos'?(n.realizados>0?'Con pagos registrados':'Sin pagos registrados'):activity?`${n.realizados} de ${n.total} realizados · ${n.pendientes} pendientes`:`${n.total} registros disponibles`;
+                return `<a class="rp-origen-${color}" href="/pages/${pages[scope]}.html?id_proyecto_nucleo=${encodeURIComponent(n.id_proyecto_nucleo)}${['sensibilizacion','caminamiento'].includes(scope)?'&tipo_actividad='+scope:''}">${escape(n.nombre_nucleo)}<small>${escape(label)}</small></a>`;}).join('')||'<p>No hay núcleos con registros disponibles para esta consulta.</p>';
+        }catch(err){if(dialog.open)dialog.querySelector('.rp-opciones').textContent=err.mensaje||err.message;}
+    }
     async function load() {
         const current = ++revision, id = $('rpProyecto').value;
+        if(dialog.open) dialog.close();
         $('rpContenido').replaceChildren(); $('rpError').hidden = true;
         $('rpContenido').setAttribute('aria-busy', String(Boolean(id)));
         for (const [key,page,param] of [['rpFicha','fichaProyecto','id'],['rpSeguimiento','seguimientoFifonafe','id_proyecto']]) {
@@ -50,6 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await window.ReportesAPI.obtenerResumenProyecto(id);
             if(current !== revision) return;
             render(data);
+            enlazarTarjetas();
             $('rpEstado').textContent = `${$('rpProyecto').selectedOptions[0].textContent} · Consultado a las ${new Date().toLocaleTimeString('es-MX')}`;
         } catch(err) {
             if(current !== revision) return;

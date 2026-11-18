@@ -52,7 +52,7 @@
 .rp-barra strong { display: inline-flex; align-items: center; gap: .7rem; flex-wrap: wrap; font-size: 1.25rem; font-weight: 650; color: #294d62; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .rp-barra small { font-size: .83rem; color: #52665c; font-weight: 600; letter-spacing: 0; }
 .rp-pista { height: 7px; border-radius: 20px; background: #edf1f3; overflow: hidden; }
-.rp-pista span { border-radius: inherit; background: linear-gradient(90deg,#386987,#74a5b9); }
+.rp-pista span { border-radius: inherit; background: linear-gradient(90deg,#173a60,#335c85); }
 .rp-verde .rp-pista span { background: linear-gradient(90deg,#28765e,#6ca88c); }
 .rp-verde strong { color: #28765e; }
 .rp-rojo .rp-pista span { background: linear-gradient(90deg,#ad4c58,#d18c91); }
@@ -70,3 +70,20 @@
  .rp-pista span { transform-origin: left; animation: rp-revelar .45s ease-out both; }
  @keyframes rp-revelar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 }
+
+.rp-consultable { position: relative; padding-bottom: 3.4rem !important; }
+.rp-origen { display: inline-block; border: 0; background: transparent; color: var(--verde,#245d49); font: inherit; font-size: .85rem; font-weight: 600; text-decoration: none; cursor: pointer; padding: .5rem 0; }
+.rp-consultable > .rp-origen { position: static; }
+.rp-consultable > .rp-origen::after { content: ''; position: absolute; inset: 0; border-radius: 20px; }
+.rp-consultable:has(.rp-origen:hover), .rp-consultable:focus-within { box-shadow: 0 5px 18px #245d4920; outline: 2px solid #789e89; }
+.rp-dialogo { max-width: 580px; width: calc(100% - 2rem); max-height: 80vh; overflow: auto; border: 1px solid #b4c9bc; border-radius: 18px; padding: 1.5rem; }
+.rp-dialogo::backdrop { background: #102a2266; }
+.rp-dialogo h2 { color: var(--verde,#245d49); }
+.rp-opciones { display: grid; gap: .5rem; margin-top: 1rem; }
+.rp-opciones a, .rp-cerrar { padding: .7rem; border: 1px solid #ccdcd1; border-radius: 8px; color: #245d49; background: white; text-decoration: none; font: inherit; cursor: pointer; }
+.rp-dialogo :focus-visible { outline: 3px solid #245d49; outline-offset: 2px; }
+
+.rp-opciones a small { display:block; margin-top:.4rem; font-size:.8rem; }
+.rp-opciones .rp-origen-azul { background:#edf3fb; border-left:5px solid #234f7a; color:#173a60; }
+.rp-opciones .rp-origen-verde { background:#eaf5ee; border-left:5px solid #28765e; color:#205c43; }
+.rp-opciones .rp-origen-pendiente { background:#fff0e9; border-left:5px solid #CC3412; color:#92270e; }

@@ -2996,8 +2996,8 @@ body:has(.aside.collapsed) .nucleo-info h3 {
 html[data-rol-actual="geografo"] .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) { grid-template-columns: minmax(0,1fr); }
 @media(min-width: 1280px) {
  .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) > a:not(.dashboard-acceso-resumen) { grid-template-columns: minmax(0,.95fr) minmax(0,1.1fr); }
- .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) .dashboard-kpi-ejecutivo { grid-template-columns: 1fr; gap: 4px; }
- .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) .dashboard-kpi-icono { display: none; }
+ .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) .dashboard-kpi-ejecutivo { grid-template-columns: 38px minmax(0,1fr); gap: 10px; align-items: center; }
+ .tarjeta-dashboard-ejecutivo:has(.dashboard-acceso-resumen) .dashboard-kpi-icono { display: grid; place-items: center; }
 }
 .tarjeta-dashboard-ejecutivo > a.dashboard-acceso-resumen { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .55rem; text-align: center; text-decoration: none; color: var(--verde); border: 1px solid #bfd3c4; border-radius: 12px; background: #f0f7f2; padding: .7rem; }
 .dashboard-acceso-resumen i { font-size: 2rem; }
