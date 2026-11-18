@@ -52,7 +52,10 @@ x-default-logging: &default-logging
 
 services:
   db:
-    image: postgis/postgis:15-3.6@sha256:91098df530c92202d69193ded45dd47e6d0b6a3117a6398b0abe2be365f23550
+    # Local validated +pa5 index, linux/amd64 only. See deploy/PA5-COMPOSE.md.
+    image: software-pa-libgdal36-candidate:20261117-pa5@sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c
+    platform: linux/amd64
+    pull_policy: never
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Define POSTGRES_ADMIN_USER en el archivo .env}
@@ -77,11 +80,13 @@ services:
     logging: *default-logging
 
   pgadmin:
+    # Optional administrative development tool; never an application dependency.
+    profiles: ["admin-tools"]
     image: dpage/pgadmin4@sha256:40fa840c5bb7c8463957f1255b01283732c2d8c9396a956d180f8e6c296753b3
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Define PGADMIN_DEFAULT_EMAIL en el archivo .env}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Define PGADMIN_DEFAULT_PASSWORD en el archivo .env}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-}
     ports:
       - "127.0.0.1:${PGADMIN_HOST_PORT:-5050}:80"
     volumes:
