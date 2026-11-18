@@ -2323,7 +2323,7 @@
     "upstream_authenticity": "not_verified"
   },
   "github": {
-    "local_workflow_count": 1,
+    "local_workflow_count": 2,
     "dependabot_file_present": false,
     "effective_branch_protection": "not_observed",
     "rulesets": "not_observed",

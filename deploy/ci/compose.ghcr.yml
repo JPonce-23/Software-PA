@@ -1,0 +1,7 @@
+# Activation override only, after owner approval + remote digest verification.
+# PA5_GHCR_IMAGE must be emitted by pa5_supply.py reference (not a mutable tag).
+services:
+  db:
+    image: ${PA5_GHCR_IMAGE:?Define the independently verified GHCR repository@sha256 reference}
+    platform: linux/amd64
+    pull_policy: never
