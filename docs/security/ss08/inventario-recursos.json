@@ -42,7 +42,7 @@
     },
     {
       "path": "dashboard.html",
-      "sha256": "653a388a90d1d13093c5c59016735b567f0ab0af4d5721391d653791a8f80115",
+      "sha256": "e048b07cbc3910db38d641ee96ee9688072548d0b2e38a49d816c2cf3c2d8a9d",
       "scripts": [
         "/js/utils/permisos.js",
         "/js/utils/proteccion.js",

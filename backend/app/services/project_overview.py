@@ -1,5 +1,5 @@
 """One snapshot, bounded result size, no per-nucleus requests or row limit."""
-from sqlalchemy import select, func, exists, case
+from sqlalchemy import select, func, exists, case, literal
 from .. import models as m
 
 
@@ -73,3 +73,46 @@ def project_overview(db, project_id):
             scalar(ambit + "_monto_" + concept, select(func.sum(column)).where(scope))
             scalar(ambit + "_con_dato_" + concept, select(func.count(column)).where(scope))
     return dict(db.execute(select(*fields)).mappings().one())
+
+
+def overview_sources(db, project_id, kind, skip, limit):
+    pn, n = m.ProyectoNucleo, m.NucleoAgrario
+    def count(model, *conditions):
+        return select(func.count()).select_from(model).where(*conditions).correlate(pn).scalar_subquery()
+    if kind == "parcelas":
+        p = m.Parcela
+        total = count(p, p.activo.is_(True), p.id_nucleo == pn.id_nucleo)
+        done = total; pending = 0
+    elif kind == "afectaciones":
+        a = m.Afectacion
+        total = count(a, a.activo.is_(True), a.id_proyecto_nucleo == pn.id_proyecto_nucleo)
+        done = total; pending = 0
+    elif kind == "pagos":
+        p, i, a = m.Pago, m.Indemnizacion, m.Afectacion
+        total = select(func.count()).select_from(p).join(i, i.id_indemnizacion == p.id_indemnizacion).join(a, a.id_afectacion == i.id_afectacion).where(
+            p.activo.is_(True), i.activo.is_(True), a.activo.is_(True), a.id_proyecto_nucleo == pn.id_proyecto_nucleo).correlate(pn).scalar_subquery()
+        done = total; pending = 0
+    elif kind in ("sensibilizacion", "caminamiento"):
+        a = m.ActividadCampo
+        filters = (a.activo.is_(True), a.id_proyecto_nucleo == pn.id_proyecto_nucleo, a.tipo_actividad == kind)
+        total = count(a, *filters)
+        done = count(a, *filters, a.fecha_realizada.is_not(None))
+        pending = count(a, *filters, a.fecha_realizada.is_(None), a.fecha_programada.is_not(None))
+    else:
+        a, cv = m.Asamblea, m.AsambleaConvocatoria
+        filters = (a.activo.is_(True), a.id_proyecto_nucleo == pn.id_proyecto_nucleo)
+        cvs = select(cv.id_asamblea).where(cv.activo.is_(True), cv.fecha_realizacion.is_not(None))
+        if kind == "asambleas":
+            total = count(a, *filters)
+            cat=m.CatalogoOperativo
+            celebrated=select(cat.id_catalogo_opcion).where(cat.tipo_catalogo=="resultado_convocatoria",cat.codigo=="celebrada",cat.activo.is_(True))
+            cvs=cvs.where(cv.id_resultado.in_(celebrated))
+            done = count(a, *filters, a.id_asamblea.in_(cvs)); pending = total - done
+        else:
+            def convocations(*extra):
+                return select(func.count()).select_from(cv).join(a, a.id_asamblea == cv.id_asamblea).where(*filters, cv.activo.is_(True), *extra).correlate(pn).scalar_subquery()
+            total=convocations(); done=convocations(cv.fecha_realizacion.is_not(None)); pending=total-done
+    query=select(pn.id_proyecto_nucleo, n.nombre_nucleo, total.label("total"), done.label("realizados"),
+                 (pending if hasattr(pending,"label") else literal(pending)).label("pendientes")).join(n,n.id_nucleo==pn.id_nucleo).where(pn.id_proyecto==project_id,pn.activo.is_(True))
+    if kind != "pagos": query=query.where(total>0)
+    return [dict(r) for r in db.execute(query.order_by(n.nombre_nucleo,pn.id_proyecto_nucleo).offset(skip).limit(limit)).mappings()]

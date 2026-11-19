@@ -893,3 +893,12 @@ def project_map(
             *(feature("parcela", row) for row in parcels),
         ],
     }
+
+
+@router.get("/proyectos/{id_proyecto}/resumen-ampliado/origenes")
+def expanded_sources(id_proyecto: int, tipo: str = Query(..., pattern="^(parcelas|afectaciones|pagos|sensibilizacion|caminamiento|asambleas|convocatorias)$"),
+                     skip: int = Query(0, ge=0), limit: int = Query(200, ge=1, le=200),
+                     db: Session = Depends(get_db), user=Depends(auth.RoleChecker(["admin", "operador", "visualizador"]))):
+    require_project_access(db,user,id_proyecto,load_details=False)
+    from ..services.project_overview import overview_sources
+    return overview_sources(db,id_proyecto,tipo,skip,limit)

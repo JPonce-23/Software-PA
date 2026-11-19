@@ -5,9 +5,15 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
+
+def published_html(web):
+    # Match the frontend Dockerfile's runtime HTML roots; build tools are excluded.
+    return sorted([*web.glob('*.html'), *(web / 'pages').rglob('*.html')])
+
 
 class ProductionSecurity(unittest.TestCase):
     def test_production_requires_exact_https_origin(self):
@@ -26,9 +32,7 @@ class ProductionSecurity(unittest.TestCase):
     def test_inline_scripts_have_csp_hash(self):
         policy = (ROOT / "deploy/tls/headers.conf").read_text(encoding="utf-8")
         self.assertNotIn("script-src 'self' 'unsafe-inline'", policy)
-        for page in (ROOT / "frontend-ssalfer").rglob("*.html"):
-            if "deploy" in page.parts:
-                continue
+        for page in published_html(ROOT / "frontend-ssalfer"):
             for script in re.findall(r'<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)</script>', page.read_text(encoding="utf-8")):
                 if script.strip():
                     digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
@@ -42,7 +46,7 @@ class ProductionSecurity(unittest.TestCase):
         scripts=[]
         # Same runtime HTML roots copied by the frontend Dockerfile. Build tools
         # and their ignored node_modules are never published by this image.
-        for page in sorted([*web.glob('*.html'),*(web/'pages').rglob('*.html')]):
+        for page in published_html(web):
             source=page.read_text(encoding='utf-8')
             for match in re.finditer(r'<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)</script>',source):
                 if match[1].strip():
@@ -68,6 +72,17 @@ class ProductionSecurity(unittest.TestCase):
                 script_src=[tokens[1:] for tokens in directives if tokens[0]=='script-src']
                 self.assertEqual(len(script_src),1)
                 self.assertCountEqual(script_src[0],expected)
+
+    def test_csp_page_scope_includes_nested_pages_and_excludes_build_dependencies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            web = Path(directory)
+            expected = {'Index.html', 'dashboard.html', 'pages/nested/review.html'}
+            for name in expected | {'tools/exceljs/node_modules/vendor/example.html',
+                                    'deploy/internal.html', 'outputs/qa.html'}:
+                path = web / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('<script>synthetic()</script>')
+            self.assertEqual({str(p.relative_to(web)) for p in published_html(web)}, expected)
 
     def test_production_docs_disabled(self):
         source = (ROOT / "backend/app/main.py").read_text()
