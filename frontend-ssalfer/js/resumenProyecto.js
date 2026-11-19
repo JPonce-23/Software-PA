@@ -65,18 +65,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         $('rpContenido').querySelector('.rp-pagos').append(pay);
     }
     const dialog=document.createElement('dialog');dialog.className='rp-dialogo';dialog.setAttribute('aria-labelledby','rpDialogTitulo');document.body.append(dialog);
-    let focoOrigen;
+    let focoOrigen, consultaOrigen=0;
     dialog.addEventListener('close',()=>focoOrigen?.focus());
     async function abrirNucleos(scope,control) {
         focoOrigen=control;
-        const actual=revision, id=$('rpProyecto').value;
+        const consulta=++consultaOrigen, actual=revision, id=$('rpProyecto').value;
         dialog.innerHTML='<h2 id="rpDialogTitulo">Consultar registros por núcleo</h2><p>Selecciona un núcleo para abrir sus registros. Azul: registros disponibles. Verde: realizados o con pagos registrados. Anaranjado: pendientes o sin pagos registrados.</p><button type="button" class="rp-cerrar">Cerrar</button><div class="rp-opciones" aria-live="polite">Consultando núcleos…</div>';
         dialog.querySelector('.rp-cerrar').onclick=()=>dialog.close();dialog.showModal();
         try {
             const rows=[];
             for(let skip=0;;skip+=200) {
                 const batch=await window.ClienteAPI.get(`/proyectos/${encodeURIComponent(id)}/resumen-ampliado/origenes?tipo=${encodeURIComponent(scope)}&skip=${skip}&limit=200`);
-                if(actual!==revision||!dialog.open)return;
+                if(consulta!==consultaOrigen||actual!==revision||!dialog.open)return;
                 rows.push(...batch);if(batch.length<200)break;
             }
             const pages={pagos:'afectacion',parcelas:'parcela',afectaciones:'afectacion',convocatorias:'asamblea',asambleas:'asamblea',sensibilizacion:'actividades',caminamiento:'actividades'};
@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const color=scope==='pagos'?(n.realizados>0?'verde':'pendiente'):activity?(n.realizados===n.total?'verde':n.pendientes>0?'pendiente':'azul'):'azul';
                 const label=scope==='pagos'?(n.realizados>0?'Con pagos registrados':'Sin pagos registrados'):activity?`${n.realizados} de ${n.total} realizados · ${n.pendientes} pendientes`:`${n.total} registros disponibles`;
                 return `<a class="rp-origen-${color}" href="/pages/${pages[scope]}.html?id_proyecto_nucleo=${encodeURIComponent(n.id_proyecto_nucleo)}${['sensibilizacion','caminamiento'].includes(scope)?'&tipo_actividad='+scope:''}">${escape(n.nombre_nucleo)}<small>${escape(label)}</small></a>`;}).join('')||'<p>No hay núcleos con registros disponibles para esta consulta.</p>';
-        }catch(err){if(dialog.open)dialog.querySelector('.rp-opciones').textContent=err.mensaje||err.message;}
+        }catch(err){if(consulta===consultaOrigen&&actual===revision&&dialog.open)dialog.querySelector('.rp-opciones').textContent=err.mensaje||err.message;}
     }
     async function load() {
         const current = ++revision, id = $('rpProyecto').value;

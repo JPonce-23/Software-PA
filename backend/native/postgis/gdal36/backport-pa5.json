@@ -1,0 +1,112 @@
+{
+  "status": "PA5_SOURCE_ONLY_REQUIRES_FUTURE_BUILD_AND_NATIVE_VALIDATION",
+  "local_version": "3.10.3+dfsg-1+pa5",
+  "parent_revision": "3.10.3+dfsg-1+pa4",
+  "parent_manifest_sha256": "bd5652ba99042c64c1ce669407b5d90486f9a065361604079ac79871d708e3da",
+  "parent_preparer_sha256": "6c1e80402a396c0907e9d2917b34a6ea3bdc0e390f2fd0f0b06fa4d15be20dde",
+  "parent_patch_sha256": "682e713ee0dd8db31fd84c7c6fd1495794934943f122ffa3711b7779efe61307",
+  "additional_patch": "security-inventory-pa5.patch",
+  "additional_patch_sha256": "9fea2c31b39eb6c09ec87b2fc18944ba9a30f3af08bbc45612e82198c3445338",
+  "files": {
+    "frmts/zlib/contrib/infback9/inftree9.c": {
+      "before": "18119c79daffedcd60cf3d97c0571b08f6ae3eafef6326209cd132e22d506b5e",
+      "after": "18119c79daffedcd60cf3d97c0571b08f6ae3eafef6326209cd132e22d506b5e"
+    },
+    "frmts/hdf4/hdf-eos/GDapi.c": {
+      "before": "eecbae4efa3ff13379f0947a47773ed829200e529626ddcaa2519bd47f99a97c",
+      "after": "422fb1c99ebf342d12d1d5529a477171d899a7470d4e9362114bf5a6e0865776"
+    },
+    "frmts/hdf4/hdf-eos/SWapi.c": {
+      "before": "d15c5b21a2a22d0576ac94b2f6f14d44a358b05050715f00dc58016e354ff5eb",
+      "after": "9c831cdd13c2cea70c362d1b6c2712d6434fafe8bf13e4afae2f79941de391b5"
+    },
+    "frmts/netcdf/netcdfdataset.cpp": {
+      "before": "01138e1525d9f3c931eedd4568396400cc2a3903f99111854c5d818ebf742c1e",
+      "after": "01138e1525d9f3c931eedd4568396400cc2a3903f99111854c5d818ebf742c1e"
+    },
+    "frmts/netcdf/netcdfdataset.h": {
+      "before": "59053357002f897ac78b00e1d1615a2bf8c3dc719686065fdead4c863055f5c9",
+      "after": "59053357002f897ac78b00e1d1615a2bf8c3dc719686065fdead4c863055f5c9"
+    },
+    "frmts/netcdf/netcdfsg.cpp": {
+      "before": "38c39e8cf2c0b04abb021431da642b1046bdacdb5c3f29805b9457435a4e59b7",
+      "after": "38c39e8cf2c0b04abb021431da642b1046bdacdb5c3f29805b9457435a4e59b7"
+    },
+    "frmts/hdf4/hdf-eos/EHapi.c": {
+      "before": "6b0d4e4a6c4a85e87d7be15eb40ffb8bac44f4fe7b2a5ef63b2762a734d7a2f8",
+      "after": "182b0ed697d426555e7b79e34c1bab2ba9c1146fc5aed87f9f2a114c408acef8"
+    },
+    "frmts/hdf4/hdf-eos/HdfEosDef.h": {
+      "before": "a1c6781d478cf4a34f672af8db0001167c601161662e11ea963341cd3bda71fb",
+      "after": "11c68c7f058a2b5e2ea51692c346a4d546d853f34113fa844329ad6d4d57ddff"
+    },
+    "frmts/hdf4/hdf4multidim.cpp": {
+      "before": "9b9ead6475fd8daa6e13379bf5886dc4f804f05518e4ed3ffe4ea4cf7c545802",
+      "after": "54123d8b3832fd2174bc447e5c12e05d8e3f525fd3eec82f3104334b08036896"
+    },
+    "apps/gdalmdiminfo_lib.cpp": {
+      "before": "a971a0eecbc9183f7151594ed84d1629e670a4b9228fd41b625487b9c507b997",
+      "after": "a971a0eecbc9183f7151594ed84d1629e670a4b9228fd41b625487b9c507b997"
+    }
+  },
+  "changed_files": [
+    "frmts/hdf4/hdf-eos/GDapi.c",
+    "frmts/hdf4/hdf-eos/SWapi.c",
+    "frmts/hdf4/hdf-eos/EHapi.c",
+    "frmts/hdf4/hdf-eos/HdfEosDef.h",
+    "frmts/hdf4/hdf4multidim.cpp"
+  ],
+  "protected_functions": {
+    "frmts/hdf4/hdf-eos/EHapi.c:EHgetmetavalue": "2a10e126abb3be71900428e29c9970b9445a56a3f46d24c8bf4f5f49aac90596",
+    "frmts/hdf4/hdf-eos/EHapi.c:EHmetagroup": "482754580838b42d8c3f173cc67281e87a4ffde0db5e2cb73c47aaf1ad7c20a6",
+    "frmts/hdf4/hdf-eos/EHapi.c:EHmetagroupstatus": "4cf491769a151944c9c3de82bfe22d3399d8d76cd71ea68feccd2e38490c65b1",
+    "frmts/hdf4/hdf-eos/SWapi.c:SWSDfldsrch": "5948ee1f03c798fa3ae523d24ec61d8af4142ee763964049b58dbdc9c7c7b30f",
+    "frmts/hdf4/hdf-eos/SWapi.c:SWfieldinfo": "9521cd720b9d3e7547316fdb94f170ee5ac35116ece6082d8e7078e0cf540385",
+    "frmts/hdf4/hdf-eos/SWapi.c:SWreadfield": "5db15ca91e35d196d6cae52cc0ee7eabba25deaff8b1fa950a206cb7a81f45f7",
+    "frmts/hdf4/hdf-eos/SWapi.c:SWinqmaps": "9745aa0e28ee0855f905b1596743eac833bef0130736a01110c1b22df46e881c",
+    "frmts/hdf4/hdf-eos/SWapi.c:SWinqfields": "03778002701ae5f094e54e9aaf3df36ac9baaec3fc1afd74353d7b6de03e105c",
+    "frmts/hdf4/hdf-eos/SWapi.c:SWnentries": "8fcf4f624172384144f0ec28acef11aedf7a5f5eb55f9ae99605dd5cee4420dd",
+    "frmts/hdf4/hdf-eos/GDapi.c:GDSDfldsrch": "d778b51e4cd410403c574522c93c257cde1a9bb79fa78ea0334f9aa4c6b1f9d5",
+    "frmts/hdf4/hdf-eos/GDapi.c:GDinqfields": "62cfdb3553d812352283c86b778b4a770a63f342ece5af27915ad446dd610bed",
+    "frmts/hdf4/hdf-eos/GDapi.c:GDnentries": "9653c012c383876727f6bb973844eb60c1695d79ecefa0285b4a81f1d346f6df"
+  },
+  "soname": "libgdal.so.36",
+  "expected_exports": 8529,
+  "package_hashes": null,
+  "library_sha256": null,
+  "image_digest": null,
+  "native_validation": "NOT RUN",
+  "future_image_tag": "software-pa-libgdal36-candidate:20261117-pa5",
+  "future_build_base": {
+    "local_tag": "software-pa-residual-postgis:20261110",
+    "index": "sha256:dbad7ae0ac6f3ba9da2c52215750115862328940703a603bc5a5bfb875e627ef",
+    "manifest_linux_amd64": "sha256:1d17c03866580492bd50bf4adb48fcbf1bad6bf40aae02edf3f2875fc0463eb6",
+    "config": "sha256:74201f3cb99d1ba38be043f6ebc0c89e07cbaa569b6793180abd8286e717707a",
+    "builder": "default",
+    "driver": "docker",
+    "pull": false,
+    "platform": "linux/amd64",
+    "mandatory_prebuild_identity_check": true,
+    "method_reference": "F2-A0 local tag, historical FROM recipe retained unchanged"
+  },
+  "internal_interfaces": {
+    "enum": "HDFEFieldInventoryStatus: ERROR=-1,UNAVAILABLE=0,RETAIN=1",
+    "new_private_symbols": [
+      "EHfieldvalue",
+      "EHfindfield",
+      "EHfieldinventory",
+      "SWfieldinventory",
+      "GDfieldinventory"
+    ],
+    "visibility": "CPL_INTERNAL; exported-symbol ABI must be checked after future build",
+    "inventory_callers": [
+      "HDF4SwathSubGroup::GetMDArrayNames",
+      "HDF4EOSGridSubGroup::GetMDArrayNames"
+    ],
+    "field_lookup_callers": [
+      "SWfinfo",
+      "GDfieldinfo"
+    ]
+  },
+  "policy": "Only preflight proof of explicit empty mappings permits omission; fieldinfo and read errors are never globally downgraded"
+}

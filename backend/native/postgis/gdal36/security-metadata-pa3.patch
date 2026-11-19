@@ -1,0 +1,925 @@
+--- a/frmts/hdf4/hdf-eos/EHapi.c
++++ b/frmts/hdf4/hdf-eos/EHapi.c
+@@ -18,6 +18,7 @@
+ 
+ #include "cpl_port.h"
+ #include <errno.h>
++#include <limits.h>
+ #include "mfhdf.h"
+ #include "HdfEosDef.h"
+ 
+@@ -2429,66 +2430,54 @@
+ |  END_PROLOG                                                                 |
+ -----------------------------------------------------------------------------*/
+ intn
+-EHgetmetavalue(char *metaptrs[], const char *parameter, char *retstr)
++EHgetmetavalue(char *metaptrs[], const char *parameter, char *retstr,
++               size_t retstr_size)
+ {
+-    intn            status = 0;	/* routine return status variable */
+-
+-    int32           slen;	/* String length */
+-    char           *newline;	/* Position of new line character */
+-    char           *sptr;	/* string pointer within metadata */
+-
+-
+-    /* Get string length of parameter string + 1 */
+-    /* ----------------------------------------- */
+-    slen = (int)strlen(parameter) + 1;
+-
+-
+-    /* Build search string (parameter string + "=") */
+-    /* -------------------------------------------- */
+-    strcpy(retstr, parameter);
+-    strcat(retstr, "=");
+-
+-
+-    /* Search for string within metadata (beginning at metaptrs[0]) */
+-    /* ------------------------------------------------------------ */
+-    sptr = strstr(metaptrs[0], retstr);
+-
+-
+-    /* If string found within desired section ... */
+-    /* ------------------------------------------ */
+-    if (sptr != NULL && sptr < metaptrs[1])
+-    {
+-	/* Store position of string within metadata */
+-	/* ---------------------------------------- */
+-	metaptrs[0] = sptr;
+-
+-	/* Find newline "\n" character */
+-	/* --------------------------- */
+-	newline = strchr(metaptrs[0], '\n');
+-	if (newline == NULL)
+-	{
+-		retstr[0] = 0;
+-		return -1;
+-	}
+-
+-	/* Copy from "=" to "\n" (exclusive) into return string */
+-	/* ---------------------------------------------------- */
+-	memcpy(retstr, metaptrs[0] + slen, newline - metaptrs[0] - slen);
+-
+-	/* Terminate return string with null */
+-	/* --------------------------------- */
+-	retstr[newline - metaptrs[0] - slen] = 0;
+-    } else
+-    {
+-	/*
+-	 * if parameter string not found within section, null return string
+-	 * and set status to -1.
+-	 */
+-	retstr[0] = 0;
+-	status = -1;
+-    }
+-
+-    return (status);
++    const char *cursor;
++    const char *end;
++    const char *match = NULL;
++    const char *value;
++    const char *newline;
++    size_t parameter_size;
++    size_t value_size;
++
++    /* The interval must refer to one live EHmetagroup allocation. */
++    if (retstr == NULL || retstr_size == 0)
++        return -1;
++    retstr[0] = '\0';
++    if (metaptrs == NULL || metaptrs[0] == NULL || metaptrs[1] == NULL ||
++        metaptrs[0] > metaptrs[1] || parameter == NULL)
++        return -1;
++    cursor = metaptrs[0];
++    end = metaptrs[1];
++    parameter_size = strlen(parameter);
++    if (parameter_size == 0 || parameter_size >= (size_t)(end - cursor))
++        return -1;
++
++    /* Bounded search: neither the key nor its '=' may cross the section. */
++    while ((size_t)(end - cursor) > parameter_size)
++    {
++        if (memcmp(cursor, parameter, parameter_size) == 0 &&
++            cursor[parameter_size] == '=')
++        {
++            match = cursor;
++            break;
++        }
++        cursor++;
++    }
++    if (match == NULL)
++        return -1;
++    value = match + parameter_size + 1;
++    newline = (const char *)memchr(value, '\n', (size_t)(end - value));
++    if (newline == NULL)
++        return -1;
++    value_size = (size_t)(newline - value);
++    if (value_size >= retstr_size)
++        return -1; /* Never silently truncate a metadata value. */
++    memcpy(retstr, value, value_size);
++    retstr[value_size] = '\0';
++    metaptrs[0] = (char *)match;
++    return 0;
+ }
+ 
+ 
+@@ -2527,163 +2516,146 @@
+ -----------------------------------------------------------------------------*/
+ char           *
+ EHmetagroup(int32 sdInterfaceID, const char *structname, const char *structcode,
+-	    const char *groupname, char *metaptrs[])
++            const char *groupname, char *metaptrs[])
+ {
+-    intn            i;		/* Loop index */
+-
+-    int32           attrIndex;	/* Structural metadata attribute index */
+-    int32           nmeta;	/* Number of 32000 byte metadata sections */
+-    int32           metalen;	/* Length of structural metadata */
+-
+-    char           *metabuf;	/* Pointer (handle) to structural metadata */
+-    char           *endptr;	/* Pointer to end of metadata section */
+-    char           *metaptr;	/* Metadata pointer */
+-    char           *prevmetaptr;/* Previous position of metadata pointer */
+-    char           *utlstr;     /* Utility string */
+-
+-
+-
+-     /* Allocate memory for utility string */
+-     /* ---------------------------------- */
+-    utlstr = (char *) calloc(UTLSTR_MAX_SIZE,sizeof(char));
+-    if(utlstr == NULL)
+-    {
+-        HEpush(DFE_NOSPACE,"EHEHmetagroup", __FILE__, __LINE__);
+-
+-        return( NULL);
+-    }
+-    /* Determine number of structural metadata "sections" */
+-    /* -------------------------------------------------- */
+-    nmeta = 0;
++    int32 nmeta = 0;
++    int32 i;
++    char query[UTLSTR_MAX_SIZE];
++    char attrname[H4_MAX_NC_NAME + 1];
++    char *metabuf = NULL;
++    char *root;
++    char *rootend;
++    char *structure;
++    char *structureend;
++    char *begin;
++    char *end;
++    const char *rootname;
++    const char *nametag;
++    size_t capacity;
++    size_t used = 0;
++    int written;
++
++    /* Failure owns/frees its buffer and leaves both outputs NULL.
++       Success transfers the buffer to the caller, even for an empty group. */
++    if (metaptrs == NULL)
++        return NULL;
++    metaptrs[0] = NULL;
++    metaptrs[1] = NULL;
++    if (structname == NULL || structcode == NULL)
++        return NULL;
++    if (strcmp(structcode, "s") == 0)
++    {
++        rootname = "SwathStructure";
++        nametag = "SwathName";
++    }
++    else if (strcmp(structcode, "g") == 0)
++    {
++        rootname = "GridStructure";
++        nametag = "GridName";
++    }
++    else if (strcmp(structcode, "p") == 0)
++    {
++        rootname = "PointStructure";
++        nametag = "PointName";
++    }
++    else
++        return NULL;
++
+     while (1)
+     {
+-	/* Search for "StructMetadata.x" attribute */
+-	/* --------------------------------------- */
+-	snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%d", "StructMetadata.", (int)nmeta);
+-	attrIndex = SDfindattr(sdInterfaceID, utlstr);
+-
+-
+-	/* If found then increment metadata section counter else exit loop */
+-	/* --------------------------------------------------------------- */
+-	if (attrIndex != -1)
+-	{
+-	    nmeta++;
+-	} else
+-	{
+-	    break;
+-	}
+-    }
+-
+-
+-    /* Allocate space for metadata (in units of 32000 bytes) */
+-    /* ----------------------------------------------------- */
+-    metabuf = (char *) calloc(32000 * nmeta, 1);
+-
+-    if(metabuf == NULL)
+-    {
+-	HEpush(DFE_NOSPACE,"EHmetagroup", __FILE__, __LINE__);
+-	free(utlstr);
+-	return(metabuf);
+-    }
+-
+-
+-    /* Read structural metadata */
+-    /* ------------------------ */
++        snprintf(query, sizeof(query), "StructMetadata.%d", (int)nmeta);
++        if (SDfindattr(sdInterfaceID, query) < 0)
++            break;
++        if (nmeta >= (INT_MAX - 1) / UTLSTRSIZE)
++            return NULL;
++        nmeta++;
++    }
++    if (nmeta == 0)
++        return NULL;
++    capacity = (size_t)nmeta * UTLSTRSIZE;
++    metabuf = (char *)calloc(capacity + 1, 1);
++    if (metabuf == NULL)
++        return NULL;
+     for (i = 0; i < nmeta; i++)
+     {
+-	snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%d", "StructMetadata.", i);
+-	attrIndex = SDfindattr(sdInterfaceID, utlstr);
+-	metalen = (int)strlen(metabuf);
+-	SDreadattr(sdInterfaceID, attrIndex, metabuf + metalen);
+-    }
+-
+-    /* Determine length (# of characters) of metadata */
+-    /* ---------------------------------------------- */
+-    metalen = (int)strlen(metabuf);
+-
+-
+-
+-    /* Find HDF-EOS structure "root" group in metadata */
+-    /* ----------------------------------------------- */
+-
+-    /* Setup proper search string */
+-    /* -------------------------- */
+-    if (strcmp(structcode, "s") == 0)
+-    {
+-	strcpy(utlstr, "GROUP=SwathStructure");
+-    } else if (strcmp(structcode, "g") == 0)
+-    {
+-	strcpy(utlstr, "GROUP=GridStructure");
+-    } else if (strcmp(structcode, "p") == 0)
+-    {
+-	strcpy(utlstr, "GROUP=PointStructure");
+-    }
+-    /* Use string search routine (strstr) to move through metadata */
+-    /* ----------------------------------------------------------- */
+-    metaptr = strstr(metabuf, utlstr);
+-
+-
+-
+-    /* Save current metadata pointer */
+-    /* ----------------------------- */
+-    prevmetaptr = metaptr;
+-
+-
+-    /* First loop for "old-style" (non-ODL) metadata string */
+-    /* ---------------------------------------------------- */
+-    if (strcmp(structcode, "s") == 0)
+-    {
+-	snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s", "SwathName=\"", structname);
+-    } else if (strcmp(structcode, "g") == 0)
+-    {
+-	snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s", "GridName=\"", structname);
+-    } else if (strcmp(structcode, "p") == 0)
+-    {
+-	snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s", "PointName=\"", structname);
+-    }
+-    /* Do string search */
+-    /* ---------------- */
+-    metaptr = strstr(metaptr, utlstr);
+-
+-
+-    /*
+-     * If not found then return to previous position in metadata and look for
+-     * "new-style" (ODL) metadata string
+-     */
+-    if (metaptr == NULL)
+-    {
+-	snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s", "GROUP=\"", structname);
+-	metaptr = strstr(prevmetaptr, utlstr);
+-    }
+-    /* Find group within structure */
+-    /* --------------------------- */
+-    if (groupname != NULL)
+-    {
+-	snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s", "GROUP=", groupname);
+-	metaptr = strstr(metaptr, utlstr);
+-
+-	snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s", "\t\tEND_GROUP=", groupname);
+-	if (metaptr)
+-	    endptr = strstr(metaptr, utlstr);
+-	else
+-	    endptr = NULL;
+-    } else
+-    {
+-	/* If groupname == NULL then find end of structure in metadata */
+-	/* ----------------------------------------------------------- */
+-	snprintf(utlstr, UTLSTR_MAX_SIZE, "%s", "\n\tEND_GROUP=");
+-	endptr = strstr(metaptr, utlstr);
+-    }
+-
+-
+-    /* Return beginning and ending pointers */
+-    /* ------------------------------------ */
+-    metaptrs[0] = metaptr;
+-    metaptrs[1] = endptr;
+-
+-    free(utlstr);
+-
+-    return (metabuf);
++        int32 index;
++        int32 numbertype;
++        int32 count;
++        const char *terminator;
++        snprintf(query, sizeof(query), "StructMetadata.%d", (int)i);
++        index = SDfindattr(sdInterfaceID, query);
++        if (index < 0 ||
++            SDattrinfo(sdInterfaceID, index, attrname, &numbertype, &count) < 0 ||
++            count < 0 || count > UTLSTRSIZE ||
++            ((numbertype & DFNT_MASK) != DFNT_CHAR8 &&
++             (numbertype & DFNT_MASK) != DFNT_UCHAR8) ||
++            (size_t)count > capacity - used)
++            goto failure;
++        if (SDreadattr(sdInterfaceID, index, metabuf + used) < 0)
++            goto failure;
++        terminator = (const char *)memchr(metabuf + used, '\0', (size_t)count);
++        used += terminator ? (size_t)(terminator - (metabuf + used)) : (size_t)count;
++        metabuf[used] = '\0';
++    }
++
++    written = snprintf(query, sizeof(query), "GROUP=%s", rootname);
++    root = strstr(metabuf, query);
++    if (root == NULL || (root != metabuf && root[-1] != '\n') ||
++        (root[written] != '\n' && root[written] != '\r'))
++        goto failure;
++    snprintf(query, sizeof(query), "END_GROUP=%s", rootname);
++    rootend = strstr(root, query);
++    if (rootend == NULL)
++        goto failure;
++    written = snprintf(query, sizeof(query), "%s=\"%s\"", nametag, structname);
++    if (written < 0 || (size_t)written >= sizeof(query))
++        goto failure;
++    structure = strstr(root, query);
++    if (structure == NULL || structure >= rootend)
++    {
++        /* Preserve the historical ODL form GROUP="name". */
++        written = snprintf(query, sizeof(query), "GROUP=\"%s\"", structname);
++        if (written < 0 || (size_t)written >= sizeof(query))
++            goto failure;
++        structure = strstr(root, query);
++    }
++    if (structure == NULL || structure >= rootend)
++        goto failure;
++    structureend = strstr(structure, "\n\tEND_GROUP=");
++    if (structureend == NULL || structureend >= rootend)
++        goto failure;
++    if (groupname == NULL)
++    {
++        begin = structure;
++        end = structureend;
++    }
++    else
++    {
++        written = snprintf(query, sizeof(query), "GROUP=%s", groupname);
++        if (written < 0 || (size_t)written >= sizeof(query))
++            goto failure;
++        begin = strstr(structure, query);
++        if (begin == NULL || begin >= structureend ||
++            (begin > metabuf && begin[-1] != '\t' && begin[-1] != ' ' && begin[-1] != '\n') ||
++            (begin[written] != '\n' && begin[written] != '\r'))
++            goto failure;
++        written = snprintf(query, sizeof(query), "\t\tEND_GROUP=%s", groupname);
++        if (written < 0 || (size_t)written >= sizeof(query))
++            goto failure;
++        end = strstr(begin, query);
++        if (end == NULL || end >= structureend ||
++            (end[written] != '\n' && end[written] != '\r'))
++            goto failure;
++    }
++    if (begin >= end)
++        goto failure;
++    metaptrs[0] = begin;
++    metaptrs[1] = end;
++    return metabuf;
++
++failure:
++    free(metabuf);
++    return NULL;
+ }
+ 
+ 
+--- a/frmts/hdf4/hdf-eos/GDapi.c
++++ b/frmts/hdf4/hdf-eos/GDapi.c
+@@ -1671,7 +1671,7 @@
+ 	    /* ----------------------------------------------- */
+ 	    metaptrs[1] = strstr(metaptrs[0], "\t\t\tEND_OBJECT");
+ 
+-	    status = EHgetmetavalue(metaptrs, "Size", utlstr);
++	    status = EHgetmetavalue(metaptrs, "Size", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 	    if (status == 0)
+ 	    {
+@@ -1792,7 +1792,7 @@
+ 	/* ------------------------- */
+ 	if (xdimsize != NULL)
+ 	{
+-	    statmeta = EHgetmetavalue(metaptrs, "XDim", utlstr);
++	    statmeta = EHgetmetavalue(metaptrs, "XDim", utlstr, UTLSTR_MAX_SIZE);
+ 	    if (statmeta == 0)
+ 	    {
+ 		*xdimsize = atoi(utlstr);
+@@ -1810,7 +1810,7 @@
+ 	/* ------------------------- */
+ 	if (ydimsize != NULL)
+ 	{
+-	    statmeta = EHgetmetavalue(metaptrs, "YDim", utlstr);
++	    statmeta = EHgetmetavalue(metaptrs, "YDim", utlstr, UTLSTR_MAX_SIZE);
+ 	    if (statmeta == 0)
+ 	    {
+ 		*ydimsize = atoi(utlstr);
+@@ -1828,7 +1828,7 @@
+ 	/* ------------------------- */
+ 	if (upleftpt != NULL)
+ 	{
+-	    statmeta = EHgetmetavalue(metaptrs, "UpperLeftPointMtrs", utlstr);
++	    statmeta = EHgetmetavalue(metaptrs, "UpperLeftPointMtrs", utlstr, UTLSTR_MAX_SIZE);
+ 	    if (statmeta == 0)
+ 	    {
+ 		/* If value is "DEFAULT" then return zeros */
+@@ -1858,7 +1858,7 @@
+ 	/* --------------------------- */
+ 	if (lowrightpt != NULL)
+ 	{
+-	    statmeta = EHgetmetavalue(metaptrs, "LowerRightMtrs", utlstr);
++	    statmeta = EHgetmetavalue(metaptrs, "LowerRightMtrs", utlstr, UTLSTR_MAX_SIZE);
+ 	    if (statmeta == 0)
+ 	    {
+ 		/* If value is "DEFAULT" then return zeros */
+@@ -1995,7 +1995,7 @@
+ 	{
+ 	    *projcode = -1;
+ 
+-	    statmeta = EHgetmetavalue(metaptrs, "Projection", utlstr);
++	    statmeta = EHgetmetavalue(metaptrs, "Projection", utlstr, UTLSTR_MAX_SIZE);
+ 	    if (statmeta == 0)
+ 	    {
+ 		/* Loop through projection codes until found */
+@@ -2035,7 +2035,7 @@
+ 	    /* ---------------------------------------------------------- */
+ 	    if (*projcode == GCTP_UTM || *projcode == GCTP_SPCS)
+ 	    {
+-		statmeta = EHgetmetavalue(metaptrs, "ZoneCode", utlstr);
++		statmeta = EHgetmetavalue(metaptrs, "ZoneCode", utlstr, UTLSTR_MAX_SIZE);
+ 		if (statmeta == 0)
+ 		{
+ 		    *zonecode = atoi(utlstr);
+@@ -2071,7 +2071,7 @@
+ 	    }
+ 	    else
+ 	    {
+-		statmeta = EHgetmetavalue(metaptrs, "ProjParams", utlstr);
++		statmeta = EHgetmetavalue(metaptrs, "ProjParams", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 		if (statmeta == 0)
+ 		{
+@@ -2117,7 +2117,7 @@
+ 	    /* ----------------------------------------------- */
+ 	    if ((*projcode != GCTP_GEO))
+ 	    {
+-		EHgetmetavalue(metaptrs, "SphereCode", utlstr);
++		EHgetmetavalue(metaptrs, "SphereCode", utlstr, UTLSTR_MAX_SIZE);
+ 		if (statmeta == 0)
+ 		{
+ 		    *spherecode = atoi(utlstr);
+@@ -2229,7 +2229,7 @@
+ 	}
+ 
+ 
+-	statmeta = EHgetmetavalue(metaptrs, "GridOrigin", utlstr);
++	statmeta = EHgetmetavalue(metaptrs, "GridOrigin", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 	if (statmeta == 0)
+ 	{
+@@ -2350,7 +2350,7 @@
+ 	}
+ 
+ 
+-	statmeta = EHgetmetavalue(metaptrs, "PixelRegistration", utlstr);
++	statmeta = EHgetmetavalue(metaptrs, "PixelRegistration", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 	if (statmeta == 0)
+ 	{
+@@ -2472,7 +2472,7 @@
+ 		metaptrs[1] = strstr(metaptrs[0], "\t\t\tEND_OBJECT");
+ 
+ 		/* Get compression type */
+-		statmeta = EHgetmetavalue(metaptrs, "CompressionType", utlstr);
++		statmeta = EHgetmetavalue(metaptrs, "CompressionType", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 		/*
+ 		 * Default is no compression if "CompressionType" string not
+@@ -2510,7 +2510,7 @@
+ 		if (*compcode == HDFE_COMP_NBIT)
+ 		{
+ 		    statmeta =
+-			EHgetmetavalue(metaptrs, "CompressionParams", utlstr);
++			EHgetmetavalue(metaptrs, "CompressionParams", utlstr, UTLSTR_MAX_SIZE);
+ 		    if (statmeta == 0)
+ 		    {
+ 			sscanf(utlstr, "(%d,%d,%d,%d)",
+@@ -2528,7 +2528,7 @@
+ 		else if (*compcode == HDFE_COMP_DEFLATE)
+ 		{
+ 		    statmeta =
+-			EHgetmetavalue(metaptrs, "DeflateLevel", utlstr);
++			EHgetmetavalue(metaptrs, "DeflateLevel", utlstr, UTLSTR_MAX_SIZE);
+ 		    if (statmeta == 0)
+ 		    {
+ 			sscanf(utlstr, "%d", &compparm[0]);
+@@ -2673,7 +2673,7 @@
+ 	    metaptrs[1] = strstr(metaptrs[0], "\t\t\tEND_OBJECT");
+ 
+ 	    /* Get DataType string */
+-	    statmeta = EHgetmetavalue(metaptrs, "DataType", utlstr);
++	    statmeta = EHgetmetavalue(metaptrs, "DataType", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 	    /* Convert to numbertype code */
+ 	    if (statmeta == 0)
+@@ -2689,7 +2689,7 @@
+ 	     * Get DimList string and trim off leading and trailing parens
+ 	     * "()"
+ 	     */
+-	    statmeta = EHgetmetavalue(metaptrs, "DimList", utlstr);
++	    statmeta = EHgetmetavalue(metaptrs, "DimList", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 	    if (statmeta == 0)
+ 	    {
+@@ -3727,7 +3727,7 @@
+ 
+         /* Get field list and strip off leading and trailing quotes */
+         /* -------------------------------------------------------- */
+-        if (EHgetmetavalue(metaptrs, "FieldList", name) == 0)
++        if (EHgetmetavalue(metaptrs, "FieldList", name, sizeof(name)) == 0)
+         {
+             const size_t len = strlen(name);
+             if (len >= 2 && name[0] == '"' && name[len-1] == '"')
+@@ -4601,12 +4601,12 @@
+ 		    {
+ 			/* Check 1st for old meta data then new */
+ 			/* ------------------------------------ */
+-			EHgetmetavalue(metaptrs, "OBJECT", utlstr);
++			EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE);
+ 			if (utlstr[0] != '"')
+ 			{
+ 			    metaptrs[0] =
+ 				strstr(metaptrs[0], "\t\t\t\tDimensionName=");
+-			    EHgetmetavalue(metaptrs, "DimensionName", utlstr);
++			    EHgetmetavalue(metaptrs, "DimensionName", utlstr, UTLSTR_MAX_SIZE);
+ 			}
+ 
+ 			/* Strip off double quotes */
+@@ -4625,7 +4625,7 @@
+ 		    /* ------------------ */
+ 		    if (dims != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "Size", utlstr);
++			EHgetmetavalue(metaptrs, "Size", utlstr, UTLSTR_MAX_SIZE);
+ 			size = atoi(utlstr);
+ 			dims[nDim] = size;
+ 		    }
+@@ -4771,7 +4771,7 @@
+ 		    {
+ 			/* Check 1st for old meta data then new */
+ 			/* ------------------------------------ */
+-			EHgetmetavalue(metaptrs, "OBJECT", utlstr);
++			EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 			/*
+ 			 * If OBJECT value begins with double quote then old
+@@ -4785,7 +4785,7 @@
+ 			    strcat(utlstr, "DataFieldName");
+ 			    strcat(utlstr, "=");
+ 			    metaptrs[0] = strstr(metaptrs[0], utlstr);
+-			    EHgetmetavalue(metaptrs, "DataFieldName", utlstr);
++			    EHgetmetavalue(metaptrs, "DataFieldName", utlstr, UTLSTR_MAX_SIZE);
+ 			}
+ 
+ 			/* Strip off double quotes */
+@@ -4805,7 +4805,7 @@
+ 		    /* Get Numbertype */
+ 		    if (numbertype != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "DataType", utlstr);
++			EHgetmetavalue(metaptrs, "DataType", utlstr, UTLSTR_MAX_SIZE);
+ 			numbertype[nFld] = EHnumstr(utlstr);
+ 		    }
+ 		    /*
+@@ -4814,7 +4814,7 @@
+ 		     */
+ 		    if (rank != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "DimList", utlstr);
++			EHgetmetavalue(metaptrs, "DimList", utlstr, UTLSTR_MAX_SIZE);
+ 			rank[nFld] = EHparsestr(utlstr, ',', ptr, slen);
+ 		    }
+ 		    /* Increment number of fields */
+@@ -5001,7 +5001,7 @@
+ 		    /*
+ 		     * Get all string values Don't count quotes
+ 		     */
+-		    EHgetmetavalue(metaptrs, &valName[i][0], utlstr);
++		    EHgetmetavalue(metaptrs, &valName[i][0], utlstr, UTLSTR_MAX_SIZE);
+ 		    if( utlstr[0] == '"' && utlstr[strlen(utlstr)-1] == '"' )
+ 		        *strbufsize += (int32)strlen(utlstr) - 2;
+ 		    else
+--- a/frmts/hdf4/hdf-eos/HdfEosDef.h
++++ b/frmts/hdf4/hdf-eos/HdfEosDef.h
+@@ -21,6 +21,7 @@
+ 
+ /* include header file for EASE grid */
+ #include "ease.h"
++#include <stddef.h>
+ 
+ /* Working Buffer Sizes */
+ #define HDFE_MAXMEMBUF  256*256*16
+@@ -332,7 +333,8 @@
+ #if defined(HDFEOS_GD_WRITE_SUPPORT) || defined(HDFEOS_SW_WRITE_SUPPORT)
+ intn EHinsertmeta(int32, const char *, const char *, int32, char *, int32 []);
+ #endif
+-intn EHgetmetavalue(char *[], const char *, char *);
++/* Internal GDAL helper: explicit destination capacity, no silent truncation. */
++intn EHgetmetavalue(char *[], const char *, char *, size_t);
+ char * EHmetagroup(int32, const char *, const char *, const char *, char *[]);
+ #if defined(HDFEOS_GD_WRITE_SUPPORT) || defined(HDFEOS_SW_WRITE_SUPPORT)
+ intn EHfillfld(int32, int32, int32, int32, int32, int32 [], VOIDP);
+--- a/frmts/hdf4/hdf-eos/SWapi.c
++++ b/frmts/hdf4/hdf-eos/SWapi.c
+@@ -1057,7 +1057,7 @@
+ 	    /* Set endptr at end of dimension definition entry */
+ 	    metaptrs[1] = strstr(metaptrs[0], "\t\t\tEND_OBJECT");
+ 
+-	    status = EHgetmetavalue(metaptrs, "Size", utlstr);
++	    status = EHgetmetavalue(metaptrs, "Size", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 	    if (status == 0)
+ 	    {
+@@ -1183,7 +1183,7 @@
+ 	if (metaptrs[0] < metaptrs[1] && metaptrs[0] != NULL)
+ 	{
+ 	    /* Get Offset */
+-	    statmeta = EHgetmetavalue(metaptrs, "Offset", utlstr);
++	    statmeta = EHgetmetavalue(metaptrs, "Offset", utlstr, UTLSTR_MAX_SIZE);
+ 	    if (statmeta == 0)
+ 	    {
+ 		*offset = atoi(utlstr);
+@@ -1197,7 +1197,7 @@
+ 
+ 
+ 	    /* Get Increment */
+-	    statmeta = EHgetmetavalue(metaptrs, "Increment", utlstr);
++	    statmeta = EHgetmetavalue(metaptrs, "Increment", utlstr, UTLSTR_MAX_SIZE);
+ 	    if (statmeta == 0)
+ 	    {
+ 		*increment = atoi(utlstr);
+@@ -1425,7 +1425,7 @@
+ 		metaptrs[1] = strstr(metaptrs[0], "\t\t\tEND_OBJECT");
+ 
+ 		/* Get compression type */
+-		statmeta = EHgetmetavalue(metaptrs, "CompressionType", utlstr);
++		statmeta = EHgetmetavalue(metaptrs, "CompressionType", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 		/*
+ 		 * Default is no compression if "CompressionType" string not
+@@ -1463,7 +1463,7 @@
+ 		if (*compcode == HDFE_COMP_NBIT)
+ 		{
+ 		    statmeta =
+-			EHgetmetavalue(metaptrs, "CompressionParams", utlstr);
++			EHgetmetavalue(metaptrs, "CompressionParams", utlstr, UTLSTR_MAX_SIZE);
+ 		    if (statmeta == 0)
+ 		    {
+ 			sscanf(utlstr, "(%d,%d,%d,%d)",
+@@ -1481,7 +1481,7 @@
+ 		else if (*compcode == HDFE_COMP_DEFLATE)
+ 		{
+ 		    statmeta =
+-			EHgetmetavalue(metaptrs, "DeflateLevel", utlstr);
++			EHgetmetavalue(metaptrs, "DeflateLevel", utlstr, UTLSTR_MAX_SIZE);
+ 		    if (statmeta == 0)
+ 		    {
+ 			sscanf(utlstr, "%d", &compparm[0]);
+@@ -1633,7 +1633,7 @@
+     if (metaptrs[0] < metaptrs[1] && metaptrs[0] != NULL)
+     {
+ 	/* Get DataType string */
+-	statmeta = EHgetmetavalue(metaptrs, "DataType", utlstr);
++	statmeta = EHgetmetavalue(metaptrs, "DataType", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 	/* Convert to numbertype code */
+ 	if (statmeta == 0)
+@@ -1649,7 +1649,7 @@
+ 	/*
+ 	 * Get DimList string and trim off leading and trailing parens "()"
+ 	 */
+-	statmeta = EHgetmetavalue(metaptrs, "DimList", utlstr);
++	statmeta = EHgetmetavalue(metaptrs, "DimList", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 	if (statmeta == 0)
+ 	{
+@@ -3498,7 +3498,7 @@
+ 		    {
+ 			/* Check 1st for old meta data then new */
+ 			/* ------------------------------------ */
+-			EHgetmetavalue(metaptrs, "OBJECT", utlstr);
++			EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 			/*
+ 			 * If OBJECT value begins with double quote then old
+@@ -3509,7 +3509,7 @@
+ 			{
+ 			    metaptrs[0] =
+ 				strstr(metaptrs[0], "\t\t\t\tDimensionName=");
+-			    EHgetmetavalue(metaptrs, "DimensionName", utlstr);
++			    EHgetmetavalue(metaptrs, "DimensionName", utlstr, UTLSTR_MAX_SIZE);
+ 			}
+ 
+ 			/* Strip off double quotes */
+@@ -3528,7 +3528,7 @@
+ 		    /* Get Dimension Size (if desired) */
+ 		    if (dims != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "Size", utlstr);
++			EHgetmetavalue(metaptrs, "Size", utlstr, UTLSTR_MAX_SIZE);
+ 			size = atoi(utlstr);
+ 			dims[nDim] = size;
+ 		    }
+@@ -3667,7 +3667,7 @@
+ 		    if (dimmaps != NULL)
+ 		    {
+ 			/* Get Geo Dim, remove quotes, add "/" */
+-			EHgetmetavalue(metaptrs, "GeoDimension", utlstr);
++			EHgetmetavalue(metaptrs, "GeoDimension", utlstr, UTLSTR_MAX_SIZE);
+ 			REMQUOTE(utlstr);
+ 			strcat(utlstr, "/");
+ 
+@@ -3681,7 +3681,7 @@
+ 			strcat(dimmaps, utlstr);
+ 
+ 			/* Get Data Dim, remove quotes */
+-			EHgetmetavalue(metaptrs, "DataDimension", utlstr);
++			EHgetmetavalue(metaptrs, "DataDimension", utlstr, UTLSTR_MAX_SIZE);
+ 			REMQUOTE(utlstr);
+ 
+ 			/* Add to map list */
+@@ -3691,7 +3691,7 @@
+ 		    /* Get Offset (if desired) */
+ 		    if (offset != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "Offset", utlstr);
++			EHgetmetavalue(metaptrs, "Offset", utlstr, UTLSTR_MAX_SIZE);
+ 			off = atoi(utlstr);
+ 			offset[nMap] = off;
+ 		    }
+@@ -3699,7 +3699,7 @@
+ 		    /* Get Increment (if desired) */
+ 		    if (increment != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "Increment", utlstr);
++			EHgetmetavalue(metaptrs, "Increment", utlstr, UTLSTR_MAX_SIZE);
+ 			incr = atoi(utlstr);
+ 			increment[nMap] = incr;
+ 		    }
+@@ -3839,7 +3839,7 @@
+ 		    if (idxmaps != NULL)
+ 		    {
+ 			/* Get Geo Dim, remove quotes, add "/" */
+-			EHgetmetavalue(metaptrs, "GeoDimension", utlstr);
++			EHgetmetavalue(metaptrs, "GeoDimension", utlstr, UTLSTR_MAX_SIZE);
+ 			REMQUOTE(utlstr);
+ 			strcat(utlstr, "/");
+ 
+@@ -3864,7 +3864,7 @@
+ 
+ 
+ 			/* Get Data Dim, remove quotes */
+-			EHgetmetavalue(metaptrs, "DataDimension", utlstr);
++			EHgetmetavalue(metaptrs, "DataDimension", utlstr, UTLSTR_MAX_SIZE);
+ 			REMQUOTE(utlstr);
+ 
+ 			/* Add to map list */
+@@ -4040,7 +4040,7 @@
+ 		    {
+ 			/* Check 1st for old meta data then new */
+ 			/* ------------------------------------ */
+-			EHgetmetavalue(metaptrs, "OBJECT", utlstr);
++			EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE);
+ 
+ 			/*
+ 			 * If OBJECT value begins with double quote then old
+@@ -4055,7 +4055,7 @@
+ 			    strcat(utlstr, utlstr2);
+ 			    strcat(utlstr, "=");
+ 			    metaptrs[0] = strstr(metaptrs[0], utlstr);
+-			    EHgetmetavalue(metaptrs, utlstr2, utlstr);
++			    EHgetmetavalue(metaptrs, utlstr2, utlstr, UTLSTR_MAX_SIZE);
+ 			}
+ 
+ 			/* Strip off double quotes */
+@@ -4075,7 +4075,7 @@
+ 		    /* Get Numbertype */
+ 		    if (numbertype != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "DataType", utlstr);
++			EHgetmetavalue(metaptrs, "DataType", utlstr, UTLSTR_MAX_SIZE);
+ 			numbertype[nFld] = EHnumstr(utlstr);
+ 		    }
+ 		    /*
+@@ -4084,7 +4084,7 @@
+ 		     */
+ 		    if (rank != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "DimList", utlstr);
++			EHgetmetavalue(metaptrs, "DimList", utlstr, UTLSTR_MAX_SIZE);
+ 			rank[nFld] = EHparsestr(utlstr, ',', ptr, slen);
+ 		    }
+ 		    /* Increment number of fields */
+@@ -4413,7 +4413,7 @@
+                         /*
+                          * Get all string values Don't count quotes
+                          */
+-                        EHgetmetavalue(metaptrs, &valName[i][0], utlstr);
++                        EHgetmetavalue(metaptrs, &valName[i][0], utlstr, UTLSTR_MAX_SIZE);
+                         if( utlstr[0] == '"' && utlstr[strlen(utlstr)-1] == '"' )
+                             *strbufsize += (int32)strlen(utlstr) - 2;
+                         else
+@@ -4698,11 +4698,14 @@
+ 		/* ------------------------------------------------ */
+ 		metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+ 					       "MergedFields", metaptrs);
+-		if(metabuf == NULL)
+-		{
+-		    free(utlstr);
+-		    return(-1);
+-		}
++        if (metabuf == NULL || metaptrs[0] == NULL || metaptrs[1] == NULL ||
++            metaptrs[0] >= metaptrs[1])
++        {
++            HEpush(DFE_GENAPP, "SWSDfldsrch", __FILE__, __LINE__);
++            free(metabuf);
++            free(utlstr);
++            return -1;
++        }
+ 
+ 		/* Store metaptr in order to recover */
+ 		/* --------------------------------- */
+@@ -4718,14 +4721,23 @@
+ 
+ 		/* If not found check for old metadata */
+ 		/* ----------------------------------- */
+-		if (metaptrs[0] == NULL)
++		if (metaptrs[0] == NULL || metaptrs[0] >= metaptrs[1])
+ 		{
+ 		    snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%.480s%s", "OBJECT=\"", name, "\"\n");
+ 		    metaptrs[0] = strstr(oldmetaptr, utlstr);
+ 		}
+ 
++        /* Both ODL object lookups must stay inside the required section. */
++        if (metaptrs[0] == NULL || metaptrs[0] < oldmetaptr ||
++            metaptrs[0] >= metaptrs[1])
++        {
++            HEpush(DFE_GENAPP, "SWSDfldsrch", __FILE__, __LINE__);
++            free(metabuf);
++            free(utlstr);
++            return -1;
++        }
+         /* Get field list and strip off leading and trailing quotes */
+-        if (EHgetmetavalue(metaptrs, "FieldList", name) == 0)
++        if (EHgetmetavalue(metaptrs, "FieldList", name, sizeof(name)) == 0)
+         {
+             const size_t len = strlen(name);
+             if (len >= 2 && name[0] == '"' && name[len-1] == '"')
+@@ -4736,7 +4748,10 @@
+         }
+         else
+         {
+-            name[0] = '\0';
++            HEpush(DFE_GENAPP, "SWSDfldsrch", __FILE__, __LINE__);
++            free(metabuf);
++            free(utlstr);
++            return -1;
+         }
+ 
+ 		/* Search for desired field within merged field list */

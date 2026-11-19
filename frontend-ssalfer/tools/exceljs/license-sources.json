@@ -1,0 +1,9 @@
+{
+  "saxes@5.0.1": {
+    "file": "licenses/saxes-5.0.1.txt",
+    "sha256": "0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e",
+    "url": "https://raw.githubusercontent.com/lddubeau/saxes/6ef6a275b20f19cb67808daf0d8f64e06aaf5b0e/LICENSE",
+    "tag_url": "https://api.github.com/repos/lddubeau/saxes/git/ref/tags/v5.0.1",
+    "tag_commit": "6ef6a275b20f19cb67808daf0d8f64e06aaf5b0e"
+  }
+}

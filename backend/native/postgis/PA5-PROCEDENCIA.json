@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "scope": "F2-E1 provenance, no bit-for-bit rebuild guarantee; no publication",
+  "build_inputs": {
+    "backend/native/postgis/Dockerfile.gdal36-pa5-candidate": "c04c9a402aadb6d4dfff2054c830b074211b3142e20a7058c35756b7f5ac5f9c",
+    "backend/native/postgis/gdal36/security-inventory-pa5.patch": "9fea2c31b39eb6c09ec87b2fc18944ba9a30f3af08bbc45612e82198c3445338",
+    "backend/native/postgis/gdal36/backport.json": "f408b583ceb6ca316304923b6f2f2f651463b327ca9720d269f0e86f50826621",
+    "backend/native/postgis/gdal36/README.md": "3d67ff7911b6cfa93efb5a20b89b9164349aeca236ed67b751da161de99c079a",
+    "backend/native/postgis/gdal36/7f3406edd992fa4afe3a638371860d9a4104db04.patch": "d974b127b3d5599ef26d8c0f763aca8fa2f57dc924b87ea1b016499e59f80eb8",
+    "backend/native/postgis/gdal36/backport-pa5.json": "132e890786a1dd5fbf4d90c1a98b61fb7050e26e515910d4de8336b254d6eb2c",
+    "backend/native/postgis/gdal36/prepare-source-pa4.py": "6c1e80402a396c0907e9d2917b34a6ea3bdc0e390f2fd0f0b06fa4d15be20dde",
+    "backend/native/postgis/gdal36/184f77dbcc74118c062c05e464c88161d3c37b9b.patch": "18608c18a907d20a6d716fc69c8284ced5121ac318fcc4025a19d9cde85bdb8e",
+    "backend/native/postgis/gdal36/security-enumeration-pa4.patch": "682e713ee0dd8db31fd84c7c6fd1495794934943f122ffa3711b7779efe61307",
+    "backend/native/postgis/gdal36/security-backport.patch": "96de956f17387303a769e8b6857d1db3bab5ee36dec9f6cbdcf0469d7153233f",
+    "backend/native/postgis/gdal36/c49254dc6380af2f02ff43ca79e3cf7c1bc82f01.patch": "3268e82995799b4b1b7cd4abbc4a678e10ad999026393ff6b15eebae3cc0114f",
+    "backend/native/postgis/gdal36/backport-pa3.json": "5f0604f4caec467b59ac2bf246a88c87992772daa0af39c26e21fbc60f8960df",
+    "backend/native/postgis/gdal36/build-packages-pa5.sh": "2fdb223fa861903c5266ff793ea611e37ac842a1cc771ef72837d49bb1fb6f10",
+    "backend/native/postgis/gdal36/backport-pa4.json": "bd5652ba99042c64c1ce669407b5d90486f9a065361604079ac79871d708e3da",
+    "backend/native/postgis/gdal36/50eea7456d83c9586f112ef96b43249372839dea.patch": "d73e82ac0b5c08798c2c8c83a7c87a75feea56f240a82f97b5b0c2d20ba3f81e",
+    "backend/native/postgis/gdal36/9491e794f1757f08063ea2f7a274ad2994afa636.patch": "808e143ed48d576d39783e2b25d15cb62d11c2aaf42eaee1908741c1da74d053",
+    "backend/native/postgis/gdal36/3e04c0385630e4d42517046d9a4967dfccfeb7fd.patch": "e2013adc49fdc5f98432b3840a4e427220b057e498fcff28c02aa182306147fb",
+    "backend/native/postgis/gdal36/build-packages.sh": "4c094476aa7bf53b7a8c86f88009539366045143597e54326ef53a225c94c16a",
+    "backend/native/postgis/gdal36/prepare-source.py": "82bcbec4fffb0eef29950e7997caab34f37238591f0732c756675eef46e60442",
+    "backend/native/postgis/gdal36/security-metadata-pa3.patch": "6e00e267f42e7fa431d910dce5a3c8ef57d09037fbdbe82d40e101145c6dfe47",
+    "backend/native/postgis/gdal36/a791f70f8eaec540974ec989ca6fb00266b7646c.patch": "fae5adc4468c004fa96c5dfb66d95acf0a25e5ec7d45c51577bbe150524f1ec6",
+    "backend/native/postgis/gdal36/prepare-source-pa5.py": "5b03f68bd679f0fa4005f43c3456b8f7a5b00670b5cfc246c19c18c0131fcd84",
+    "backend/native/postgis/gdal36/build-packages-pa4.sh": "71a465f6a9e813f48b82aeb8b684b90dbf41c2734613c55b2fb8f349d7d7cb33"
+  },
+  "runtime_context": {
+    "Dockerfile": "2a5a571997b4dd266bddead5a6663e02108f6251b8b847e6be1bbc1e5e818617",
+    "gdal-data_3.10.3+dfsg-1+pa5_all.deb": "323a72afea832605ca7fa7ec4d15aa6d19345ad14bb737bcac95d9851b83d1c6",
+    "gdal-plugins_3.10.3+dfsg-1+pa5_amd64.deb": "940c8633ef2c00d90c6bbde4cc467e95be9b4cb75164f9a3962728cb1596c1cc",
+    "libgdal36_3.10.3+dfsg-1+pa5_amd64.deb": "dae975487dd6a42443b95ddac2f76994f8cb4a2bc0ba71a5f1caa5afd68b3cb7"
+  },
+  "runtime_recipe": "backend/native/postgis/Dockerfile.pa5-validated-runtime",
+  "image": {
+    "tag": "software-pa-libgdal36-candidate:20261117-pa5",
+    "engine_image_id": "sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c",
+    "index": {
+      "mediaType": "application/vnd.oci.image.index.v1+json",
+      "digest": "sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c",
+      "size": 856
+    },
+    "platform_manifest": {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:27e9ca0702414c9515cf205df5635af7ad7509385dffcf7dcf6fb048c185f9b7",
+      "size": 5799,
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    "os": "linux",
+    "architecture": "amd64",
+    "config_digest": "sha256:dfe80e1feb214799ba101b037f0b72e2499de606a63ef88497f4e13bb1ed3f19",
+    "repo_digests": [
+      "software-pa-libgdal36-candidate@sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c"
+    ],
+    "rootfs": {
+      "Type": "layers",
+      "Layers": [
+        "sha256:a70f6272827f64e1427d048ced77491aab5d64ab95725e56920802ff391197d7",
+        "sha256:bad7ac542f8f71815a4e3eb1ae935f43cef7e5148ed932a34fcea165330d740f",
+        "sha256:10daca7c4475cf31a0de1d572ba547d258dd44d869da1eb8536ea9e54f4fdd31",
+        "sha256:0bed2a4a850052272fe3e0d07dd34963f93c492e7f547a129753200d795aca7b",
+        "sha256:e1eb3edef25cf9e04a8bdb648e35f832f1d5936ce6e14b820371e1b6a166ab78",
+        "sha256:86de9887e546727c325a740553db1143e2dc5aca24a891559189d601d9b81117",
+        "sha256:8978834d28764c3ed7183dd9bc52391e44a12068cca0d2beaa637fce907e513f",
+        "sha256:163c4897d031bb0ae3a311206c43894ee91ff3aead5c85db9c77044cca6751a9",
+        "sha256:3fccdeca7c3cf1028fa60c8e24c59efdc11b5338d6503a113255b46cc12c8c9f",
+        "sha256:efb0551e9426bc3d171819cfef776f62157f9dc1b219b21cef554345ec9b50c3",
+        "sha256:6e8082627ede9ddc287d627956fb25ed25b16598beb317f33a9f627cfc2c3f88",
+        "sha256:76f6bcb7dd4359f0c940314bb0ef4e4eba07403e143aa35f278d5f8b71be79e2",
+        "sha256:8cd4531fc5ba33da3bcf5d6c66c386fc9db4a77263d02c369340f2885238c220",
+        "sha256:ef9399aa3a28afb10e3a98ee39946f9e05ec0ba08f5215ca5f12282afdd53cea",
+        "sha256:d50bd3e7931b83607fbf2e45d0663993e37c0d41918ea712eb537241b0427857",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:b39bf14fdcf964ab22478939535c748c33df16db3f4bd6dc6df24b7e0df7d935",
+        "sha256:231cc7a2ea4d91cd877ff660f2a4b66635bac2dae9b6d4469841f129ae193ebe",
+        "sha256:6474dd71744e08af94e4d4794fe11103c30b9c8de70f6e6302d79b8d088a39b5",
+        "sha256:027724b27a41048d01710e5c1e1b119c9ccb04528961849d150a1da295e63785",
+        "sha256:d3309ddea444a3f7a9467d40efbba8cac0c7985723620d45b6b434247877048a",
+        "sha256:6ca6789270b7b01a3c2fe3d66b49c8ede1261bd3c84a1c0aeed799590d694610",
+        "sha256:28a072d9591823257d7aaaaa26954a5bcc8f75fc02431ae8c790d9a6db5641cc",
+        "sha256:f0c50a24dfbb0504bc1a95f18e0335af2e4026557f01ecc83a8e6eeb52e1606e",
+        "sha256:a80b19bcf69c38531cd722c4e116f2c891f3b1b85d3f7fddbb92c91587a7a612",
+        "sha256:c57f19fc52f78e30bfc409e8021c6e6a8d05ec247f02c41622daea006845e55a",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:2b4232ed268422cc3ae5ce31ca4b281e30a2e36a940fafe7371e9dbe8c69bb17",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+      ]
+    },
+    "base_index": "sha256:dbad7ae0ac6f3ba9da2c52215750115862328940703a603bc5a5bfb875e627ef",
+    "base_manifest": {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:1d17c03866580492bd50bf4adb48fcbf1bad6bf40aae02edf3f2875fc0463eb6",
+      "size": 5040,
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    "base_config": "sha256:74201f3cb99d1ba38be043f6ebc0c89e07cbaa569b6793180abd8286e717707a",
+    "essential_config_equal": true,
+    "registry_publication": false
+  },
+  "archive": {
+    "format": "Docker image save archive with OCI layout/index/blobs and Docker manifest.json compatibility",
+    "archive_sha256": "4099c542cf891338320396fca45fac0bc47bd1064217e70b331259981ad025b2",
+    "config_platform": "linux/amd64",
+    "ordered_layers": 29,
+    "all_uncompressed_diff_ids_verified": true,
+    "repo_tags": [
+      "software-pa-libgdal36-candidate:20261117-pa5"
+    ],
+    "wrapper_annotations": {
+      "io.containerd.image.name": "docker.io/library/software-pa-libgdal36-candidate:20261117-pa5",
+      "org.opencontainers.image.ref.name": "20261117-pa5"
+    },
+    "docker_load_tested": false
+  },
+  "library_sha256": "10c9bc0c0bbafe2f16b51c130ad5f4ba2030c204cbbac5a271a79e6418abadeb",
+  "historical_evidence": {
+    "PROCEDENCIA_COMPILACION.json": "40f0a95cf49efc8476f0dc3407b404bb02f65793879ce7b006d9b1d594418567",
+    "HASHES_CONTEXTO_BUILD.json": "32538cc21109635d4e0c72917503ad05edc4853001057cf5bcba10471dafe956",
+    "HASHES_CONTEXTO_RUNTIME.json": "f31648659fccee51c1b59fa8040cd9b8c41d6b34c8c8e41d692aafd7c1b06a49",
+    "BUILD_A_COMMAND.json": "d8354221b459783bc28b267c9ba6cdc6d58d96e535a9cbc36a3d9f813dc44057",
+    "BUILD_B_COMMAND.json": "6818e2fbd0e5620d59dbb7d318abe114326e5166b93d838fab8fa04675a59741",
+    "RESULTADO_ETAPA_F2E1.md": "b2d77d8c465d83932facfe5806c265ca6935932198a51dd02c50bb45acc5d9e2"
+  }
+}

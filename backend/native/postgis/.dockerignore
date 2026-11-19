@@ -1,0 +1,9 @@
+*
+!Dockerfile
+!backport.json
+!CVE-2026-73515.patch
+!upstream-stable36.patch
+!verify-source.py
+!Dockerfile.gdal36-candidate
+!gdal36/
+!gdal36/**

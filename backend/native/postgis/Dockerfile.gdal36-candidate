@@ -1,0 +1,38 @@
+# Source-prepared +pa3 candidate: build/native acceptance requires F2 approval.
+# Both stages require the exact local historical PostGIS OCI image in the builder.
+# ABI36 Debian package backport candidate. Build requires new explicit approval.
+FROM software-pa-residual-postgis@sha256:dbad7ae0ac6f3ba9da2c52215750115862328940703a603bc5a5bfb875e627ef AS gdal36-build
+RUN printf 'Types: deb-src\nURIs: https://deb.debian.org/debian\nSuites: trixie\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.pgp\n' > /etc/apt/sources.list.d/software-pa-source.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends build-essential curl ca-certificates devscripts debian-keyring gpgv binutils \
+       libgeos-dev=3.14.1-2.pgdg13+1 libproj-dev=9.8.1-1.pgdg13+1 \
+    && apt-mark hold postgresql-15 postgresql-15-postgis-3 postgresql-15-postgis-3-scripts \
+       libgeos-c1t64 libgeos3.14.1 libgeos-dev libproj25 libproj-dev \
+    && apt-get build-dep -y --no-install-recommends gdal=3.10.3+dfsg-1 \
+    && rm -rf /var/lib/apt/lists/*
+COPY gdal36 /opt/gdal36
+# Preserve original dynamic ABI for an exported-symbol comparison after build.
+RUN nm -D --defined-only /usr/lib/x86_64-linux-gnu/libgdal.so.36 > /opt/gdal36/original-exported-symbols.txt \
+    && dpkg-query -W -f='${binary:Package}\t${Version}\n' > /opt/gdal36/original-packages.tsv
+RUN sh /opt/gdal36/build-packages.sh
+
+FROM software-pa-residual-postgis@sha256:dbad7ae0ac6f3ba9da2c52215750115862328940703a603bc5a5bfb875e627ef
+# Preserve the exact previously validated core + LLVM; never rebuild PostGIS here.
+RUN echo 'f302aca21231b7855fa66644b5cfd58085cf12fa4fda70627ec21b437cb636e0  /usr/lib/postgresql/15/lib/postgis-3.so' | sha256sum -c - \
+    && echo 'b95e9e68087c1e6e491775a10e71936f573c970a5dab0c84cda1dba35220e578  /usr/lib/postgresql/15/lib/bitcode/postgis-3.index.bc' | sha256sum -c - \
+    && echo '9f3a0c2f303bb1159ae662dcb9024f7904b03da3cab05b30e5f557a4e542bd42  /usr/lib/postgresql/15/lib/bitcode/postgis-3/flatgeobuf.bc' | sha256sum -c - \
+    && echo 'd994e2eb001a679d6cf5a414fc8dd2702cc79e65825ee46dfdb00c8545f092df  /usr/lib/postgresql/15/lib/bitcode/postgis-3/lwgeom_in_flatgeobuf.bc' | sha256sum -c -
+
+COPY --from=gdal36-build /opt/gdal36-output /opt/gdal36-output
+COPY --from=gdal36-build /opt/gdal36/original-exported-symbols.txt /opt/gdal36-output/provenance/
+COPY --from=gdal36-build /opt/gdal36/original-packages.tsv /opt/gdal36-output/provenance/
+# dpkg alone must reject missing/newer runtime dependencies; no apt repair,
+# forced dependencies, SONAME symlinks or removal of raster is permitted.
+RUN dpkg -i /opt/gdal36-output/packages/*.deb \
+    && test -z "$(dpkg --audit)" \
+    && test "$(dpkg-query -W -f='${Version}' libgdal36)" = '3.10.3+dfsg-1+pa3' \
+    && ldd /usr/lib/postgresql/15/lib/postgis_raster-3.so > /opt/gdal36-output/provenance/raster-linkage.txt \
+    && ! grep -F 'not found' /opt/gdal36-output/provenance/raster-linkage.txt \
+    && dpkg-query -W -f='${binary:Package}\t${Version}\n' > /opt/gdal36-output/provenance/runtime-packages.tsv \
+    && sha256sum /usr/lib/x86_64-linux-gnu/libgdal.so.36* > /opt/gdal36-output/provenance/runtime-binary.sha256
+LABEL org.software-pa.gdal36.backport="3.10.3+dfsg-1+pa3-source-candidate-native-qa-required"
