@@ -27,6 +27,7 @@ SCA_DECODER_RESTRICTION = {
     'sha256': '4a5ec77cbbd5a8a739ebb359a529bc19d4d048f89c6fef6d4ff4b8551be34e1f',
 }
 FIFONAFE_EXPANSION = json.loads((ASSETS/'inventario-extension-034.json').read_text())
+AUDIT_HARDENING = json.loads((ASSETS/'inventario-extension-035.json').read_text())
 spec=importlib.util.spec_from_file_location('ss07_offline',ASSETS/'preparar_verificador.py')
 audit=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit)
@@ -180,12 +181,12 @@ class PrivilegeAuditTests(unittest.TestCase):
     def test_migration_manifest_matches_all_current_sources(self):
         inventory=json.loads((ASSETS/'inventario-estatico.json').read_text())
         migrations=[*inventory['migrations'], SS12_EXPANSION, SS12_RECOVERY_EXPANSION, SCA_DECODER_RESTRICTION,
-                    *FIFONAFE_EXPANSION['migrations']]
+                    *FIFONAFE_EXPANSION['migrations'], *AUDIT_HARDENING['migrations']]
         expected={m['file'] for m in migrations}
         actual={str(p.relative_to(ROOT)) for p in (ROOT/'backend/db/migrations').glob('[0-9][0-9][0-9]_*.sql') if p.is_file()}
         self.assertEqual(expected,actual)
         self.assertEqual(len(inventory['migrations']),30)
-        self.assertEqual(len(expected),34)
+        self.assertEqual(len(expected),35)
         self.assertEqual(len(migrations),len(expected))
         for migration in migrations:
             self.assertEqual(hashlib.sha256((ROOT/migration['file']).read_bytes()).hexdigest(),migration['sha256'])
