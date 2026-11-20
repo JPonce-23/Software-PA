@@ -17,6 +17,8 @@ docker image inspect "$reference" > "$temporary/inspect.json"
 python3 - "$temporary/inspect.json" "$reference" "$script_dir/../../docs/security/ss09/native-pa5.json" <<'PY'
 import json,sys
 r=json.load(open(sys.argv[1]))[0];ref=sys.argv[2];expected='sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c'
+# This verifier requires the containerd store: Id is its target (OCI index),
+# not the config digest. The archive verifier checks manifest -> config separately.
 assert r['Id']==expected and r['Descriptor']['digest']==expected
 assert r['Os']=='linux' and r['Architecture']=='amd64'
 repository=ref.split('@')[0];last=repository.rsplit('/',1)[-1]

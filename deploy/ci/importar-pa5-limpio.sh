@@ -4,9 +4,13 @@ set -eu
 archive=${1:?Pass frozen pa5-validated-image.tar}
 test "${PA5_DISPOSABLE_ENGINE_APPROVED:-}" = yes
 # Refuse existing resources; never remove them to manufacture a clean engine.
-test -z "$(docker image ls -aq)"
-test -z "$(docker ps -aq)"
-test -z "$(docker volume ls -q)"
+# Assign separately so a failed discovery command cannot look like an empty store.
+images=$(docker image ls -aq)
+containers=$(docker ps -aq)
+volumes=$(docker volume ls -q)
+test -z "$images"
+test -z "$containers"
+test -z "$volumes"
 docker info --format '{{json .DriverStatus}}' | python3 -c 'import json,sys; assert ["driver-type","io.containerd.snapshotter.v1"] in json.load(sys.stdin)'
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 temporary=$(mktemp -d)

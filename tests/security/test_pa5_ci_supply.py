@@ -106,6 +106,77 @@ class Pa5SupplyTests(unittest.TestCase):
         row['Architecture']='amd64';row['RootFS']['Layers']=[]
         with self.assertRaisesRegex(ValueError,'ENGINE_ROOTFS_MISMATCH'):supply.validate_inspect([row],supply.REPOSITORY+'@'+digest,digest,catalog)
 
+    def run_local_engine_verifier(self, change=None):
+        """Exercise the original shell path with synthetic Docker replies, no Engine."""
+        catalog=json.loads((CI/'pa5-supply-catalog.json').read_text())
+        native=json.loads((ROOT/'docs/security/ss09/native-pa5.json').read_text())
+        row=dict(Id=catalog['local_index_digest'],
+                 Descriptor=dict(digest=catalog['local_index_digest']),
+                 Os='linux',Architecture='amd64',RootFS=native['image_identity']['rootfs'],
+                 RepoDigests=['software-pa-libgdal36-candidate@'+catalog['local_index_digest']])
+        if change:change(row,catalog)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);stub=root/'docker';calls=root/'calls'
+            stub.write_text('''#!/usr/bin/env python3
+import json,os,sys
+from pathlib import Path
+args=sys.argv[1:]
+with open(os.environ['PA5_TEST_CALLS'],'a') as f:f.write(json.dumps(args)+'\\n')
+if args[0]=='info':print(json.dumps([['driver-type','io.containerd.snapshotter.v1']]))
+elif args[:2]==['image','inspect']:print(os.environ['PA5_TEST_INSPECT'])
+elif args[0]=='create':sys.exit(73) # Stop at proof boundary, never simulate library success.
+else:sys.exit(91)
+''')
+            stub.chmod(0o755)
+            env=dict(os.environ,PATH=str(root)+os.pathsep+os.environ['PATH'],
+                     PA5_TEST_CALLS=str(calls),PA5_TEST_INSPECT=json.dumps([row]))
+            reference='software-pa-libgdal36-candidate:20261117-pa5@'+catalog['local_index_digest']
+            run=subprocess.run(['sh',str(CI/'verificar-pa5-engine.sh'),reference],env=env,capture_output=True)
+            return run,[json.loads(line) for line in calls.read_text().splitlines()]
+
+    def test_local_containerd_index_identity_passes_identity_gate(self):
+        run,calls=self.run_local_engine_verifier()
+        self.assertEqual(run.returncode,73) # Identity passed; Docker create deliberately refused.
+        self.assertIn('create',[c[0] for c in calls])
+        self.assertNotIn(b'PA5_ENGINE_ID_PLATFORM_LIBRARY_COMPOSE_REFERENCE_OK',run.stdout)
+
+    def test_local_config_and_manifest_cannot_masquerade_as_index(self):
+        for field in ['config_digest','platform_manifest_digest']:
+            with self.subTest(field=field):
+                run,calls=self.run_local_engine_verifier(lambda r,c:r.update(Id=c[field]))
+                self.assertNotEqual(run.returncode,0)
+                self.assertNotIn('create',[c[0] for c in calls])
+
+    def test_local_descriptor_and_compose_reference_remain_mandatory(self):
+        changes=[lambda r,c:r.update(Descriptor=dict(digest=c['config_digest'])),
+                 lambda r,c:r.update(RepoDigests=[]),
+                 lambda r,c:r.update(Architecture='arm64'),
+                 lambda r,c:r.update(RootFS=dict(Type='layers',Layers=[]))]
+        for change in changes:
+            with self.subTest(change=change):
+                run,calls=self.run_local_engine_verifier(change)
+                self.assertNotEqual(run.returncode,0)
+                self.assertNotIn('create',[c[0] for c in calls])
+
+    def test_local_importer_discovery_errors_are_fatal_before_import(self):
+        for fail in ['image','ps','volume']:
+            with self.subTest(fail=fail),tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);stub=root/'docker';calls=root/'calls'
+                stub.write_text('''#!/usr/bin/env python3
+import json,os,sys
+with open(os.environ['PA5_TEST_CALLS'],'a') as f:f.write(json.dumps(sys.argv[1:])+'\\n')
+if sys.argv[1]==os.environ['PA5_TEST_FAIL']:sys.exit(8)
+if sys.argv[1] in {'image','ps','volume'}:sys.exit(0)
+sys.exit(91)
+''')
+                stub.chmod(0o755)
+                env=dict(os.environ,PATH=str(root)+os.pathsep+os.environ['PATH'],
+                         PA5_DISPOSABLE_ENGINE_APPROVED='yes',PA5_TEST_FAIL=fail,PA5_TEST_CALLS=str(calls))
+                run=subprocess.run(['sh',str(CI/'importar-pa5-limpio.sh'),'/nonexistent-qa-archive'],env=env,capture_output=True)
+                self.assertEqual(run.returncode,8)
+                commands=[json.loads(line) for line in calls.read_text().splitlines()]
+                self.assertFalse(any(c[:2]==['image','load'] or c[0]=='info' for c in commands))
+
     def workflow(self):
         return yaml.load((ROOT/'.github/workflows/pa5-verify.yml').read_text(),Loader=yaml.BaseLoader)
 
