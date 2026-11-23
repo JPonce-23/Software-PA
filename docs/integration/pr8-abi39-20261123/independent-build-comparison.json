@@ -1,0 +1,174 @@
+{
+  "source_commit": "15f42c42cd89ea0bb4499e1db9fa7f6096c255db",
+  "engine_id": "9efbaf92-7703-4fa0-9192-31b975794366",
+  "images": {
+    "accepted": "sha256:f6c729cc2047d5795c98f3daccd747380ec25538e747687f37b6159b21bf7264",
+    "independent": "sha256:88adea76ddb46b735f1079c0ad3d9d050f5c0c1c11aa0e406e419daa73af52cb"
+  },
+  "independent_context": true,
+  "no_cache": true,
+  "pull": false,
+  "build_network": "none",
+  "checks": {
+    "gdal": true,
+    "app": true,
+    "python_payload_excluding_pyc": true,
+    "linked_elf": true,
+    "apt": true,
+    "python_distributions": true,
+    "uid": true,
+    "gid": true,
+    "python": true,
+    "machine": true
+  },
+  "differing_files_or_values": {
+    "gdal": [],
+    "app": [],
+    "python_payload_excluding_pyc": [],
+    "linked_elf": [],
+    "apt": [],
+    "python_distributions": [],
+    "uid": [],
+    "gid": [],
+    "python": [],
+    "machine": []
+  },
+  "second_acceptance": {
+    "state": "PASS",
+    "stages": [
+      {
+        "stage": "backend-artifact",
+        "exit": 0
+      },
+      {
+        "stage": "postgres-uid",
+        "exit": 0
+      },
+      {
+        "stage": "api-db-start",
+        "exit": 0
+      },
+      {
+        "stage": "database-encoding",
+        "exit": 0
+      },
+      {
+        "stage": "backend-native",
+        "exit": 0
+      },
+      {
+        "stage": "backend-api-pytest",
+        "exit": 0
+      },
+      {
+        "stage": "uvicorn-start",
+        "exit": 0
+      },
+      {
+        "stage": "uvicorn-endpoints",
+        "exit": 0
+      },
+      {
+        "stage": "uvicorn-auth",
+        "exit": 0
+      },
+      {
+        "stage": "uvicorn-logs",
+        "exit": 0
+      },
+      {
+        "stage": "api-db-logs",
+        "exit": 0
+      },
+      {
+        "stage": "cleanup-pa5-pr8-abi39-independent-api",
+        "exit": 0
+      },
+      {
+        "stage": "cleanup-pa5-pr8-abi39-independent-db",
+        "exit": 0
+      }
+    ]
+  },
+  "http_body_bytes": 323859727,
+  "conservative_disk_kib_including_existing_containerd": {
+    "/home/lopezqa/qa/pr8-abi39-671db97": 524028,
+    "/var/lib/docker": 240,
+    "/var/lib/containerd": 6570952
+  },
+  "conservative_disk_total_kib": 7095220,
+  "oci_image_ids_identical": false,
+  "native_recompilation_performed": true,
+  "byte_identical_oci_image_claimed": false,
+  "payload_state": "PASS",
+  "functional_state": "PASS",
+  "payload_fingerprints": {
+    "gdal": {
+      "accepted": {
+        "entries": 373,
+        "sha256": "8db0ec454923c6738a52b69f29e042656855554ab0f6bae57936220835216696"
+      },
+      "independent": {
+        "entries": 373,
+        "sha256": "8db0ec454923c6738a52b69f29e042656855554ab0f6bae57936220835216696"
+      }
+    },
+    "app": {
+      "accepted": {
+        "entries": 55,
+        "sha256": "dcb8a9bb360a60c3301b8b9fe320c604b1a6bca98665da5e0e7172d2a061e77e"
+      },
+      "independent": {
+        "entries": 55,
+        "sha256": "dcb8a9bb360a60c3301b8b9fe320c604b1a6bca98665da5e0e7172d2a061e77e"
+      }
+    },
+    "python_payload_excluding_pyc": {
+      "accepted": {
+        "entries": 5575,
+        "sha256": "6a0b16e0f3ac7f29463d1bb8ba827cb88e55195017e2836ecd5084ac1d77ad4c"
+      },
+      "independent": {
+        "entries": 5575,
+        "sha256": "6a0b16e0f3ac7f29463d1bb8ba827cb88e55195017e2836ecd5084ac1d77ad4c"
+      }
+    },
+    "linked_elf": {
+      "accepted": {
+        "entries": 61,
+        "sha256": "5367ebb55dd25dee1b656b21f65ff9949e07e2593cd67827baef468ec1c86957"
+      },
+      "independent": {
+        "entries": 61,
+        "sha256": "5367ebb55dd25dee1b656b21f65ff9949e07e2593cd67827baef468ec1c86957"
+      }
+    },
+    "apt": {
+      "accepted": {
+        "entries": 131,
+        "sha256": "35743095e3f3ede35acb9843526015509f8ce5ff24ec851a111aefd3f55f32d4"
+      },
+      "independent": {
+        "entries": 131,
+        "sha256": "35743095e3f3ede35acb9843526015509f8ce5ff24ec851a111aefd3f55f32d4"
+      }
+    },
+    "python_distributions": {
+      "accepted": {
+        "entries": 41,
+        "sha256": "e546a873e49d74c2611474a326952522f3d7a479acb2415b8933c7412dd2bc70"
+      },
+      "independent": {
+        "entries": 41,
+        "sha256": "e546a873e49d74c2611474a326952522f3d7a479acb2415b8933c7412dd2bc70"
+      }
+    }
+  },
+  "build_log_cache_hits": 0,
+  "frozen_pa5_unchanged": true,
+  "networks": [
+    "host",
+    "none"
+  ],
+  "task_containers_remaining": []
+}

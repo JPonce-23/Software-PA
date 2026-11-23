@@ -1,0 +1,88 @@
+{"marker": "GDAL_NATIVE_OK", "version": "GDAL 3.13.3 \"Iowa City\", released 2026/08/13", "drivers": ["ESRI Shapefile", "ESRIJSON", "GPKG", "GeoJSON", "GeoJSONSeq", "KML", "LIBKML", "MEM", "SQLite", "TopoJSON"]}
+{"abi": 39, "release": "3.13.3", "abi36_loaded": false}
+GDAL 3.13.3 "Iowa City", released 2026/08/13
+Supported Formats: (ro:read-only, rw:read-write, +:write from scratch, u:update, v:virtual-I/O s:subdatasets)
+  MEM -raster,multidimensional raster,vector- (rw+): In Memory raster, vector and multidimensional raster
+  ESRI Shapefile -vector- (rw+uv): ESRI Shapefile (*.shp, *.dbf, *.shz, *.shp.zip)
+  LIBKML -vector- (rw+uv): Keyhole Markup Language (LIBKML) (*.kml, *.kmz)
+  KML -vector- (rw+v): Keyhole Markup Language (KML) (*.kml)
+  GeoJSON -vector- (rw+uv): GeoJSON (*.json, *.geojson)
+  GeoJSONSeq -vector- (rw+v): GeoJSON Sequence (*.geojsonl, *.geojsons)
+  ESRIJSON -vector- (rov): ESRIJSON (*.json)
+  TopoJSON -vector- (rov): TopoJSON (*.json, *.topojson)
+  GPKG -raster,vector- (rw+uvs): GeoPackage (*.gpkg, *.gpkg.zip)
+  SQLite -vector- (rw+uv): SQLite / Spatialite (*.sqlite, *.db)
+	linux-vdso.so.1 (0x00007f26166e7000)
+	libgdal.so.39 => /opt/gdal/lib/libgdal.so.39 (0x00007f2615665000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f26153ff000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f26153d2000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f26151de000)
+	libz.so.1 => /lib/x86_64-linux-gnu/libz.so.1 (0x00007f26151bc000)
+	libkmlbase.so.1 => /lib/x86_64-linux-gnu/libkmlbase.so.1 (0x00007f261519c000)
+	libkmldom.so.1 => /lib/x86_64-linux-gnu/libkmldom.so.1 (0x00007f26150f4000)
+	libkmlengine.so.1 => /lib/x86_64-linux-gnu/libkmlengine.so.1 (0x00007f26150b9000)
+	libexpat.so.1 => /lib/x86_64-linux-gnu/libexpat.so.1 (0x00007f261508b000)
+	libsqlite3.so.0 => /lib/x86_64-linux-gnu/libsqlite3.so.0 (0x00007f2614f0b000)
+	libspatialite.so.8 => /lib/x86_64-linux-gnu/libspatialite.so.8 (0x00007f2614757000)
+	libgeos_c.so.1 => /lib/x86_64-linux-gnu/libgeos_c.so.1 (0x00007f2614700000)
+	libproj.so.25 => /lib/x86_64-linux-gnu/libproj.so.25 (0x00007f26142b4000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f26141c4000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f26166e9000)
+	libminizip.so.1 => /lib/x86_64-linux-gnu/libminizip.so.1 (0x00007f26141b5000)
+	liburiparser.so.1 => /lib/x86_64-linux-gnu/liburiparser.so.1 (0x00007f2614199000)
+	libxml2.so.2 => /lib/x86_64-linux-gnu/libxml2.so.2 (0x00007f2613fe1000)
+	librttopo.so.1 => /lib/x86_64-linux-gnu/librttopo.so.1 (0x00007f2613f6b000)
+	libfreexl.so.1 => /lib/x86_64-linux-gnu/libfreexl.so.1 (0x00007f2613f5a000)
+	libgeos.so.3.13.1 => /lib/x86_64-linux-gnu/libgeos.so.3.13.1 (0x00007f2613c07000)
+	libtiff.so.6 => /lib/x86_64-linux-gnu/libtiff.so.6 (0x00007f2613b71000)
+	libcurl-gnutls.so.4 => /lib/x86_64-linux-gnu/libcurl-gnutls.so.4 (0x00007f2613a85000)
+	liblzma.so.5 => /lib/x86_64-linux-gnu/liblzma.so.5 (0x00007f2613a54000)
+	libwebp.so.7 => /lib/x86_64-linux-gnu/libwebp.so.7 (0x00007f26139d2000)
+	libzstd.so.1 => /lib/x86_64-linux-gnu/libzstd.so.1 (0x00007f2613908000)
+	libLerc.so.4 => /lib/x86_64-linux-gnu/libLerc.so.4 (0x00007f2613878000)
+	libjbig.so.0 => /lib/x86_64-linux-gnu/libjbig.so.0 (0x00007f2613867000)
+	libjpeg.so.62 => /lib/x86_64-linux-gnu/libjpeg.so.62 (0x00007f26137d0000)
+	libdeflate.so.0 => /lib/x86_64-linux-gnu/libdeflate.so.0 (0x00007f26137b9000)
+	libnghttp3.so.9 => /lib/x86_64-linux-gnu/libnghttp3.so.9 (0x00007f261378f000)
+	libngtcp2_crypto_gnutls.so.8 => /lib/x86_64-linux-gnu/libngtcp2_crypto_gnutls.so.8 (0x00007f2613781000)
+	libngtcp2.so.16 => /lib/x86_64-linux-gnu/libngtcp2.so.16 (0x00007f2613736000)
+	libnghttp2.so.14 => /lib/x86_64-linux-gnu/libnghttp2.so.14 (0x00007f2613704000)
+	libidn2.so.0 => /lib/x86_64-linux-gnu/libidn2.so.0 (0x00007f26136d1000)
+	librtmp.so.1 => /lib/x86_64-linux-gnu/librtmp.so.1 (0x00007f26136b3000)
+	libssh2.so.1 => /lib/x86_64-linux-gnu/libssh2.so.1 (0x00007f261366a000)
+	libpsl.so.5 => /lib/x86_64-linux-gnu/libpsl.so.5 (0x00007f2613654000)
+	libnettle.so.8 => /lib/x86_64-linux-gnu/libnettle.so.8 (0x00007f26135fe000)
+	libgnutls.so.30 => /lib/x86_64-linux-gnu/libgnutls.so.30 (0x00007f26133d5000)
+	libgssapi_krb5.so.2 => /lib/x86_64-linux-gnu/libgssapi_krb5.so.2 (0x00007f261337f000)
+	libldap.so.2 => /lib/x86_64-linux-gnu/libldap.so.2 (0x00007f261331b000)
+	liblber.so.2 => /lib/x86_64-linux-gnu/liblber.so.2 (0x00007f261330a000)
+	libbrotlidec.so.1 => /lib/x86_64-linux-gnu/libbrotlidec.so.1 (0x00007f26132fa000)
+	libsharpyuv.so.0 => /lib/x86_64-linux-gnu/libsharpyuv.so.0 (0x00007f26132f1000)
+	libunistring.so.5 => /lib/x86_64-linux-gnu/libunistring.so.5 (0x00007f2613109000)
+	libhogweed.so.6 => /lib/x86_64-linux-gnu/libhogweed.so.6 (0x00007f26130be000)
+	libgmp.so.10 => /lib/x86_64-linux-gnu/libgmp.so.10 (0x00007f2613034000)
+	libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f26129f7000)
+	libp11-kit.so.0 => /lib/x86_64-linux-gnu/libp11-kit.so.0 (0x00007f2612856000)
+	libtasn1.so.6 => /lib/x86_64-linux-gnu/libtasn1.so.6 (0x00007f2612840000)
+	libkrb5.so.3 => /lib/x86_64-linux-gnu/libkrb5.so.3 (0x00007f2612768000)
+	libk5crypto.so.3 => /lib/x86_64-linux-gnu/libk5crypto.so.3 (0x00007f261273a000)
+	libcom_err.so.2 => /lib/x86_64-linux-gnu/libcom_err.so.2 (0x00007f2612732000)
+	libkrb5support.so.0 => /lib/x86_64-linux-gnu/libkrb5support.so.0 (0x00007f2612724000)
+	libsasl2.so.2 => /lib/x86_64-linux-gnu/libsasl2.so.2 (0x00007f2612708000)
+	libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f26125f8000)
+	libbrotlicommon.so.1 => /lib/x86_64-linux-gnu/libbrotlicommon.so.1 (0x00007f26125d5000)
+	libffi.so.8 => /lib/x86_64-linux-gnu/libffi.so.8 (0x00007f26125c6000)
+	libkeyutils.so.1 => /lib/x86_64-linux-gnu/libkeyutils.so.1 (0x00007f26125bf000)
+	libresolv.so.2 => /lib/x86_64-linux-gnu/libresolv.so.2 (0x00007f26125ad000)
+No broken requirements found.
+WARNING: The directory '/home/ssalfer/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you should use sudo's -H flag.
+test_allowed_formats_with_malformed_content_fail_closed (test_gis_driver_policy_native.NativeDriverPolicyTests.test_allowed_formats_with_malformed_content_fail_closed) ... ok
+test_allowed_gis_formats_round_trip (test_gis_driver_policy_native.NativeDriverPolicyTests.test_allowed_gis_formats_round_trip) ... ok
+test_both_native_processes_receive_policy_before_input (test_gis_driver_policy_native.NativeDriverPolicyTests.test_both_native_processes_receive_policy_before_input) ... ok
+test_unneeded_drivers_are_not_compiled (test_gis_driver_policy_native.NativeDriverPolicyTests.test_unneeded_drivers_are_not_compiled) ... ok
+test_vrt_and_disguised_csv_cannot_delegate_or_bypass (test_gis_driver_policy_native.NativeDriverPolicyTests.test_vrt_and_disguised_csv_cannot_delegate_or_bypass) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.875s
+
+OK

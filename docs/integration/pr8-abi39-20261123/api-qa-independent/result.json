@@ -1,0 +1,57 @@
+{
+  "state": "PASS",
+  "stages": [
+    {
+      "stage": "backend-artifact",
+      "exit": 0
+    },
+    {
+      "stage": "postgres-uid",
+      "exit": 0
+    },
+    {
+      "stage": "api-db-start",
+      "exit": 0
+    },
+    {
+      "stage": "database-encoding",
+      "exit": 0
+    },
+    {
+      "stage": "backend-native",
+      "exit": 0
+    },
+    {
+      "stage": "backend-api-pytest",
+      "exit": 0
+    },
+    {
+      "stage": "uvicorn-start",
+      "exit": 0
+    },
+    {
+      "stage": "uvicorn-endpoints",
+      "exit": 0
+    },
+    {
+      "stage": "uvicorn-auth",
+      "exit": 0
+    },
+    {
+      "stage": "uvicorn-logs",
+      "exit": 0
+    },
+    {
+      "stage": "api-db-logs",
+      "exit": 0
+    },
+    {
+      "stage": "cleanup-pa5-pr8-abi39-independent-api",
+      "exit": 0
+    },
+    {
+      "stage": "cleanup-pa5-pr8-abi39-independent-db",
+      "exit": 0
+    }
+  ]
+}

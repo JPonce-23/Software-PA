@@ -20,8 +20,9 @@ Backend construido y validado realmente. Base fuente `671db9750047831b9543e2867a
 | GDAL nativo: 5 pruebas de drivers/round trips/rechazos; carga explícita .so.39 y exclusión .so.36 | PASS |
 | Uvicorn real con comando candidato: health/root, login, sesión, CSRF ausente rechazado y logout | PASS |
 | Limpieza de contenedores propios; +pa5 y redes host/none conservados | PASS |
-| CI remoto del nuevo HEAD | Pendiente de publicación al crear este commit; consultar checks del SHA publicado |
-| Recompilación nativa independiente / reproducibilidad bit a bit | NOT RUN; no se declara |
+| CI remoto de 15f42c4 | 4 jobs SUCCESS; registry/native smoke SKIPPED; comprobar cada HEAD posterior |
+| Recompilación nativa independiente, contexto nuevo y --no-cache | PASS; payloads iguales por SHA-256, aceptación repetida |
+| Identidad de imagen OCI bit a bit | No se afirma: los IDs OCI difieren |
 | Merge y despliegue | NO REALIZADOS |
 
 ## Correcciones verificadas
@@ -36,10 +37,26 @@ Adquisición mediante Python stdlib del host PA5-QA; apt/pip resuelven dentro de
 
 Se recibieron **323,859,727 bytes HTTP**, más una reserva conservadora de 128 MiB para entradas locales: dentro de 5 GiB. Disco: **4,417,984 KiB como cota conservadora**, sumando árbol de tarea, DockerRootDir y **todo** `/var/lib/containerd`, incluido lo preexistente; dentro de 20 GiB. DockerRootDir por sí solo no cubre este Engine con snapshotter containerd. Compilación con 2 trabajos y límite de 3 GiB RAM.
 
-El builder clásico consumió la base local por digest y los cierres adquiridos, con `DOCKER_BUILDKIT=0`, `--pull=false` y `--network none`. La receta offline, locks y hashes observados acompañan este informe. Los empaquetados posteriores reutilizaron las capas nativas propias; el payload completo `/opt/gdal` y `/app/app` coincide con el primer build. Esto no demuestra una recompilación independiente ni reproducibilidad bit a bit. La imagen QA contiene los insumos públicos de suministro en sus capas; no se presenta como una imagen mínima de producción ni como un SCA completo.
+El builder clásico consumió la base local por digest y los cierres adquiridos, con `DOCKER_BUILDKIT=0`, `--pull=false` y `--network none`. La receta offline, locks y hashes observados acompañan este informe. Los empaquetados posteriores reutilizaron las capas nativas propias; el payload completo `/opt/gdal` y `/app/app` coincide con el primer build. Esos primeros empaquetados no demuestran una recompilación independiente. La reconstrucción posterior descrita abajo sí vuelve a compilar sin caché; no se afirma identidad OCI bit a bit. La imagen QA contiene los insumos públicos de suministro en sus capas; no se presenta como una imagen mínima de producción ni como un SCA completo.
+
+## Reconstrucción independiente completada
+
+Sobre el código de `15f42c42cd89ea0bb4499e1db9fa7f6096c255db`, se verificaron 552 archivos de entrada, se creó otro contexto y se ejecutó el builder clásico con `--no-cache --pull=false --network none`, 2 trabajos CMake y 3 GiB RAM. El log no contiene hits de caché. No se descargaron dependencias nuevas.
+
+Imagen independiente: `software-pa-backend-qa:15f42c4-abi39-independent`, ID `sha256:88adea76ddb46b735f1079c0ad3d9d050f5c0c1c11aa0e406e419daa73af52cb`.
+
+La comparación SHA-256 no encontró diferencias en los **373 archivos GDAL**, **55 archivos de aplicación**, **5,575 archivos Python instalados excluyendo .pyc/.pyo**, **61 bibliotecas ELF enlazadas**, 131 registros apt y 41 distribuciones Python. UID/GID 10001, Python 3.11.18 y plataforma también coinciden. Los metadatos OCI y los .pyc no forman parte de esta afirmación; los IDs de imagen son diferentes.
+
+Sobre el segundo ID real se repitieron las **190 pruebas de integración y 5 nativas**, más health/root/login/sesión/CSRF/logout contra Uvicorn: PASS. Otro clúster sintético UTF8 con 001–035, socket y claves nuevos; sus contenedores fueron eliminados al terminar. No sumar esos reintentos como nuevas pruebas únicas.
+
+Contador HTTP inalterado: 323,859,727 bytes. La cota conservadora final de disco sube a **7,095,220 KiB (6.77 GiB)**, incluyendo todo containerd preexistente: sigue debajo de 20 GiB. +pa5 conserva su digest y las redes siguen siendo host/none.
+
+[Comparación y fingerprints](pr8-abi39-20261123/independent-build-comparison.json), [segunda aceptación](pr8-abi39-20261123/api-qa-independent/result.json), [190 pruebas repetidas](pr8-abi39-20261123/logs-independent/backend-api-pytest.log). Inventarios completos y log de compilación: `outputs/pr8-backend-executed-20261123/independent/`, con SHA256SUMS.
+
+El CI remoto de `15f42c4` terminó con cuatro jobs SUCCESS; el transporte GHCR/registry-native quedó SKIPPED por borrador. Ese job consume PostgreSQL desde un registro y exige un Engine vacío; no es una prueba del backend ABI39. No se ejecutó en otro Engine ni se retiraron imágenes del laboratorio para satisfacerlo. El 403 del conector para editar la metadata de #8 permanece registrado; no se presenta como un fallo del backend ni como una autorización pendiente de adquisición/build/pruebas.
 
 ## Evidencia y decisión
 
 [Evidencia seleccionada y checksums](pr8-abi39-20261123/SHA256SUMS), [resultado máquina](pr8-abi39-20261123/execution-result.json), [pytest real](pr8-abi39-20261123/logs/backend-api-pytest.log), [pruebas nativas](pr8-abi39-20261123/logs/backend-native.log), [HTTP real](pr8-abi39-20261123/logs/uvicorn-auth.log). Evidencia íntegra local, incluidos intentos fallidos: `outputs/pr8-backend-executed-20261123/` (290 archivos, SHA256SUMS). Claves, envs, sockets, bases y uploads excluidos.
 
-El bloqueo técnico del backend ABI39 queda resuelto para el alcance ejecutado. Publicar este candidato y comprobar el CI del SHA resultante; no atribuirle checks de otro HEAD. Un job omitido, pendiente o fallido no es PASS. No integrar si queda una validación obligatoria sin ejecutar. No se modificaron patrenes, Docker original de Cooper, PR #9, +pa5, migraciones, configuración Docker/WSL o redes. No se despliega ni se realiza merge desde esta ejecución.
+El bloqueo técnico del backend ABI39 queda resuelto, incluida la recompilación independiente para el alcance medido. La integración de código a dev tiene evidencia nativa y funcional favorable por la ruta local validada; esto no acredita distribución GHCR ni despliegue. Publicar este candidato y comprobar el CI del SHA resultante; no atribuirle checks de otro HEAD. Un job omitido, pendiente o fallido no es PASS. No integrar si queda una validación obligatoria sin ejecutar. No se modificaron patrenes, Docker original de Cooper, PR #9, +pa5, migraciones, configuración Docker/WSL o redes. No se despliega ni se realiza merge desde esta ejecución.
