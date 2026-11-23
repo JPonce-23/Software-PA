@@ -1,0 +1,8 @@
+{
+  "state": "PASS",
+  "engine_identity_semantics": "Docker29 containerd Id is index digest",
+  "root": "sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79",
+  "manifest": "sha256:b701198cb708b68d9413ca67d6311bd97c9389a2c5fe4da0511fc652642366cd",
+  "config": "sha256:896edfbcbf0c29ad15681617a8886cb9871b7f24c5fde4606114c8ee6bfe4c70",
+  "rootfs_matches": true
+}

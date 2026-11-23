@@ -1,0 +1,39 @@
+# Build fixed upstream GDAL on the same pinned Debian/Python base. Never mix
+# sid libraries into trixie. This candidate requires native QA before integration.
+FROM python:3.11-slim-trixie@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79 AS gdal-build
+COPY supply /supply
+COPY install-apt.sh /usr/local/src/install-apt.sh
+RUN sh /usr/local/src/install-apt.sh build
+COPY build-gdal-offline.sh /usr/local/src/build-gdal.sh
+RUN sh /usr/local/src/build-gdal.sh
+
+FROM python:3.11-slim-trixie@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
+WORKDIR /app
+COPY supply /supply
+COPY install-apt.sh /usr/local/src/install-apt.sh
+RUN sh /usr/local/src/install-apt.sh runtime
+COPY --from=gdal-build /opt/gdal /opt/gdal
+RUN echo /opt/gdal/lib > /etc/ld.so.conf.d/software-pa-gdal.conf && ldconfig \
+    && ln -s /opt/gdal/bin/ogrinfo /usr/local/bin/ogrinfo \
+    && ln -s /opt/gdal/bin/ogr2ogr /usr/local/bin/ogr2ogr \
+    && ln -s /opt/gdal/bin/gdalinfo /usr/local/bin/gdalinfo
+ENV GDAL_DATA=/opt/gdal/share/gdal
+LABEL org.software-pa.gdal.version="3.13.3" \
+      org.software-pa.gdal.source-sha256="5e0c388d83da2d686cc00a40272882432cdb54edff43d4af173e532844a0a0ea"
+COPY backend/native/check-gdal.py /usr/local/lib/software-pa/check-gdal.py
+RUN python /usr/local/lib/software-pa/check-gdal.py
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --no-index --find-links=/supply/python/runtime --require-hashes -r /supply/python/runtime.lock && pip check
+
+RUN groupadd --gid 10001 ssalfer && useradd --uid 10001 --gid ssalfer --no-create-home ssalfer
+
+COPY --chown=root:root backend/ .
+# Source checkouts can be private (0600/0700). Only packaged code is made
+# readable; .dockerignore excludes uploads, secrets and QA data.
+RUN chmod -R a+rX /app && install -d -o 10001 -g 10001 -m 0700 /app/uploads
+ENV PYTHONDONTWRITEBYTECODE=1
+USER 10001:10001
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers", "--log-config", "/app/logging.json", "--no-access-log", "--workers", "2"]

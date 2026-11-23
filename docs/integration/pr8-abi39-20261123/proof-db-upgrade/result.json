@@ -1,0 +1,8 @@
+{
+  "state": "PASS",
+  "scope": "private PostgreSQL roles/ledger/034; original smoke skipped this invocation",
+  "scenario": "upgrade",
+  "temporary_objects_allowed": true,
+  "audit_temp_shadow_reproduced": false,
+  "engine_id": "9efbaf92-7703-4fa0-9192-31b975794366"
+}
