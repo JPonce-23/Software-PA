@@ -1,0 +1,17 @@
+{
+  "scope": "035 forward-only replacement; no historical hash or global ACL changes",
+  "migrations": [
+    {
+      "file": "backend/db/migrations/035_endurecer_auditoria_search_path.sql",
+      "sha256": "6e2390b77293cd6be13f8da0d1ae3bfe2f5181afb4deee033b6ba7036d73d4ee"
+    }
+  ],
+  "replaced_functions": [
+    "public.fn_audit_log()"
+  ],
+  "search_path": [
+    "pg_catalog",
+    "public",
+    "pg_temp"
+  ]
+}

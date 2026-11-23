@@ -1,0 +1,126 @@
+From a791f70f8eaec540974ec989ca6fb00266b7646c Mon Sep 17 00:00:00 2001
+From: Even Rouault <even.rouault@spatialys.com>
+Date: Fri, 17 Apr 2026 09:28:59 +0200
+Subject: [PATCH] HDF4-EOS: fix 2 heap-buffer-overflow
+
+Fixes #14378
+Fixes #14379
+---
+ autotest/gcore/data/hdf4/issue_14378.he4 | Bin 0 -> 3224 bytes
+ autotest/gcore/data/hdf4/issue_14379.he4 | Bin 0 -> 3138 bytes
+ autotest/gcore/hdf4_read.py              |  24 +++++++++++++++++++++++
+ frmts/hdf4/hdf-eos/GDapi.c               |   8 ++++++--
+ frmts/hdf4/hdf-eos/SWapi.c               |   8 ++++++--
+ 5 files changed, 36 insertions(+), 4 deletions(-)
+ create mode 100644 autotest/gcore/data/hdf4/issue_14378.he4
+ create mode 100644 autotest/gcore/data/hdf4/issue_14379.he4
+
+diff --git a/autotest/gcore/data/hdf4/issue_14378.he4 b/autotest/gcore/data/hdf4/issue_14378.he4
+new file mode 100644
+index 0000000000000000000000000000000000000000..d61515b1e3709a5bd36c13e4a40ffbfd419f49cf
+GIT binary patch
+literal 3224
+zcmeHKO>5gg5FORAg`84Cdo5)NlwN|X*uLbTgA!Q@#j#7Qq&*bG+TM^2wq>L>#{ESh
+zA<$n@`d9iZ+L_fy)HKk0(HiVGPqX`GXP;pGqV~#wA3);`7y#BaqA%thJVX2)z_>AQ
+z32!fuKQ!;5hWH!e1H@a1e<JQ6t^+)Ojrc9%24WZSd&DN<CE|Cq`mbzMIBi7LhpG>i
+z2PzL#9;iG}dEh_y0MLDj?oR+Gp3g2soXBXwx~&d76EndR!R$Tei*dZ-@rJbz_E_6)
+zcPam0<M?cN{?Qq&xw;yucr{V0STwDS{p1EG;eOMy^z#9q3upIqqk~;!)2w3=`BKcL
+zNc09?_!pTHo}7yXRgG!Z@bE+LC~yi+Ygkqhr%InOCK;5MUxl-86DEl#r$1;H%V2&c
+z&K1vVEW~pz7tiBVJP`Axh&i<*t--_R!DcBO&mRP#-yga`r>(0)y}nG8^SHcxK`l@!
+zFXx-3evPtLKcqc65`B(_af9#r7JlRH8X6aF|GYPXo%G;Nh2m3OyJdsvDizxZXpn8R
+zbqswUXUk|3ChJSNxQxQ7oX@cIFp9?OSSr!F5?yE<d472^&VPxAJc}k=k?nLRlP9@c
+z4}Z6*VR`N!K`CiR?~+lua=cO^!Of5r%S@48Gw<nx??N5_CzzQLp{{#JS?M-^18U#Z
+A%K!iX
+
+literal 0
+HcmV?d00001
+
+diff --git a/autotest/gcore/data/hdf4/issue_14379.he4 b/autotest/gcore/data/hdf4/issue_14379.he4
+new file mode 100644
+index 0000000000000000000000000000000000000000..0086ee6e986324b9a3b95848fece1f8d841d6516
+GIT binary patch
+literal 3138
+zcmeHJ&1%~~5FRCtg`CnBdN12Rp#|5-jxRar;8>R0BL85^p@o8wt#z`&vdn5t@I&O-
+zmq^HKl%D!BeSmgGa$JWL`T*5}#JAtf?)>Nz%+viB8hi&@FF^w^E)jjvZ($GdHvsKg
+zzae}$LjF|0gMGwb5uYF~A^w5*HR1!rKM}t}Tn2c;5Wk`ue{EKQ^F|bXDEd%npwK{}
+zfkFd?2L2-r0L@D@KLNbA9d^cLDv||j){fbb&v}?~W>%TQCvp|aHEWzyS;K5J$^T!=
+z9rniq%atM;DY=@emE;v;Lk>UKLA_!aWbK79w~o4N!biw`vPEpwO+=r!XuMo<>G7Ew
+zBx0euN~YEuvu0NDd5ex-a>eCPoL_8Ab+XZmj02fm@~OhIEVu0s0=LsgHctct@C8+j
+zOs8iDkJ$|qs?ZU99-*JnKmFKg`<8vrWtAAlcAppI^B8juscfn$xBKfQw``~92aeZo
+z`NxgiB4SUZ%AyTr@z(%5>D>pe?Bwj`E&b#5u<_Z)(zI**xl8!Q5gN*8EpOZz!Snp{
+zbh!#6yt!tA-cm|p_p(EzjZ7a}HgvOPG7Zk7nOMw{AQJH$6AzMPawUc0wF};aa@%%x
+y599em>J7^pm_FQ4i0pQNXOuCc&|<PuJbg@To%i&+Y|=k~a;_UFQT=4kZ~F~5o5HgI
+
+literal 0
+HcmV?d00001
+
+diff --git a/autotest/gcore/hdf4_read.py b/autotest/gcore/hdf4_read.py
+index 8cca336ee7c4..15c4ebb16ebd 100755
+--- a/autotest/gcore/hdf4_read.py
++++ b/autotest/gcore/hdf4_read.py
+@@ -619,3 +619,27 @@ def test_hdf4_gh_14363():
+         pytest.skip()
+ 
+     gdal.Open("data/hdf4/issue_14363.he4")
++
++
++###############################################################################
++# Test bugfix for https://github.com/OSGeo/gdal/issues/14378
++
++
++def test_hdf4_gh_14378():
++
++    if gdaltest.hdf4_drv is None:
++        pytest.skip()
++
++    gdal.Open("data/hdf4/issue_14378.he4")
++
++
++###############################################################################
++# Test bugfix for https://github.com/OSGeo/gdal/issues/14379
++
++
++def test_hdf4_gh_14379():
++
++    if gdaltest.hdf4_drv is None:
++        pytest.skip()
++
++    gdal.Open("data/hdf4/issue_14379.he4")
+diff --git a/frmts/hdf4/hdf-eos/GDapi.c b/frmts/hdf4/hdf-eos/GDapi.c
+index b9793243ae6e..564f5a524da9 100644
+--- a/frmts/hdf4/hdf-eos/GDapi.c
++++ b/frmts/hdf4/hdf-eos/GDapi.c
+@@ -1753,8 +1753,12 @@ GDfieldinfo(int32 gridID, const char *fieldname, int32 * rank, int32 dims[],
+ 
+ 	    if (statmeta == 0)
+ 	    {
+-		memmove(utlstr, utlstr + 1, strlen(utlstr) - 2);
+-		utlstr[strlen(utlstr) - 2] = 0;
++		const size_t len = strlen(utlstr);
++		if (len >= 2 && utlstr[0] == '(' && utlstr[len-1] == ')')
++		{
++		    memmove(utlstr, utlstr + 1, len - 2);
++		    utlstr[len - 2] = '\0';
++		}
+ 
+ 		/* Parse trimmed DimList string and get rank */
+ 		ndims = EHparsestr(utlstr, ',', ptr, slen);
+diff --git a/frmts/hdf4/hdf-eos/SWapi.c b/frmts/hdf4/hdf-eos/SWapi.c
+index b8814a4ea418..6fe7b5915710 100644
+--- a/frmts/hdf4/hdf-eos/SWapi.c
++++ b/frmts/hdf4/hdf-eos/SWapi.c
+@@ -1301,8 +1301,12 @@ SWfinfo(int32 swathID, const char *fieldtype, const char *fieldname,
+ 
+ 	if (statmeta == 0)
+ 	{
+-	    memmove(utlstr, utlstr + 1, strlen(utlstr) - 2);
+-	    utlstr[strlen(utlstr) - 2] = 0;
++	    const size_t len = strlen(utlstr);
++	    if (len >= 2 && utlstr[0] == '(' && utlstr[len-1] == ')')
++	    {
++	        memmove(utlstr, utlstr + 1, len - 2);
++	        utlstr[len - 2] = '\0';
++	    }
+ 
+ 	    /* Parse trimmed DimList string and get rank */
+ 	    ndims = EHparsestr(utlstr, ',', ptr, slen);

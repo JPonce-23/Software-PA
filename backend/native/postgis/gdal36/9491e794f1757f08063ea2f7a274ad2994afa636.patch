@@ -1,0 +1,116 @@
+From 9491e794f1757f08063ea2f7a274ad2994afa636 Mon Sep 17 00:00:00 2001
+From: Even Rouault <even.rouault@spatialys.com>
+Date: Wed, 15 Apr 2026 00:53:49 +0200
+Subject: [PATCH] HDF4-EOS: fix heap-buffer-overflow/nullptr-deref
+
+Fixes #14356
+---
+ autotest/gcore/data/hdf4/issue_14356.he4 | Bin 0 -> 7304 bytes
+ autotest/gcore/hdf4_read.py              |  12 ++++++++++++
+ autotest/gcore/hdf4multidim.py           |  11 +++++++++++
+ frmts/hdf4/hdf-eos/SWapi.c               |   9 ++++++---
+ 4 files changed, 29 insertions(+), 3 deletions(-)
+ create mode 100644 autotest/gcore/data/hdf4/issue_14356.he4
+
+diff --git a/autotest/gcore/data/hdf4/issue_14356.he4 b/autotest/gcore/data/hdf4/issue_14356.he4
+new file mode 100644
+index 0000000000000000000000000000000000000000..acf3affcf3750637c11133fbc9bd5714edf59f89
+GIT binary patch
+literal 7304
+zcmeI%+iFum6b9g_wGB}a4|t_W5X2j)nYC7WxadXO^niH6db$uo+HPs2Z8X`X)Ys{q
+zrLQ5rf={C}t2OM!%&+&7T_`KlJwK~E^D$v^ZSvNH`{Cks&rLX2{}ieZwNrN~)Zd-E
+zaZ>vh>pQ(LzFa$Vlc7Eh^-QR1q5c`_hoQdg+}%(*4)s*1In)nAJss-zp?)0Ge_dST
+z`ustRpTqb$jMu<;4UE^ocnyr#z<<65T>Oj_KR-FQ(Ozr3Ee6A0|DYi=+;~;&72RRc
+zXg+GJ6<dSD?%=pV3y&JqB#HO`>so*H;?2v&&7*F)yIBqnx68vpaixAS`flm<M#o>N
+z*Y)quyZgoB{b$Ge;(i!CzpLHbFAicqVdTZ~lhu{ii=!c(T(6H_Ys5}(zti-cPPjiL
+z_r4a3z8UJ(=j~2*elkcpGZRYHP=cXxeiF(kl&hf(L*x7;R8Xi?Lj{J$`AKLCg|@1p
+zEf^Z-C!w<_bha8g3q#}lBy<ji&Q(L_U}&75gwCVT`D*Aq42|=X&;=B_Pz_yxp>ci^
+zs>?dJ`hByS>YFfD6VlvBGMj5v{e@LbNOKV^Z(w;W%V%kMWXl^{9^=x4v|q%_8(tp!
+z@>yUW3G+sn$HX)t?H3{Q2ARjoe3qF<&b)EvF*Hp``$g2eq2{qQpT*{pHgB|f%uN%L
+zesx{uT#)fb*qbJ#xyTzCZ-l*3)*B&jWV{jfrU_}k$Qv1NguPLAHzVYYj5osGG$HL5
+zc_ZVEus6!?X@tCy@kZF2CZzo$Z)Cg?_D0#AjgU7o-UxfsgtTAejf^+K-YC1j>H5ie
+zW8;mnH%&<TW#o;GH^$yHA<aeJ*mz^?jkEh3BX4ZHG4`ejX}`!D8*hxgadv-W<c*Ct
+z#@;j`?H74t<BhR5&hBrFys`1d*qbJ#{UUE{yfOC1+5L@?H#XiFd((uZUwxl*-o$tl
+z>`fEWT;xrRH^JT{yT1wYCdQj!Z<>(yi@b^PCfJ)~_cuY_#CQ|zO%u|7kvB2k1bdV0
+z{wBzq7;l2TX+qjB@+QWcU~iJ$-voIR<4v$PO-TDi-o$tl>`k)!o4y}8Z!P1kg}sg5
+z(d4Kko_5$%mdc1djnN~Vi5n;3nD27<9lls|({GoazFFOL*U!&vo)u+xr(1Ssny$7~
+zmV;&};uTMf^welVzlyv4xxd{R9`z2sgd><?XRH5lX15SGz0zK*&Tx~pv-lGZou<N<
+zaJ7pQA2+ob&x1z6p}4tT^!NJP-7=m=t@Vn%ondw?&e1-cyV?$Y{<+t@sN8g2kC+<q
+UU+HZfmc=mqqw$$kM@F~*2I=i%!2kdN
+
+literal 0
+HcmV?d00001
+
+diff --git a/autotest/gcore/hdf4_read.py b/autotest/gcore/hdf4_read.py
+index 6c37cb426b90..36268ebd7a50 100755
+--- a/autotest/gcore/hdf4_read.py
++++ b/autotest/gcore/hdf4_read.py
+@@ -595,3 +595,15 @@ def test_hdf4_gcp_nodata():
+     ds = None
+ 
+     assert gcp_count == 72, "did not get expected gcp count"
++
++
++###############################################################################
++# Test bugfix for https://github.com/OSGeo/gdal/issues/14356
++
++
++def test_hdf4_gh_14356():
++
++    if gdaltest.hdf4_drv is None:
++        pytest.skip()
++
++    gdal.Open("data/hdf4/issue_14356.he4")
+diff --git a/autotest/gcore/hdf4multidim.py b/autotest/gcore/hdf4multidim.py
+index 68c5732624e1..df53dda01918 100644
+--- a/autotest/gcore/hdf4multidim.py
++++ b/autotest/gcore/hdf4multidim.py
+@@ -529,3 +529,14 @@ def get_lut():
+     assert got[255 * 3 + 0] == 255
+     assert got[255 * 3 + 1] == 0
+     assert got[255 * 3 + 2] == 1
++
++
++###############################################################################
++# Test bugfix for https://github.com/OSGeo/gdal/issues/14356
++
++
++def test_hdf4_multidim_gh_14356():
++
++    ds = gdal.OpenEx("data/hdf4/issue_14356.he4", gdal.OF_MULTIDIM_RASTER)
++
++    gdal.MultiDimInfo(ds)
+diff --git a/frmts/hdf4/hdf-eos/SWapi.c b/frmts/hdf4/hdf-eos/SWapi.c
+index 32e73dcd56ea..b8814a4ea418 100644
+--- a/frmts/hdf4/hdf-eos/SWapi.c
++++ b/frmts/hdf4/hdf-eos/SWapi.c
+@@ -2382,7 +2382,7 @@ SWinqfields(int32 swathID, const char *fieldtype, char *fieldlist, int32 rank[],
+ 
+ 	    /* Begin loop through mapping entries in metadata */
+ 	    /* ---------------------------------------------- */
+-	    while (1)
++	    while (metaptrs[0])
+ 	    {
+ 		/* Search for OBJECT string */
+ 		metaptrs[0] = strstr(metaptrs[0], "\t\tOBJECT=");
+@@ -2753,7 +2753,7 @@ SWnentries(int32 swathID, int32 entrycode, int32 * strbufsize)
+ 
+             /* Begin loop through entries in metadata */
+             /* -------------------------------------- */
+-            while (1)
++            while (metaptrs[0])
+             {
+                 /* Search for first string */
+                 strcpy(utlstr, &valName[0][0]);
+@@ -2769,7 +2769,10 @@ SWnentries(int32 swathID, int32 entrycode, int32 * strbufsize)
+                          * Get all string values Don't count quotes
+                          */
+                         EHgetmetavalue(metaptrs, &valName[i][0], utlstr);
+-                        *strbufsize += (int32)strlen(utlstr) - 2;
++                        if( utlstr[0] == '"' && utlstr[strlen(utlstr)-1] == '"' )
++                            *strbufsize += (int32)strlen(utlstr) - 2;
++                        else
++                            *strbufsize += (int32)strlen(utlstr);
+                     }
+                     /* Increment number of entries */
+                     nEntries++;

@@ -1,0 +1,95 @@
+name: PA5 verified supply
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      remote_digest:
+        description: Independently reviewed GHCR index digest (sha256:...)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pa5-verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONNOUSERSITE: '1'
+  PYTHON_DOTENV_DISABLED: '1'
+
+jobs:
+  pa5-contracts:
+    name: PA5 offline supply contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.11.17'
+          pip-version: '26.3'
+      - name: Install existing pinned static-test tools
+        run: |
+          python -m pip install --only-binary=:all: -r tests/ci/requirements.txt
+          python -m pip check
+      - name: Check PR supply contracts without registry credentials
+        run: |
+          python -B -m unittest discover -s tests/security -p test_pa5_ci_supply.py -v
+          for script in deploy/ci/*.sh; do sh -n "$script"; done
+
+  pa5-supply:
+    name: PA5 registry identity and native smoke
+    needs: pa5-contracts
+    # Forks/drafts get offline checks only. Native verification never executes PR tooling.
+    if: >-
+      github.repository == 'JPonce-23/Software-PA' &&
+      ((github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        !github.event.pull_request.draft) ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.ref == 'refs/heads/dev' ||
+         github.ref == 'refs/heads/security/integracion-pa5-final-20261118')))
+    environment: pa5-verification
+    runs-on: [self-hosted, linux, x64, pa5-disposable]
+    timeout-minutes: 15
+    concurrency:
+      group: pa5-disposable-engine
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Require independently approved verifier commit
+        shell: bash
+        env:
+          APPROVED_VERIFIER_SHA: ${{ vars.PA5_APPROVED_VERIFIER_SHA }}
+        run: |
+          set -euo pipefail
+          [[ "$APPROVED_VERIFIER_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'Configure PA5_APPROVED_VERIFIER_SHA with a reviewed, published commit.' >&2
+            exit 2
+          }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ vars.PA5_APPROVED_VERIFIER_SHA }}
+          persist-credentials: false
+      - name: Verify immutable supply and run disposable native smoke
+        shell: bash
+        env:
+          PA5_RUNNER_APPROVED: 'yes'
+          PA5_APPROVED_REMOTE_DIGEST: ${{ vars.PA5_APPROVED_REMOTE_DIGEST }}
+          PA5_REQUESTED_REMOTE_DIGEST: ${{ github.event_name == 'workflow_dispatch' && inputs.remote_digest || vars.PA5_APPROVED_REMOTE_DIGEST }}
+          PA5_PROTECTED_ENGINE_ID: ${{ vars.PA5_PROTECTED_ENGINE_ID }}
+          PA5_SKOPEO_SHA256: ${{ vars.PA5_SKOPEO_SHA256 }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: sh deploy/ci/pa5-ci-verify.sh

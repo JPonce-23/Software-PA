@@ -1,0 +1,1191 @@
+--- a/frmts/zlib/contrib/infback9/inftree9.c
++++ b/frmts/zlib/contrib/infback9/inftree9.c
+@@ -43,25 +43,25 @@
+     unsigned drop;              /* code bits to drop for sub-table */
+     int left;                   /* number of prefix codes available */
+     unsigned used;              /* code entries in table used */
+     unsigned huff;              /* Huffman code */
+     unsigned incr;              /* for incrementing code, index */
+     unsigned fill;              /* index for replicating entries */
+     unsigned low;               /* low bits for current root entry */
+     unsigned mask;              /* mask for low root bits */
+     code this;                  /* table entry for duplication */
+     code FAR *next;             /* next available space in table */
+     const unsigned short FAR *base;     /* base value table to use */
+     const unsigned short FAR *extra;    /* extra bits table to use */
+-    int end;                    /* use base and extra for symbol > end */
++    unsigned match;             /* use base and extra for symbol >= match */
+     unsigned short count[MAXBITS+1];    /* number of codes of each length */
+     unsigned short offs[MAXBITS+1];     /* offsets in table for each length */
+     static const unsigned short lbase[31] = { /* Length codes 257..285 base */
+         3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17,
+         19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115,
+         131, 163, 195, 227, 3, 0, 0};
+     static const unsigned short lext[31] = { /* Length codes 257..285 extra */
+         128, 128, 128, 128, 128, 128, 128, 128, 129, 129, 129, 129,
+         130, 130, 130, 130, 131, 131, 131, 131, 132, 132, 132, 132,
+         133, 133, 133, 133, 144, 194, 65};
+     static const unsigned short dbase[32] = { /* Distance codes 0..31 base */
+         1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49,
+@@ -164,66 +164,64 @@
+        for more information.
+ 
+        sym increments through all symbols, and the loop terminates when
+        all codes of length max, i.e. all codes, have been processed.  This
+        routine permits incomplete codes, so another loop after this one fills
+        in the rest of the decoding tables with invalid code markers.
+      */
+ 
+     /* set up for code type */
+     switch (type) {
+     case CODES:
+         base = extra = work;    /* dummy value--not used */
+-        end = 19;
++        match = 20;
+         break;
+     case LENS:
+         base = lbase;
+-        base -= 257;
+         extra = lext;
+-        extra -= 257;
+-        end = 256;
++        match = 257;
+         break;
+     default:            /* DISTS */
+         base = dbase;
+         extra = dext;
+-        end = -1;
++        match = 0;
+     }
+ 
+     /* initialize state for loop */
+     huff = 0;                   /* starting code */
+     sym = 0;                    /* starting code symbol */
+     len = min;                  /* starting code length */
+     next = *table;              /* current table to fill in */
+     curr = root;                /* current table index bits */
+     drop = 0;                   /* current bits to drop from code for index */
+     low = (unsigned)(-1);       /* trigger new sub-table when len > root */
+     used = 1U << root;          /* use root table entries */
+     mask = used - 1;            /* mask for comparing low */
+ 
+     /* check available table space */
+     if ((type == LENS && used >= ENOUGH_LENS) ||
+         (type == DISTS && used >= ENOUGH_DISTS))
+         return 1;
+ 
+     /* process all codes and make table entries */
+     for (;;) {
+         /* create table entry */
+         this.bits = (unsigned char)(len - drop);
+-        if ((int)(work[sym]) < end) {
++        if ((unsigned)(work[sym]) + 1 < match) {
+             this.op = (unsigned char)0;
+             this.val = work[sym];
+         }
+-        else if ((int)(work[sym]) > end) {
+-            this.op = (unsigned char)(extra[work[sym]]);
+-            this.val = base[work[sym]];
++        else if ((work[sym]) >= match) {
++            this.op = (unsigned char)(extra[work[sym]- match]);
++            this.val = base[work[sym]- match];
+         }
+         else {
+             this.op = (unsigned char)(32 + 64);         /* end of block */
+             this.val = 0;
+         }
+ 
+         /* replicate for those indices with low len bits equal to huff */
+         incr = 1U << (len - drop);
+         fill = 1U << curr;
+         do {
+             fill -= incr;
+             next[(huff >> drop) + fill] = this;
+--- a/frmts/hdf4/hdf-eos/GDapi.c
++++ b/frmts/hdf4/hdf-eos/GDapi.c
+@@ -2684,26 +2684,30 @@
+ 		HEpush(DFE_GENAPP, "GDfieldinfo", __FILE__, __LINE__);
+ 		HEreport("\"DataType\" string not found in metadata.\n");
+ 	    }
+ 
+ 	    /*
+ 	     * Get DimList string and trim off leading and trailing parens
+ 	     * "()"
+ 	     */
+ 	    statmeta = EHgetmetavalue(metaptrs, "DimList", utlstr);
+ 
+ 	    if (statmeta == 0)
+ 	    {
+-		memmove(utlstr, utlstr + 1, strlen(utlstr) - 2);
+-		utlstr[strlen(utlstr) - 2] = 0;
++		const size_t len = strlen(utlstr);
++		if (len >= 2 && utlstr[0] == '(' && utlstr[len-1] == ')')
++		{
++		    memmove(utlstr, utlstr + 1, len - 2);
++		    utlstr[len - 2] = '\0';
++		}
+ 
+ 		/* Parse trimmed DimList string and get rank */
+ 		ndims = EHparsestr(utlstr, ',', ptr, slen);
+ 		*rank = ndims;
+ 	    }
+ 	    else
+ 	    {
+ 		status = -1;
+ 		HEpush(DFE_GENAPP, "GDfieldinfo", __FILE__, __LINE__);
+ 		HEreport("\"DimList\" string not found in metadata.\n");
+ 	    }
+ 
+@@ -3712,30 +3716,39 @@
+ 		metaptr = strstr(metaptr, utlstr);
+ 
+ 
+ 		/* If not found check for old metadata */
+ 		/* ----------------------------------- */
+ 		if (metaptr == NULL)
+ 		{
+ 		    snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s%s", "OBJECT=\"", name, "\"\n");
+ 		    metaptr = strstr(oldmetaptr, utlstr);
+ 		}
+ #endif
+ 
+-		/* Get field list and strip off leading and trailing quotes */
+-		/* -------------------------------------------------------- */
+-		EHgetmetavalue(metaptrs, "FieldList", name);
+-		memmove(name, name + 1, strlen(name) - 2);
+-		name[strlen(name) - 2] = 0;
+-
++        /* Get field list and strip off leading and trailing quotes */
++        /* -------------------------------------------------------- */
++        if (EHgetmetavalue(metaptrs, "FieldList", name) == 0)
++        {
++            const size_t len = strlen(name);
++            if (len >= 2 && name[0] == '"' && name[len-1] == '"')
++            {
++                memmove(name, name + 1, strlen(name) - 2);
++                name[strlen(name) - 2] = 0;
++            }
++        }
++        else
++        {
++            name[0] = '\0';
++        }
+ 
+ 		/* Search for desired field within merged field list */
+ 		/* ------------------------------------------------- */
+ 		snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s%s", "\"", fieldname, "\"");
+ 		dum = EHstrwithin(utlstr, name, ',');
+ 
+ 		free(metabuf);
+ 	    }
+ 	    else
+ 	    {
+ 		/* If solo (unmerged) check if SDS name matches fieldname */
+ 		/* ------------------------------------------------------ */
+@@ -4980,25 +4993,28 @@
+ 	    strcat(utlstr, "=");
+ 	    metaptrs[0] = strstr(metaptrs[0], utlstr);
+ 
+ 	    /* If found within relevant metadata section ... */
+ 	    if (metaptrs[0] < metaptrs[1] && metaptrs[0] != NULL)
+ 	    {
+ 		for (i = 0; i < nVal; i++)
+ 		{
+ 		    /*
+ 		     * Get all string values Don't count quotes
+ 		     */
+ 		    EHgetmetavalue(metaptrs, &valName[i][0], utlstr);
+-		    *strbufsize += (int32)strlen(utlstr) - 2;
++		    if( utlstr[0] == '"' && utlstr[strlen(utlstr)-1] == '"' )
++		        *strbufsize += (int32)strlen(utlstr) - 2;
++		    else
++		        *strbufsize += (int32)strlen(utlstr);
+ 		}
+ 		/* Increment number of entries */
+ 		nEntries++;
+ 
+ 		/* Go to end of OBJECT */
+ 		metaptrs[0] = strstr(metaptrs[0], "END_OBJECT");
+ 	    }
+ 	    else
+ 		/* No more entries found */
+ 	    {
+ 		break;
+ 	    }
+--- a/frmts/hdf4/hdf-eos/SWapi.c
++++ b/frmts/hdf4/hdf-eos/SWapi.c
+@@ -1644,26 +1644,30 @@
+ 	    HEpush(DFE_GENAPP, "SWfinfo", __FILE__, __LINE__);
+ 	    HEreport("\"DataType\" string not found in metadata.\n");
+ 	}
+ 
+ 
+ 	/*
+ 	 * Get DimList string and trim off leading and trailing parens "()"
+ 	 */
+ 	statmeta = EHgetmetavalue(metaptrs, "DimList", utlstr);
+ 
+ 	if (statmeta == 0)
+ 	{
+-	    memmove(utlstr, utlstr + 1, strlen(utlstr) - 2);
+-	    utlstr[strlen(utlstr) - 2] = 0;
++	    const size_t len = strlen(utlstr);
++	    if (len >= 2 && utlstr[0] == '(' && utlstr[len-1] == ')')
++	    {
++	        memmove(utlstr, utlstr + 1, len - 2);
++	        utlstr[len - 2] = '\0';
++	    }
+ 
+ 	    /* Parse trimmed DimList string and get rank */
+ 	    ndims = EHparsestr(utlstr, ',', ptr, slen);
+ 	    *rank = ndims;
+ 	}
+ 	else
+ 	{
+ 	    status = -1;
+ 	    HEpush(DFE_GENAPP, "SWfinfo", __FILE__, __LINE__);
+ 	    HEreport("\"DimList\" string not found in metadata.\n");
+ 	}
+ 
+@@ -4014,25 +4018,25 @@
+ 	    }
+ 
+ 
+ 	    /* If field names are desired then "clear" name buffer */
+ 	    if (fieldlist != NULL)
+ 	    {
+ 		fieldlist[0] = 0;
+ 	    }
+ 
+ 
+ 	    /* Begin loop through mapping entries in metadata */
+ 	    /* ---------------------------------------------- */
+-	    while (1)
++	    while (metaptrs[0])
+ 	    {
+ 		/* Search for OBJECT string */
+ 		metaptrs[0] = strstr(metaptrs[0], "\t\tOBJECT=");
+ 
+ 		/* If found within "Geo" or "Data" Field metadata section .. */
+ 		if (metaptrs[0] < metaptrs[1] && metaptrs[0] != NULL)
+ 		{
+ 		    /* Get Fieldnames (if desired) */
+ 		    if (fieldlist != NULL)
+ 		    {
+ 			/* Check 1st for old meta data then new */
+ 			/* ------------------------------------ */
+@@ -4385,41 +4389,44 @@
+         if (metabuf)
+         {
+             metaflag = (strstr(metabuf, "GROUP=\"") == NULL) ? 1 : 0;
+             if (metaflag == 0)
+             {
+                 nVal = 1;
+                 strcpy(&valName[0][0], "\t\tOBJECT");
+             }
+ 
+ 
+             /* Begin loop through entries in metadata */
+             /* -------------------------------------- */
+-            while (1)
++            while (metaptrs[0])
+             {
+                 /* Search for first string */
+                 strcpy(utlstr, &valName[0][0]);
+                 strcat(utlstr, "=");
+                 metaptrs[0] = strstr(metaptrs[0], utlstr);
+ 
+                 /* If found within relevant metadata section ... */
+                 if (metaptrs[0] < metaptrs[1] && metaptrs[0] != NULL)
+                 {
+                     for (i = 0; i < nVal; i++)
+                     {
+                         /*
+                          * Get all string values Don't count quotes
+                          */
+                         EHgetmetavalue(metaptrs, &valName[i][0], utlstr);
+-                        *strbufsize += (int32)strlen(utlstr) - 2;
++                        if( utlstr[0] == '"' && utlstr[strlen(utlstr)-1] == '"' )
++                            *strbufsize += (int32)strlen(utlstr) - 2;
++                        else
++                            *strbufsize += (int32)strlen(utlstr);
+                     }
+                     /* Increment number of entries */
+                     nEntries++;
+ 
+                     /* Go to end of OBJECT */
+                     metaptrs[0] = strstr(metaptrs[0], "END_OBJECT");
+                 }
+                 else
+                     /* No more entries found */
+                 {
+                     break;
+                 }
+@@ -4708,29 +4715,38 @@
+ 			name, "\"\n");
+ 		metaptrs[0] = strstr(metaptrs[0], utlstr);
+ 
+ 
+ 		/* If not found check for old metadata */
+ 		/* ----------------------------------- */
+ 		if (metaptrs[0] == NULL)
+ 		{
+ 		    snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%.480s%s", "OBJECT=\"", name, "\"\n");
+ 		    metaptrs[0] = strstr(oldmetaptr, utlstr);
+ 		}
+ 
+-
+-		/* Get field list and strip off leading and trailing quotes */
+-		EHgetmetavalue(metaptrs, "FieldList", name);  /* not return status --xhua */
+-		memmove(name, name + 1, strlen(name) - 2);
+-		name[strlen(name) - 2] = 0;
++        /* Get field list and strip off leading and trailing quotes */
++        if (EHgetmetavalue(metaptrs, "FieldList", name) == 0)
++        {
++            const size_t len = strlen(name);
++            if (len >= 2 && name[0] == '"' && name[len-1] == '"')
++            {
++                memmove(name, name + 1, strlen(name) - 2);
++                name[strlen(name) - 2] = 0;
++            }
++        }
++        else
++        {
++            name[0] = '\0';
++        }
+ 
+ 		/* Search for desired field within merged field list */
+ 		snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s%s", "\"", fieldname, "\"");
+ 		dum = EHstrwithin(utlstr, name, ',');
+ 
+ 		free(metabuf);
+ 	    }
+ 	    else
+ 	    {
+ 		/* If solo (unmerged) check if SDS name matches fieldname */
+ 		/* ------------------------------------------------------ */
+ 		dum = EHstrwithin(fieldname, name, ',');
+--- a/frmts/netcdf/netcdfdataset.cpp
++++ b/frmts/netcdf/netcdfdataset.cpp
+@@ -3981,68 +3981,56 @@
+                     std::swap(yMinMax[0], yMinMax[1]);
+                 }
+             }
+ 
+             // Geostationary satellites can specify units in (micro)radians
+             // So we check if they do, and if so convert to linear units
+             // (meters)
+             const char *pszProjName = oSRS.GetAttrValue("PROJECTION");
+             if (pszProjName != nullptr)
+             {
+                 if (EQUAL(pszProjName, SRS_PT_GEOSTATIONARY_SATELLITE))
+                 {
+-                    double satelliteHeight =
++                    const double satelliteHeight =
+                         oSRS.GetProjParm(SRS_PP_SATELLITE_HEIGHT, 1.0);
+-                    size_t nAttlen = 0;
+-                    char szUnits[NC_MAX_NAME + 1];
+-                    szUnits[0] = '\0';
+-                    nc_type nAttype = NC_NAT;
+-                    nc_inq_att(nGroupId, nVarDimXID, "units", &nAttype,
+-                               &nAttlen);
+-                    if (nAttlen < sizeof(szUnits) &&
+-                        nc_get_att_text(nGroupId, nVarDimXID, "units",
+-                                        szUnits) == NC_NOERR)
++                    std::string osUnits;
++                    if (NCDFGetAttr(nGroupId, nVarDimXID, "units", osUnits) ==
++                        CE_None)
+                     {
+-                        szUnits[nAttlen] = '\0';
+-                        if (EQUAL(szUnits, "microradian"))
++                        if (EQUAL(osUnits.c_str(), "microradian"))
+                         {
+                             xMinMax[0] =
+                                 xMinMax[0] * satelliteHeight * 0.000001;
+                             xMinMax[1] =
+                                 xMinMax[1] * satelliteHeight * 0.000001;
+                         }
+-                        else if (EQUAL(szUnits, "rad") ||
+-                                 EQUAL(szUnits, "radian"))
++                        else if (EQUAL(osUnits.c_str(), "rad") ||
++                                 EQUAL(osUnits.c_str(), "radian"))
+                         {
+                             xMinMax[0] = xMinMax[0] * satelliteHeight;
+                             xMinMax[1] = xMinMax[1] * satelliteHeight;
+                         }
+                     }
+-                    szUnits[0] = '\0';
+-                    nc_inq_att(nGroupId, nVarDimYID, "units", &nAttype,
+-                               &nAttlen);
+-                    if (nAttlen < sizeof(szUnits) &&
+-                        nc_get_att_text(nGroupId, nVarDimYID, "units",
+-                                        szUnits) == NC_NOERR)
++                    if (NCDFGetAttr(nGroupId, nVarDimYID, "units", osUnits) ==
++                        CE_None)
+                     {
+-                        szUnits[nAttlen] = '\0';
+-                        if (EQUAL(szUnits, "microradian"))
++                        if (EQUAL(osUnits.c_str(), "microradian"))
+                         {
+                             yMinMax[0] =
+                                 yMinMax[0] * satelliteHeight * 0.000001;
+                             yMinMax[1] =
+                                 yMinMax[1] * satelliteHeight * 0.000001;
+                         }
+-                        else if (EQUAL(szUnits, "rad") ||
+-                                 EQUAL(szUnits, "radian"))
++                        else if (EQUAL(osUnits.c_str(), "rad") ||
++                                 EQUAL(osUnits.c_str(), "radian"))
+                         {
+                             yMinMax[0] = yMinMax[0] * satelliteHeight;
+                             yMinMax[1] = yMinMax[1] * satelliteHeight;
+                         }
+                     }
+                 }
+             }
+ 
+             adfTempGeoTransform[0] = xMinMax[0];
+             adfTempGeoTransform[1] = (xMinMax[1] - xMinMax[0]) /
+                                      (poDS->nRasterXSize + (node_offset - 1));
+             adfTempGeoTransform[2] = 0;
+@@ -5075,26 +5063,25 @@
+             {
+                 bSame = false;
+                 break;
+             }
+             if (atttype == NC_CHAR)
+             {
+                 if (CPLGetValueType(pszValue) != CPL_VALUE_STRING)
+                 {
+                     bSame = false;
+                     break;
+                 }
+                 std::string val;
+-                val.resize(attlen);
+-                nc_get_att_text(cdfid, NCDFVarID, szAttrName, &val[0]);
++                NCDFGetAttr(cdfid, NCDFVarID, szAttrName, val);
+                 if (val != pszValue)
+                 {
+                     bSame = false;
+                     break;
+                 }
+             }
+             else
+             {
+                 const CPLStringList aosTokens(
+                     CSLTokenizeString2(pszValue, ",", 0));
+                 if (static_cast<size_t>(aosTokens.size()) != attlen)
+                 {
+@@ -6398,28 +6385,26 @@
+         }
+         CPLFree(panSubGroupIds);
+     }
+ 
+     return CE_None;
+ }
+ 
+ /************************************************************************/
+ /*                netCDFDataset::CreateSubDatasetList()                 */
+ /************************************************************************/
+ void netCDFDataset::CreateSubDatasetList(int nGroupId)
+ {
+-    char szVarStdName[NC_MAX_NAME + 1];
++    std::string osVarStdName;
+     int *ponDimIds = nullptr;
+-    nc_type nAttype;
+-    size_t nAttlen;
+ 
+     netCDFDataset *poDS = this;
+ 
+     int nVarCount;
+     nc_inq_nvars(nGroupId, &nVarCount);
+ 
+     for (int nVar = 0; nVar < nVarCount; nVar++)
+     {
+ 
+         int nDims;
+         nc_inq_varndims(nGroupId, nVar, &nDims);
+ 
+@@ -6479,35 +6464,28 @@
+                     pszType = "64-bit unsigned integer";
+                     break;
+                 default:
+                     break;
+             }
+ 
+             char *pszName = nullptr;
+             if (NCDFGetVarFullName(nGroupId, nVar, &pszName) != CE_None)
+                 continue;
+ 
+             nSubDatasets++;
+ 
+-            nAttlen = 0;
+-            nc_inq_att(nGroupId, nVar, CF_STD_NAME, &nAttype, &nAttlen);
+-            if (nAttlen < sizeof(szVarStdName) &&
+-                nc_get_att_text(nGroupId, nVar, CF_STD_NAME, szVarStdName) ==
+-                    NC_NOERR)
+-            {
+-                szVarStdName[nAttlen] = '\0';
+-            }
+-            else
+-            {
+-                snprintf(szVarStdName, sizeof(szVarStdName), "%s", pszName);
++            if (NCDFGetAttr(nGroupId, nVar, CF_STD_NAME, osVarStdName) !=
++                CE_None)
++            {
++                osVarStdName = pszName;
+             }
+ 
+             char szTemp[NC_MAX_NAME + 1];
+             snprintf(szTemp, sizeof(szTemp), "SUBDATASET_%d_NAME",
+                      nSubDatasets);
+ 
+             if (strchr(pszName, ' ') || strchr(pszName, ':'))
+             {
+                 poDS->papszSubDatasets = CSLSetNameValue(
+                     poDS->papszSubDatasets, szTemp,
+                     CPLSPrintf("NETCDF:\"%s\":\"%s\"", poDS->osFilename.c_str(),
+                                pszName));
+@@ -6519,25 +6497,25 @@
+                     CPLSPrintf("NETCDF:\"%s\":%s", poDS->osFilename.c_str(),
+                                pszName));
+             }
+ 
+             CPLFree(pszName);
+ 
+             snprintf(szTemp, sizeof(szTemp), "SUBDATASET_%d_DESC",
+                      nSubDatasets);
+ 
+             poDS->papszSubDatasets =
+                 CSLSetNameValue(poDS->papszSubDatasets, szTemp,
+                                 CPLSPrintf("[%s] %s (%s)", osDim.c_str(),
+-                                           szVarStdName, pszType));
++                                           osVarStdName.c_str(), pszType));
+         }
+     }
+ 
+     // Recurse on sub groups.
+     int nSubGroups = 0;
+     int *panSubGroupIds = nullptr;
+     NCDFGetSubGroups(nGroupId, &nSubGroups, &panSubGroupIds);
+     for (int i = 0; i < nSubGroups; i++)
+     {
+         CreateSubDatasetList(panSubGroupIds[i]);
+     }
+     CPLFree(panSubGroupIds);
+@@ -8326,39 +8304,29 @@
+     poDS->nCFVersion = nccfdriver::getCFVersion(cdfid);
+     bool bHasSimpleGeometries = false;  // but not necessarily valid
+     if (poDS->nCFVersion >= 1.8)
+     {
+         bHasSimpleGeometries = poDS->DetectAndFillSGLayers(cdfid);
+         if (bHasSimpleGeometries)
+         {
+             poDS->bSGSupport = true;
+             poDS->vcdf.enableFullVirtualMode();
+         }
+     }
+ 
+-    char szConventions[NC_MAX_NAME + 1];
+-    szConventions[0] = '\0';
+-    nc_type nAttype = NC_NAT;
+-    size_t nAttlen = 0;
+-    nc_inq_att(cdfid, NC_GLOBAL, "Conventions", &nAttype, &nAttlen);
+-    if (nAttlen >= sizeof(szConventions) ||
+-        nc_get_att_text(cdfid, NC_GLOBAL, "Conventions", szConventions) !=
+-            NC_NOERR)
++    std::string osConventions;
++    if (NCDFGetAttr(cdfid, NC_GLOBAL, "Conventions", osConventions) != CE_None)
+     {
+         CPLDebug("GDAL_netCDF", "No UNIDATA NC_GLOBAL:Conventions attribute");
+         // Note that 'Conventions' is always capital 'C' in CF spec.
+-    }
+-    else
+-    {
+-        szConventions[nAttlen] = '\0';
+     }
+ 
+     // Create band information objects.
+     CPLDebug("GDAL_netCDF", "var_count = %d", nvars);
+ 
+     // Create a corresponding GDALDataset.
+     // Create Netcdf Subdataset if filename as NETCDF tag.
+     poDS->cdfid = cdfid;
+ #ifdef ENABLE_UFFD
+     poDS->pCtx = pCtx;
+ #endif
+     poDS->eAccess = poOpenInfo->eAccess;
+@@ -8513,25 +8481,25 @@
+     // Dimensions to appear in the relative order T, then Z, then Y,
+     // then X  to the file. All other dimensions should, whenever
+     // possible, be placed to the left of the spatiotemporal
+     // dimensions.
+ 
+     // Verify that dimensions are in the {T,Z,Y,X} or {T,Z,Y,X} order
+     // Ideally we should detect for other ordering and act accordingly
+     // Only done if file has Conventions=CF-* and only prints warning
+     // To disable set GDAL_NETCDF_VERIFY_DIMS=NO and to use only
+     // attributes (not varnames) set GDAL_NETCDF_VERIFY_DIMS=STRICT
+     const bool bCheckDims =
+         CPLTestBool(CPLGetConfigOption("GDAL_NETCDF_VERIFY_DIMS", "YES")) &&
+-        STARTS_WITH_CI(szConventions, "CF");
++        STARTS_WITH_CI(osConventions.c_str(), "CF");
+ 
+     if (nd >= 2 && bCheckDims)
+     {
+         char szDimName1[NC_MAX_NAME + 1] = {};
+         char szDimName2[NC_MAX_NAME + 1] = {};
+         status = nc_inq_dimname(cdfid, poDS->m_anDimIds[nd - 1], szDimName1);
+         NCDF_ERR(status);
+         status = nc_inq_dimname(cdfid, poDS->m_anDimIds[nd - 2], szDimName2);
+         NCDF_ERR(status);
+         if (NCDFIsVarLongitude(cdfid, -1, szDimName1) == false &&
+             NCDFIsVarProjectionX(cdfid, -1, szDimName1) == false)
+         {
+@@ -10648,24 +10616,53 @@
+ /* sets pdfValue to first value found */
+ CPLErr NCDFGetAttr(int nCdfId, int nVarId, const char *pszAttrName,
+                    double *pdfValue)
+ {
+     return NCDFGetAttr1(nCdfId, nVarId, pszAttrName, pdfValue, nullptr);
+ }
+ 
+ /* pszValue is the responsibility of the caller and must be freed */
+ CPLErr NCDFGetAttr(int nCdfId, int nVarId, const char *pszAttrName,
+                    char **pszValue)
+ {
+     return NCDFGetAttr1(nCdfId, nVarId, pszAttrName, nullptr, pszValue);
++}
++
++CPLErr NCDFGetAttr(int nCdfId, int nVarId, const char *pszAttrName,
++                   std::string &osValue)
++{
++    nc_type nAttrType = NC_NAT;
++    size_t nAttrLen = 0;
++
++    int status = nc_inq_att(nCdfId, nVarId, pszAttrName, &nAttrType, &nAttrLen);
++    if (status != NC_NOERR)
++        return CE_Failure;
++
++    if (nAttrType != NC_CHAR)
++        return CE_Failure;
++
++    try
++    {
++        osValue.resize(nAttrLen, 0);
++    }
++    catch (const std::exception &)
++    {
++        return CE_Failure;
++    }
++
++    const auto nErr = nc_get_att_text(nCdfId, nVarId, pszAttrName,
++                                      osValue.data()) != NC_NOERR;
++    NCDF_ERR_RET(nErr);
++
++    return CE_None;
+ }
+ 
+ /* By default write NC_CHAR, but detect for int/float/double and */
+ /* NC4 string arrays */
+ static CPLErr NCDFPutAttr(int nCdfId, int nVarId, const char *pszAttrName,
+                           const char *pszValue)
+ {
+     int status = 0;
+     char *pszTemp = nullptr;
+ 
+     /* get the attribute values as tokens */
+     char **papszValues = NCDFTokenizeArray(pszValue);
+@@ -12211,40 +12208,40 @@
+                     *pnVarId = v;
+                     nRasterVars++;
+                 }
+             }
+             else if (nVarDims == 1)
+             {
+                 nc_type atttype = NC_NAT;
+                 size_t attlen = 0;
+                 if (nc_inq_att(nCdfId, v, "instance_dimension", &atttype,
+                                &attlen) == NC_NOERR &&
+                     atttype == NC_CHAR && attlen < NC_MAX_NAME)
+                 {
+-                    char szInstanceDimension[NC_MAX_NAME + 1];
+-                    if (nc_get_att_text(nCdfId, v, "instance_dimension",
+-                                        szInstanceDimension) == NC_NOERR)
++                    std::string osInstanceDimension;
++                    if (NCDFGetAttr(nCdfId, v, "instance_dimension",
++                                    osInstanceDimension) == CE_None)
+                     {
+-                        szInstanceDimension[attlen] = 0;
+-                        int status = nc_inq_dimid(nCdfId, szInstanceDimension,
+-                                                  &nProfileDimId);
++                        const int status =
++                            nc_inq_dimid(nCdfId, osInstanceDimension.c_str(),
++                                         &nProfileDimId);
+                         if (status == NC_NOERR)
+                             nParentIndexVarID = v;
+                         else
+                             nProfileDimId = -1;
+                         if (status == NC_EBADDIM)
+                             CPLError(CE_Warning, CPLE_AppDefined,
+                                      "Attribute instance_dimension='%s' refers "
+                                      "to a non existing dimension",
+-                                     szInstanceDimension);
++                                     osInstanceDimension.c_str());
+                         else
+                             NCDF_ERR(status);
+                     }
+                 }
+                 if (v != nParentIndexVarID)
+                 {
+                     anPotentialVectorVarID.push_back(v);
+                     int nDimId = -1;
+                     nc_inq_vardimid(nCdfId, v, &nDimId);
+                     oMapDimIdToCount[nDimId]++;
+                 }
+             }
+--- a/frmts/netcdf/netcdfdataset.h
++++ b/frmts/netcdf/netcdfdataset.h
+@@ -785,24 +785,26 @@
+ double NCDFGetDefaultNoDataValue(int nCdfId, int nVarId, int nVarType,
+                                  bool &bGotNoData);
+ 
+ int64_t NCDFGetDefaultNoDataValueAsInt64(int nCdfId, int nVarId,
+                                          bool &bGotNoData);
+ uint64_t NCDFGetDefaultNoDataValueAsUInt64(int nCdfId, int nVarId,
+                                            bool &bGotNoData);
+ 
+ CPLErr NCDFGetAttr(int nCdfId, int nVarId, const char *pszAttrName,
+                    double *pdfValue);
+ CPLErr NCDFGetAttr(int nCdfId, int nVarId, const char *pszAttrName,
+                    char **pszValue);
++CPLErr NCDFGetAttr(int nCdfId, int nVarId, const char *pszAttrName,
++                   std::string &osValue);
+ bool NCDFIsUnlimitedDim(bool bIsNC4, int cdfid, int nDimId);
+ bool NCDFIsUserDefinedType(int ncid, int type);
+ 
+ CPLString NCDFGetGroupFullName(int nGroupId);
+ 
+ CPLErr NCDFResolveVar(int nStartGroupId, const char *pszVar, int *pnGroupId,
+                       int *pnVarId, bool bMandatory = false);
+ 
+ // Dimension check functions.
+ bool NCDFIsVarLongitude(int nCdfId, int nVarId, const char *pszVarName);
+ bool NCDFIsVarLatitude(int nCdfId, int nVarId, const char *pszVarName);
+ bool NCDFIsVarProjectionX(int nCdfId, int nVarId, const char *pszVarName);
+--- a/frmts/netcdf/netcdfsg.cpp
++++ b/frmts/netcdf/netcdfsg.cpp
+@@ -10,54 +10,24 @@
+  * SPDX-License-Identifier: MIT
+  ****************************************************************************/
+ #include <cstdio>
+ #include <cstring>
+ #include <set>
+ #include <vector>
+ #include "netcdf.h"
+ #include "netcdfdataset.h"
+ #include "netcdfsg.h"
+ 
+ namespace nccfdriver
+ {
+-/* Attribute Fetch
+- * -
+- * A function which makes it a bit easier to fetch single text attribute values
+- * ncid: as used in netcdf.h
+- * varID: variable id in which to look for the attribute
+- * attrName: name of attribute to fine
+- * alloc: a reference to a string that will be filled with the attribute (i.e.
+- * truncated and filled with the return value) Returns: a reference to the
+- * string to fill (a.k.a. string pointed to by alloc reference)
+- */
+-std::string &attrf(int ncid, int varId, const char *attrName,
+-                   std::string &alloc)
+-{
+-    size_t len = 0;
+-    nc_inq_attlen(ncid, varId, attrName, &len);
+-
+-    if (len < 1)
+-    {
+-        alloc.clear();
+-        return alloc;
+-    }
+-
+-    alloc.resize(len);
+-    memset(&alloc[0], 0, len);
+-
+-    // Now look through this variable for the attribute
+-    nc_get_att_text(ncid, varId, attrName, &alloc[0]);
+-
+-    return alloc;
+-}
+ 
+ /* SGeometry_Reader
+  * (implementations)
+  *
+  */
+ SGeometry_Reader::SGeometry_Reader(int ncId, int geoVarId)
+     : gc_varId(geoVarId), touple_order(0)
+ {
+ 
+     char container_name[NC_MAX_NAME + 1];
+     memset(container_name, 0, NC_MAX_NAME + 1);
+ 
+@@ -73,85 +43,92 @@
+ 
+     // Find geometry type
+     this->type = nccfdriver::getGeometryType(ncId, geoVarId);
+ 
+     if (this->type == NONE)
+     {
+         throw SG_Exception_Existential(
+             static_cast<const char *>(container_name), CF_SG_GEOMETRY_TYPE);
+     }
+ 
+     // Get grid mapping variable, if it exists
+     this->gm_varId = INVALID_VAR_ID;
+-    if (attrf(ncId, geoVarId, CF_GRD_MAPPING, gm_name_s) != "")
++    if (NCDFGetAttr(ncId, geoVarId, CF_GRD_MAPPING, gm_name_s) == CE_None &&
++        !gm_name_s.empty())
+     {
+         const char *gm_name = gm_name_s.c_str();
+         int gmVID;
+         if (nc_inq_varid(ncId, gm_name, &gmVID) == NC_NOERR)
+         {
+             this->gm_varId = gmVID;
+         }
+     }
+ 
+     // Find a list of node counts and part node count
+     std::string nc_name_s;
+     std::string pnc_name_s;
+     std::string ir_name_s;
+     int pnc_vid = INVALID_VAR_ID;
+     int nc_vid = INVALID_VAR_ID;
+     int ir_vid = INVALID_VAR_ID;
+     int buf;
+     size_t bound = 0;
+     size_t total_node_count = 0;  // used in error checks later
+     size_t total_part_node_count = 0;
+-    if (attrf(ncId, geoVarId, CF_SG_NODE_COUNT, nc_name_s) != "")
++
++    if (NCDFGetAttr(ncId, geoVarId, CF_SG_NODE_COUNT, nc_name_s) == CE_None &&
++        !nc_name_s.empty())
+     {
+         const char *nc_name = nc_name_s.c_str();
+         nc_inq_varid(ncId, nc_name, &nc_vid);
+         while (nc_get_var1_int(ncId, nc_vid, &bound, &buf) == NC_NOERR)
+         {
+             if (buf < 0)
+             {
+                 throw SG_Exception_Value_Violation(
+                     static_cast<const char *>(container_name), CF_SG_NODE_COUNT,
+                     "negative");
+             }
+ 
+             this->node_counts.push_back(buf);
+             total_node_count += buf;
+             bound++;
+         }
+     }
+ 
+-    if (attrf(ncId, geoVarId, CF_SG_PART_NODE_COUNT, pnc_name_s) != "")
++    if (NCDFGetAttr(ncId, geoVarId, CF_SG_PART_NODE_COUNT, pnc_name_s) ==
++            CE_None &&
++        !pnc_name_s.empty())
+     {
+         const char *pnc_name = pnc_name_s.c_str();
+         bound = 0;
+         nc_inq_varid(ncId, pnc_name, &pnc_vid);
+         while (nc_get_var1_int(ncId, pnc_vid, &bound, &buf) == NC_NOERR)
+         {
+             if (buf < 0)
+             {
+                 throw SG_Exception_Value_Violation(
+                     static_cast<const char *>(container_name),
+                     CF_SG_PART_NODE_COUNT, "negative");
+             }
+ 
+             this->pnode_counts.push_back(buf);
+             total_part_node_count += buf;
+             bound++;
+         }
+     }
+ 
+-    if (attrf(ncId, geoVarId, CF_SG_INTERIOR_RING, ir_name_s) != "")
++    if (NCDFGetAttr(ncId, geoVarId, CF_SG_INTERIOR_RING, ir_name_s) ==
++            CE_None &&
++        !ir_name_s.empty())
+     {
+         const char *ir_name = ir_name_s.c_str();
+         bound = 0;
+         nc_inq_varid(ncId, ir_name, &ir_vid);
+         while (nc_get_var1_int(ncId, ir_vid, &bound, &buf) == NC_NOERR)
+         {
+             bool store = buf == 0 ? false : true;
+ 
+             if (buf != 0 && buf != 1)
+             {
+                 throw SG_Exception_Value_Required(
+                     static_cast<const char *>(container_name),
+@@ -221,25 +198,27 @@
+ 
+     if (node_counts.size() > 0)
+     {
+         for (size_t i = 0; i < node_counts.size() - 1; i++)
+         {
+             rc = rc + node_counts[i];
+             bound_list.push_back(rc);
+         }
+     }
+ 
+     std::string cart_s;
+     // Node Coordinates
+-    if (attrf(ncId, geoVarId, CF_SG_NODE_COORDINATES, cart_s) == "")
++    if (NCDFGetAttr(ncId, geoVarId, CF_SG_NODE_COORDINATES, cart_s) !=
++            CE_None ||
++        cart_s.empty())
+     {
+         throw SG_Exception_Existential(container_name, CF_SG_NODE_COORDINATES);
+     }
+ 
+     // Create parts count list and an offset list for parts indexing
+     if (this->node_counts.size() > 0)
+     {
+         int ind = 0;
+         int parts = 0;
+         int prog = 0;
+         int c = 0;
+ 
+@@ -283,25 +262,25 @@
+     strncpy(cart, cart_s.c_str(), NC_MAX_NAME);
+ 
+     char *dim = strtok(cart, " ");
+     int axis_id = 0;
+ 
+     while (dim != nullptr)
+     {
+         if (nc_inq_varid(ncId, dim, &axis_id) == NC_NOERR)
+         {
+ 
+             // Check axis signature
+             std::string a_sig;
+-            attrf(ncId, axis_id, CF_AXIS, a_sig);
++            NCDFGetAttr(ncId, axis_id, CF_AXIS, a_sig);
+ 
+             // If valid signify axis correctly
+             if (a_sig == "X")
+             {
+                 X = axis_id;
+             }
+             else if (a_sig == "Y")
+             {
+                 Y = axis_id;
+             }
+             else if (a_sig == "Z")
+             {
+@@ -757,61 +736,48 @@
+     {
+         return;
+     }
+ 
+     // Then scan throughout the netcdfDataset if those variables
+     // geometry_container attribute matches the container
+     int varCount = 0;
+     if (nc_inq_nvars(this->nc, &varCount) != NC_NOERR)
+     {
+         return;
+     }
+ 
++    std::string buf;
+     for (int curr = 0; curr < varCount; curr++)
+     {
+-        size_t contname2_len = 0;
+-
+-        // First find container length, and make buf that size in chars
+-        if (nc_inq_attlen(this->nc, curr, CF_SG_GEOMETRY, &contname2_len) !=
+-            NC_NOERR)
+-        {
+-            // not a geometry variable, continue
+-            continue;
+-        }
+-
+-        // Also if present but empty, go on
+-        if (contname2_len == 0)
+-            continue;
+-
+-        // Otherwise, geometry: see what container it has
+-        char buf[NC_MAX_CHAR + 1];
+-        memset(buf, 0, NC_MAX_CHAR + 1);
+-
+-        if (nc_get_att_text(this->nc, curr, CF_SG_GEOMETRY, buf) != NC_NOERR)
++        if (NCDFGetAttr(this->nc, curr, CF_SG_GEOMETRY, buf) != CE_None ||
++            buf.empty())
+         {
+             continue;
+         }
+ 
+         // If matches, then establish a reference by placing this variable's
+         // data in both vectors
+-        if (!strcmp(contname, buf))
+-        {
+-            char property_name[NC_MAX_NAME + 1] = {0};
++        if (!strcmp(contname, buf.c_str()))
++        {
++            std::string property_name;
+ 
+             // look for special OGR original name field
+-            if (nc_get_att_text(this->nc, curr, OGR_SG_ORIGINAL_LAYERNAME,
+-                                property_name) != NC_NOERR)
+-            {
+-                // if doesn't exist, then just use the variable name
+-                if (nc_inq_varname(this->nc, curr, property_name) != NC_NOERR)
++            if (NCDFGetAttr(this->nc, curr, OGR_SG_ORIGINAL_LAYERNAME,
++                            property_name) != CE_None)
++            {
++                // if it doesn't exist, then just use the variable name
++                property_name.resize(NC_MAX_NAME + 1, 0);
++
++                if (nc_inq_varname(this->nc, curr, property_name.data()) !=
++                    NC_NOERR)
+                 {
+                     throw SG_Exception_General_Malformed(contname);
+                 }
+             }
+ 
+             std::string n(property_name);
+             v_ids.push_back(curr);
+             v_headers.push_back(n);
+         }
+     }
+ }
+ 
+@@ -874,77 +840,77 @@
+ SG_Exception::~SG_Exception()
+ {
+ }
+ 
+ // Helpers
+ // following is a short hand for a clean up and exit, since goto isn't allowed
+ double getCFVersion(int ncid)
+ {
+     double ver = -1.0;
+     std::string attrVal;
+ 
+     // Fetch the CF attribute
+-    if (attrf(ncid, NC_GLOBAL, NCDF_CONVENTIONS, attrVal) == "")
++    if (NCDFGetAttr(ncid, NC_GLOBAL, NCDF_CONVENTIONS, attrVal) != CE_None ||
++        attrVal.empty())
+     {
+         return ver;
+     }
+ 
+     if (sscanf(attrVal.c_str(), "CF-%lf", &ver) != 1)
+     {
+         return -1.0;
+     }
+ 
+     return ver;
+ }
+ 
+ geom_t getGeometryType(int ncid, int varid)
+ {
+     geom_t ret = UNSUPPORTED;
+     std::string gt_name_s;
+-    const char *gt_name =
+-        attrf(ncid, varid, CF_SG_GEOMETRY_TYPE, gt_name_s).c_str();
+-
+-    if (gt_name[0] == '\0')
++
++    if (NCDFGetAttr(ncid, varid, CF_SG_GEOMETRY_TYPE, gt_name_s) != CE_None ||
++        gt_name_s.empty())
+     {
+         return NONE;
+     }
+ 
+     // Points
+-    if (!strcmp(gt_name, CF_SG_TYPE_POINT))
++    if (!strcmp(gt_name_s.c_str(), CF_SG_TYPE_POINT))
+     {
+         // Node Count not present? Assume that it is a multipoint.
+         if (nc_inq_att(ncid, varid, CF_SG_NODE_COUNT, nullptr, nullptr) ==
+             NC_ENOTATT)
+         {
+             ret = POINT;
+         }
+         else
+             ret = MULTIPOINT;
+     }
+ 
+     // Lines
+-    else if (!strcmp(gt_name, CF_SG_TYPE_LINE))
++    else if (!strcmp(gt_name_s.c_str(), CF_SG_TYPE_LINE))
+     {
+         // Part Node Count present? Assume multiline
+         if (nc_inq_att(ncid, varid, CF_SG_PART_NODE_COUNT, nullptr, nullptr) ==
+             NC_ENOTATT)
+         {
+             ret = LINE;
+         }
+         else
+             ret = MULTILINE;
+     }
+ 
+     // Polygons
+-    else if (!strcmp(gt_name, CF_SG_TYPE_POLY))
++    else if (!strcmp(gt_name_s.c_str(), CF_SG_TYPE_POLY))
+     {
+         /* Polygons versus MultiPolygons, slightly ambiguous
+          * Part Node Count & no Interior Ring - MultiPolygon
+          * no Part Node Count & no Interior Ring - Polygon
+          * Part Node Count & Interior Ring - assume that it is a MultiPolygon
+          */
+         int pnc_present =
+             nc_inq_att(ncid, varid, CF_SG_PART_NODE_COUNT, nullptr, nullptr);
+         int ir_present =
+             nc_inq_att(ncid, varid, CF_SG_INTERIOR_RING, nullptr, nullptr);
+ 
+         if (pnc_present == NC_ENOTATT && ir_present == NC_ENOTATT)
+@@ -1084,38 +1050,36 @@
+ }
+ 
+ int scanForGeometryContainers(int ncid, std::set<int> &r_ids)
+ {
+     int nvars;
+     if (nc_inq_nvars(ncid, &nvars) != NC_NOERR)
+     {
+         return -1;
+     }
+ 
+     r_ids.clear();
+ 
+-    // For each variable check for geometry attribute
+-    // If has geometry attribute, then check the associated variable ID
+-
++    // For each variable check for a geometry attribute
++    // If it has geometry attribute, then check the associated variable ID
++    std::string buf;
+     for (int itr = 0; itr < nvars; itr++)
+     {
+-        char c[NC_MAX_CHAR];
+-        memset(c, 0, NC_MAX_CHAR);
+-        if (nc_get_att_text(ncid, itr, CF_SG_GEOMETRY, c) != NC_NOERR)
++        if (NCDFGetAttr(ncid, itr, CF_SG_GEOMETRY, buf) != CE_None)
+         {
+             continue;
+         }
+ 
+         int varID;
+-        if (nc_inq_varid(ncid, c, &varID) != NC_NOERR)
++        if (nc_inq_varid(ncid, buf.c_str(), &varID) != NC_NOERR)
+         {
+             continue;
+         }
+ 
+         // Now have variable ID. See if vector contains it, and if not
+         // insert
+         r_ids.insert(varID);  // It's a set. No big deal sets don't allow
+                               // duplicates anyways
+     }
+ 
+     return 0;
+ }

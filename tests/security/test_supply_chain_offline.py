@@ -54,7 +54,7 @@ class SupplyChainTests(unittest.TestCase):
         self.assertTrue(one['local_integrity_ok'])
         self.assertEqual(len(one['python']),38);self.assertEqual(len(one['node']['locked']),0)
         self.assertEqual(one['node']['source_status'],'absent_retired')
-        self.assertEqual(len(one['vendors']['files']),20)
+        self.assertEqual(len(one['vendors']['files']),21)
         parsers = {row['name']: row for row in one['python'] if row['name'] in ('pypdf', 'pillow')}
         self.assertEqual({name: row['declared_version'] for name, row in parsers.items()},
                          {'pypdf': '6.21.4', 'pillow': '13.0.0'})
@@ -79,8 +79,23 @@ class SupplyChainTests(unittest.TestCase):
             self.assertEqual(row['sha256'],hashlib.sha256((ROOT/row['path']).read_bytes()).hexdigest())
             self.assertTrue(row['matches_local_baseline'])
             self.assertEqual(row['upstream_authenticity'],'not_verified')
-        excel=next(p for p in report['files'] if p['path'].endswith('exceljs-4.4.0.min.js'))
-        self.assertFalse(excel['version_literal_present'],'filename/README must not become an internal version assertion')
+        excel=next(p for p in report['files'] if p['path'].endswith('exceljs-4.4.0-ssalfer.min.js'))
+        self.assertEqual(excel['sha256'],chain.audit(ROOT)['exceljs']['sha256'])
+        self.assertTrue(chain.audit(ROOT)['exceljs']['local_bundle_and_lock_coherent'])
+
+    def test_native_inventory_cannot_select_old_pa_revision(self):
+        root=self.fixture();path=root/'docs/security/ss09/native-pa5.json'
+        obj=json.loads(path.read_text());obj['packages'][0]['version']='3.10.3+dfsg-1+pa4'
+        path.write_text(json.dumps(obj));report=chain.audit(root)
+        self.assertFalse(report['local_integrity_ok'])
+        self.assertIn('NATIVE_SELECTION_DRIFT',report['issues'])
+
+    def test_reconstructed_exceljs_lock_drift_fails_closed(self):
+        root=self.fixture();path=root/'frontend-ssalfer/tools/exceljs/package-lock.json'
+        path.write_text(path.read_text()+'\n')
+        report=chain.audit(root)
+        self.assertFalse(report['local_integrity_ok'])
+        self.assertIn('EXCELJS_BUNDLE_OR_LOCK_DRIFT',report['issues'])
 
     def test_synthetic_vendor_alteration_is_detected_without_accepting_new_hash(self):
         root=self.fixture();path=root/'frontend-ssalfer/js/vendor/leaflet-1.9.4/leaflet.js'

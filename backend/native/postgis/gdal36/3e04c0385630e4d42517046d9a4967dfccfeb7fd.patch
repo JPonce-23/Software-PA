@@ -1,0 +1,247 @@
+From 3e04c0385630e4d42517046d9a4967dfccfeb7fd Mon Sep 17 00:00:00 2001
+From: Even Rouault <even.rouault@spatialys.com>
+Date: Mon, 20 Apr 2026 10:55:13 +0200
+Subject: [PATCH] HDF4-EOS: fix 2 heap-buffer-overflow
+
+Fixes #14398
+Fixes #14399
+---
+ autotest/gcore/data/hdf4/issue_14398.he4 | Bin 0 -> 3853 bytes
+ autotest/gcore/data/hdf4/issue_14399.he4 | Bin 0 -> 3852 bytes
+ autotest/gcore/hdf4_read.py              |  54 +++++++----------------
+ autotest/gcore/hdf4multidim.py           |  38 ++++++++--------
+ frmts/hdf4/hdf-eos/GDapi.c               |  21 ++++++---
+ frmts/hdf4/hdf-eos/SWapi.c               |  19 +++++---
+ 6 files changed, 64 insertions(+), 68 deletions(-)
+ create mode 100644 autotest/gcore/data/hdf4/issue_14398.he4
+ create mode 100644 autotest/gcore/data/hdf4/issue_14399.he4
+
+diff --git a/autotest/gcore/data/hdf4/issue_14398.he4 b/autotest/gcore/data/hdf4/issue_14398.he4
+new file mode 100644
+index 0000000000000000000000000000000000000000..801078cfe11eaea1b3242d997996512be8540ca8
+GIT binary patch
+literal 3853
+zcmeHK&u<bz6n?uDwhJv1O&U#%S-EJF27%Tz#u7_QX=9)@h1O_H$O2PKrG@M+l6vwV
+z@b0<CnqIxtqw%K3L=*2G{1ZIsH?zyKQ2cT5xZ8C3_M12JzW4Uc=1nwkL85oWuPY=G
+zse3?=<Tn%mehVB^UeOrvXW%jASm3X~3(5%viNaIBS78$Zo_B0GzU|m3z+J~?{HJqa
+zopJCl!Oznksle~~T=`VsPry_12a>^m2ads482AV90(?b?A~%WTBdh~F`33wEY$k}J
+zmw>atlfVywXMv-@FMy|k&jG&%z5yHq{sw%FN8Z!sV>=Um9{fD`HQ?8PUju#(_%-k!
+zY5@HWdJXhdL~FUcw#^K)(K^uP60_PSYckzrT5?9qv#Qb2jYBPcYeq{a({tSZZ`YmY
+zM2j$5#BC867kVdL5`0Q@QFxXpw5>Ng%%t%h{Rzu8_LHRI4l<cY33Dz^2$V#p*S8CC
+z>qOEu0{9mPsXsahxk6Gj!U1>2)dwB*6Qx{9d#W1^z1n0L3*mWNH@KM)&4o)rO%lqu
+zI$5-qyuHM~XleN`T1@#PI7K<Z-!b?-`4r7&kQ6kf0gR}a87XeA<_o!s#Y~Im&G1IQ
+zy1B7+FH`F3)^5o%IyI|fu(0Z|_p{}-N-C_XVtifSXPJ2MP&~xJ+E%Nqm2a?S9mL9d
+zu5yO72_&5z@FIbky0LV3Wx1SjIpIU)FVMEJJ!RW%Fx(LYG@h|cl0)ue^!zhyT1*{U
+z^}*npsoyWkr}rarmjUa9q+5C~ayO(N*9)olY==~4`)y|EJjr%kIgFPN+bomIua_(N
+z!bY|{>&h-POe=Fe?&M)6E~HNnC!yy-c=YJ)@vhz?Gaj?LP;Bx=oP2p`N3@4=-g&=(
+zY}sNFA#X^HXX=n1&j`Htb(WkW^Du+O$oB+E@)7?4;Etmbia1-?S}9S?F4-cp^g6=D
+zrdG0+HBjH;6EG(B2X=_q8DSi>F1K5?irF>mJI%Uj)OIVaR<&z1ESA`1a}-+6<-MB(
+z0?wn%o2{B|@$a0S!;u^pYkzjcp)bN;aL<0=!8OF0Q0yp;OK(&=*rp>G*F0dyf<s{x
+Q2SCNyjuaGm<W{!(Uv3))O#lD@
+
+literal 0
+HcmV?d00001
+
+diff --git a/autotest/gcore/data/hdf4/issue_14399.he4 b/autotest/gcore/data/hdf4/issue_14399.he4
+new file mode 100644
+index 0000000000000000000000000000000000000000..45b5c7a6308ca5d97ac869efe78059a4541577c4
+GIT binary patch
+literal 3852
+zcmeHK%}x_h6h1RR%M=8R32|Y}&=n-uv;{+qOr$WhYFbL#LNqaHrtJj=3vFhm5?uKZ
+zE_?<IkAO?#PK}8R!wcvexYF<3nU>)v>cVAjGq>M-_uPBFd*<B9nX!Qz3Vk4Mw@D$=
+zc7dL$?`Qz{J@7>IEe!&H1s;qZN&F3XF?vixM6pTWDcD4S7Xll`_XC?K@IhcR{3~c!
+zXBhk&@C&p{8t_M+tDZ>w1$a{ZL@N02z!UHl1O5rT2wx*aBX^0^Q>+6#b{+gOY(|00
+zz!~6cz^{R4fX9GOfbRg01OEV?;@x)j^syg_ejNI7=;uH`2l_eC&w+jp{O24%eS^9K
+zbrsP=Gplb3$F*Dg`g~$eFNvnGT%jjt^{l8l9m_e?)AwfebTU29_J3;+UJ)(9XbIgC
+zFdAwnGzC5tx+y&?6xp<z9pTdOmi1hi_Fj@S^dOUolr(2?QlKI$y)(NATPKn|BY=N#
+zkou#8NKZ(Lu5iH4Sp86-eza_s^%s_7TeYUZSOoW*mcwRJGz(XTbVVv-b*d~axxB<B
+zOIrR%iK%`D7mXg{cLaV{JwdTKL{Su_0~paTbEHtpW%Fj$6RyW`bHcmNm5LkdM$WMt
+zWzXr<y^bSdT0oW_nblNG(|B~v+7m{+aL70g?g^r3q>?~SduXHG7EWGldFw5E-z#{I
+zYfQt}EUp<C=358CDcRdQ!BC3FxZ}Zfr?o5U9<s>DtyI>lxz!?AUkDtCeNHeiT5<XD
+z>Pp4vaZ;hi58t=(g=X4qFf3Hl%JxfPuu^Sx&8%KM{}P*)Q!lK_TMex#w}17bJe|E=
+z-ax=uo|Uylv%zk<&bwT9OWk{aOBJz)@LK$Yd<`bXD~D}inAx>THJdMHDsw&AdE51j
+z>39%_*|?O>fj+0V>p^-9>Fx5c_w^Qpvn?7@u^W;cq65((CP<mH<nv|AMWnn7YC=;l
+z=n0L$`<c$1pP?b*TpsgjB1JvrR|k50WFh@C`Hj^wP59Yf5T4b*X7M_RW<2lQ$&fFP
+zL3y%pw&a<L;S=pvyH&4lH{8Znv*9}RoocI9J8*1IBzD9+MOMr#GFp1}-#+r&Z-k$f
+r?uU=g-LR!JBpT<lrLzpX*1=)DO!SOZmWA)aF^c#{k_I^zXKsH3k_`(o
+
+literal 0
+HcmV?d00001
+
+diff --git a/autotest/gcore/hdf4_read.py b/autotest/gcore/hdf4_read.py
+index 15c4ebb16ebd..f57117f2554a 100755
+--- a/autotest/gcore/hdf4_read.py
++++ b/autotest/gcore/hdf4_read.py
+@@ -598,48 +598,24 @@ def test_hdf4_gcp_nodata():
+ 
+ 
+ ###############################################################################
+-# Test bugfix for https://github.com/OSGeo/gdal/issues/14356
++# Test bugfix for various crashes
+ 
+ 
+-def test_hdf4_gh_14356():
+-
+-    if gdaltest.hdf4_drv is None:
+-        pytest.skip()
+-
+-    gdal.Open("data/hdf4/issue_14356.he4")
+-
+-
+-###############################################################################
+-# Test bugfix for https://github.com/OSGeo/gdal/issues/14363
+-
+-
+-def test_hdf4_gh_14363():
+-
+-    if gdaltest.hdf4_drv is None:
+-        pytest.skip()
+-
+-    gdal.Open("data/hdf4/issue_14363.he4")
+-
+-
+-###############################################################################
+-# Test bugfix for https://github.com/OSGeo/gdal/issues/14378
+-
+-
+-def test_hdf4_gh_14378():
+-
+-    if gdaltest.hdf4_drv is None:
+-        pytest.skip()
+-
+-    gdal.Open("data/hdf4/issue_14378.he4")
+-
+-
+-###############################################################################
+-# Test bugfix for https://github.com/OSGeo/gdal/issues/14379
+-
+-
+-def test_hdf4_gh_14379():
++@pytest.mark.parametrize(
++    "filename",
++    [
++        "data/hdf4/issue_14356.he4",
++        "data/hdf4/issue_14363.he4",
++        "data/hdf4/issue_14378.he4",
++        "data/hdf4/issue_14379.he4",
++        "data/hdf4/issue_14398.he4",
++        "data/hdf4/issue_14399.he4",
++    ],
++)
++def test_hdf4_gh_crashes(filename):
+ 
+     if gdaltest.hdf4_drv is None:
+         pytest.skip()
+ 
+-    gdal.Open("data/hdf4/issue_14379.he4")
++    with gdaltest.disable_exceptions(), gdal.quiet_errors():
++        gdal.Open(filename)
+diff --git a/autotest/gcore/hdf4multidim.py b/autotest/gcore/hdf4multidim.py
+index 88808da754a9..27155985439d 100644
+--- a/autotest/gcore/hdf4multidim.py
++++ b/autotest/gcore/hdf4multidim.py
+@@ -533,22 +533,24 @@ def get_lut():
+ 
+ 
+ ###############################################################################
+-# Test bugfix for https://github.com/OSGeo/gdal/issues/14356
+-
+-
+-def test_hdf4_multidim_gh_14356():
+-
+-    ds = gdal.OpenEx("data/hdf4/issue_14356.he4", gdal.OF_MULTIDIM_RASTER)
+-
+-    gdal.MultiDimInfo(ds)
+-
+-
+-###############################################################################
+-# Test bugfix for https://github.com/OSGeo/gdal/issues/14363
+-
+-
+-def test_hdf4_multidim_gh_14363():
+-
+-    ds = gdal.OpenEx("data/hdf4/issue_14363.he4", gdal.OF_MULTIDIM_RASTER)
+-
++# Test bugfix for various crashes
++
++
++@pytest.mark.parametrize(
++    "filename",
++    [
++        "data/hdf4/issue_14356.he4",
++        "data/hdf4/issue_14363.he4",
++        "data/hdf4/issue_14378.he4",
++        "data/hdf4/issue_14379.he4",
++        "data/hdf4/issue_14398.he4",
++        "data/hdf4/issue_14399.he4",
++    ],
++)
++def test_hdf4multidim_gh_crashes(filename):
++
++    if gdaltest.hdf4_drv is None:
++        pytest.skip()
++
++    ds = gdal.OpenEx(filename, gdal.OF_MULTIDIM_RASTER)
+     gdal.MultiDimInfo(ds)
+diff --git a/frmts/hdf4/hdf-eos/GDapi.c b/frmts/hdf4/hdf-eos/GDapi.c
+index 564f5a524da9..0442ed430d23 100644
+--- a/frmts/hdf4/hdf-eos/GDapi.c
++++ b/frmts/hdf4/hdf-eos/GDapi.c
+@@ -1979,12 +1979,21 @@ GDSDfldsrch(int32 gridID, int32 sdInterfaceID, const char *fieldname,
+ 		}
+ #endif
+ 
+-		/* Get field list and strip off leading and trailing quotes */
+-		/* -------------------------------------------------------- */
+-		EHgetmetavalue(metaptrs, "FieldList", name);
+-		memmove(name, name + 1, strlen(name) - 2);
+-		name[strlen(name) - 2] = 0;
+-
++        /* Get field list and strip off leading and trailing quotes */
++        /* -------------------------------------------------------- */
++        if (EHgetmetavalue(metaptrs, "FieldList", name) == 0)
++        {
++            const size_t len = strlen(name);
++            if (len >= 2 && name[0] == '"' && name[len-1] == '"')
++            {
++                memmove(name, name + 1, strlen(name) - 2);
++                name[strlen(name) - 2] = 0;
++            }
++        }
++        else
++        {
++            name[0] = '\0';
++        }
+ 
+ 		/* Search for desired field within merged field list */
+ 		/* ------------------------------------------------- */
+diff --git a/frmts/hdf4/hdf-eos/SWapi.c b/frmts/hdf4/hdf-eos/SWapi.c
+index 6fe7b5915710..cf0ef0148d59 100644
+--- a/frmts/hdf4/hdf-eos/SWapi.c
++++ b/frmts/hdf4/hdf-eos/SWapi.c
+@@ -3083,11 +3083,20 @@ SWSDfldsrch(int32 swathID, int32 sdInterfaceID, const char *fieldname,
+ 		    metaptrs[0] = strstr(oldmetaptr, utlstr);
+ 		}
+ 
+-
+-		/* Get field list and strip off leading and trailing quotes */
+-		EHgetmetavalue(metaptrs, "FieldList", name);  /* not return status --xhua */
+-		memmove(name, name + 1, strlen(name) - 2);
+-		name[strlen(name) - 2] = 0;
++        /* Get field list and strip off leading and trailing quotes */
++        if (EHgetmetavalue(metaptrs, "FieldList", name) == 0)
++        {
++            const size_t len = strlen(name);
++            if (len >= 2 && name[0] == '"' && name[len-1] == '"')
++            {
++                memmove(name, name + 1, strlen(name) - 2);
++                name[strlen(name) - 2] = 0;
++            }
++        }
++        else
++        {
++            name[0] = '\0';
++        }
+ 
+ 		/* Search for desired field within merged field list */
+ 		snprintf(utlstr, UTLSTR_MAX_SIZE, "%s%s%s", "\"", fieldname, "\"");

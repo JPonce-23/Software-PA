@@ -2,7 +2,6 @@
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
@@ -307,16 +306,13 @@ def test_foreign_target_not_visible(docs, role):
         expected=403, json={"titulo": "Ajeno"})
 
 
-def test_health_030(docs):
-    assert docs.api("GET", "/health").json() == {"status": "ok", "schema": 30}
+def test_health_current_schema(docs):
+    assert docs.api("GET", "/health").json() == {"status": "ok", "schema": 35}
 
 
-def test_existing_document_version_regression_isolated(docs):
-    from .test_documents_dashboard import test_document_version_is_immutable_and_downloadable
-    with TestClient(app, raise_server_exceptions=False) as client:
-        test_document_version_is_immutable_and_downloadable(
-            client, {}, docs.api, {"project_nucleus": docs.pn},
-        )
+# The upload regression runs in test_document_upload_independent.py. This
+# module's outer transaction holds writer locks until teardown; the production
+# authorization fence correctly rejects uploads while those locks exist.
 
 
 @pytest.mark.parametrize("name", [

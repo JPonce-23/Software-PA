@@ -1,0 +1,1541 @@
+[
+  {
+    "package": "libexpat1",
+    "version": "2.9.0-1~deb13u1",
+    "architecture": "amd64",
+    "filename": "libexpat1_2.9.0-1~deb13u1_amd64.deb",
+    "sha256": "feff874772cae904ae4d24e917b35664952bec4b4ae9100a4edda5a7fa746832",
+    "size": 125744,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/e/expat/libexpat1_2.9.0-1~deb13u1_amd64.deb"
+  },
+  {
+    "package": "zlib1g",
+    "version": "1:1.3.dfsg+really1.3.1-1+deb13u1",
+    "architecture": "amd64",
+    "filename": "zlib1g_1%3a1.3.dfsg+really1.3.1-1+deb13u1_amd64.deb",
+    "sha256": "8c27c342230503b73dfde629642c3b352e87b554e06d60cf58772f236a305ceb",
+    "size": 88720,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/z/zlib/zlib1g_1.3.dfsg+really1.3.1-1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libproc2-0",
+    "version": "2:4.0.4-9",
+    "architecture": "amd64",
+    "filename": "libproc2-0_2%3a4.0.4-9_amd64.deb",
+    "sha256": "c9d61caab1b2ddfc3f17edb95be31b9809fcb2daf27d853dff615bc4ebd08b4b",
+    "size": 65596,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/procps/libproc2-0_4.0.4-9_amd64.deb"
+  },
+  {
+    "package": "procps",
+    "version": "2:4.0.4-9",
+    "architecture": "amd64",
+    "filename": "procps_2%3a4.0.4-9_amd64.deb",
+    "sha256": "4db90bb6776772fc52585d6b1fbfc52ec2a85480e1b4363b743fbb2ffa2a5375",
+    "size": 882088,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/procps/procps_4.0.4-9_amd64.deb"
+  },
+  {
+    "package": "bzip2",
+    "version": "1.0.8-6",
+    "architecture": "amd64",
+    "filename": "bzip2_1.0.8-6_amd64.deb",
+    "sha256": "6b5fbe71f0fc41e85919bc4b3c514e6c47577c5005dbf1f5af6e4a49cc221aab",
+    "size": 40520,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/bzip2/bzip2_1.0.8-6_amd64.deb"
+  },
+  {
+    "package": "ca-certificates",
+    "version": "20250419+deb13u1",
+    "architecture": "all",
+    "filename": "ca-certificates_20250419+deb13u1_all.deb",
+    "sha256": "c10585ac22c7f617a73d394eea29ba71d0356f350ae973b19043d1b017f80f54",
+    "size": 160720,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/c/ca-certificates/ca-certificates_20250419+deb13u1_all.deb"
+  },
+  {
+    "package": "perl-modules-5.40",
+    "version": "5.40.1-6+deb13u1",
+    "architecture": "all",
+    "filename": "perl-modules-5.40_5.40.1-6+deb13u1_all.deb",
+    "sha256": "4c46cdd8f3135aa1c95f07e817f8e5d9be590687441ac1c27e3a8c49400f35ce",
+    "size": 3013728,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/perl/perl-modules-5.40_5.40.1-6+deb13u1_all.deb"
+  },
+  {
+    "package": "libgdbm-compat4t64",
+    "version": "1.24-2",
+    "architecture": "amd64",
+    "filename": "libgdbm-compat4t64_1.24-2_amd64.deb",
+    "sha256": "2cbd43cf2dfbf57ff48188b5d79d29cf7ea8f0dedaa61ab0bcc02eceff50ea01",
+    "size": 50280,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gdbm/libgdbm-compat4t64_1.24-2_amd64.deb"
+  },
+  {
+    "package": "libperl5.40",
+    "version": "5.40.1-6+deb13u1",
+    "architecture": "amd64",
+    "filename": "libperl5.40_5.40.1-6+deb13u1_amd64.deb",
+    "sha256": "e44777ff47ad248d1debd57e1f96ab5e89061a341008ae39880ba3b5fc15f273",
+    "size": 4325996,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/perl/libperl5.40_5.40.1-6+deb13u1_amd64.deb"
+  },
+  {
+    "package": "perl",
+    "version": "5.40.1-6+deb13u1",
+    "architecture": "amd64",
+    "filename": "perl_5.40.1-6+deb13u1_amd64.deb",
+    "sha256": "ef145c247787d6f40dcdefd5b417502484827cde0d555998c17fd5b27ec1e1dd",
+    "size": 267736,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/perl/perl_5.40.1-6+deb13u1_amd64.deb"
+  },
+  {
+    "package": "xz-utils",
+    "version": "5.8.1-1+deb13u2",
+    "architecture": "amd64",
+    "filename": "xz-utils_5.8.1-1+deb13u2_amd64.deb",
+    "sha256": "66b060ef2f09722c947ba019da5e9a63f6bac9d7bf90b32339a72c0390acc53f",
+    "size": 659760,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/x/xz-utils/xz-utils_5.8.1-1+deb13u2_amd64.deb"
+  },
+  {
+    "package": "libsframe1",
+    "version": "2.44-3",
+    "architecture": "amd64",
+    "filename": "libsframe1_2.44-3_amd64.deb",
+    "sha256": "38f625dfdc582717029ac3a3e97c51d994ec2e7a0e9b230c6b44e40d1276311f",
+    "size": 78360,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/binutils/libsframe1_2.44-3_amd64.deb"
+  },
+  {
+    "package": "binutils-common",
+    "version": "2.44-3",
+    "architecture": "amd64",
+    "filename": "binutils-common_2.44-3_amd64.deb",
+    "sha256": "002da5d23f8757dee97a2c0a40e0e1d4d85a43da094488ee2ee7068d4d3691f9",
+    "size": 2508768,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/binutils/binutils-common_2.44-3_amd64.deb"
+  },
+  {
+    "package": "libbinutils",
+    "version": "2.44-3",
+    "architecture": "amd64",
+    "filename": "libbinutils_2.44-3_amd64.deb",
+    "sha256": "4f4664c8a8f0ad0c8631c39fab02e3d8d86ccc6f4436a1d59f059dbcb0492679",
+    "size": 534440,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/binutils/libbinutils_2.44-3_amd64.deb"
+  },
+  {
+    "package": "libgprofng0",
+    "version": "2.44-3",
+    "architecture": "amd64",
+    "filename": "libgprofng0_2.44-3_amd64.deb",
+    "sha256": "0d36d0bde85c467ac6735dded08e19dd30ae1369e3908b9eb48ccc0d6ff66648",
+    "size": 807764,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/binutils/libgprofng0_2.44-3_amd64.deb"
+  },
+  {
+    "package": "libctf-nobfd0",
+    "version": "2.44-3",
+    "architecture": "amd64",
+    "filename": "libctf-nobfd0_2.44-3_amd64.deb",
+    "sha256": "e280b2be3db6e584500e865c251605b95c346767d87ccb2524e44992048fc657",
+    "size": 155672,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/binutils/libctf-nobfd0_2.44-3_amd64.deb"
+  },
+  {
+    "package": "libctf0",
+    "version": "2.44-3",
+    "architecture": "amd64",
+    "filename": "libctf0_2.44-3_amd64.deb",
+    "sha256": "120cafcd93132a276fa92a8fb4cf39b23d14e5a3e348f4f5580638d71ca95ac5",
+    "size": 88616,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/binutils/libctf0_2.44-3_amd64.deb"
+  },
+  {
+    "package": "libjansson4",
+    "version": "2.14-2+b3",
+    "architecture": "amd64",
+    "filename": "libjansson4_2.14-2+b3_amd64.deb",
+    "sha256": "60707a62fe6c1228c3389b12a13ca4efd76defc5532473e547a29e99cf7d2a6e",
+    "size": 39792,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/j/jansson/libjansson4_2.14-2+b3_amd64.deb"
+  },
+  {
+    "package": "binutils-x86-64-linux-gnu",
+    "version": "2.44-3",
+    "architecture": "amd64",
+    "filename": "binutils-x86-64-linux-gnu_2.44-3_amd64.deb",
+    "sha256": "e6741ce95ff0f7a131c8d9faa3528ccbbc453078bbc62a97da81340ed7462c53",
+    "size": 1013844,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/binutils/binutils-x86-64-linux-gnu_2.44-3_amd64.deb"
+  },
+  {
+    "package": "binutils",
+    "version": "2.44-3",
+    "architecture": "amd64",
+    "filename": "binutils_2.44-3_amd64.deb",
+    "sha256": "6bc08c02539ba53b5e748142397144c499f9b20b5fa9bb56431545db124addeb",
+    "size": 265400,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/binutils/binutils_2.44-3_amd64.deb"
+  },
+  {
+    "package": "libc-dev-bin",
+    "version": "2.41-12+deb13u4",
+    "architecture": "amd64",
+    "filename": "libc-dev-bin_2.41-12+deb13u4_amd64.deb",
+    "sha256": "2c21175d6a8283ed566d154c0c0bc06f60836e53b0b9e1f74c14eac586b68c24",
+    "size": 59960,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/glibc/libc-dev-bin_2.41-12+deb13u4_amd64.deb"
+  },
+  {
+    "package": "linux-libc-dev",
+    "version": "6.12.117-1",
+    "architecture": "all",
+    "filename": "linux-libc-dev_6.12.117-1_all.deb",
+    "sha256": "8b4848725a2705e5b1612f2135c44300716690ba762368ab87df127e9a5ed416",
+    "size": 3085840,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/l/linux/linux-libc-dev_6.12.117-1_all.deb"
+  },
+  {
+    "package": "libcrypt-dev",
+    "version": "1:4.4.38-1",
+    "architecture": "amd64",
+    "filename": "libcrypt-dev_1%3a4.4.38-1_amd64.deb",
+    "sha256": "98e2333aea8d64ca68f9b75c16256d3a05492fd8f9e6dba96adbc6f19e4f5a09",
+    "size": 119040,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libx/libxcrypt/libcrypt-dev_4.4.38-1_amd64.deb"
+  },
+  {
+    "package": "rpcsvc-proto",
+    "version": "1.4.3-1",
+    "architecture": "amd64",
+    "filename": "rpcsvc-proto_1.4.3-1_amd64.deb",
+    "sha256": "32ac0692694f8a34cc90c895f4fc739680fb2ef0e2d4870a68833682bf1c81a3",
+    "size": 63268,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/r/rpcsvc-proto/rpcsvc-proto_1.4.3-1_amd64.deb"
+  },
+  {
+    "package": "libc6-dev",
+    "version": "2.41-12+deb13u4",
+    "architecture": "amd64",
+    "filename": "libc6-dev_2.41-12+deb13u4_amd64.deb",
+    "sha256": "1fda734dabcd80b77266a09ab62b0f1e3e16d8091db62899890b2200745632a2",
+    "size": 1994660,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/glibc/libc6-dev_2.41-12+deb13u4_amd64.deb"
+  },
+  {
+    "package": "libisl23",
+    "version": "0.27-1",
+    "architecture": "amd64",
+    "filename": "libisl23_0.27-1_amd64.deb",
+    "sha256": "ac8518042e81c00de1effb72bba7e88ac4ecd488f7ea8b9e3ebc63159cb53b35",
+    "size": 659152,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/i/isl/libisl23_0.27-1_amd64.deb"
+  },
+  {
+    "package": "libmpfr6",
+    "version": "4.2.2-1",
+    "architecture": "amd64",
+    "filename": "libmpfr6_4.2.2-1_amd64.deb",
+    "sha256": "75dddce11dabc7fc543712c33dc27b7f2ee66a111763eb5eac654d010b42cd92",
+    "size": 729320,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/m/mpfr4/libmpfr6_4.2.2-1_amd64.deb"
+  },
+  {
+    "package": "libmpc3",
+    "version": "1.3.1-1+b3",
+    "architecture": "amd64",
+    "filename": "libmpc3_1.3.1-1+b3_amd64.deb",
+    "sha256": "2af0a5c128e03694a41c0b011bd8a958b7297436cdb3a15ddad7866dae8c300b",
+    "size": 52244,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/m/mpclib3/libmpc3_1.3.1-1+b3_amd64.deb"
+  },
+  {
+    "package": "cpp-14-x86-64-linux-gnu",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "cpp-14-x86-64-linux-gnu_14.2.0-19_amd64.deb",
+    "sha256": "ef274b5379f5f97fc71619d39ecc84d039d3e184570d207b909c90afaa5d79e0",
+    "size": 11047460,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/cpp-14-x86-64-linux-gnu_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "cpp-14",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "cpp-14_14.2.0-19_amd64.deb",
+    "sha256": "3bae5fe03c56c6d021900ab4fb79e35c6f75eee72a73fccc6f28a39db559d6a0",
+    "size": 1280,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/cpp-14_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "cpp-x86-64-linux-gnu",
+    "version": "4:14.2.0-1",
+    "architecture": "amd64",
+    "filename": "cpp-x86-64-linux-gnu_4%3a14.2.0-1_amd64.deb",
+    "sha256": "d902f484e38bce59e82efc0df2fe20139a0932ca759ecafdfe6e5b6c72238eb8",
+    "size": 4840,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-defaults/cpp-x86-64-linux-gnu_14.2.0-1_amd64.deb"
+  },
+  {
+    "package": "cpp",
+    "version": "4:14.2.0-1",
+    "architecture": "amd64",
+    "filename": "cpp_4%3a14.2.0-1_amd64.deb",
+    "sha256": "a6ba40550aadec80437813e0fce5516574945ff40e72306a5b378c03af3a6544",
+    "size": 1568,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-defaults/cpp_14.2.0-1_amd64.deb"
+  },
+  {
+    "package": "libcc1-0",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libcc1-0_14.2.0-19_amd64.deb",
+    "sha256": "2d587e3bfba4aec701946b7ba0c1640b97b6d8dd0a34ba1c70ae85261ecedefa",
+    "size": 42796,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libcc1-0_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "libgomp1",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libgomp1_14.2.0-19_amd64.deb",
+    "sha256": "72b7a1a33c48f3195efeb044111b34ae684b1e640bb6495c832443b798601cd5",
+    "size": 137148,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libgomp1_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "libitm1",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libitm1_14.2.0-19_amd64.deb",
+    "sha256": "febdb3c528cde1a3abe952e17a1d3cfa7ccaca5b6f506d983d34385dad199490",
+    "size": 25956,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libitm1_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "libatomic1",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libatomic1_14.2.0-19_amd64.deb",
+    "sha256": "212b399aae2f7299203d261a57e49372e09565a9a5ea971905f94a3960366c05",
+    "size": 9308,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libatomic1_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "libasan8",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libasan8_14.2.0-19_amd64.deb",
+    "sha256": "771899ade7310fe31aa538a509354c33d62bbe4e408b4e5fc1e513988dc42645",
+    "size": 2725272,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libasan8_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "liblsan0",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "liblsan0_14.2.0-19_amd64.deb",
+    "sha256": "a0df07da76287a45e665d584363dc2a6a1c4e240aee41b8bbc0f67cdff97cd68",
+    "size": 1204164,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/liblsan0_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "libtsan2",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libtsan2_14.2.0-19_amd64.deb",
+    "sha256": "529d7f68227d16975076c5f842e8b687faea1b5df8e0dcf62e436d5402844ca5",
+    "size": 2460216,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libtsan2_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "libubsan1",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libubsan1_14.2.0-19_amd64.deb",
+    "sha256": "9205a1bef7d6a52ffc06548e0cde169ff303e688c12d9be3a98f734449077e22",
+    "size": 1074340,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libubsan1_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "libhwasan0",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libhwasan0_14.2.0-19_amd64.deb",
+    "sha256": "2cdaf797cad8ac30a964ab081370682dd065ae1b0305a0be9d8e0e14cd0657d7",
+    "size": 1487768,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libhwasan0_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "libquadmath0",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libquadmath0_14.2.0-19_amd64.deb",
+    "sha256": "f5b51cf0ece3ec3bb7494d0cdbff3ce715ae00cfb2b6ed787f7db91319d64a7b",
+    "size": 145068,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libquadmath0_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "libgcc-14-dev",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libgcc-14-dev_14.2.0-19_amd64.deb",
+    "sha256": "ca6f2d36d96b19b3eb71405b0b80134d8c89380b02204a2512e5c58ceb090628",
+    "size": 2672328,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libgcc-14-dev_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "gcc-14-x86-64-linux-gnu",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "gcc-14-x86-64-linux-gnu_14.2.0-19_amd64.deb",
+    "sha256": "a17ef039f1ba482051c3efb5c2c24070002e60dd0bd09fd456ec31481a11b725",
+    "size": 21389968,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/gcc-14-x86-64-linux-gnu_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "gcc-14",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "gcc-14_14.2.0-19_amd64.deb",
+    "sha256": "21500408b5019d8d29f70ce58488e2eea469a1adb4b5fd7db45e819b5efcac4e",
+    "size": 540064,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/gcc-14_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "gcc-x86-64-linux-gnu",
+    "version": "4:14.2.0-1",
+    "architecture": "amd64",
+    "filename": "gcc-x86-64-linux-gnu_4%3a14.2.0-1_amd64.deb",
+    "sha256": "04c28c2760b0094b3d7758154ac095303dd00599b63ebad4086a325b607308b7",
+    "size": 1436,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-defaults/gcc-x86-64-linux-gnu_14.2.0-1_amd64.deb"
+  },
+  {
+    "package": "gcc",
+    "version": "4:14.2.0-1",
+    "architecture": "amd64",
+    "filename": "gcc_4%3a14.2.0-1_amd64.deb",
+    "sha256": "eee65c41a441c57c05f754ced1b9d093956966a1c7da9938c3ec00d3dc2f905d",
+    "size": 5136,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-defaults/gcc_14.2.0-1_amd64.deb"
+  },
+  {
+    "package": "libstdc++-14-dev",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "libstdc++-14-dev_14.2.0-19_amd64.deb",
+    "sha256": "4b962fac5f1af0bd8b1b3f97e0f47b9d8e9a79e88802143f00ebfbd78ad87a7b",
+    "size": 2375760,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/libstdc++-14-dev_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "g++-14-x86-64-linux-gnu",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "g++-14-x86-64-linux-gnu_14.2.0-19_amd64.deb",
+    "sha256": "c66b009fedd340520279d1af2f91d0668e9f64f0c08fe62179ca1c75e556be58",
+    "size": 12114812,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/g++-14-x86-64-linux-gnu_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "g++-14",
+    "version": "14.2.0-19",
+    "architecture": "amd64",
+    "filename": "g++-14_14.2.0-19_amd64.deb",
+    "sha256": "4706ab29eab3d81e93582b45b229fdedc71f1eec3071996a448cf2c8beb83f3a",
+    "size": 22544,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-14/g++-14_14.2.0-19_amd64.deb"
+  },
+  {
+    "package": "g++-x86-64-linux-gnu",
+    "version": "4:14.2.0-1",
+    "architecture": "amd64",
+    "filename": "g++-x86-64-linux-gnu_4%3a14.2.0-1_amd64.deb",
+    "sha256": "15e10fc3948ec76be8d51b23e75ad9df9c39588c94f1f47059cee02c117c7583",
+    "size": 1200,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-defaults/g++-x86-64-linux-gnu_14.2.0-1_amd64.deb"
+  },
+  {
+    "package": "g++",
+    "version": "4:14.2.0-1",
+    "architecture": "amd64",
+    "filename": "g++_4%3a14.2.0-1_amd64.deb",
+    "sha256": "f86661c021ab2acb39ceb87315e7c2d4d420fdadc19945d5d589f3953410445c",
+    "size": 1344,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gcc-defaults/g++_14.2.0-1_amd64.deb"
+  },
+  {
+    "package": "make",
+    "version": "4.4.1-2",
+    "architecture": "amd64",
+    "filename": "make_4.4.1-2_amd64.deb",
+    "sha256": "70a9709e665383b06068ccd423d62ea191b65355f318a25565dbf324b254cec6",
+    "size": 463104,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/m/make-dfsg/make_4.4.1-2_amd64.deb"
+  },
+  {
+    "package": "libdpkg-perl",
+    "version": "1.22.22",
+    "architecture": "all",
+    "filename": "libdpkg-perl_1.22.22_all.deb",
+    "sha256": "b41eaeb4879091023f8c1a058510844a244d3d0bd0f437e0e05d58213e36fd9f",
+    "size": 650808,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/d/dpkg/libdpkg-perl_1.22.22_all.deb"
+  },
+  {
+    "package": "patch",
+    "version": "2.8-2",
+    "architecture": "amd64",
+    "filename": "patch_2.8-2_amd64.deb",
+    "sha256": "80c46a0085b33acc74bf451fddb6a70cb43d4ebcc4a873aec04d8d0a63ffc630",
+    "size": 134328,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/patch/patch_2.8-2_amd64.deb"
+  },
+  {
+    "package": "dpkg-dev",
+    "version": "1.22.22",
+    "architecture": "all",
+    "filename": "dpkg-dev_1.22.22_all.deb",
+    "sha256": "6d4020421740a70e1fb9c41b07f8bb8306d93aef6fea1a8ce11a1f839921f414",
+    "size": 1337268,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/d/dpkg/dpkg-dev_1.22.22_all.deb"
+  },
+  {
+    "package": "build-essential",
+    "version": "12.12",
+    "architecture": "amd64",
+    "filename": "build-essential_12.12_amd64.deb",
+    "sha256": "a45159aebea0d98d6652ac5a56b7fff164a7733a7dc736b9f8715ca504519d3a",
+    "size": 4624,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/build-essential/build-essential_12.12_amd64.deb"
+  },
+  {
+    "package": "cmake-data",
+    "version": "3.31.6-2",
+    "architecture": "all",
+    "filename": "cmake-data_3.31.6-2_all.deb",
+    "sha256": "d9060145be892f43cd1888024114ceab019c81479d4b0a3383fe14cebe2295cb",
+    "size": 2268208,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/c/cmake/cmake-data_3.31.6-2_all.deb"
+  },
+  {
+    "package": "libxml2",
+    "version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+    "architecture": "amd64",
+    "filename": "libxml2_2.12.7+dfsg+really2.9.14-2.1+deb13u3_amd64.deb",
+    "sha256": "e0c6b63ce4602a036a526f60fe5e6c1586710688058d98fc1001b9b3147b7efd",
+    "size": 699724,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libx/libxml2/libxml2_2.12.7+dfsg+really2.9.14-2.1+deb13u3_amd64.deb"
+  },
+  {
+    "package": "libarchive13t64",
+    "version": "3.7.4-4+deb13u1",
+    "architecture": "amd64",
+    "filename": "libarchive13t64_3.7.4-4+deb13u1_amd64.deb",
+    "sha256": "12e06195a899e8db371803ed70111fc7302573d3ed84e967d3d48ef2d543ace8",
+    "size": 350192,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/liba/libarchive/libarchive13t64_3.7.4-4+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libbrotli1",
+    "version": "1.1.0-2+deb13u1",
+    "architecture": "amd64",
+    "filename": "libbrotli1_1.1.0-2+deb13u1_amd64.deb",
+    "sha256": "db46824c60fee46aff3cc0be3e5f736bc606cae669b1fb17516a41e8073251a9",
+    "size": 303640,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/b/brotli/libbrotli1_1.1.0-2+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libkrb5support0",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "libkrb5support0_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "3a0acd8b37955c0e102c756b52c97df2a31f67b96453c35dab70df218d309117",
+    "size": 33124,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/libkrb5support0_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libcom-err2",
+    "version": "1.47.2-3+b12",
+    "architecture": "amd64",
+    "filename": "libcom-err2_1.47.2-3+b12_amd64.deb",
+    "sha256": "bd43e020b8fed399db3eebf098111f10fba4c436fff99ccad72cc7e27c9764ec",
+    "size": 25036,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/e/e2fsprogs/libcom-err2_1.47.2-3+b12_amd64.deb"
+  },
+  {
+    "package": "libk5crypto3",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "libk5crypto3_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "7da07ee674b47f1f0be7cc89317c25310086a1f1761217d0f72e6ae2c5a69b84",
+    "size": 81152,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/libk5crypto3_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libkeyutils1",
+    "version": "1.6.3-6",
+    "architecture": "amd64",
+    "filename": "libkeyutils1_1.6.3-6_amd64.deb",
+    "sha256": "0b11ad17be0300b63ad4eeb4c6450fed24d34b7b740f23e5363dcb29ee6d5eba",
+    "size": 9456,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/keyutils/libkeyutils1_1.6.3-6_amd64.deb"
+  },
+  {
+    "package": "libkrb5-3",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "libkrb5-3_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "47d71d6a7f2e59b9bae5f89602397594805113b95889ad18fa703cd53abafc97",
+    "size": 326056,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/libkrb5-3_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libgssapi-krb5-2",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "libgssapi-krb5-2_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "30847c1fde4240567d7ed3aeab4f655dd591203758b857e85e824045aae70299",
+    "size": 138356,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/libgssapi-krb5-2_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libunistring5",
+    "version": "1.3-2",
+    "architecture": "amd64",
+    "filename": "libunistring5_1.3-2_amd64.deb",
+    "sha256": "6dd3490bef06ea1096f32d10766b7e016cf579bfae8451d1b7df15ce05b8aa46",
+    "size": 476768,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libu/libunistring/libunistring5_1.3-2_amd64.deb"
+  },
+  {
+    "package": "libidn2-0",
+    "version": "2.3.8-2",
+    "architecture": "amd64",
+    "filename": "libidn2-0_2.3.8-2_amd64.deb",
+    "sha256": "90b039bcdc4578f8e1c4935adf8dbb525e36a164deefdbbb8c45bac347d48278",
+    "size": 109096,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libi/libidn2/libidn2-0_2.3.8-2_amd64.deb"
+  },
+  {
+    "package": "libsasl2-modules-db",
+    "version": "2.1.28+dfsg1-9",
+    "architecture": "amd64",
+    "filename": "libsasl2-modules-db_2.1.28+dfsg1-9_amd64.deb",
+    "sha256": "a5c38659fbd62c33c6d9bfa2be43e75a572d1818531aad32dd74d0a58cc4bd19",
+    "size": 19768,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/c/cyrus-sasl2/libsasl2-modules-db_2.1.28+dfsg1-9_amd64.deb"
+  },
+  {
+    "package": "libsasl2-2",
+    "version": "2.1.28+dfsg1-9",
+    "architecture": "amd64",
+    "filename": "libsasl2-2_2.1.28+dfsg1-9_amd64.deb",
+    "sha256": "66e49d7ae026811b49a0050f18b0325960a2625ffd1ff60d91b7844a815fa9d2",
+    "size": 57512,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/c/cyrus-sasl2/libsasl2-2_2.1.28+dfsg1-9_amd64.deb"
+  },
+  {
+    "package": "libldap2",
+    "version": "2.6.10+dfsg-1",
+    "architecture": "amd64",
+    "filename": "libldap2_2.6.10+dfsg-1_amd64.deb",
+    "sha256": "60069e4a550ca890113fa89d3001417781b18e146ec5d637d31e368dec9909bd",
+    "size": 193576,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/o/openldap/libldap2_2.6.10+dfsg-1_amd64.deb"
+  },
+  {
+    "package": "libnghttp2-14",
+    "version": "1.64.0-1.1+deb13u1",
+    "architecture": "amd64",
+    "filename": "libnghttp2-14_1.64.0-1.1+deb13u1_amd64.deb",
+    "sha256": "896cb217537c09251fb909b8541349010ac279d802d871e98c06a62a2c67ce2c",
+    "size": 76188,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/n/nghttp2/libnghttp2-14_1.64.0-1.1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libnghttp3-9",
+    "version": "1.8.0-1",
+    "architecture": "amd64",
+    "filename": "libnghttp3-9_1.8.0-1_amd64.deb",
+    "sha256": "388e4c33b72829cbf0d098afdc8539fa5ba7458eddb077f5538fdb4d5538716b",
+    "size": 67656,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/n/nghttp3/libnghttp3-9_1.8.0-1_amd64.deb"
+  },
+  {
+    "package": "libpsl5t64",
+    "version": "0.21.2-1.1+b1",
+    "architecture": "amd64",
+    "filename": "libpsl5t64_0.21.2-1.1+b1_amd64.deb",
+    "sha256": "59d42bb1f9ebc0d1776fe616efb08a7a8568b05982e00f70b03c63863db768ab",
+    "size": 57188,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libp/libpsl/libpsl5t64_0.21.2-1.1+b1_amd64.deb"
+  },
+  {
+    "package": "libp11-kit0",
+    "version": "0.25.5-3",
+    "architecture": "amd64",
+    "filename": "libp11-kit0_0.25.5-3_amd64.deb",
+    "sha256": "784bf2063e166c8bc851a32623b74ebd85c499043a9d57c5bbd64fa63447f45a",
+    "size": 425240,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/p11-kit/libp11-kit0_0.25.5-3_amd64.deb"
+  },
+  {
+    "package": "libtasn1-6",
+    "version": "4.20.0-2+deb13u1",
+    "architecture": "amd64",
+    "filename": "libtasn1-6_4.20.0-2+deb13u1_amd64.deb",
+    "sha256": "23fec6e06583ce2bad9b2c04c9b485e90440e259b1abf8677cd80d3ce60831ad",
+    "size": 50112,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libt/libtasn1-6/libtasn1-6_4.20.0-2+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libgnutls30t64",
+    "version": "3.8.9-3+deb13u4",
+    "architecture": "amd64",
+    "filename": "libgnutls30t64_3.8.9-3+deb13u4_amd64.deb",
+    "sha256": "18a8bdfd91c7e3bcb01719d55a2b56849c7160b34f1f52b1c4fdfdd41bf1352b",
+    "size": 1469024,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gnutls28/libgnutls30t64_3.8.9-3+deb13u4_amd64.deb"
+  },
+  {
+    "package": "librtmp1",
+    "version": "2.4+20151223.gitfa8646d.1-2+b5",
+    "architecture": "amd64",
+    "filename": "librtmp1_2.4+20151223.gitfa8646d.1-2+b5_amd64.deb",
+    "sha256": "93baa2004cbe6c8721b9e81beed078612540aef120970b4751305c51c6697368",
+    "size": 58840,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/r/rtmpdump/librtmp1_2.4+20151223.gitfa8646d.1-2+b5_amd64.deb"
+  },
+  {
+    "package": "libssh2-1t64",
+    "version": "1.11.1-1+deb13u2",
+    "architecture": "amd64",
+    "filename": "libssh2-1t64_1.11.1-1+deb13u2_amd64.deb",
+    "sha256": "dbb1024c192d4d292b7cfa902b96076cfe81b56a5eed4fb28da36e8bf543e49a",
+    "size": 245240,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libs/libssh2/libssh2-1t64_1.11.1-1+deb13u2_amd64.deb"
+  },
+  {
+    "package": "libcurl4t64",
+    "version": "8.14.1-2+deb13u7",
+    "architecture": "amd64",
+    "filename": "libcurl4t64_8.14.1-2+deb13u7_amd64.deb",
+    "sha256": "4f89bd3e7a33bbd8f7422817a8a8e2233c9e194fda9c331e33bf98705f525bfc",
+    "size": 391640,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/c/curl/libcurl4t64_8.14.1-2+deb13u7_amd64.deb"
+  },
+  {
+    "package": "libjsoncpp26",
+    "version": "1.9.6-3",
+    "architecture": "amd64",
+    "filename": "libjsoncpp26_1.9.6-3_amd64.deb",
+    "sha256": "fd0b75839fe7b1a08df49e4203b1fb042df4f7d982db8d91c1fd7bdbcd4b1460",
+    "size": 81684,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libj/libjsoncpp/libjsoncpp26_1.9.6-3_amd64.deb"
+  },
+  {
+    "package": "librhash1",
+    "version": "1.4.5-1",
+    "architecture": "amd64",
+    "filename": "librhash1_1.4.5-1_amd64.deb",
+    "sha256": "9bf56d7d8ce3e7680a0dd8e3cfe8acdf50e0aa3b98b0a907cf744a4d1711af72",
+    "size": 132184,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/r/rhash/librhash1_1.4.5-1_amd64.deb"
+  },
+  {
+    "package": "libuv1t64",
+    "version": "1.50.0-2",
+    "architecture": "amd64",
+    "filename": "libuv1t64_1.50.0-2_amd64.deb",
+    "sha256": "5fec8035002e0c745b64d1c5b3e1dc42790d1a77574315b976cf3e4aab9ddc0a",
+    "size": 153752,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libu/libuv1/libuv1t64_1.50.0-2_amd64.deb"
+  },
+  {
+    "package": "cmake",
+    "version": "3.31.6-2",
+    "architecture": "amd64",
+    "filename": "cmake_3.31.6-2_amd64.deb",
+    "sha256": "dee2fc94973325240604ffbca677a3f16b462fb6520946bd81be1ecbac770a02",
+    "size": 11969144,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/c/cmake/cmake_3.31.6-2_amd64.deb"
+  },
+  {
+    "package": "comerr-dev",
+    "version": "2.1-1.47.2-3+b12",
+    "architecture": "amd64",
+    "filename": "comerr-dev_2.1-1.47.2-3+b12_amd64.deb",
+    "sha256": "8edac804c86b5c0713497af4a692caae425cee95bb7931256a57b7393b4be90a",
+    "size": 56720,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/e/e2fsprogs/comerr-dev_2.1-1.47.2-3+b12_amd64.deb"
+  },
+  {
+    "package": "curl",
+    "version": "8.14.1-2+deb13u7",
+    "architecture": "amd64",
+    "filename": "curl_8.14.1-2+deb13u7_amd64.deb",
+    "sha256": "135636bd8b713c582d33e50ec4e36ea55cc3c5da3f12bbeb6b87d2bcbd3a0649",
+    "size": 270212,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/c/curl/curl_8.14.1-2+deb13u7_amd64.deb"
+  },
+  {
+    "package": "libgssrpc4t64",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "libgssrpc4t64_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "ff88e52a6b6599851f3d44f7223f15123d9e5a0b02ed9a308c05c31fa88f7d73",
+    "size": 60132,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/libgssrpc4t64_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libkadm5clnt-mit12",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "libkadm5clnt-mit12_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "9d1271f9ef8d3d308e1d9373cccc59de0e2b2b62b0ddd39cffd76cb18af24bb2",
+    "size": 42648,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/libkadm5clnt-mit12_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libkdb5-10t64",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "libkdb5-10t64_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "d6d4ec516fe87c545862b117bc5cec294cabf06319c400720ec6c01bc215b79f",
+    "size": 42788,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/libkdb5-10t64_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libkadm5srv-mit12",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "libkadm5srv-mit12_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "ab608b7692bcb980957c2dc83da291fa58e065955fdc6c0882c66d26502693ca",
+    "size": 54440,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/libkadm5srv-mit12_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "krb5-multidev",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "krb5-multidev_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "8f8735ab56020070d8d448c13d214f6d6ba5a2c1d4661b24fa3ba63491cb3f80",
+    "size": 126392,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/krb5-multidev_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libboost1.83-dev",
+    "version": "1.83.0-4.2",
+    "architecture": "amd64",
+    "filename": "libboost1.83-dev_1.83.0-4.2_amd64.deb",
+    "sha256": "1f11fc6fb2ffe9378a0f0ebc8f2fd9223fb958b4a40bb9381c67a8857d947ca3",
+    "size": 10588968,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/boost1.83/libboost1.83-dev_1.83.0-4.2_amd64.deb"
+  },
+  {
+    "package": "libboost-dev",
+    "version": "1.83.0.2+b2",
+    "architecture": "amd64",
+    "filename": "libboost-dev_1.83.0.2+b2_amd64.deb",
+    "sha256": "00a8b3f70dc56337e2e516b7fc05a1ee2e916b7fdf2ba8a9d89a068ea8878df0",
+    "size": 3836,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/b/boost-defaults/libboost-dev_1.83.0.2+b2_amd64.deb"
+  },
+  {
+    "package": "libbrotli-dev",
+    "version": "1.1.0-2+deb13u1",
+    "architecture": "amd64",
+    "filename": "libbrotli-dev_1.1.0-2+deb13u1_amd64.deb",
+    "sha256": "e2caf8700d5b786049bec7eeadf57dd2d8dc8523084f957e74e2e6dbba166fee",
+    "size": 395536,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/b/brotli/libbrotli-dev_1.1.0-2+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libngtcp2-16",
+    "version": "1.11.0-1+deb13u1",
+    "architecture": "amd64",
+    "filename": "libngtcp2-16_1.11.0-1+deb13u1_amd64.deb",
+    "sha256": "627eec81ebbd48c4e6091f5cd9dc5070b792b7075000eed60ab08c7daa961caf",
+    "size": 131904,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/n/ngtcp2/libngtcp2-16_1.11.0-1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libngtcp2-crypto-gnutls8",
+    "version": "1.11.0-1+deb13u1",
+    "architecture": "amd64",
+    "filename": "libngtcp2-crypto-gnutls8_1.11.0-1+deb13u1_amd64.deb",
+    "sha256": "2a7f109c0c4db6a800e4661c5e5e34e1f1f83c8162482276183d1ada9da7c96c",
+    "size": 29524,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/n/ngtcp2/libngtcp2-crypto-gnutls8_1.11.0-1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libcurl3t64-gnutls",
+    "version": "8.14.1-2+deb13u7",
+    "architecture": "amd64",
+    "filename": "libcurl3t64-gnutls_8.14.1-2+deb13u7_amd64.deb",
+    "sha256": "9475c591b338b81859ee6d06bf2a9fbb01b52f184c235afa7f6e7f1652136e55",
+    "size": 384636,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/c/curl/libcurl3t64-gnutls_8.14.1-2+deb13u7_amd64.deb"
+  },
+  {
+    "package": "libevent-2.1-7t64",
+    "version": "2.1.13-stable-1~deb13u1",
+    "architecture": "amd64",
+    "filename": "libevent-2.1-7t64_2.1.13-stable-1~deb13u1_amd64.deb",
+    "sha256": "9a2a9a6c4ceaafe280f8f39ffa217bb50719c5e79feb75f412755c4036a76ca0",
+    "size": 182984,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/libe/libevent/libevent-2.1-7t64_2.1.13-stable-1~deb13u1_amd64.deb"
+  },
+  {
+    "package": "libunbound8",
+    "version": "1.26.2-0+deb13u1",
+    "architecture": "amd64",
+    "filename": "libunbound8_1.26.2-0+deb13u1_amd64.deb",
+    "sha256": "5b057b041a39f40208ddf9aeff1b5581a6c3af68c9a96c784a0d6270f1943a1a",
+    "size": 644244,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/u/unbound/libunbound8_1.26.2-0+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libgnutls-dane0t64",
+    "version": "3.8.9-3+deb13u4",
+    "architecture": "amd64",
+    "filename": "libgnutls-dane0t64_3.8.9-3+deb13u4_amd64.deb",
+    "sha256": "119a357b321614be7e17655cccbf767bd55b136d1ad722d3e80fb99d862fe2f4",
+    "size": 455908,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gnutls28/libgnutls-dane0t64_3.8.9-3+deb13u4_amd64.deb"
+  },
+  {
+    "package": "libgnutls-openssl27t64",
+    "version": "3.8.9-3+deb13u4",
+    "architecture": "amd64",
+    "filename": "libgnutls-openssl27t64_3.8.9-3+deb13u4_amd64.deb",
+    "sha256": "b7d1252b21d4e10bb46dcd97b5f8dd5a6412f166e945f386bc908c9b2cb82b44",
+    "size": 455752,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gnutls28/libgnutls-openssl27t64_3.8.9-3+deb13u4_amd64.deb"
+  },
+  {
+    "package": "libidn2-dev",
+    "version": "2.3.8-2",
+    "architecture": "amd64",
+    "filename": "libidn2-dev_2.3.8-2_amd64.deb",
+    "sha256": "aeb3e0b149c7ca594065891c1f16e800689680f08f9119f90f95d1089f322a15",
+    "size": 102624,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libi/libidn2/libidn2-dev_2.3.8-2_amd64.deb"
+  },
+  {
+    "package": "libp11-kit-dev",
+    "version": "0.25.5-3",
+    "architecture": "amd64",
+    "filename": "libp11-kit-dev_0.25.5-3_amd64.deb",
+    "sha256": "6a19763ae89f584085cd7333f1923ccbd9eaeccb9fd2bf32e7cedd302e720b9a",
+    "size": 207740,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/p11-kit/libp11-kit-dev_0.25.5-3_amd64.deb"
+  },
+  {
+    "package": "libtasn1-6-dev",
+    "version": "4.20.0-2+deb13u1",
+    "architecture": "amd64",
+    "filename": "libtasn1-6-dev_4.20.0-2+deb13u1_amd64.deb",
+    "sha256": "5e00e22434b179100b94c80483eb22793029bf2d1c2fa40688825f0062395a54",
+    "size": 99324,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libt/libtasn1-6/libtasn1-6-dev_4.20.0-2+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libgmpxx4ldbl",
+    "version": "2:6.3.0+dfsg-3",
+    "architecture": "amd64",
+    "filename": "libgmpxx4ldbl_2%3a6.3.0+dfsg-3_amd64.deb",
+    "sha256": "344c4cc65d955ac1b0f0a390d8bf5ad288fb1fda9e9f31f86d43ea6098eae603",
+    "size": 329016,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gmp/libgmpxx4ldbl_6.3.0+dfsg-3_amd64.deb"
+  },
+  {
+    "package": "libgmp-dev",
+    "version": "2:6.3.0+dfsg-3",
+    "architecture": "amd64",
+    "filename": "libgmp-dev_2%3a6.3.0+dfsg-3_amd64.deb",
+    "sha256": "68f392cc03f896ecc3764eb4844d2a898ff016f47dda160465f152f811152b81",
+    "size": 642124,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gmp/libgmp-dev_6.3.0+dfsg-3_amd64.deb"
+  },
+  {
+    "package": "nettle-dev",
+    "version": "3.10.1-1",
+    "architecture": "amd64",
+    "filename": "nettle-dev_3.10.1-1_amd64.deb",
+    "sha256": "686dc13aaa2804161dbc7c916a664bf37fb7bb9a8128b6e025fa45ab06804e3a",
+    "size": 1317924,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/n/nettle/nettle-dev_3.10.1-1_amd64.deb"
+  },
+  {
+    "package": "libgnutls28-dev",
+    "version": "3.8.9-3+deb13u4",
+    "architecture": "amd64",
+    "filename": "libgnutls28-dev_3.8.9-3+deb13u4_amd64.deb",
+    "sha256": "f7048cead574f6142449a3b4089b042a42372a6b76d900324156ae97dbeb08ed",
+    "size": 1410552,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/gnutls28/libgnutls28-dev_3.8.9-3+deb13u4_amd64.deb"
+  },
+  {
+    "package": "libkrb5-dev",
+    "version": "1.21.3-5+deb13u1",
+    "architecture": "amd64",
+    "filename": "libkrb5-dev_1.21.3-5+deb13u1_amd64.deb",
+    "sha256": "62c3dbd746163878e73e22206d1dcc01f0f5296d3ca4ece5fb8cb7cb80396e4f",
+    "size": 16204,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/k/krb5/libkrb5-dev_1.21.3-5+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libldap-dev",
+    "version": "2.6.10+dfsg-1",
+    "architecture": "amd64",
+    "filename": "libldap-dev_2.6.10+dfsg-1_amd64.deb",
+    "sha256": "f8543c82b923b0e137a0843e57d6fb96e3b9ca3f2e98fdb6d65e8b6d9c20e592",
+    "size": 311848,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/o/openldap/libldap-dev_2.6.10+dfsg-1_amd64.deb"
+  },
+  {
+    "package": "libpkgconf3",
+    "version": "1.8.1-4",
+    "architecture": "amd64",
+    "filename": "libpkgconf3_1.8.1-4_amd64.deb",
+    "sha256": "85087cd04e57fd4ab7d6e816d348c335047823ab60c78878336b74f07b352ca1",
+    "size": 36436,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/pkgconf/libpkgconf3_1.8.1-4_amd64.deb"
+  },
+  {
+    "package": "pkgconf-bin",
+    "version": "1.8.1-4",
+    "architecture": "amd64",
+    "filename": "pkgconf-bin_1.8.1-4_amd64.deb",
+    "sha256": "54efef2aef4db5fcb5e0f5b7746465000c6a779b06f3686d0ec3d2a901b20aeb",
+    "size": 30220,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/pkgconf/pkgconf-bin_1.8.1-4_amd64.deb"
+  },
+  {
+    "package": "pkgconf",
+    "version": "1.8.1-4",
+    "architecture": "amd64",
+    "filename": "pkgconf_1.8.1-4_amd64.deb",
+    "sha256": "f1fcad470ca3ac80b4a0f4af6f03cd215089473996b07e508b3ee342bbb11af7",
+    "size": 26172,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/pkgconf/pkgconf_1.8.1-4_amd64.deb"
+  },
+  {
+    "package": "libnghttp2-dev",
+    "version": "1.64.0-1.1+deb13u1",
+    "architecture": "amd64",
+    "filename": "libnghttp2-dev_1.64.0-1.1+deb13u1_amd64.deb",
+    "sha256": "8729ae4b34c3884ecd068c66a7643a1c7a5a89597b9d8879bac85ec335df6179",
+    "size": 116548,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/n/nghttp2/libnghttp2-dev_1.64.0-1.1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libnghttp3-dev",
+    "version": "1.8.0-1",
+    "architecture": "amd64",
+    "filename": "libnghttp3-dev_1.8.0-1_amd64.deb",
+    "sha256": "47089a3bfde3562ea4524ceb768186045398012a466499268b8a5fb115b81a4e",
+    "size": 91280,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/n/nghttp3/libnghttp3-dev_1.8.0-1_amd64.deb"
+  },
+  {
+    "package": "libngtcp2-crypto-gnutls-dev",
+    "version": "1.11.0-1+deb13u1",
+    "architecture": "amd64",
+    "filename": "libngtcp2-crypto-gnutls-dev_1.11.0-1+deb13u1_amd64.deb",
+    "sha256": "813b822f0eeeb502c31bbb60d70c4aa1ef48e2b9055000ad02526b4a814dc2fe",
+    "size": 34384,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/n/ngtcp2/libngtcp2-crypto-gnutls-dev_1.11.0-1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libngtcp2-dev",
+    "version": "1.11.0-1+deb13u1",
+    "architecture": "amd64",
+    "filename": "libngtcp2-dev_1.11.0-1+deb13u1_amd64.deb",
+    "sha256": "456afe694be7a290f8ca0a38207f0ce203cf6460725d0194550188775f0f698e",
+    "size": 183444,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/n/ngtcp2/libngtcp2-dev_1.11.0-1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libpsl-dev",
+    "version": "0.21.2-1.1+b1",
+    "architecture": "amd64",
+    "filename": "libpsl-dev_0.21.2-1.1+b1_amd64.deb",
+    "sha256": "3f609ce40be2e3a259b98dd8b7f1b0520044ca495adf7d7b9f55f5d93de5a15e",
+    "size": 77628,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libp/libpsl/libpsl-dev_0.21.2-1.1+b1_amd64.deb"
+  },
+  {
+    "package": "zlib1g-dev",
+    "version": "1:1.3.dfsg+really1.3.1-1+deb13u1",
+    "architecture": "amd64",
+    "filename": "zlib1g-dev_1%3a1.3.dfsg+really1.3.1-1+deb13u1_amd64.deb",
+    "sha256": "88ebb839a7a54c97dceb647e2a2bfa2451d6f440801ceef3d56f654022637eb9",
+    "size": 919568,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/z/zlib/zlib1g-dev_1.3.dfsg+really1.3.1-1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "librtmp-dev",
+    "version": "2.4+20151223.gitfa8646d.1-2+b5",
+    "architecture": "amd64",
+    "filename": "librtmp-dev_2.4+20151223.gitfa8646d.1-2+b5_amd64.deb",
+    "sha256": "a888ac5f02cc5a51668a04d1d5477b6a1f29d32288c244839094dd7a26ac889c",
+    "size": 68032,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/r/rtmpdump/librtmp-dev_2.4+20151223.gitfa8646d.1-2+b5_amd64.deb"
+  },
+  {
+    "package": "libssl-dev",
+    "version": "3.5.7-1~deb13u3",
+    "architecture": "amd64",
+    "filename": "libssl-dev_3.5.7-1~deb13u3_amd64.deb",
+    "sha256": "c5f5f0383cac45209fefe85b3c3308e5ef6743663597d89bedcb96aaa06b8342",
+    "size": 2968412,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/o/openssl/libssl-dev_3.5.7-1~deb13u3_amd64.deb"
+  },
+  {
+    "package": "libssh2-1-dev",
+    "version": "1.11.1-1+deb13u2",
+    "architecture": "amd64",
+    "filename": "libssh2-1-dev_1.11.1-1+deb13u2_amd64.deb",
+    "sha256": "d3267add3544b2ad8fc28b9f57c462e85448045a049725e97e4ba1e59922ea7b",
+    "size": 393840,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libs/libssh2/libssh2-1-dev_1.11.1-1+deb13u2_amd64.deb"
+  },
+  {
+    "package": "libzstd-dev",
+    "version": "1.5.7+dfsg-1",
+    "architecture": "amd64",
+    "filename": "libzstd-dev_1.5.7+dfsg-1_amd64.deb",
+    "sha256": "de5f8aabcf4cb5cd1b441495ea4c24838e88ecbb30ae22c032a1b3b68a9d6f1e",
+    "size": 371112,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libz/libzstd/libzstd-dev_1.5.7+dfsg-1_amd64.deb"
+  },
+  {
+    "package": "libcurl4-gnutls-dev",
+    "version": "8.14.1-2+deb13u7",
+    "architecture": "amd64",
+    "filename": "libcurl4-gnutls-dev_8.14.1-2+deb13u7_amd64.deb",
+    "sha256": "2aa21dd4794f5f86da93fe9a26ccd3b2da1aea021dd68d2e0fa369d7aa5d95f6",
+    "size": 504168,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/c/curl/libcurl4-gnutls-dev_8.14.1-2+deb13u7_amd64.deb"
+  },
+  {
+    "package": "libdeflate0",
+    "version": "1.23-2",
+    "architecture": "amd64",
+    "filename": "libdeflate0_1.23-2_amd64.deb",
+    "sha256": "5fe37fb79d53f5c91da6ba3ac4c1a8453e1f2b1ff0e0ea45189c5338bbfdbf82",
+    "size": 47344,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libd/libdeflate/libdeflate0_1.23-2_amd64.deb"
+  },
+  {
+    "package": "libdeflate-dev",
+    "version": "1.23-2",
+    "architecture": "amd64",
+    "filename": "libdeflate-dev_1.23-2_amd64.deb",
+    "sha256": "839ad493dd3b100022bd85970db72de93a1e363182c99cd21c95dbbe5825159b",
+    "size": 55880,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libd/libdeflate/libdeflate-dev_1.23-2_amd64.deb"
+  },
+  {
+    "package": "libexpat1-dev",
+    "version": "2.9.0-1~deb13u1",
+    "architecture": "amd64",
+    "filename": "libexpat1-dev_2.9.0-1~deb13u1_amd64.deb",
+    "sha256": "f1fb8aa3165e8c8f20d9e37e1d421fe17eaeb647fcf8fe3305acf3afb315c677",
+    "size": 184304,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/e/expat/libexpat1-dev_2.9.0-1~deb13u1_amd64.deb"
+  },
+  {
+    "package": "libminizip1t64",
+    "version": "1:1.3.dfsg+really1.3.1-1+deb13u1",
+    "architecture": "amd64",
+    "filename": "libminizip1t64_1%3a1.3.dfsg+really1.3.1-1+deb13u1_amd64.deb",
+    "sha256": "141c00221b2e65e289729649b3d7fbab5231ac0339b8e3ad7aaca67e92d62f67",
+    "size": 53208,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/z/zlib/libminizip1t64_1.3.dfsg+really1.3.1-1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libfreexl1",
+    "version": "2.0.0-1+b3",
+    "architecture": "amd64",
+    "filename": "libfreexl1_2.0.0-1+b3_amd64.deb",
+    "sha256": "5e7fdf37e75f09542293732a06eb04849ef210a042515d46cb0f9213373eda93",
+    "size": 40020,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/f/freexl/libfreexl1_2.0.0-1+b3_amd64.deb"
+  },
+  {
+    "package": "libminizip-dev",
+    "version": "1:1.3.dfsg+really1.3.1-1+deb13u1",
+    "architecture": "amd64",
+    "filename": "libminizip-dev_1%3a1.3.dfsg+really1.3.1-1+deb13u1_amd64.deb",
+    "sha256": "89fc08d25a3f0feadfe75c874a4e9b093da0dedf091d896e018abc231aae9085",
+    "size": 60892,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/z/zlib/libminizip-dev_1.3.dfsg+really1.3.1-1+deb13u1_amd64.deb"
+  },
+  {
+    "package": "libfreexl-dev",
+    "version": "2.0.0-1+b3",
+    "architecture": "amd64",
+    "filename": "libfreexl-dev_2.0.0-1+b3_amd64.deb",
+    "sha256": "25d4e8c7722601f34023c0ba4e8f25ffa36102b8d0d637f5f37542e2f7c980c0",
+    "size": 42084,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/f/freexl/libfreexl-dev_2.0.0-1+b3_amd64.deb"
+  },
+  {
+    "package": "libgeos3.13.1",
+    "version": "3.13.1-1",
+    "architecture": "amd64",
+    "filename": "libgeos3.13.1_3.13.1-1_amd64.deb",
+    "sha256": "174b08f3092a8f10cf51d618d934d9703b88b4c51abf41d33535a12b7797e970",
+    "size": 970340,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/geos/libgeos3.13.1_3.13.1-1_amd64.deb"
+  },
+  {
+    "package": "libgeos-c1t64",
+    "version": "3.13.1-1",
+    "architecture": "amd64",
+    "filename": "libgeos-c1t64_3.13.1-1_amd64.deb",
+    "sha256": "a57f23882d8c3f28e3c7b757244a496264c2afde5a0e23a8196fe616b5667def",
+    "size": 102396,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/geos/libgeos-c1t64_3.13.1-1_amd64.deb"
+  },
+  {
+    "package": "libgeos-dev",
+    "version": "3.13.1-1",
+    "architecture": "amd64",
+    "filename": "libgeos-dev_3.13.1-1_amd64.deb",
+    "sha256": "2f6c0148678d67b3789a4b9357bd3427290763f4024c5a26028842f80b3e8c62",
+    "size": 58568,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/g/geos/libgeos-dev_3.13.1-1_amd64.deb"
+  },
+  {
+    "package": "libjbig0",
+    "version": "2.1-6.1+b2",
+    "architecture": "amd64",
+    "filename": "libjbig0_2.1-6.1+b2_amd64.deb",
+    "sha256": "95cbc44561651e1b3385454df08e8f2efe84498f6963a85259be2cc2fe798709",
+    "size": 32116,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/j/jbigkit/libjbig0_2.1-6.1+b2_amd64.deb"
+  },
+  {
+    "package": "libjbig-dev",
+    "version": "2.1-6.1+b2",
+    "architecture": "amd64",
+    "filename": "libjbig-dev_2.1-6.1+b2_amd64.deb",
+    "sha256": "058620479f5c2d6cab7f052264c42a6f6bd3f6806fc0bad37aa757738955861a",
+    "size": 31380,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/j/jbigkit/libjbig-dev_2.1-6.1+b2_amd64.deb"
+  },
+  {
+    "package": "libjpeg62-turbo",
+    "version": "1:2.1.5-4",
+    "architecture": "amd64",
+    "filename": "libjpeg62-turbo_1%3a2.1.5-4_amd64.deb",
+    "sha256": "5504299ad0e3c0a9ca9f962a68a650a040db52f9f416a109e74df48d55601d3f",
+    "size": 168152,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libj/libjpeg-turbo/libjpeg62-turbo_2.1.5-4_amd64.deb"
+  },
+  {
+    "package": "libjpeg62-turbo-dev",
+    "version": "1:2.1.5-4",
+    "architecture": "amd64",
+    "filename": "libjpeg62-turbo-dev_1%3a2.1.5-4_amd64.deb",
+    "sha256": "e687e3c8b24a3aa74974928b8e0b07f6df2442187492d85cbcea7dacd91e3aba",
+    "size": 291604,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libj/libjpeg-turbo/libjpeg62-turbo-dev_2.1.5-4_amd64.deb"
+  },
+  {
+    "package": "libjpeg-dev",
+    "version": "1:2.1.5-4",
+    "architecture": "amd64",
+    "filename": "libjpeg-dev_1%3a2.1.5-4_amd64.deb",
+    "sha256": "405e38b18e38a3904337c643b87e908ea743cb7348f13ba827dba55489f2cb38",
+    "size": 72204,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libj/libjpeg-turbo/libjpeg-dev_2.1.5-4_amd64.deb"
+  },
+  {
+    "package": "liburiparser1",
+    "version": "0.9.8+dfsg-2",
+    "architecture": "amd64",
+    "filename": "liburiparser1_0.9.8+dfsg-2_amd64.deb",
+    "sha256": "fd8f461644a9f6016e69ca41820d8789749d6b84b0ae5843bc48bdc5966310cf",
+    "size": 45464,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/u/uriparser/liburiparser1_0.9.8+dfsg-2_amd64.deb"
+  },
+  {
+    "package": "libkmlbase1t64",
+    "version": "1.3.0-12+b2",
+    "architecture": "amd64",
+    "filename": "libkmlbase1t64_1.3.0-12+b2_amd64.deb",
+    "sha256": "5dae3f953cb86da46609533d629283dc2396ab394d9c7cdd7c03b4c13a21dcc2",
+    "size": 50496,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libk/libkml/libkmlbase1t64_1.3.0-12+b2_amd64.deb"
+  },
+  {
+    "package": "libkmldom1t64",
+    "version": "1.3.0-12+b2",
+    "architecture": "amd64",
+    "filename": "libkmldom1t64_1.3.0-12+b2_amd64.deb",
+    "sha256": "6c131663720169bdb3bd5f280662723f2d31a878f28c088997aac0408cf431b1",
+    "size": 157512,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libk/libkml/libkmldom1t64_1.3.0-12+b2_amd64.deb"
+  },
+  {
+    "package": "libkmlengine1t64",
+    "version": "1.3.0-12+b2",
+    "architecture": "amd64",
+    "filename": "libkmlengine1t64_1.3.0-12+b2_amd64.deb",
+    "sha256": "ddfd90eb186c6bd4e18613c839f7e85d4eaa3d4e12e29ba5d5a8a25257f1009c",
+    "size": 80132,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libk/libkml/libkmlengine1t64_1.3.0-12+b2_amd64.deb"
+  },
+  {
+    "package": "libkmlconvenience1t64",
+    "version": "1.3.0-12+b2",
+    "architecture": "amd64",
+    "filename": "libkmlconvenience1t64_1.3.0-12+b2_amd64.deb",
+    "sha256": "55572732931d3c47113870e5b331ca21d3c565242277d65829b281eca7d85885",
+    "size": 49840,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libk/libkml/libkmlconvenience1t64_1.3.0-12+b2_amd64.deb"
+  },
+  {
+    "package": "libkmlregionator1t64",
+    "version": "1.3.0-12+b2",
+    "architecture": "amd64",
+    "filename": "libkmlregionator1t64_1.3.0-12+b2_amd64.deb",
+    "sha256": "e1bf7fd40357313e6854670b4cff90f4ab6f98a50a23d9dcdfa5d2da4a4727f1",
+    "size": 22760,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libk/libkml/libkmlregionator1t64_1.3.0-12+b2_amd64.deb"
+  },
+  {
+    "package": "libkmlxsd1t64",
+    "version": "1.3.0-12+b2",
+    "architecture": "amd64",
+    "filename": "libkmlxsd1t64_1.3.0-12+b2_amd64.deb",
+    "sha256": "5499202259821ddd05f5eb918b38d38babb73099e6bd505fe9e06fefad411fb8",
+    "size": 31072,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libk/libkml/libkmlxsd1t64_1.3.0-12+b2_amd64.deb"
+  },
+  {
+    "package": "liburiparser-dev",
+    "version": "0.9.8+dfsg-2",
+    "architecture": "amd64",
+    "filename": "liburiparser-dev_0.9.8+dfsg-2_amd64.deb",
+    "sha256": "38525847fa11b1da0be670c1bba37fc137b80ba2345c4975b68de91f39199be0",
+    "size": 26684,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/u/uriparser/liburiparser-dev_0.9.8+dfsg-2_amd64.deb"
+  },
+  {
+    "package": "libkml-dev",
+    "version": "1.3.0-12+b2",
+    "architecture": "amd64",
+    "filename": "libkml-dev_1.3.0-12+b2_amd64.deb",
+    "sha256": "3e110dd21f76cb93f576b6149cdff1f5ce786a9f5b64b259c2addab2abd7423b",
+    "size": 661936,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libk/libkml/libkml-dev_1.3.0-12+b2_amd64.deb"
+  },
+  {
+    "package": "liblerc4",
+    "version": "4.0.0+ds-5",
+    "architecture": "amd64",
+    "filename": "liblerc4_4.0.0+ds-5_amd64.deb",
+    "sha256": "2e0c13c0ddbde12968c2c713c2e0474a5b78e90d5216031256a725e8c76aa31c",
+    "size": 182976,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/l/lerc/liblerc4_4.0.0+ds-5_amd64.deb"
+  },
+  {
+    "package": "liblerc-dev",
+    "version": "4.0.0+ds-5",
+    "architecture": "amd64",
+    "filename": "liblerc-dev_4.0.0+ds-5_amd64.deb",
+    "sha256": "101ee2049de8e3931242bc4230da28053acc9c82d6f397b8fda11bcb957929ab",
+    "size": 183412,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/l/lerc/liblerc-dev_4.0.0+ds-5_amd64.deb"
+  },
+  {
+    "package": "liblzma-dev",
+    "version": "5.8.1-1+deb13u2",
+    "architecture": "amd64",
+    "filename": "liblzma-dev_5.8.1-1+deb13u2_amd64.deb",
+    "sha256": "7b5104b0418b2e958447f74c135841aefda555293ac7f7494cfc7a16b7180816",
+    "size": 348376,
+    "origin": "https://snapshot.debian.org/archive/debian-security/20261119T000000Z/pool/updates/main/x/xz-utils/liblzma-dev_5.8.1-1+deb13u2_amd64.deb"
+  },
+  {
+    "package": "proj-data",
+    "version": "9.6.0-1",
+    "architecture": "all",
+    "filename": "proj-data_9.6.0-1_all.deb",
+    "sha256": "1b916075d1276853018c2dfb60eb3ea504e1bf5d312ff37d3805cca5243244b5",
+    "size": 6303116,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/proj/proj-data_9.6.0-1_all.deb"
+  },
+  {
+    "package": "libsharpyuv0",
+    "version": "1.5.0-0.1",
+    "architecture": "amd64",
+    "filename": "libsharpyuv0_1.5.0-0.1_amd64.deb",
+    "sha256": "51934833d909588f7761fd84362114e90d8d2d38af57edf5df5c4a705e037547",
+    "size": 115612,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libw/libwebp/libsharpyuv0_1.5.0-0.1_amd64.deb"
+  },
+  {
+    "package": "libwebp7",
+    "version": "1.5.0-0.1",
+    "architecture": "amd64",
+    "filename": "libwebp7_1.5.0-0.1_amd64.deb",
+    "sha256": "c749744b04abdd1426b0c7718e516362c03a557c5151662092d6d4f2cef6e7c1",
+    "size": 317856,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libw/libwebp/libwebp7_1.5.0-0.1_amd64.deb"
+  },
+  {
+    "package": "libtiff6",
+    "version": "4.7.0-3+deb13u3",
+    "architecture": "amd64",
+    "filename": "libtiff6_4.7.0-3+deb13u3_amd64.deb",
+    "sha256": "6bb2038f36817ae1ee6d33df03917b21835dcc2e0f3e3e80a71390e83c171173",
+    "size": 345492,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/t/tiff/libtiff6_4.7.0-3+deb13u3_amd64.deb"
+  },
+  {
+    "package": "libproj25",
+    "version": "9.6.0-1",
+    "architecture": "amd64",
+    "filename": "libproj25_9.6.0-1_amd64.deb",
+    "sha256": "c6fafb82c6f55c091b54c19ef652eb695fbdd2bfac508e291d132276eefac143",
+    "size": 1452508,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/proj/libproj25_9.6.0-1_amd64.deb"
+  },
+  {
+    "package": "libsqlite3-dev",
+    "version": "3.46.1-7+deb13u2",
+    "architecture": "amd64",
+    "filename": "libsqlite3-dev_3.46.1-7+deb13u2_amd64.deb",
+    "sha256": "56e1945d52292b506c1f0bcb77543fea289ccee857c478dcddded40226e1594d",
+    "size": 1109400,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/s/sqlite3/libsqlite3-dev_3.46.1-7+deb13u2_amd64.deb"
+  },
+  {
+    "package": "libwebpdemux2",
+    "version": "1.5.0-0.1",
+    "architecture": "amd64",
+    "filename": "libwebpdemux2_1.5.0-0.1_amd64.deb",
+    "sha256": "b6e4aba184b2c3f7ce88b3e49557fe0c38c909df54528ebe5e167ad651f0f593",
+    "size": 113392,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libw/libwebp/libwebpdemux2_1.5.0-0.1_amd64.deb"
+  },
+  {
+    "package": "libwebpmux3",
+    "version": "1.5.0-0.1",
+    "architecture": "amd64",
+    "filename": "libwebpmux3_1.5.0-0.1_amd64.deb",
+    "sha256": "8bc86d509406ad496b6414c7068b3dadc0f8c502027973cbf1765c7bb54fabdf",
+    "size": 126140,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libw/libwebp/libwebpmux3_1.5.0-0.1_amd64.deb"
+  },
+  {
+    "package": "libwebpdecoder3",
+    "version": "1.5.0-0.1",
+    "architecture": "amd64",
+    "filename": "libwebpdecoder3_1.5.0-0.1_amd64.deb",
+    "sha256": "0f2fa9009be0856dc32297637b404b2733d209a13bf743c54a11c8b942f9fa0b",
+    "size": 207560,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libw/libwebp/libwebpdecoder3_1.5.0-0.1_amd64.deb"
+  },
+  {
+    "package": "libsharpyuv-dev",
+    "version": "1.5.0-0.1",
+    "architecture": "amd64",
+    "filename": "libsharpyuv-dev_1.5.0-0.1_amd64.deb",
+    "sha256": "4462f1e4e746e6117296d077c121d18977e719443e169f0547bb4bed203fe0d3",
+    "size": 119744,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libw/libwebp/libsharpyuv-dev_1.5.0-0.1_amd64.deb"
+  },
+  {
+    "package": "libwebp-dev",
+    "version": "1.5.0-0.1",
+    "architecture": "amd64",
+    "filename": "libwebp-dev_1.5.0-0.1_amd64.deb",
+    "sha256": "cac680fe731eb850575dbb29ecfc8a5d30faaec5979df939fee5f314dbaa5130",
+    "size": 449772,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libw/libwebp/libwebp-dev_1.5.0-0.1_amd64.deb"
+  },
+  {
+    "package": "libtiffxx6",
+    "version": "4.7.0-3+deb13u3",
+    "architecture": "amd64",
+    "filename": "libtiffxx6_4.7.0-3+deb13u3_amd64.deb",
+    "sha256": "64d1fa23128a6658b60150c4894e6a12406e4eb8e1209f6530d10c4ae811c338",
+    "size": 164076,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/t/tiff/libtiffxx6_4.7.0-3+deb13u3_amd64.deb"
+  },
+  {
+    "package": "libtiff-dev",
+    "version": "4.7.0-3+deb13u3",
+    "architecture": "amd64",
+    "filename": "libtiff-dev_4.7.0-3+deb13u3_amd64.deb",
+    "sha256": "06b5847f751423fa8dfe1a05dca9bdf1e6deb51fee254c5d2407ed4e32bb0a17",
+    "size": 488456,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/t/tiff/libtiff-dev_4.7.0-3+deb13u3_amd64.deb"
+  },
+  {
+    "package": "libproj-dev",
+    "version": "9.6.0-1",
+    "architecture": "amd64",
+    "filename": "libproj-dev_9.6.0-1_amd64.deb",
+    "sha256": "3637b5174d483cc670ce8b96eedadf1d6c4fe65fc00c45e1746c8a131fc7ecfd",
+    "size": 137404,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/p/proj/libproj-dev_9.6.0-1_amd64.deb"
+  },
+  {
+    "package": "librttopo1",
+    "version": "1.1.0-4",
+    "architecture": "amd64",
+    "filename": "librttopo1_1.1.0-4_amd64.deb",
+    "sha256": "9e99faa81ca826331acae79c4b4401edd96098d354c818efb00bdb51937535b5",
+    "size": 178748,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libr/librttopo/librttopo1_1.1.0-4_amd64.deb"
+  },
+  {
+    "package": "librttopo-dev",
+    "version": "1.1.0-4",
+    "architecture": "amd64",
+    "filename": "librttopo-dev_1.1.0-4_amd64.deb",
+    "sha256": "3dc427d40d08d327387800b184574a9b4f7290cac93df909743f64448cf4aa83",
+    "size": 220256,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libr/librttopo/librttopo-dev_1.1.0-4_amd64.deb"
+  },
+  {
+    "package": "libspatialite8t64",
+    "version": "5.1.0-3+b2",
+    "architecture": "amd64",
+    "filename": "libspatialite8t64_5.1.0-3+b2_amd64.deb",
+    "sha256": "3a9ca047706390c5c57dd5f1ac4cd227ca44cc5f8910fbdf6d197371bbb88b8d",
+    "size": 1864076,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/s/spatialite/libspatialite8t64_5.1.0-3+b2_amd64.deb"
+  },
+  {
+    "package": "libxml2-dev",
+    "version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+    "architecture": "amd64",
+    "filename": "libxml2-dev_2.12.7+dfsg+really2.9.14-2.1+deb13u3_amd64.deb",
+    "sha256": "2d1a5825cabb43cf4be6848a4acc4a73c50d9c3740ab0c76e2fed80a3e5c6398",
+    "size": 794724,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/libx/libxml2/libxml2-dev_2.12.7+dfsg+really2.9.14-2.1+deb13u3_amd64.deb"
+  },
+  {
+    "package": "libspatialite-dev",
+    "version": "5.1.0-3+b2",
+    "architecture": "amd64",
+    "filename": "libspatialite-dev_5.1.0-3+b2_amd64.deb",
+    "sha256": "896b65848f51e0e92df864cb3da572ba846428003e082c16f29cfeee1eca3f83",
+    "size": 2025060,
+    "origin": "https://snapshot.debian.org/archive/debian/20261119T000000Z/pool/main/s/spatialite/libspatialite-dev_5.1.0-3+b2_amd64.deb"
+  }
+]

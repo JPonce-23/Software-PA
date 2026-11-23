@@ -9,8 +9,8 @@
     "ssalfer_candidate": {
       "compose_files_in_order": [
         "docker-compose.yml",
-        "docker-compose.prod.yml",
-        "docker-compose.ssalfer.yml"
+        "docker-compose.ssalfer.yml",
+        "docker-compose.prod.yml"
       ],
       "explicit_build_services": [
         "backend",
@@ -19,12 +19,15 @@
       "explicit_runtime_services": [
         "db",
         "backend",
-        "frontend_ssalfer"
+        "frontend_ssalfer",
+        "tls_proxy"
       ],
       "services_not_selected_by_this_profile": [
         "pgadmin"
       ],
-      "frontend_service": "frontend_ssalfer"
+      "frontend_service": "frontend_ssalfer",
+      "database_candidate_reference": "software-pa-libgdal36-candidate:20261117-pa5@sha256:d413671654deef3c43367ea3fd0be56a32a36d75b9d971970e33ec56a76b7c3c",
+      "distribution_status": "pending_clean_ci_supply_local_engine_only"
     }
   },
   "requirements": {

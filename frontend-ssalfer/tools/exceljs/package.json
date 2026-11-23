@@ -1,0 +1,22 @@
+{
+  "name": "ssalfer-exceljs-browser-build",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reproducible ExcelJS browser distribution without elliptic or crypto-browserify",
+  "scripts": {
+    "build": "node build.cjs"
+  },
+  "dependencies": {
+    "browserify": "17.0.1",
+    "create-hash": "1.2.0",
+    "exceljs": "4.4.0",
+    "randombytes": "2.1.0",
+    "uglify-js": "3.19.3",
+    "acorn": "8.15.0",
+    "crypto-browserify": "file:./crypto-build-disabled"
+  },
+  "overrides": {
+    "uuid": "11.1.1",
+    "crypto-browserify": "$crypto-browserify"
+  }
+}

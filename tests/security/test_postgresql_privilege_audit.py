@@ -26,6 +26,8 @@ SCA_DECODER_RESTRICTION = {
     'file': 'backend/db/migrations/033_restringir_flatgeobuf.sql',
     'sha256': '4a5ec77cbbd5a8a739ebb359a529bc19d4d048f89c6fef6d4ff4b8551be34e1f',
 }
+FIFONAFE_EXPANSION = json.loads((ASSETS/'inventario-extension-034.json').read_text())
+AUDIT_HARDENING = json.loads((ASSETS/'inventario-extension-035.json').read_text())
 spec=importlib.util.spec_from_file_location('ss07_offline',ASSETS/'preparar_verificador.py')
 audit=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit)
@@ -178,12 +180,14 @@ class PrivilegeAuditTests(unittest.TestCase):
 
     def test_migration_manifest_matches_all_current_sources(self):
         inventory=json.loads((ASSETS/'inventario-estatico.json').read_text())
-        migrations=[*inventory['migrations'], SS12_EXPANSION, SS12_RECOVERY_EXPANSION, SCA_DECODER_RESTRICTION]
+        migrations=[*inventory['migrations'], SS12_EXPANSION, SS12_RECOVERY_EXPANSION, SCA_DECODER_RESTRICTION,
+                    *FIFONAFE_EXPANSION['migrations'], *AUDIT_HARDENING['migrations']]
         expected={m['file'] for m in migrations}
         actual={str(p.relative_to(ROOT)) for p in (ROOT/'backend/db/migrations').glob('[0-9][0-9][0-9]_*.sql') if p.is_file()}
         self.assertEqual(expected,actual)
         self.assertEqual(len(inventory['migrations']),30)
-        self.assertEqual(len(expected),33)
+        self.assertEqual(len(expected),35)
+        self.assertEqual(len(migrations),len(expected))
         for migration in migrations:
             self.assertEqual(hashlib.sha256((ROOT/migration['file']).read_bytes()).hexdigest(),migration['sha256'])
 
@@ -195,8 +199,10 @@ class PrivilegeAuditTests(unittest.TestCase):
             if isinstance(cls,ast.ClassDef):
                 for item in cls.body:
                     if isinstance(item,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='__tablename__' for t in item.targets):model_tables.add(ast.literal_eval(item.value))
-        self.assertEqual(model_tables,{m['relation'] for m in inventory['models']} | {'documento_operacion'})
-        names={o['name'] for o in inventory['objects']} | {'documento_operacion', 'fn_documento_operacion_integridad'}
+        self.assertEqual(model_tables,{m['relation'] for m in inventory['models']} | {'documento_operacion'}
+                         | {m['relation'] for m in FIFONAFE_EXPANSION['models']})
+        names=({o['name'] for o in inventory['objects']} | {'documento_operacion', 'fn_documento_operacion_integridad'}
+               | {o['name'] for o in FIFONAFE_EXPANSION['objects']})
         self.assertLessEqual(model_tables,names)
         self.assertEqual({o['kind'] for o in inventory['objects']},{'TABLE','VIEW','FUNCTION','SEQUENCE'})
         self.assertIn('fn_audit_log',names)
@@ -235,6 +241,57 @@ class PrivilegeAuditTests(unittest.TestCase):
         self.assertEqual(len(runtime_revoke),1)
         self.assertEqual([role.rolename for role in runtime_revoke[0].grantees],['software_pa_app'])
         self.assertEqual({priv.priv_name for priv in runtime_revoke[0].privileges},{'delete','truncate'})
+
+    @unittest.skipUnless(importlib.util.find_spec('pglast'), 'Parser PostgreSQL no instalado; gramática 034 pendiente QA')
+    def test_fifonafe_expansion_declares_model_objects_and_runtime_acl(self):
+        from pglast import ast as pg, enums, parse_sql
+        inventory=FIFONAFE_EXPANSION
+        self.assertEqual(len(inventory['migrations']),1)
+        statements=[item.stmt for item in parse_sql((ROOT/inventory['migrations'][0]['file']).read_text())]
+        tables=[item for item in statements if isinstance(item,pg.CreateStmt)]
+        self.assertEqual(len(tables),1)
+        table=tables[0]
+        self.assertEqual(inventory['models'],[{'class':'EtiquetaSeguimientoFifonafe',
+                                              'relation':table.relation.relname}])
+        model=next(item for item in ast.parse((ROOT/'backend/app/models.py').read_text()).body
+                   if isinstance(item,ast.ClassDef) and item.name==inventory['models'][0]['class'])
+        columns={item.targets[0].id for item in model.body if isinstance(item,ast.Assign)
+                 and isinstance(item.value,ast.Call) and isinstance(item.value.func,ast.Name)
+                 and item.value.func.id=='Column'}
+        self.assertEqual(columns,{item.colname for item in table.tableElts if isinstance(item,pg.ColumnDef)})
+        objects=[('TABLE',table.relation.relname)]
+        for column in table.tableElts:
+            if not isinstance(column,pg.ColumnDef):continue
+            for constraint in column.constraints or ():
+                if constraint.contype==enums.ConstrType.CONSTR_IDENTITY:
+                    self.assertEqual(constraint.generated_when,'a')
+                    sequence=next(obj for obj in inventory['objects'] if obj['kind']=='SEQUENCE')
+                    self.assertEqual((sequence['table'],sequence['identity_column']),
+                                     (table.relation.relname,column.colname))
+                    objects.append(('SEQUENCE',f'{table.relation.relname}_{column.colname}_seq'))
+        objects.extend(('FUNCTION',item.funcname[-1].sval) for item in statements
+                       if isinstance(item,pg.CreateFunctionStmt))
+        self.assertCountEqual(objects,[(obj['kind'],obj['name']) for obj in inventory['objects']])
+        indexes=[(item.idxname,item.relation.relname,False) for item in statements if isinstance(item,pg.IndexStmt)]
+        for column in table.tableElts:
+            if isinstance(column,pg.ColumnDef):
+                indexes.extend((f'{table.relation.relname}_pkey',table.relation.relname,True)
+                               for c in column.constraints or () if c.contype==enums.ConstrType.CONSTR_PRIMARY)
+        self.assertCountEqual(indexes,[(i['name'],i['table'],i['implicit_primary_key']) for i in inventory['indexes']])
+        self.assertCountEqual([(item.trigname,item.relation.relname,item.funcname[-1].sval)
+                               for item in statements if isinstance(item,pg.CreateTrigStmt)],
+                              [(t['name'],t['table'],t['function']) for t in inventory['triggers']])
+        grants=[]
+        for item in statements:
+            if not isinstance(item,pg.GrantStmt):continue
+            self.assertTrue(item.is_grant)
+            self.assertFalse(item.grant_option)
+            self.assertEqual(len(item.objects),1)
+            self.assertEqual(len(item.grantees),1)
+            grants.append((item.objtype.name.removeprefix('OBJECT_'),item.objects[0].relname,
+                           item.grantees[0].rolename,frozenset(p.priv_name for p in item.privileges)))
+        self.assertCountEqual(grants,[(g['kind'],g['name'],g['role'],frozenset(g['privileges']))
+                                      for g in inventory['grants']])
 
     def test_safe_example_cannot_enable_qa(self):
         data=json.loads((ASSETS/'config-ejemplo.json').read_text())

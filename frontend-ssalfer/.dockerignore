@@ -10,3 +10,7 @@ outputs/
 tests/
 **/*.cjs
 **/*.map
+
+# Build toolchains are never served in the frontend image.
+/tools/
+**/node_modules/

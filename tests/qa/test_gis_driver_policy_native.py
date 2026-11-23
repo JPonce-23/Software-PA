@@ -43,7 +43,7 @@ class NativeDriverPolicyTests(unittest.TestCase):
     def test_allowed_gis_formats_round_trip(self):
         paths = [('geojson', self.source)]
         paths.extend((fmt, self.convert_fixture(driver, suffix)) for fmt, driver, suffix in [
-            ('kml', 'KML', 'kml'), ('gpkg', 'GPKG', 'gpkg'),
+            ('kml', 'KML', 'kml'), ('kml', 'LIBKML', 'libkml.kml'), ('gpkg', 'GPKG', 'gpkg'),
             ('shp', 'ESRI Shapefile', 'shp')])
         for fmt, path in paths:
             with self.subTest(fmt=fmt):
@@ -60,38 +60,24 @@ class NativeDriverPolicyTests(unittest.TestCase):
                 path.write_bytes(b'benign truncated synthetic file')
                 self.assert_rejected(path)
 
-    def test_valid_forbidden_formats_and_disguised_extension_are_rejected(self):
-        for driver, suffix in [('FlatGeobuf', 'fgb'), ('CSV', 'csv')]:
-            path = self.convert_fixture(driver, suffix)
-            # Positive control: the same binary can open this benign fixture.
-            result = subprocess.run(['ogrinfo', '-ro', '-so', '-al', '-json', str(path)],
-                                    capture_output=True, check=True, timeout=30,
-                                    env=ing._gdal_environment())
-            self.assertEqual(json.loads(result.stdout)['driverShortName'], driver)
-            self.assert_rejected(path)
-            disguised = path.with_suffix('.gpkg')
-            disguised.write_bytes(path.read_bytes())
-            self.assert_rejected(disguised)
+    def test_unneeded_drivers_are_not_compiled(self):
+        # Unlike the vulnerable full package, the fixed minimal build must not
+        # register these parsers even without the runtime GDAL_SKIP setting.
+        env = dict(ing._gdal_environment());env.pop('GDAL_SKIP')
+        for driver in ['netCDF','HDF4','HDF5','FlatGeobuf','CSV','OGR_VRT']:
+            with self.subTest(driver=driver):
+                control = subprocess.run(['ogrinfo','--format',driver], env=env,
+                    capture_output=True, timeout=30)
+                self.assertNotEqual(control.returncode,0)
 
-    def test_vrt_cannot_delegate_to_an_allowed_file(self):
-        path = self.root / 'delegating.vrt'
-        path.write_text(f'<OGRVRTDataSource><OGRVRTLayer name="legitimate">'
-                        f'<SrcDataSource>{self.source}</SrcDataSource>'
-                        '</OGRVRTLayer></OGRVRTDataSource>')
-        subprocess.run(['ogrinfo', '-ro', '-so', str(path)], check=True,
-                       capture_output=True, timeout=30, env=ing._gdal_environment())
-        self.assert_rejected(path)
-
-    def test_netcdf_is_unregistered_before_any_user_file_is_opened(self):
-        # No NetCDF payload is needed: verify registration without opening input.
-        env = ing._gdal_environment()
-        baseline = dict(env)
-        baseline.pop('GDAL_SKIP')
-        command = ['ogrinfo', '--format', 'netCDF']
-        control = subprocess.run(command, env=baseline, capture_output=True, timeout=30)
-        self.assertEqual(control.returncode, 0, control.stderr)
-        blocked = subprocess.run(command, env=env, capture_output=True, timeout=30)
-        self.assertNotEqual(blocked.returncode, 0)
+    def test_vrt_and_disguised_csv_cannot_delegate_or_bypass(self):
+        vrt = self.root/'delegating.vrt'
+        vrt.write_text(f'<OGRVRTDataSource><OGRVRTLayer name="legitimate">'
+            f'<SrcDataSource>{self.source}</SrcDataSource>'
+            '</OGRVRTLayer></OGRVRTDataSource>')
+        self.assert_rejected(vrt)
+        csv = self.root/'disguised.gpkg';csv.write_text('name,x,y\nfixture,-99,20\n')
+        self.assert_rejected(csv)
 
     def test_both_native_processes_receive_policy_before_input(self):
         original = ing.subprocess.Popen

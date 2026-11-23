@@ -13,6 +13,16 @@
       "vulnerability_review": "pending"
     },
     {
+      "path": "frontend-ssalfer/js/vendor/ExcelJS-build-LICENSES.txt",
+      "size": 135576,
+      "sha256": "68f45056f6ee03c52436e72d8734e5c7665f7c8e98d60f041af272516f8ad563",
+      "family": "exceljs",
+      "declared_version": "4.4.0",
+      "version_evidence": "Reconstructed SSALFER bundle; package-lock and runtime-graph under tools/exceljs; verify.py required",
+      "upstream_authenticity": "not_verified",
+      "vulnerability_review": "pending"
+    },
+    {
       "path": "frontend-ssalfer/js/vendor/HTML2CANVAS-LICENSE.txt",
       "size": 1061,
       "sha256": "86200ce4e92d9a22c41c8647a55f7a5fddff304ff89b4d36ecc699ed8c123d2c",
@@ -24,8 +34,8 @@
     },
     {
       "path": "frontend-ssalfer/js/vendor/README.md",
-      "size": 1270,
-      "sha256": "83bdd4ab077b4c4fc4bc821a87513088f88d7cd5b2ca669b2e8d2ba50d25a879",
+      "size": 1969,
+      "sha256": "1fc78896c2603a6f9a4119a04e9ad4bc027e9c07dea557aa424dff33f0d09477",
       "family": "vendor-documentation",
       "declared_version": null,
       "version_evidence": "local documentation only",
@@ -93,12 +103,12 @@
       "vulnerability_review": "pending"
     },
     {
-      "path": "frontend-ssalfer/js/vendor/exceljs-4.4.0.min.js",
-      "size": 947702,
-      "sha256": "7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9",
+      "path": "frontend-ssalfer/js/vendor/exceljs-4.4.0-ssalfer.min.js",
+      "size": 603009,
+      "sha256": "cd738e64c8d89615473b662ba0bc8fdd8b07d6baa29837b3225986529bba7a57",
       "family": "exceljs",
       "declared_version": "4.4.0",
-      "version_evidence": "filename and README only; main JS banner has date, not semantic version",
+      "version_evidence": "Reconstructed SSALFER bundle; package-lock and runtime-graph under tools/exceljs; verify.py required",
       "upstream_authenticity": "not_verified",
       "vulnerability_review": "pending"
     },

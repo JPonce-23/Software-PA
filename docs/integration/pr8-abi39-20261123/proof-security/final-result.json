@@ -1,0 +1,153 @@
+{
+  "state": "PASS",
+  "suites": 35,
+  "tests": 638,
+  "suites_with_skips": [],
+  "initial_harness_failures_preserved": true,
+  "rows": [
+    {
+      "suite": "test_audit_search_path_035.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_auth_origin_security.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_deployment_integration_contract.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_deep_validation.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_http_codes.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_idempotency.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_reconciliation.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_recovery.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_recovery_execution.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_starlette_historical.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_starlette_pending.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_storage.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_transactions.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_document_validation.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_exceljs_artifact_audit.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_gdal36_backport_semantics.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_gdal36_pa3_source.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_gdal_fixed_build.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_gis_resource_limits.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_gis_subprocess_environment.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_http_deployment_security.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_http_error_boundary.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_migration_runner.py",
+      "exit": 0,
+      "initial_exit": 1,
+      "retry_log": "test_migration_runner.py.retry.log"
+    },
+    {
+      "suite": "test_pa5_ci_supply.py",
+      "exit": 0,
+      "initial_exit": 1,
+      "retry_log": "test_pa5_ci_supply.py.retry.log"
+    },
+    {
+      "suite": "test_pa5_native_local.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_postgis_backport_source.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_postgresql_privilege_audit.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_production.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_project_overview_sources.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_protected_page_inventory.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_reconciled_candidate.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_release_preflights.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_reporting_resource_limits.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_safe_logging_security.py",
+      "exit": 0
+    },
+    {
+      "suite": "test_supply_chain_offline.py",
+      "exit": 0
+    }
+  ]
+}

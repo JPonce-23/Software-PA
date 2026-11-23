@@ -1,0 +1,44 @@
+{
+  "cve": "CVE-2026-73515",
+  "source_url": "https://download.osgeo.org/postgis/source/postgis-3.6.4.tar.gz",
+  "source_sha256": "ed8dc6679f1e06f7b113592b04cde2a7e00f1b1e681294c8ca2204058990cec6",
+  "upstream_commit": "767fa40644253281f6d4e8b06811489b0a0f9b0d",
+  "upstream_patch_sha256": "dc31d8b92d00cfe3fdae75ea4f0bcc6e1e6132be655d0e4f391221be60792b3d",
+  "adapted_patch_sha256": "96ff33ddb440299258fff44efa8d731093078dca4d3812cc35635e2038602a17",
+  "files": {
+    "deps/flatgeobuf/flatgeobuf_c.cpp": {
+      "before": "38cb8ef933f6cf78568dbe7f24d00ff141ce9cd8bc0abc5218cea3cd9d9f0f7c",
+      "after": "2f8b557058f04310609b71328dc13ad50fc1925ee4172d054b3ee495fa91aec1"
+    },
+    "deps/flatgeobuf/geometryreader.cpp": {
+      "before": "b421034915109ce558ded5aaf5a56d1dc0edf1398d23fd239c6d5ad78f5beea2",
+      "after": "5cfc35fef5829766d58c4f9f553184efc0fea38c6e226400bc064a2124f2358d"
+    },
+    "postgis/flatgeobuf.c": {
+      "before": "b337d781f4b076c10b49a877adf61f37fd928af36ab010aefe4c6c1667922d5a",
+      "after": "1bfdec3c35eb9ba861b75f300b58c467aa7caa086ac7b7119ec617fb7f08ff65"
+    },
+    "postgis/flatgeobuf.h": {
+      "before": "29a3b2c425f66f0d8c41154e3040494d539aa445e6b0b173ca573c269b17f7c7",
+      "after": "f3775bceb7ce7b1068678146cdf4166f2c1f674e84a7f928792f478d712d6a90"
+    },
+    "postgis/lwgeom_in_flatgeobuf.c": {
+      "before": "3cfaf2b1126cdd43c3041542b27e0d1c573ed26e8196b96108f1c7c4df1c63c5",
+      "after": "a9f5e437aa57431602041337165a95a0804694a04cd33f9963393e69a1048b28"
+    },
+    "regress/core/flatgeobuf.sql": {
+      "before": "50b39604f40ad23d32b7a6043dc7299df68c0e20ca791a0753cfc5f9f9661431",
+      "after": "bd5b93543dfd3b8b1fb05c9a8c4bd1e724ad11eff74236c0f1b4a574acec4108"
+    },
+    "regress/core/flatgeobuf_expected": {
+      "before": "3e1ff7356caed71d00745cf496b408ddb6b3feff53fae273aadd3f45b763de81",
+      "after": "e5c87edf45f8d38571befdb2adcd225a9bfe370ed13dca0e1910e037b1c60355"
+    }
+  },
+  "adaptations": [
+    "Omit NEWS hunk: source release has a different header; provenance lives in this manifest.",
+    "Preserve existing UInt32GetDatum mapping for unsigned int (upstream parent used Int64GetDatum).",
+    "Preserve existing Float8 conversion for FLOAT8 destination (upstream parent lacked this schema-mismatch fix)."
+  ],
+  "status": "SOURCE_PATCH_ONLY_REQUIRES_NATIVE_BUILD_AND_QA"
+}

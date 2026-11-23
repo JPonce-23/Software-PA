@@ -1,0 +1,946 @@
+--- a/frmts/hdf4/hdf-eos/GDapi.c
++++ b/frmts/hdf4/hdf-eos/GDapi.c
+@@ -4689,6 +4689,7 @@
+ GDinqfields(int32 gridID, char *fieldlist, int32 rank[],
+ 	    int32 numbertype[])
+ {
++    intn groupstatus = EH_METAGROUP_ERROR;
+     intn            status;	/* routine return status variable */
+ 
+     int32           fid;	/* HDF-EOS file ID */
+@@ -4735,13 +4736,15 @@
+ 
+ 	    /* Get pointers to "DataField" section within SM */
+ 	    /* --------------------------------------------- */
+-	    metabuf = (char *) EHmetagroup(sdInterfaceID, gridname, "g",
+-					   "DataField", metaptrs);
++	    metabuf = (char *) EHmetagroupstatus(sdInterfaceID, gridname, "g",
++					   "DataField", metaptrs, &groupstatus);
+ 	    if(metabuf == NULL)
+-	    {
++        {
+ 		free(utlstr);
+-		return(-1);
+-	    }
++            if (groupstatus == EH_METAGROUP_ABSENT && fieldlist != NULL)
++                fieldlist[0] = '\0';
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 
+ 
+ 	    /* If field names are desired then "clear" name buffer */
+@@ -4771,7 +4774,12 @@
+ 		    {
+ 			/* Check 1st for old meta data then new */
+ 			/* ------------------------------------ */
+-			EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 
+ 			/*
+ 			 * If OBJECT value begins with double quote then old
+@@ -4785,7 +4793,12 @@
+ 			    strcat(utlstr, "DataFieldName");
+ 			    strcat(utlstr, "=");
+ 			    metaptrs[0] = strstr(metaptrs[0], utlstr);
+-			    EHgetmetavalue(metaptrs, "DataFieldName", utlstr, UTLSTR_MAX_SIZE);
++			    if (EHgetmetavalue(metaptrs, "DataFieldName", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			}
+ 
+ 			/* Strip off double quotes */
+@@ -4805,7 +4818,12 @@
+ 		    /* Get Numbertype */
+ 		    if (numbertype != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "DataType", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "DataType", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			numbertype[nFld] = EHnumstr(utlstr);
+ 		    }
+ 		    /*
+@@ -4814,7 +4832,12 @@
+ 		     */
+ 		    if (rank != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "DimList", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "DimList", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			rank[nFld] = EHparsestr(utlstr, ',', ptr, slen);
+ 		    }
+ 		    /* Increment number of fields */
+@@ -4883,6 +4906,7 @@
+ GDnentries(int32 gridID, int32 entrycode, int32 * strbufsize)
+ 
+ {
++    intn groupstatus = EH_METAGROUP_ERROR;
+     intn            status;	/* routine return status variable */
+     intn            i;		/* Loop index */
+ 
+@@ -4936,13 +4960,13 @@
+ 	{
+ 	case HDFE_NENTDIM:
+ 	    {
+-		metabuf = (char *) EHmetagroup(sdInterfaceID, gridname, "g",
+-					       "Dimension", metaptrs);
++		metabuf = (char *) EHmetagroupstatus(sdInterfaceID, gridname, "g",
++					       "Dimension", metaptrs, &groupstatus);
+ 		if(metabuf == NULL)
+-		{
++        {
+ 		    free(utlstr);
+-		    return(-1);
+-		}
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 
+ 		nVal = 1;
+ 		strcpy(&valName[0][0], "DimensionName");
+@@ -4951,13 +4975,13 @@
+ 
+ 	case HDFE_NENTDFLD:
+ 	    {
+-		metabuf = (char *) EHmetagroup(sdInterfaceID, gridname, "g",
+-					       "DataField", metaptrs);
++		metabuf = (char *) EHmetagroupstatus(sdInterfaceID, gridname, "g",
++					       "DataField", metaptrs, &groupstatus);
+ 		if(metabuf == NULL)
+-		{
++        {
+ 		    free(utlstr);
+-		    return(-1);
+-		}
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 
+ 		nVal = 1;
+ 		strcpy(&valName[0][0], "DataFieldName");
+@@ -5001,7 +5025,12 @@
+ 		    /*
+ 		     * Get all string values Don't count quotes
+ 		     */
+-		    EHgetmetavalue(metaptrs, &valName[i][0], utlstr, UTLSTR_MAX_SIZE);
++		    if (EHgetmetavalue(metaptrs, &valName[i][0], utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 		    if( utlstr[0] == '"' && utlstr[strlen(utlstr)-1] == '"' )
+ 		        *strbufsize += (int32)strlen(utlstr) - 2;
+ 		    else
+--- a/frmts/hdf4/hdf-eos/SWapi.c
++++ b/frmts/hdf4/hdf-eos/SWapi.c
+@@ -3426,6 +3426,7 @@
+ SWinqdims(int32 swathID, char *dimnames, int32 dims[])
+ 
+ {
++    intn groupstatus = EH_METAGROUP_ERROR;
+     intn            status;	/* routine return status variable */
+ 
+     int32           fid;	/* HDF-EOS file ID */
+@@ -3469,13 +3470,15 @@
+ 	    Vgetname(SWXSwath[sID].IDTable, swathname);
+ 
+ 	    /* Get pointers to "Dimension" section within SM */
+-	    metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					   "Dimension", metaptrs);
++	    metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					   "Dimension", metaptrs, &groupstatus);
+ 	    if(metabuf == NULL)
+-	    {
++        {
+ 		free(utlstr);
+-		return(-1);
+-	    }
++            if (groupstatus == EH_METAGROUP_ABSENT && dimnames != NULL)
++                dimnames[0] = '\0';
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 	    /* If dimension names are desired then "clear" name buffer */
+ 	    if (dimnames != NULL)
+ 	    {
+@@ -3498,7 +3501,12 @@
+ 		    {
+ 			/* Check 1st for old meta data then new */
+ 			/* ------------------------------------ */
+-			EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 
+ 			/*
+ 			 * If OBJECT value begins with double quote then old
+@@ -3509,7 +3517,12 @@
+ 			{
+ 			    metaptrs[0] =
+ 				strstr(metaptrs[0], "\t\t\t\tDimensionName=");
+-			    EHgetmetavalue(metaptrs, "DimensionName", utlstr, UTLSTR_MAX_SIZE);
++			    if (EHgetmetavalue(metaptrs, "DimensionName", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			}
+ 
+ 			/* Strip off double quotes */
+@@ -3528,7 +3541,12 @@
+ 		    /* Get Dimension Size (if desired) */
+ 		    if (dims != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "Size", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "Size", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			size = atoi(utlstr);
+ 			dims[nDim] = size;
+ 		    }
+@@ -3596,6 +3614,7 @@
+ SWinqmaps(int32 swathID, char *dimmaps, int32 offset[], int32 increment[])
+ 
+ {
++    intn groupstatus = EH_METAGROUP_ERROR;
+     intn            status;	/* routine return status variable */
+ 
+     int32           fid;	/* HDF-EOS file ID */
+@@ -3640,13 +3659,15 @@
+ 	    Vgetname(SWXSwath[sID].IDTable, swathname);
+ 
+ 	    /* Get pointers to "DimensionMap" section within SM */
+-	    metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					   "DimensionMap", metaptrs);
++	    metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					   "DimensionMap", metaptrs, &groupstatus);
+ 	    if(metabuf == NULL)
+-	    {
++        {
+ 		free(utlstr);
+-		return(-1);
+-	    }
++            if (groupstatus == EH_METAGROUP_ABSENT && dimmaps != NULL)
++                dimmaps[0] = '\0';
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 	    /* If mapping names are desired then "clear" name buffer */
+ 	    if (dimmaps != NULL)
+ 	    {
+@@ -3667,7 +3688,12 @@
+ 		    if (dimmaps != NULL)
+ 		    {
+ 			/* Get Geo Dim, remove quotes, add "/" */
+-			EHgetmetavalue(metaptrs, "GeoDimension", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "GeoDimension", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			REMQUOTE(utlstr);
+ 			strcat(utlstr, "/");
+ 
+@@ -3681,7 +3707,12 @@
+ 			strcat(dimmaps, utlstr);
+ 
+ 			/* Get Data Dim, remove quotes */
+-			EHgetmetavalue(metaptrs, "DataDimension", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "DataDimension", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			REMQUOTE(utlstr);
+ 
+ 			/* Add to map list */
+@@ -3691,7 +3722,12 @@
+ 		    /* Get Offset (if desired) */
+ 		    if (offset != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "Offset", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "Offset", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			off = atoi(utlstr);
+ 			offset[nMap] = off;
+ 		    }
+@@ -3699,7 +3735,12 @@
+ 		    /* Get Increment (if desired) */
+ 		    if (increment != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "Increment", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "Increment", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			incr = atoi(utlstr);
+ 			increment[nMap] = incr;
+ 		    }
+@@ -3769,6 +3810,7 @@
+ SWinqidxmaps(int32 swathID, char *idxmaps, int32 idxsizes[])
+ 
+ {
++    intn groupstatus = EH_METAGROUP_ERROR;
+     intn            status;	/* routine return status variable */
+ 
+     int32           fid;	/* HDF-EOS file ID */
+@@ -3812,13 +3854,15 @@
+ 	    Vgetname(SWXSwath[sID].IDTable, swathname);
+ 
+ 	    /* Get pointers to "IndexDimensionMap" section within SM */
+-	    metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					   "IndexDimensionMap", metaptrs);
++	    metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					   "IndexDimensionMap", metaptrs, &groupstatus);
+ 	    if(metabuf == NULL)
+-	    {
++        {
+ 		free(utlstr);
+-		return(-1);
+-	    }
++            if (groupstatus == EH_METAGROUP_ABSENT && idxmaps != NULL)
++                idxmaps[0] = '\0';
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 	    /* If mapping names are desired then "clear" name buffer */
+ 	    if (idxmaps != NULL)
+ 	    {
+@@ -3839,7 +3883,12 @@
+ 		    if (idxmaps != NULL)
+ 		    {
+ 			/* Get Geo Dim, remove quotes, add "/" */
+-			EHgetmetavalue(metaptrs, "GeoDimension", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "GeoDimension", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			REMQUOTE(utlstr);
+ 			strcat(utlstr, "/");
+ 
+@@ -3864,7 +3913,12 @@
+ 
+ 
+ 			/* Get Data Dim, remove quotes */
+-			EHgetmetavalue(metaptrs, "DataDimension", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "DataDimension", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+ 			REMQUOTE(utlstr);
+ 
+ 			/* Add to map list */
+@@ -3937,6 +3991,7 @@
+ 	    int32 numbertype[])
+ 
+ {
++    intn groupstatus = EH_METAGROUP_ERROR;
+     intn            status;	/* routine return status variable */
+ 
+     int32           fid;	/* HDF-EOS file ID */
+@@ -3994,26 +4049,30 @@
+ 	    /* Get pointers to "GeoField" or "DataField" section within SM */
+ 	    if (strcmp(fieldtype, "Geolocation Fields") == 0)
+ 	    {
+-		metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					       "GeoField", metaptrs);
++		metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					       "GeoField", metaptrs, &groupstatus);
+ 		if(metabuf == NULL)
+-		{
++        {
+ 		    free(utlstr);
+ 		    free(utlstr2);
+-		    return(-1);
+-		}
++            if (groupstatus == EH_METAGROUP_ABSENT && fieldlist != NULL)
++                fieldlist[0] = '\0';
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 		strcpy(utlstr2, "GeoFieldName");
+ 	    }
+ 	    else
+ 	    {
+-		metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					       "DataField", metaptrs);
++		metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					       "DataField", metaptrs, &groupstatus);
+ 		if(metabuf == NULL)
+-		{
++        {
+ 		    free(utlstr);
+ 		    free(utlstr2);
+-		    return(-1);
+-		}
++            if (groupstatus == EH_METAGROUP_ABSENT && fieldlist != NULL)
++                fieldlist[0] = '\0';
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 		strcpy(utlstr2, "DataFieldName");
+ 	    }
+ 
+@@ -4040,7 +4099,13 @@
+ 		    {
+ 			/* Check 1st for old meta data then new */
+ 			/* ------------------------------------ */
+-			EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "OBJECT", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                free(utlstr2);
++                return -1;
++            }
+ 
+ 			/*
+ 			 * If OBJECT value begins with double quote then old
+@@ -4055,7 +4120,13 @@
+ 			    strcat(utlstr, utlstr2);
+ 			    strcat(utlstr, "=");
+ 			    metaptrs[0] = strstr(metaptrs[0], utlstr);
+-			    EHgetmetavalue(metaptrs, utlstr2, utlstr, UTLSTR_MAX_SIZE);
++			    if (EHgetmetavalue(metaptrs, utlstr2, utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                free(utlstr2);
++                return -1;
++            }
+ 			}
+ 
+ 			/* Strip off double quotes */
+@@ -4075,7 +4146,13 @@
+ 		    /* Get Numbertype */
+ 		    if (numbertype != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "DataType", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "DataType", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                free(utlstr2);
++                return -1;
++            }
+ 			numbertype[nFld] = EHnumstr(utlstr);
+ 		    }
+ 		    /*
+@@ -4084,7 +4161,13 @@
+ 		     */
+ 		    if (rank != NULL)
+ 		    {
+-			EHgetmetavalue(metaptrs, "DimList", utlstr, UTLSTR_MAX_SIZE);
++			if (EHgetmetavalue(metaptrs, "DimList", utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                free(utlstr2);
++                return -1;
++            }
+ 			rank[nFld] = EHparsestr(utlstr, ',', ptr, slen);
+ 		    }
+ 		    /* Increment number of fields */
+@@ -4253,6 +4336,7 @@
+ SWnentries(int32 swathID, int32 entrycode, int32 * strbufsize)
+ 
+ {
++    intn groupstatus = EH_METAGROUP_ERROR;
+     intn            status;	    /* routine return status variable */
+     intn            i;		    /* Loop index */
+ 
+@@ -4306,13 +4390,13 @@
+ 	case HDFE_NENTDIM:
+ 	    /* Dimensions */
+ 	    {
+-		metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					       "Dimension", metaptrs);
++		metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					       "Dimension", metaptrs, &groupstatus);
+ 		if(metabuf == NULL)
+-		{
++        {
+ 		    free(utlstr);
+-		    return(-1);
+-		}
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 		nVal = 1;
+ 		strcpy(&valName[0][0], "DimensionName");
+ 	    }
+@@ -4321,13 +4405,13 @@
+ 	case HDFE_NENTMAP:
+ 	    /* Dimension Maps */
+ 	    {
+-		metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					       "DimensionMap", metaptrs);
++		metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					       "DimensionMap", metaptrs, &groupstatus);
+ 		if(metabuf == NULL)
+-		{
++        {
+ 		    free(utlstr);
+-		    return(-1);
+-		}
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 		nVal = 2;
+ 		strcpy(&valName[0][0], "GeoDimension");
+ 		strcpy(&valName[1][0], "DataDimension");
+@@ -4337,13 +4421,13 @@
+ 	case HDFE_NENTIMAP:
+ 	    /* Indexed Dimension Maps */
+ 	    {
+-		metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					     "IndexDimensionMap", metaptrs);
++		metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					     "IndexDimensionMap", metaptrs, &groupstatus);
+ 		if(metabuf == NULL)
+-		{
++        {
+ 		    free(utlstr);
+-		    return(-1);
+-		}
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 		nVal = 2;
+ 		strcpy(&valName[0][0], "GeoDimension");
+ 		strcpy(&valName[1][0], "DataDimension");
+@@ -4353,13 +4437,13 @@
+ 	case HDFE_NENTGFLD:
+ 	    /* Geolocation Fields */
+ 	    {
+-		metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					       "GeoField", metaptrs);
++		metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					       "GeoField", metaptrs, &groupstatus);
+ 		if(metabuf == NULL)
+-		{
++        {
+ 		    free(utlstr);
+-		    return(-1);
+-		}
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 		nVal = 1;
+ 		strcpy(&valName[0][0], "GeoFieldName");
+ 	    }
+@@ -4368,13 +4452,13 @@
+ 	case HDFE_NENTDFLD:
+ 	    /* Data Fields */
+ 	    {
+-		metabuf = (char *) EHmetagroup(sdInterfaceID, swathname, "s",
+-					       "DataField", metaptrs);
++		metabuf = (char *) EHmetagroupstatus(sdInterfaceID, swathname, "s",
++					       "DataField", metaptrs, &groupstatus);
+ 		if(metabuf == NULL)
+-		{
++        {
+ 		    free(utlstr);
+-		    return(-1);
+-		}
++            return groupstatus == EH_METAGROUP_ABSENT ? 0 : -1;
++        }
+ 		nVal = 1;
+ 		strcpy(&valName[0][0], "DataFieldName");
+ 	    }
+@@ -4413,7 +4497,12 @@
+                         /*
+                          * Get all string values Don't count quotes
+                          */
+-                        EHgetmetavalue(metaptrs, &valName[i][0], utlstr, UTLSTR_MAX_SIZE);
++                        if (EHgetmetavalue(metaptrs, &valName[i][0], utlstr, UTLSTR_MAX_SIZE) != 0 || utlstr[0] == '\0')
++            {
++                free(metabuf);
++                free(utlstr);
++                return -1;
++            }
+                         if( utlstr[0] == '"' && utlstr[strlen(utlstr)-1] == '"' )
+                             *strbufsize += (int32)strlen(utlstr) - 2;
+                         else
+--- a/frmts/hdf4/hdf-eos/EHapi.c
++++ b/frmts/hdf4/hdf-eos/EHapi.c
+@@ -2518,6 +2518,15 @@
+ EHmetagroup(int32 sdInterfaceID, const char *structname, const char *structcode,
+             const char *groupname, char *metaptrs[])
+ {
++    /* Preserve the strict +pa3 contract for required-metadata consumers. */
++    return EHmetagroupstatus(sdInterfaceID, structname, structcode,
++                             groupname, metaptrs, NULL);
++}
++
++char *
++EHmetagroupstatus(int32 sdInterfaceID, const char *structname, const char *structcode,
++            const char *groupname, char *metaptrs[], intn *groupstatus)
++{
+     int32 nmeta = 0;
+     int32 i;
+     char query[UTLSTR_MAX_SIZE];
+@@ -2537,6 +2546,8 @@
+ 
+     /* Failure owns/frees its buffer and leaves both outputs NULL.
+        Success transfers the buffer to the caller, even for an empty group. */
++    if (groupstatus != NULL)
++        *groupstatus = EH_METAGROUP_ERROR;
+     if (metaptrs == NULL)
+         return NULL;
+     metaptrs[0] = NULL;
+@@ -2634,11 +2645,33 @@
+         written = snprintf(query, sizeof(query), "GROUP=%s", groupname);
+         if (written < 0 || (size_t)written >= sizeof(query))
+             goto failure;
+-        begin = strstr(structure, query);
+-        if (begin == NULL || begin >= structureend ||
+-            (begin > metabuf && begin[-1] != '\t' && begin[-1] != ' ' && begin[-1] != '\n') ||
+-            (begin[written] != '\n' && begin[written] != '\r'))
++        begin = structure;
++        while ((begin = strstr(begin, query)) != NULL && begin < structureend)
++        {
++            if ((begin == metabuf || begin[-1] == '\t' || begin[-1] == ' ' ||
++                 begin[-1] == '\n') &&
++                (begin[written] == '\n' || begin[written] == '\r'))
++                break;
++            begin++;
++        }
++        if (begin == NULL || begin >= structureend)
++        {
++            /* Absence is not malformed input: require a valid enclosing
++               structure and no orphan closing marker for the requested group. */
++            written = snprintf(query, sizeof(query), "END_GROUP=%s", groupname);
++            if (written < 0 || (size_t)written >= sizeof(query))
++                goto failure;
++            end = structure;
++            while ((end = strstr(end, query)) != NULL && end < structureend)
++            {
++                if (end[written] == '\n' || end[written] == '\r')
++                    goto failure;
++                end++;
++            }
++            if (groupstatus != NULL)
++                *groupstatus = EH_METAGROUP_ABSENT;
+             goto failure;
++        }
+         written = snprintf(query, sizeof(query), "\t\tEND_GROUP=%s", groupname);
+         if (written < 0 || (size_t)written >= sizeof(query))
+             goto failure;
+@@ -2651,6 +2684,8 @@
+         goto failure;
+     metaptrs[0] = begin;
+     metaptrs[1] = end;
++    if (groupstatus != NULL)
++        *groupstatus = EH_METAGROUP_PRESENT;
+     return metabuf;
+ 
+ failure:
+--- a/frmts/hdf4/hdf-eos/HdfEosDef.h
++++ b/frmts/hdf4/hdf-eos/HdfEosDef.h
+@@ -336,6 +336,12 @@
+ /* Internal GDAL helper: explicit destination capacity, no silent truncation. */
+ intn EHgetmetavalue(char *[], const char *, char *, size_t);
+ char * EHmetagroup(int32, const char *, const char *, const char *, char *[]);
++/* Private lookup status: no empty-success substitution for malformed metadata. */
++#define EH_METAGROUP_ERROR (-1)
++#define EH_METAGROUP_ABSENT 0
++#define EH_METAGROUP_PRESENT 1
++char * EHmetagroupstatus(int32, const char *, const char *, const char *,
++                         char *[], intn *);
+ #if defined(HDFEOS_GD_WRITE_SUPPORT) || defined(HDFEOS_SW_WRITE_SUPPORT)
+ intn EHfillfld(int32, int32, int32, int32, int32, int32 [], VOIDP);
+ #endif
+--- a/frmts/hdf4/hdf4multidim.cpp
++++ b/frmts/hdf4/hdf4multidim.cpp
+@@ -1351,27 +1351,36 @@
+ {
+     CPLMutexHolderD(&hHDF4Mutex);
+     std::vector<std::string> ret;
+-
+     int32 nStrBufSize = 0;
+-    const int32 nFields =
+-        SWnentries(m_poSwathHandle->m_handle, m_entryType, &nStrBufSize);
+-    std::string osFieldList;
+-    osFieldList.resize(nStrBufSize);
++    const int32 nFields = SWnentries(m_poSwathHandle->m_handle, m_entryType, &nStrBufSize);
++    if (nFields < 0 || nStrBufSize < 0 ||
++        (nFields == 0 && nStrBufSize != 0) ||
++        (nFields > 0 && (nStrBufSize == 0 || nFields > nStrBufSize)))
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: invalid field enumeration");
++        return ret;
++    }
++    if (nFields == 0)
++        return ret; /* A legitimate empty query: no data() dereference. */
++    std::string osFieldList(static_cast<size_t>(nStrBufSize) + 1, '\0');
+     std::vector<int32> ranks(nFields);
+     std::vector<int32> numberTypes(nFields);
+-
+-    if (m_entryType == HDFE_NENTDFLD)
+-        SWinqdatafields(m_poSwathHandle->m_handle, &osFieldList[0], &ranks[0],
+-                        &numberTypes[0]);
+-    else
+-        SWinqgeofields(m_poSwathHandle->m_handle, &osFieldList[0], &ranks[0],
+-                       &numberTypes[0]);
+-
+-    CPLStringList aosFields(
+-        CSLTokenizeString2(osFieldList.c_str(), ",", CSLT_HONOURSTRINGS));
++    const int32 nRead = m_entryType == HDFE_NENTDFLD
++        ? SWinqdatafields(m_poSwathHandle->m_handle, &osFieldList[0], ranks.data(), numberTypes.data())
++        : SWinqgeofields(m_poSwathHandle->m_handle, &osFieldList[0], ranks.data(), numberTypes.data());
++    if (nRead != nFields)
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: field enumeration changed or failed");
++        return ret;
++    }
++    CPLStringList aosFields(CSLTokenizeString2(osFieldList.c_str(), ",", CSLT_HONOURSTRINGS));
++    if (aosFields.size() != nFields)
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: field-name count mismatch");
++        return ret;
++    }
+     for (int i = 0; i < aosFields.size(); i++)
+         ret.push_back(aosFields[i]);
+-
+     return ret;
+ }
+ 
+@@ -1390,15 +1399,24 @@
+     std::string dimNames;
+ 
+     int32 nStrBufSize = 0;
+-    if (SWnentries(m_poSwathHandle->m_handle, HDFE_NENTDIM, &nStrBufSize) < 0 ||
+-        nStrBufSize <= 0)
+-    {
++    const int32 nDimensions = SWnentries(m_poSwathHandle->m_handle, HDFE_NENTDIM, &nStrBufSize);
++    if (nDimensions <= 0 || nStrBufSize <= 0 || nDimensions > nStrBufSize)
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: required dimension metadata missing or invalid");
+         return nullptr;
+     }
+-    dimNames.resize(nStrBufSize);
++    dimNames.resize(static_cast<size_t>(nStrBufSize) + 1);
+     if (SWfieldinfo(m_poSwathHandle->m_handle, osName.c_str(), &iRank,
+                     &aiDimSizes[0], &iNumType, &dimNames[0]) < 0)
+     {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: required field metadata lookup failed");
++        return nullptr;
++    }
++    if (iRank < 1 || iRank > H4_MAX_VAR_DIMS ||
++        std::any_of(aiDimSizes.begin(), aiDimSizes.begin() + iRank,
++                    [](int32 n) { return n < 0; }))
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: invalid field rank or dimensions");
+         return nullptr;
+     }
+     aiDimSizes.resize(iRank);
+@@ -1451,28 +1469,40 @@
+ {
+     if (!m_dims.empty())
+         return m_dims;
+-    std::string dimNames;
+     int32 nStrBufSize = 0;
+-    if (SWnentries(m_poSwathHandle->m_handle, HDFE_NENTDIM, &nStrBufSize) < 0 ||
+-        nStrBufSize <= 0)
+-    {
++    const int32 nEntries = SWnentries(m_poSwathHandle->m_handle, HDFE_NENTDIM, &nStrBufSize);
++    if (nEntries < 0 || nStrBufSize < 0 ||
++        (nEntries == 0 && nStrBufSize != 0) ||
++        (nEntries > 0 && (nStrBufSize == 0 || nEntries > nStrBufSize)))
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: invalid dimension enumeration");
+         return m_dims;
+     }
+-    dimNames.resize(nStrBufSize);
+-    int32 nDims = SWinqdims(m_poSwathHandle->m_handle, &dimNames[0], nullptr);
++    if (nEntries == 0)
++        return m_dims;
++    std::string dimNames(static_cast<size_t>(nStrBufSize) + 1, '\0');
++    const int32 nDims = SWinqdims(m_poSwathHandle->m_handle, &dimNames[0], nullptr);
++    if (nDims < 0 || nDims != nEntries)
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: dimension enumeration failed");
++        return m_dims;
++    }
+     std::vector<int32> aiDimSizes(nDims);
+-    SWinqdims(m_poSwathHandle->m_handle, &dimNames[0], &aiDimSizes[0]);
+-    CPLStringList aosDimNames(
+-        CSLTokenizeString2(dimNames.c_str(), ",", CSLT_HONOURSTRINGS));
+-    if (static_cast<size_t>(aosDimNames.size()) == aiDimSizes.size())
+-    {
+-        for (int i = 0; i < aosDimNames.size(); i++)
+-        {
+-            m_dims.push_back(std::make_shared<GDALDimension>(
+-                GetFullName(), aosDimNames[i], std::string(), std::string(),
+-                aiDimSizes[i]));
+-        }
+-    }
++    if (SWinqdims(m_poSwathHandle->m_handle, &dimNames[0], aiDimSizes.data()) != nDims)
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: dimension-size enumeration failed");
++        return m_dims;
++    }
++    CPLStringList aosDimNames(CSLTokenizeString2(dimNames.c_str(), ",", CSLT_HONOURSTRINGS));
++    if (aosDimNames.size() != nDims ||
++        std::any_of(aiDimSizes.begin(), aiDimSizes.end(), [](int32 n) { return n < 0; }))
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: dimension metadata mismatch");
++        return m_dims;
++    }
++    for (int i = 0; i < aosDimNames.size(); i++)
++        m_dims.push_back(std::make_shared<GDALDimension>(GetFullName(), aosDimNames[i],
++                         std::string(), std::string(), aiDimSizes[i]));
+     return m_dims;
+ }
+ 
+@@ -2081,24 +2111,35 @@
+ HDF4EOSGridSubGroup::GetMDArrayNames(CSLConstList) const
+ {
+     std::vector<std::string> ret;
+-
+     int32 nStrBufSize = 0;
+-    const int32 nFields =
+-        GDnentries(m_poGDHandle->m_handle, m_entryType, &nStrBufSize);
+-    std::string osFieldList;
+-    osFieldList.resize(nStrBufSize);
++    const int32 nFields = GDnentries(m_poGDHandle->m_handle, m_entryType, &nStrBufSize);
++    if (nFields < 0 || nStrBufSize < 0 ||
++        (nFields == 0 && nStrBufSize != 0) ||
++        (nFields > 0 && (nStrBufSize == 0 || nFields > nStrBufSize)))
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: invalid field enumeration");
++        return ret;
++    }
++    if (nFields == 0)
++        return ret; /* A legitimate empty query: no data() dereference. */
++    std::string osFieldList(static_cast<size_t>(nStrBufSize) + 1, '\0');
+     std::vector<int32> ranks(nFields);
+     std::vector<int32> numberTypes(nFields);
+-
+     CPLAssert(m_entryType == HDFE_NENTDFLD);
+-    GDinqfields(m_poGDHandle->m_handle, &osFieldList[0], &ranks[0],
+-                &numberTypes[0]);
+-
+-    CPLStringList aosFields(
+-        CSLTokenizeString2(osFieldList.c_str(), ",", CSLT_HONOURSTRINGS));
++    const int32 nRead = GDinqfields(m_poGDHandle->m_handle, &osFieldList[0], ranks.data(), numberTypes.data());
++    if (nRead != nFields)
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: field enumeration changed or failed");
++        return ret;
++    }
++    CPLStringList aosFields(CSLTokenizeString2(osFieldList.c_str(), ",", CSLT_HONOURSTRINGS));
++    if (aosFields.size() != nFields)
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: field-name count mismatch");
++        return ret;
++    }
+     for (int i = 0; i < aosFields.size(); i++)
+         ret.push_back(aosFields[i]);
+-
+     return ret;
+ }
+ 
+@@ -2117,14 +2158,29 @@
+     std::string dimNames;
+ 
+     int32 nStrBufSize = 0;
+-    GDnentries(m_poGDHandle->m_handle, HDFE_NENTDIM, &nStrBufSize);
++    const int32 nDimensions = GDnentries(m_poGDHandle->m_handle, HDFE_NENTDIM, &nStrBufSize);
++    if (nDimensions < 0 || nStrBufSize < 0 ||
++        (nDimensions == 0 && nStrBufSize != 0) ||
++        (nDimensions > 0 && (nStrBufSize == 0 || nDimensions > nStrBufSize)))
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: invalid Grid dimension enumeration");
++        return nullptr;
++    }
+     if (nStrBufSize <= 0)
+         dimNames.resize(HDFE_DIMBUFSIZE);
+     else
+-        dimNames.resize(nStrBufSize);
++        dimNames.resize(static_cast<size_t>(nStrBufSize) + 1);
+     if (GDfieldinfo(m_poGDHandle->m_handle, osName.c_str(), &iRank,
+                     &aiDimSizes[0], &iNumType, &dimNames[0]) < 0)
+     {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: required field metadata lookup failed");
++        return nullptr;
++    }
++    if (iRank < 1 || iRank > H4_MAX_VAR_DIMS ||
++        std::any_of(aiDimSizes.begin(), aiDimSizes.begin() + iRank,
++                    [](int32 n) { return n < 0; }))
++    {
++        CPLError(CE_Failure, CPLE_AppDefined, "HDF4: invalid field rank or dimensions");
+         return nullptr;
+     }
+     aiDimSizes.resize(iRank);
+--- a/apps/gdalmdiminfo_lib.cpp
++++ b/apps/gdalmdiminfo_lib.cpp
+@@ -20,6 +20,7 @@
+ #include "gdalargumentparser.h"
+ #include <limits>
+ #include <set>
++#include <stdexcept>
+ 
+ static void DumpArray(const std::shared_ptr<GDALGroup> &rootGroup,
+                       const std::shared_ptr<GDALMDArray> &array,
+@@ -920,7 +921,11 @@
+         if (oSetNames.find(name) != oSetNames.end())
+             continue;  // should not happen on well behaved drivers
+         oSetNames.insert(name);
++        const auto arrayErrorCounter = CPLGetErrorCounter();
+         auto array = group->OpenMDArray(name);
++        if (CPLGetErrorCounter() != arrayErrorCounter &&
++            CPLGetLastErrorType() >= CE_Failure)
++            throw std::runtime_error(CPLGetLastErrorMsg());
+         if (array)
+         {
+             serializer.AddObjKey(array->GetName());
+@@ -976,7 +981,11 @@
+         DumpAttrs(attrs, serializer, psOptions);
+     }
+ 
++    const auto dimsErrorCounter = CPLGetErrorCounter();
+     auto dims = group->GetDimensions();
++    if (CPLGetErrorCounter() != dimsErrorCounter &&
++        CPLGetLastErrorType() >= CE_Failure)
++        throw std::runtime_error(CPLGetLastErrorMsg());
+     if (!dims.empty())
+     {
+         serializer.AddObjKey("dimensions");
+@@ -987,7 +996,11 @@
+     CPLStringList aosOptionsGetArray(psOptions->aosArrayOptions);
+     if (psOptions->bDetailed)
+         aosOptionsGetArray.SetNameValue("SHOW_ALL", "YES");
++    const auto arrayNamesErrorCounter = CPLGetErrorCounter();
+     auto arrayNames = group->GetMDArrayNames(aosOptionsGetArray.List());
++    if (CPLGetErrorCounter() != arrayNamesErrorCounter &&
++        CPLGetLastErrorType() >= CE_Failure)
++        throw std::runtime_error(CPLGetLastErrorMsg());
+     if (!arrayNames.empty())
+     {
+         serializer.AddObjKey("arrays");

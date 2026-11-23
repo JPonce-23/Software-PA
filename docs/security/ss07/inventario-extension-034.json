@@ -1,0 +1,75 @@
+{
+  "scope": "Declaraciones de la migración 034; complemento del inventario histórico 001–030, sin simular ACL efectivas.",
+  "migrations": [
+    {
+      "file": "backend/db/migrations/034_seguimiento_fifonafe_etiquetas.sql",
+      "sha256": "75e07a23e96da26d1a93a5ed90e9a3ad3990a58adc878b50ff9476f659bd1aef"
+    }
+  ],
+  "models": [
+    {
+      "class": "EtiquetaSeguimientoFifonafe",
+      "relation": "etiqueta_seguimiento_fifonafe"
+    }
+  ],
+  "objects": [
+    {
+      "kind": "TABLE",
+      "name": "etiqueta_seguimiento_fifonafe"
+    },
+    {
+      "kind": "SEQUENCE",
+      "name": "etiqueta_seguimiento_fifonafe_id_etiqueta_seq",
+      "table": "etiqueta_seguimiento_fifonafe",
+      "identity_column": "id_etiqueta"
+    },
+    {
+      "kind": "FUNCTION",
+      "name": "fn_etiqueta_fifonafe_inmutable"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "ix_etiqueta_fifonafe_convenio",
+      "table": "etiqueta_seguimiento_fifonafe",
+      "implicit_primary_key": false
+    },
+    {
+      "name": "etiqueta_seguimiento_fifonafe_pkey",
+      "table": "etiqueta_seguimiento_fifonafe",
+      "implicit_primary_key": true
+    }
+  ],
+  "triggers": [
+    {
+      "name": "trg_etiqueta_fifonafe_inmutable",
+      "table": "etiqueta_seguimiento_fifonafe",
+      "function": "fn_etiqueta_fifonafe_inmutable"
+    },
+    {
+      "name": "trg_audit_etiqueta_fifonafe",
+      "table": "etiqueta_seguimiento_fifonafe",
+      "function": "fn_audit_log"
+    }
+  ],
+  "grants": [
+    {
+      "kind": "TABLE",
+      "name": "etiqueta_seguimiento_fifonafe",
+      "role": "software_pa_app",
+      "privileges": [
+        "select",
+        "insert"
+      ]
+    },
+    {
+      "kind": "SEQUENCE",
+      "name": "etiqueta_seguimiento_fifonafe_id_etiqueta_seq",
+      "role": "software_pa_app",
+      "privileges": [
+        "usage",
+        "select"
+      ]
+    }
+  ]
+}

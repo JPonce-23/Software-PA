@@ -1,0 +1,80 @@
+{
+  "status": "PA3_SOURCE_PREPARED_REQUIRES_F2_BUILD_AND_NATIVE_QA",
+  "local_version": "3.10.3+dfsg-1+pa3",
+  "soname": "libgdal.so.36",
+  "parent_revision": "3.10.3+dfsg-1+pa2",
+  "parent_manifest_sha256": "f408b583ceb6ca316304923b6f2f2f651463b327ca9720d269f0e86f50826621",
+  "parent_patch_sha256": "96de956f17387303a769e8b6857d1db3bab5ee36dec9f6cbdcf0469d7153233f",
+  "additional_patch": "security-metadata-pa3.patch",
+  "additional_patch_sha256": "6e00e267f42e7fa431d910dce5a3c8ef57d09037fbdbe82d40e101145c6dfe47",
+  "files": {
+    "frmts/hdf4/hdf-eos/EHapi.c": {
+      "original": "51c6246a84ff41f1beed87f70de1971dcdfe1e2396bd91989f22bc35abb3d6ea",
+      "before": "51c6246a84ff41f1beed87f70de1971dcdfe1e2396bd91989f22bc35abb3d6ea",
+      "after": "35090db8526ee8e0b7e3b9b3f5a493b29a0d0e1f10b601cefb9439e5b791ee43"
+    },
+    "frmts/hdf4/hdf-eos/GDapi.c": {
+      "original": "21ba7e64fde0860ed0b69bf8059abee5144738c7079a5f5e90fd5426f2bedf3a",
+      "before": "8b6920b53f284f8e46d74f92513f762acc8ad2d31bce3df380d06246c120a1ab",
+      "after": "ff0eacd91bbab5976b76244e16b9a95be7565164cd2b5ba397339fdadbaa4770"
+    },
+    "frmts/hdf4/hdf-eos/HdfEosDef.h": {
+      "original": "3befd90228b3f65d5f2b83d209608f33bb1a5d158463b5a694b33c84169b966d",
+      "before": "3befd90228b3f65d5f2b83d209608f33bb1a5d158463b5a694b33c84169b966d",
+      "after": "16ba44cef24ce6801bf370f0332548f173dcba808362c6a72e21990e7719e9b2"
+    },
+    "frmts/hdf4/hdf-eos/SWapi.c": {
+      "original": "599a1b22f86cc1df0dc16b882a9be580a080a2922e1e8d2c4ffc65cad6993046",
+      "before": "46106ee6c2d62d2cf741f8e7aa6fd77b19fe3c22587a0b83ad97b73827492de2",
+      "after": "c3d83bf58fb8eb37dbdeeaff9dbc9a83c38bb7a9cba48ee779ff20d35bddf593"
+    }
+  },
+  "function_scope": {
+    "frmts/hdf4/hdf-eos/EHapi.c": [
+      "EHgetmetavalue",
+      "EHmetagroup"
+    ],
+    "frmts/hdf4/hdf-eos/GDapi.c": [
+      "GDSDfldsrch",
+      "GDcompinfo",
+      "GDdiminfo",
+      "GDfieldinfo",
+      "GDgridinfo",
+      "GDinqdims",
+      "GDinqfields",
+      "GDnentries",
+      "GDorigininfo",
+      "GDpixreginfo",
+      "GDprojinfo"
+    ],
+    "frmts/hdf4/hdf-eos/SWapi.c": [
+      "SWSDfldsrch",
+      "SWcompinfo",
+      "SWdiminfo",
+      "SWfinfo",
+      "SWinqdims",
+      "SWinqfields",
+      "SWinqidxmaps",
+      "SWinqmaps",
+      "SWmapinfo",
+      "SWnentries"
+    ]
+  },
+  "allowed_prologue_changes": {
+    "frmts/hdf4/hdf-eos/EHapi.c": "Add <limits.h> for checked attribute allocation"
+  },
+  "internal_interface": {
+    "function": "EHgetmetavalue",
+    "signature": "intn EHgetmetavalue(char *[], const char *, char *, size_t)",
+    "call_sites": 48,
+    "destinations": {
+      "utlstr": "UTLSTR_MAX_SIZE=512",
+      "name": "sizeof(name)=2048"
+    },
+    "public_GDAL_ABI_changed": false
+  },
+  "historical_artifacts_replaced": false,
+  "native_validation": "NOT_RUN_F1",
+  "package_hashes": null,
+  "image_digest": null
+}
