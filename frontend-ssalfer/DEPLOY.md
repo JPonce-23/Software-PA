@@ -47,6 +47,34 @@ genérico sin esa configuración no reenvían `/api/` a FastAPI y no reproducen
 este flujo. Las variables del contenedor no reescriben automáticamente el JS
 empaquetado; los cambios en estáticos requieren reconstrucción dirigida.
 
+## Mapa base de OpenStreetMap
+
+El mapa principal y la previsualización GIS cargan las imágenes directamente
+desde `https://tile.openstreetmap.org/{z}/{x}/{y}.png`. OpenStreetMap exige un
+`Referer` válido en solicitudes de navegador; heredar el `no-referrer` global
+puede producir imágenes «403 Access blocked» aunque las capas del proyecto
+sigan funcionando. Ver la [política del proveedor](https://operations.osmfoundation.org/policies/tiles/).
+
+Ambas capas Leaflet fijan `referrerPolicy: 'strict-origin'` por imagen: envían
+sólo el origen del sitio, sin ruta, parámetros ni identificadores del proyecto.
+El resto del sitio conserva `Referrer-Policy: no-referrer`. Las políticas CSP
+Report-Only de los dos proxies incluyen el host canónico sin subdominios.
+La caché de las imágenes sigue las cabeceras del proveedor en el navegador.
+
+Para aplicar la corrección, reconstruir y recrear `frontend_ssalfer` con la
+selección Compose del entorno. Si se usa el edge TLS, actualizar también su
+imagen/configuración mediante el procedimiento habitual. Reiniciar una imagen
+antigua no incorpora estos cambios. No requiere migraciones de base de datos.
+
+Verificación manual tras actualizar: abrir el mapa y la previsualización GIS;
+en Red/Network comprobar que las imágenes proceden de `tile.openstreetmap.org`,
+que el `Referer` contiene sólo el origen y que las respuestas muestran mapas.
+Mantener desmarcada «Disable cache» para respetar la caché del proveedor.
+Comprobar zoom, filtros de DDV/núcleos/parcelas y selección de geometrías.
+Si persiste `ERR_CONNECTION_CLOSED` con esas solicitudes correctas, revisar
+conectividad, proxy/firewall o un bloqueo persistente del proveedor desde la
+red afectada; la corrección de cabeceras no acredita por sí sola conectividad.
+
 ## Origen, cookies y CSRF
 
 Para QA HTTP de desarrollo, un archivo `.env.qa` nuevo y exclusivo debe definir

@@ -212,7 +212,7 @@ class HttpDeploymentTests(unittest.TestCase):
             self.assertIn("'self'",directives[key])
         self.assertIn("'unsafe-inline'",directives['style-src'])
         self.assertNotIn("'unsafe-inline'",directives['script-src'])
-        self.assertIn('https://*.tile.openstreetmap.org',directives['img-src'])
+        self.assertIn('https://tile.openstreetmap.org',directives['img-src'])
         for token in ('data:','blob:'):self.assertIn(token,directives['img-src'])
         self.assertIn('blob:',directives['frame-src'])
         self.assertNotIn('report-uri',directives)
