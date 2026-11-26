@@ -19,8 +19,8 @@
     },
     {
       "path": "deploy/tls/headers.conf",
-      "sha256": "20953367ca2306631d0e979af01bcded8fc3bb1d928c43968af8aa791e792728",
-      "size": 999
+      "sha256": "a397a49be11273b9f96b00f2ed9c5d8582a4fd62fcf81a2f75123e1e9c826b8e",
+      "size": 997
     },
     {
       "path": "deploy/tls/proxy.conf",
