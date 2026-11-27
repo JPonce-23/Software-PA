@@ -1,0 +1,32 @@
+# Integración local. Cargar después de base, SSALFER y prod. Requiere Compose >= 2.24.4.
+services:
+  db:
+    image: software-pa-db-security:20261124-p3-r2-gosu@sha256:d02cf5ff3c3c78232b8fba1cc62a6569918a78ea3b907f2731c511145b93fb09
+    platform: linux/amd64
+    pull_policy: never
+  backend:
+    image: software-pa-backend-security:20261124-p3-openssl@sha256:74281eeb7aeb2345332d36fd3dcb7cf4fab2c6db9ec54aec89ed3c6b299bd870
+    platform: linux/amd64
+    pull_policy: never
+    build: !reset null
+  frontend_ssalfer:
+    image: software-pa-cierre/frontend:nginx-1.30.7-p2-ec379a6@sha256:6043269ff796a16fee3ea67d1eec46101addd03916ebb9451a0e5ebecd54bc67
+    platform: linux/amd64
+    pull_policy: never
+    build: !reset null
+  tls_proxy:
+    image: software-pa-cierre/tls:nginx-1.30.7-p2-ec379a6@sha256:bbcef35a2d7b39ac3603f018d61ae9fd5fffbb69d0ca1499864c71801f5003ac
+    platform: linux/amd64
+    pull_policy: never
+    build: !reset null
+    ports: !override
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+    volumes:
+      - type: bind
+        source: ${SSALFER_DEV_TLS_CERT_DIR:?Define el directorio de certificados local}
+        target: /etc/letsencrypt
+        read_only: true
+        bind:
+          create_host_path: false
+  pgadmin: !reset null

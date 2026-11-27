@@ -3,6 +3,11 @@
 Sistema para organizar el desarrollo y las pruebas del proyecto de liberación
 de derechos de vía.
 
+Para instalar la candidata validada ec379a6, usa la
+[guía de suministro offline](deploy/ssalfer-candidata/README.md). Ahí se indican
+los archivos Compose para integración local, QA y producción. Los pasos de
+este README describen el flujo de desarrollo desde el código fuente.
+
 ## Arquitectura
 
 El Compose base define tres servicios: `db`, `backend` y `pgadmin`.
